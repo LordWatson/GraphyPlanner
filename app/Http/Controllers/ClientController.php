@@ -11,6 +11,7 @@ use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -75,18 +76,27 @@ class ClientController extends Controller
         $user = $request->user();
         $canViewBilling = $user->can('viewBilling', $client);
 
+        $canViewSocialAccounts = $user->can('viewAny', [SocialAccount::class, $client]);
+
         return Inertia::render('clients/show', [
             'client' => $this->transform($client, $canViewBilling),
             'can' => [
                 'update' => $user->can('update', $client),
                 'delete' => $user->can('delete', $client),
                 'createInvoice' => $user->can('create', [Invoice::class, $client]),
+                'createSocialAccount' => $user->can('create', [SocialAccount::class, $client]),
             ],
             'invoices' => $canViewBilling
                 ? $client->invoices()
                     ->latest('issue_date')
                     ->get()
                     ->map(fn (Invoice $invoice) => $this->transformInvoice($invoice, $user))
+                : [],
+            'socialAccounts' => $canViewSocialAccounts
+                ? $client->socialAccounts()
+                    ->latest()
+                    ->get()
+                    ->map(fn (SocialAccount $socialAccount) => $this->transformSocialAccount($socialAccount, $user))
                 : [],
         ]);
     }
@@ -178,6 +188,32 @@ class ClientController extends Controller
             'can' => [
                 'send' => $invoice->status === InvoiceStatus::Draft && $user->can('send', $invoice),
                 'mark_paid' => $invoice->status === InvoiceStatus::Sent && $user->can('markPaid', $invoice),
+            ],
+        ];
+    }
+
+    /**
+     * Transform a social account model into an array for the client page.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformSocialAccount(SocialAccount $socialAccount, User $user): array
+    {
+        return [
+            'id' => $socialAccount->id,
+            'platform' => $socialAccount->platform->value,
+            'handle' => $socialAccount->handle,
+            'display_name' => $socialAccount->display_name,
+            'timezone' => $socialAccount->timezone,
+            'language' => $socialAccount->language,
+            'country' => $socialAccount->country,
+            'default_location' => $socialAccount->default_location,
+            'posting_windows' => $socialAccount->posting_windows,
+            'persona_override' => $socialAccount->persona_override,
+            'connection_status' => $socialAccount->connection_status->value,
+            'can' => [
+                'update' => $user->can('update', $socialAccount),
+                'delete' => $user->can('delete', $socialAccount),
             ],
         ];
     }

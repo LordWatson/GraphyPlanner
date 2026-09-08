@@ -91,6 +91,14 @@ class Client extends Model
     }
 
     /**
+     * @return HasMany<SocialAccount, $this>
+     */
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(SocialAccount::class);
+    }
+
+    /**
      * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
      *
      * @return array{status: \App\Enums\ClientHealth, reason: string}

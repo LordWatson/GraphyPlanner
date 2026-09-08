@@ -3,12 +3,20 @@ import { ChevronDown, NotebookPen, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import InvoiceController from '@/actions/App/Http/Controllers/InvoiceController';
+import SocialAccountController from '@/actions/App/Http/Controllers/SocialAccountController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index } from '@/routes/clients';
 
@@ -45,6 +53,18 @@ type InvoiceData = {
     can: { send: boolean; mark_paid: boolean };
 };
 
+type SocialAccountData = {
+    id: number;
+    platform: string;
+    handle: string;
+    display_name: string | null;
+    timezone: string;
+    language: string | null;
+    country: string | null;
+    connection_status: string;
+    can: { update: boolean; delete: boolean };
+};
+
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
     active: 'success',
     paused: 'warning',
@@ -64,14 +84,29 @@ const invoiceStatusVariant: Record<string, 'secondary' | 'warning' | 'success'> 
     paid: 'success',
 };
 
+const connectionStatusVariant: Record<string, 'success' | 'warning' | 'secondary'> = {
+    connected: 'success',
+    token_expired: 'warning',
+    not_connected: 'secondary',
+};
+
+const platformOptions = [
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'tiktok', label: 'TikTok' },
+    { value: 'facebook', label: 'Facebook' },
+    { value: 'linkedin', label: 'LinkedIn' },
+];
+
 export default function ClientShow({
     client,
     can,
     invoices,
+    socialAccounts,
 }: {
     client: ClientData;
-    can: { update: boolean; delete: boolean; createInvoice: boolean };
+    can: { update: boolean; delete: boolean; createInvoice: boolean; createSocialAccount: boolean };
     invoices: InvoiceData[];
+    socialAccounts: SocialAccountData[];
 }) {
     const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
 
@@ -180,6 +215,97 @@ export default function ClientShow({
                         </dl>
                     )}
                 </div>
+
+                {socialAccounts !== undefined && (
+                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        <Heading title="Social accounts" description="Platforms this client posts to" />
+
+                        {can.createSocialAccount && (
+                            <Form
+                                {...SocialAccountController.store.form(client.id)}
+                                resetOnSuccess
+                                className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="platform">Platform</Label>
+                                            <Select name="platform" defaultValue="instagram">
+                                                <SelectTrigger id="platform" className="w-full">
+                                                    <SelectValue placeholder="Select a platform" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {platformOptions.map((platform) => (
+                                                        <SelectItem key={platform.value} value={platform.value}>
+                                                            {platform.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError message={errors.platform} />
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="handle">Handle</Label>
+                                            <Input id="handle" name="handle" required />
+                                            <InputError message={errors.handle} />
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="display_name">Display name</Label>
+                                            <Input id="display_name" name="display_name" />
+                                            <InputError message={errors.display_name} />
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="timezone">Timezone (IANA)</Label>
+                                            <Input id="timezone" name="timezone" placeholder="Europe/Amsterdam" required />
+                                            <InputError message={errors.timezone} />
+                                        </div>
+                                        <div className="col-span-full">
+                                            <Button type="submit" size="sm" disabled={processing}>
+                                                Add social account
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </Form>
+                        )}
+
+                        {socialAccounts.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No social accounts yet.</p>
+                        ) : (
+                            <div className="flex flex-col divide-y divide-border">
+                                {socialAccounts.map((account) => (
+                                    <div
+                                        key={account.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                    >
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">{account.handle}</span>
+                                                <Badge variant="outline">{account.platform}</Badge>
+                                                <Badge variant={connectionStatusVariant[account.connection_status] ?? 'outline'}>
+                                                    {account.connection_status}
+                                                </Badge>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {account.display_name ?? account.handle} · {account.timezone}
+                                            </span>
+                                        </div>
+                                        {account.can.delete && (
+                                            <Form {...SocialAccountController.destroy.form(account.id)}>
+                                                {({ processing }) => (
+                                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                        <Trash2 />
+                                                        Remove
+                                                    </Button>
+                                                )}
+                                            </Form>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {invoices !== undefined && (
                     <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
