@@ -8,12 +8,14 @@ use App\Models\BrandBrain;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Policies\AssetPolicy;
 use App\Policies\BrandBrainPolicy;
 use App\Policies\CampaignPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\InvoicePolicy;
+use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Services\LocalAssetStorage;
 use Carbon\CarbonImmutable;
@@ -49,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(SocialAccount::class, SocialAccountPolicy::class);
         Gate::policy(Campaign::class, CampaignPolicy::class);
         Gate::policy(Asset::class, AssetPolicy::class);
+        Gate::policy(Post::class, PostPolicy::class);
     }
 
     /**

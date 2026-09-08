@@ -13,6 +13,7 @@ use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -81,9 +82,14 @@ class ClientController extends Controller
         $canViewSocialAccounts = $user->can('viewAny', [SocialAccount::class, $client]);
         $canViewCampaigns = $user->can('viewAny', [Campaign::class, $client]);
         $canViewAssets = $user->can('viewAny', [Asset::class, $client]);
+        $canViewPosts = $user->can('viewAny', [Post::class, $client]);
 
         $campaigns = $canViewCampaigns
             ? $client->campaigns()->latest()->get()
+            : collect();
+
+        $socialAccounts = $canViewSocialAccounts || $canViewPosts
+            ? $client->socialAccounts()->latest()->get()
             : collect();
 
         return Inertia::render('clients/show', [
@@ -95,6 +101,7 @@ class ClientController extends Controller
                 'createSocialAccount' => $user->can('create', [SocialAccount::class, $client]),
                 'createCampaign' => $user->can('create', [Campaign::class, $client]),
                 'createAsset' => $user->can('create', [Asset::class, $client]),
+                'createPost' => $user->can('create', [Post::class, $client]),
             ],
             'invoices' => $canViewBilling
                 ? $client->invoices()
@@ -103,10 +110,7 @@ class ClientController extends Controller
                     ->map(fn (Invoice $invoice) => $this->transformInvoice($invoice, $user))
                 : [],
             'socialAccounts' => $canViewSocialAccounts
-                ? $client->socialAccounts()
-                    ->latest()
-                    ->get()
-                    ->map(fn (SocialAccount $socialAccount) => $this->transformSocialAccount($socialAccount, $user))
+                ? $socialAccounts->map(fn (SocialAccount $socialAccount) => $this->transformSocialAccount($socialAccount, $user))
                 : [],
             'campaigns' => $canViewCampaigns
                 ? $campaigns->map(fn (Campaign $campaign) => $this->transformCampaign($campaign, $user))
@@ -116,6 +120,21 @@ class ClientController extends Controller
                     ->latest()
                     ->get()
                     ->map(fn (Asset $asset) => $this->transformAsset($asset, $user))
+                : [],
+            'posts' => $canViewPosts
+                ? $client->posts()
+                    ->with('targets.socialAccount', 'campaign')
+                    ->latest()
+                    ->get()
+                    ->map(fn (Post $post) => $this->transformPost($post, $user))
+                : [],
+            'targetAccounts' => $canViewPosts
+                ? $socialAccounts->map(fn (SocialAccount $socialAccount) => [
+                    'id' => $socialAccount->id,
+                    'platform' => $socialAccount->platform->value,
+                    'handle' => $socialAccount->handle,
+                    'timezone' => $socialAccount->timezone,
+                ])
                 : [],
         ]);
     }
@@ -255,6 +274,38 @@ class ClientController extends Controller
             'can' => [
                 'update' => $user->can('update', $campaign),
                 'delete' => $user->can('delete', $campaign),
+            ],
+        ];
+    }
+
+    /**
+     * Transform a post model into an array for the client page.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformPost(Post $post, User $user): array
+    {
+        return [
+            'id' => $post->id,
+            'campaign_id' => $post->campaign_id,
+            'campaign_name' => $post->campaign?->name,
+            'status' => $post->status->value,
+            'approval_mode' => $post->approval_mode->value,
+            'master_caption' => $post->master_caption,
+            'hashtags' => $post->hashtags,
+            'targets' => $post->targets->map(fn ($target) => [
+                'id' => $target->id,
+                'social_account_id' => $target->social_account_id,
+                'platform' => $target->socialAccount?->platform?->value,
+                'handle' => $target->socialAccount?->handle,
+                'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),
+                'scheduled_local_time' => $target->scheduled_local_time,
+                'scheduled_at_utc' => $target->scheduled_at_utc?->toIso8601String(),
+            ])->values(),
+            'created_at' => $post->created_at?->toIso8601String(),
+            'can' => [
+                'update' => $user->can('update', $post),
+                'delete' => $user->can('delete', $post),
             ],
         ];
     }

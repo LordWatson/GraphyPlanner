@@ -6,6 +6,7 @@ use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PostController;
 use App\Http\Controllers\SocialAccountController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +47,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.assets.store');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])
         ->name('assets.destroy');
+
+    Route::post('clients/{client}/posts', [PostController::class, 'store'])
+        ->name('clients.posts.store');
 });
 
 require __DIR__.'/settings.php';

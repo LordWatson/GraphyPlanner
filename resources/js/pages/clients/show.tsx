@@ -17,6 +17,7 @@ import {
     NotebookPen,
     Pencil,
     Receipt,
+    Send,
     Share2,
     Trash2,
     UploadCloud,
@@ -27,6 +28,7 @@ import AssetController from '@/actions/App/Http/Controllers/AssetController';
 import CampaignController from '@/actions/App/Http/Controllers/CampaignController';
 import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import InvoiceController from '@/actions/App/Http/Controllers/InvoiceController';
+import PostController from '@/actions/App/Http/Controllers/PostController';
 import SocialAccountController from '@/actions/App/Http/Controllers/SocialAccountController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -114,6 +116,36 @@ type AssetData = {
     can: { delete: boolean };
 };
 
+type PostTargetData = {
+    id: number;
+    social_account_id: number;
+    platform: string | null;
+    handle: string | null;
+    scheduled_local_date: string | null;
+    scheduled_local_time: string | null;
+    scheduled_at_utc: string | null;
+};
+
+type PostData = {
+    id: number;
+    campaign_id: number | null;
+    campaign_name: string | null;
+    status: string;
+    approval_mode: string;
+    master_caption: string | null;
+    hashtags: string[] | null;
+    targets: PostTargetData[];
+    created_at: string | null;
+    can: { update: boolean; delete: boolean };
+};
+
+type TargetAccountData = {
+    id: number;
+    platform: string;
+    handle: string;
+    timezone: string;
+};
+
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
     active: 'success',
     paused: 'warning',
@@ -172,6 +204,20 @@ const assetSourceIcon: Record<string, typeof UploadCloud> = {
     url: Link2,
 };
 
+const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline' | 'destructive'> = {
+    idea: 'outline',
+    draft: 'secondary',
+    internal_review: 'warning',
+    waiting_client: 'warning',
+    changes_requested: 'destructive',
+    approved: 'success',
+    scheduled: 'success',
+    publishing: 'warning',
+    published: 'success',
+    failed: 'destructive',
+    archived: 'outline',
+};
+
 export default function ClientShow({
     client,
     can,
@@ -179,6 +225,8 @@ export default function ClientShow({
     socialAccounts,
     campaigns,
     assets,
+    posts,
+    targetAccounts,
 }: {
     client: ClientData;
     can: {
@@ -188,17 +236,28 @@ export default function ClientShow({
         createSocialAccount: boolean;
         createCampaign: boolean;
         createAsset: boolean;
+        createPost: boolean;
     };
     invoices: InvoiceData[];
     socialAccounts: SocialAccountData[];
     campaigns: CampaignData[];
     assets: AssetData[];
+    posts: PostData[];
+    targetAccounts: TargetAccountData[];
 }) {
     const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
     const [socialAccountsOpen, setSocialAccountsOpen] = useState(false);
     const [campaignsOpen, setCampaignsOpen] = useState(false);
     const [assetsOpen, setAssetsOpen] = useState(false);
+    const [postsOpen, setPostsOpen] = useState(true);
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
+    const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<number[]>([]);
+
+    const toggleTargetAccount = (id: number) => {
+        setSelectedTargetAccounts((current) =>
+            current.includes(id) ? current.filter((accountId) => accountId !== id) : [...current, id],
+        );
+    };
 
     const metaChips: { icon: typeof Globe; label: string }[] = [
         client.website ? { icon: Globe, label: client.website } : null,
@@ -221,6 +280,7 @@ export default function ClientShow({
     const statCards = [
         { icon: Share2, label: 'Social accounts', value: socialAccounts.length, hint: 'Connected platforms' },
         { icon: Clapperboard, label: 'Campaigns', value: campaigns.length, hint: 'Total campaigns' },
+        { icon: Send, label: 'Posts', value: posts.length, hint: 'Scheduled & published' },
         { icon: FileImage, label: 'Assets', value: assets.length, hint: 'Uploads & links on file' },
         {
             icon: Receipt,
@@ -303,7 +363,7 @@ export default function ClientShow({
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     {statCards.map(({ icon: Icon, label, value, hint }) => (
                         <div
                             key={label}
@@ -539,6 +599,176 @@ export default function ClientShow({
                                                             </Button>
                                                         )}
                                                     </Form>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {posts !== undefined && (
+                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                            onClick={() => setPostsOpen((open) => !open)}
+                            aria-expanded={postsOpen}
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <Send className="size-4" />
+                                </span>
+                                <Heading title="Posts" description="Scheduled content across social accounts" />
+                            </div>
+                            <ChevronDown
+                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${postsOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        {postsOpen && (
+                            <>
+                                {can.createPost && (
+                                    <Form
+                                        {...PostController.store.form(client.id)}
+                                        resetOnSuccess
+                                        onSuccess={() => setSelectedTargetAccounts([])}
+                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                    >
+                                        {({ processing, errors }) => (
+                                            <>
+                                                <div className="col-span-full grid gap-1">
+                                                    <Label htmlFor="master_caption">Caption</Label>
+                                                    <textarea
+                                                        id="master_caption"
+                                                        name="master_caption"
+                                                        rows={3}
+                                                        className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                    />
+                                                    <InputError message={errors.master_caption} />
+                                                </div>
+                                                <div className="col-span-full grid gap-1">
+                                                    <Label>Target accounts</Label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {targetAccounts.length === 0 && (
+                                                            <p className="text-sm text-muted-foreground">
+                                                                Add a social account before creating posts.
+                                                            </p>
+                                                        )}
+                                                        {targetAccounts.map((account) => {
+                                                            const AccountIcon = platformIcon[account.platform] ?? Share2;
+                                                            const selected = selectedTargetAccounts.includes(account.id);
+                                                            return (
+                                                                <button
+                                                                    key={account.id}
+                                                                    type="button"
+                                                                    onClick={() => toggleTargetAccount(account.id)}
+                                                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                                                        selected
+                                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                                            : 'border-border bg-muted/50 text-foreground'
+                                                                    }`}
+                                                                >
+                                                                    <AccountIcon className="size-3.5" />
+                                                                    {account.handle} · {account.timezone}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    {selectedTargetAccounts.map((accountId, i) => (
+                                                        <input
+                                                            key={accountId}
+                                                            type="hidden"
+                                                            name={`targets[${i}][social_account_id]`}
+                                                            value={accountId}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="scheduled_local_date">Scheduled date</Label>
+                                                    <Input
+                                                        id="scheduled_local_date"
+                                                        type="date"
+                                                        onChange={(e) => {
+                                                            document
+                                                                .querySelectorAll<HTMLInputElement>('input[name$="[scheduled_local_date]"]')
+                                                                .forEach((input) => (input.value = e.target.value));
+                                                        }}
+                                                    />
+                                                    {selectedTargetAccounts.map((accountId, i) => (
+                                                        <input key={accountId} type="hidden" name={`targets[${i}][scheduled_local_date]`} />
+                                                    ))}
+                                                </div>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="scheduled_local_time">Scheduled time (local)</Label>
+                                                    <Input
+                                                        id="scheduled_local_time"
+                                                        type="time"
+                                                        onChange={(e) => {
+                                                            document
+                                                                .querySelectorAll<HTMLInputElement>('input[name$="[scheduled_local_time]"]')
+                                                                .forEach((input) => (input.value = e.target.value));
+                                                        }}
+                                                    />
+                                                    {selectedTargetAccounts.map((accountId, i) => (
+                                                        <input key={accountId} type="hidden" name={`targets[${i}][scheduled_local_time]`} />
+                                                    ))}
+                                                </div>
+                                                <InputError message={errors['targets.0.social_account_id']} />
+                                                <div className="col-span-full">
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={processing || selectedTargetAccounts.length === 0}
+                                                    >
+                                                        Create post
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </Form>
+                                )}
+
+                                {posts.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No posts yet.</p>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {posts.map((post) => (
+                                            <div
+                                                key={post.id}
+                                                className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3"
+                                            >
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant={postStatusVariant[post.status] ?? 'outline'}>
+                                                            {post.status.replace('_', ' ')}
+                                                        </Badge>
+                                                        {post.campaign_name && (
+                                                            <span className="text-xs text-muted-foreground">{post.campaign_name}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {post.master_caption && (
+                                                    <p className="text-sm">{post.master_caption}</p>
+                                                )}
+                                                {post.targets.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {post.targets.map((target) => {
+                                                            const AccountIcon = platformIcon[target.platform ?? ''] ?? Share2;
+                                                            return (
+                                                                <span
+                                                                    key={target.id}
+                                                                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground"
+                                                                >
+                                                                    <AccountIcon className="size-3.5 text-primary" />
+                                                                    {target.handle} · {target.scheduled_local_date ?? '—'}
+                                                                    {target.scheduled_local_time ? ` ${target.scheduled_local_time}` : ''}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}

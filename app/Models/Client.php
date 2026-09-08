@@ -115,6 +115,14 @@ class Client extends Model
     }
 
     /**
+     * @return HasMany<Post, $this>
+     */
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    /**
      * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
      *
      * @return array{status: \App\Enums\ClientHealth, reason: string}

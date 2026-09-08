@@ -21,5 +21,14 @@ class AlexanderWatsonUserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+
+        User::updateOrCreate(
+            ['email' => 'rseklani@gmail.com'],
+            [
+                'name' => 'Rimma Seklani',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
     }
 }
