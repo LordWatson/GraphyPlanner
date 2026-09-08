@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { Building2, CalendarDays, Users } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { dashboard } from '@/routes';
 
@@ -9,16 +10,32 @@ type DashboardSummary = {
     scheduledPosts: number;
 };
 
-type DashboardProps = {
-    summary: DashboardSummary;
+type InvoiceMonthlyTotal = {
+    month: string;
+    label: string;
+    invoiced: number;
+    paid: number;
 };
 
-export default function Dashboard({ summary }: DashboardProps) {
+type DashboardProps = {
+    summary: DashboardSummary;
+    invoiceTotals: InvoiceMonthlyTotal[];
+};
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+});
+
+export default function Dashboard({ summary, invoiceTotals }: DashboardProps) {
     const summaryCards = [
         { icon: Users, label: 'Clients', hint: 'Active clients under management', value: summary.clients },
         { icon: Building2, label: 'Brands', hint: 'Brands across all clients', value: summary.brands },
         { icon: CalendarDays, label: 'Scheduled posts', hint: 'Upcoming in the next 7 days', value: summary.scheduledPosts },
     ];
+
+    const hasInvoiceData = invoiceTotals.some((month) => month.invoiced > 0 || month.paid > 0);
 
     return (
         <>
@@ -45,7 +62,45 @@ export default function Dashboard({ summary }: DashboardProps) {
                         </div>
                     ))}
                 </div>
-                <div className="relative flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
+                {invoiceTotals.length > 0 && (
+                    <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
+                        <span
+                            aria-hidden
+                            className="absolute inset-x-0 top-0 h-1 bg-gradient-brand"
+                        />
+                        <div className="flex flex-col gap-1">
+                            <h2 className="text-sm font-semibold">Invoice revenue</h2>
+                            <p className="text-xs text-muted-foreground">
+                                Invoiced vs. paid amounts over the last {invoiceTotals.length} months
+                            </p>
+                        </div>
+                        {hasInvoiceData ? (
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={invoiceTotals}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                                        <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                                        <YAxis
+                                            tick={{ fontSize: 12 }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickFormatter={(value: number) => currencyFormatter.format(value)}
+                                        />
+                                        <Tooltip formatter={(value) => currencyFormatter.format(Number(value))} />
+                                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                                        <Bar dataKey="invoiced" name="Invoiced" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="paid" name="Paid" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <p className="py-8 text-center text-xs text-muted-foreground">
+                                No invoices raised in this period yet.
+                            </p>
+                        )}
+                    </div>
+                )}
+                <div className="relative flex min-h-[30vh] flex-1 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
                     <div
                         aria-hidden
                         className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.04]"
