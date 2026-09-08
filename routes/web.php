@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\BrandBrainController;
+use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
@@ -32,6 +34,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('social-accounts.update');
     Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
         ->name('social-accounts.destroy');
+
+    Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
+        ->name('clients.campaigns.store');
+    Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])
+        ->name('campaigns.update');
+    Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
+        ->name('campaigns.destroy');
+
+    Route::post('clients/{client}/assets', [AssetController::class, 'store'])
+        ->name('clients.assets.store');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])
+        ->name('assets.destroy');
 });
 
 require __DIR__.'/settings.php';

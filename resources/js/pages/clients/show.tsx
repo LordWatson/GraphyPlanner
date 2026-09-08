@@ -1,6 +1,8 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { ChevronDown, NotebookPen, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import AssetController from '@/actions/App/Http/Controllers/AssetController';
+import CampaignController from '@/actions/App/Http/Controllers/CampaignController';
 import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import InvoiceController from '@/actions/App/Http/Controllers/InvoiceController';
 import SocialAccountController from '@/actions/App/Http/Controllers/SocialAccountController';
@@ -65,6 +67,31 @@ type SocialAccountData = {
     can: { update: boolean; delete: boolean };
 };
 
+type CampaignData = {
+    id: number;
+    name: string;
+    status: string;
+    start_date: string | null;
+    end_date: string | null;
+    goal: string | null;
+    notes: string | null;
+    can: { update: boolean; delete: boolean };
+};
+
+type AssetData = {
+    id: number;
+    campaign_id: number | null;
+    source: 'upload' | 'figma' | 'url';
+    type: string | null;
+    url: string | null;
+    original_filename: string | null;
+    mime_type: string | null;
+    size: number | null;
+    rights: string | null;
+    variant_group_id: string | null;
+    can: { delete: boolean };
+};
+
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
     active: 'success',
     paused: 'warning',
@@ -97,19 +124,46 @@ const platformOptions = [
     { value: 'linkedin', label: 'LinkedIn' },
 ];
 
+const campaignStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
+    planning: 'outline',
+    active: 'success',
+    completed: 'secondary',
+    archived: 'outline',
+};
+
+const assetSourceOptions = [
+    { value: 'upload', label: 'Upload file' },
+    { value: 'figma', label: 'Figma link' },
+    { value: 'url', label: 'External URL' },
+];
+
 export default function ClientShow({
     client,
     can,
     invoices,
     socialAccounts,
+    campaigns,
+    assets,
 }: {
     client: ClientData;
-    can: { update: boolean; delete: boolean; createInvoice: boolean; createSocialAccount: boolean };
+    can: {
+        update: boolean;
+        delete: boolean;
+        createInvoice: boolean;
+        createSocialAccount: boolean;
+        createCampaign: boolean;
+        createAsset: boolean;
+    };
     invoices: InvoiceData[];
     socialAccounts: SocialAccountData[];
+    campaigns: CampaignData[];
+    assets: AssetData[];
 }) {
     const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
     const [socialAccountsOpen, setSocialAccountsOpen] = useState(false);
+    const [campaignsOpen, setCampaignsOpen] = useState(false);
+    const [assetsOpen, setAssetsOpen] = useState(false);
+    const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
 
     return (
         <>
@@ -305,6 +359,225 @@ export default function ClientShow({
                                                 </div>
                                                 {account.can.delete && (
                                                     <Form {...SocialAccountController.destroy.form(account.id)}>
+                                                        {({ processing }) => (
+                                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                                <Trash2 />
+                                                                Remove
+                                                            </Button>
+                                                        )}
+                                                    </Form>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {campaigns !== undefined && (
+                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                            onClick={() => setCampaignsOpen((open) => !open)}
+                            aria-expanded={campaignsOpen}
+                        >
+                            <Heading title="Campaigns" description="Marketing campaigns for this client" />
+                            <ChevronDown
+                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${campaignsOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        {campaignsOpen && (
+                            <>
+                                {can.createCampaign && (
+                                    <Form
+                                        {...CampaignController.store.form(client.id)}
+                                        resetOnSuccess
+                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                    >
+                                        {({ processing, errors }) => (
+                                            <>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="name">Name</Label>
+                                                    <Input id="name" name="name" required />
+                                                    <InputError message={errors.name} />
+                                                </div>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="start_date">Start date</Label>
+                                                    <Input id="start_date" name="start_date" type="date" />
+                                                    <InputError message={errors.start_date} />
+                                                </div>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="end_date">End date</Label>
+                                                    <Input id="end_date" name="end_date" type="date" />
+                                                    <InputError message={errors.end_date} />
+                                                </div>
+                                                <div className="col-span-full grid gap-1">
+                                                    <Label htmlFor="goal">Goal</Label>
+                                                    <textarea
+                                                        id="goal"
+                                                        name="goal"
+                                                        rows={3}
+                                                        className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                    />
+                                                    <InputError message={errors.goal} />
+                                                </div>
+                                                <div className="col-span-full">
+                                                    <Button type="submit" size="sm" disabled={processing}>
+                                                        Add campaign
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </Form>
+                                )}
+
+                                {campaigns.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No campaigns yet.</p>
+                                ) : (
+                                    <div className="flex flex-col divide-y divide-border">
+                                        {campaigns.map((campaign) => (
+                                            <div
+                                                key={campaign.id}
+                                                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                            >
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium">{campaign.name}</span>
+                                                        <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'}>
+                                                            {campaign.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {campaign.start_date ?? '—'}
+                                                        {campaign.end_date ? ` – ${campaign.end_date}` : ''}
+                                                        {campaign.goal ? ` · ${campaign.goal}` : ''}
+                                                    </span>
+                                                </div>
+                                                {campaign.can.delete && (
+                                                    <Form {...CampaignController.destroy.form(campaign.id)}>
+                                                        {({ processing }) => (
+                                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                                <Trash2 />
+                                                                Remove
+                                                            </Button>
+                                                        )}
+                                                    </Form>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {assets !== undefined && (
+                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                            onClick={() => setAssetsOpen((open) => !open)}
+                            aria-expanded={assetsOpen}
+                        >
+                            <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
+                            <ChevronDown
+                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${assetsOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        {assetsOpen && (
+                            <>
+                                {can.createAsset && (
+                                    <Form
+                                        {...AssetController.store.form(client.id)}
+                                        resetOnSuccess
+                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                        encType="multipart/form-data"
+                                    >
+                                        {({ processing, errors }) => (
+                                            <>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="source">Source</Label>
+                                                    <Select
+                                                        name="source"
+                                                        defaultValue="upload"
+                                                        onValueChange={(value) => setAssetSource(value as 'upload' | 'figma' | 'url')}
+                                                    >
+                                                        <SelectTrigger id="source" className="w-full">
+                                                            <SelectValue placeholder="Select a source" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {assetSourceOptions.map((source) => (
+                                                                <SelectItem key={source.value} value={source.value}>
+                                                                    {source.label}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <InputError message={errors.source} />
+                                                </div>
+                                                {assetSource === 'upload' ? (
+                                                    <div className="grid gap-1">
+                                                        <Label htmlFor="file">File</Label>
+                                                        <Input id="file" name="file" type="file" />
+                                                        <InputError message={errors.file} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid gap-1">
+                                                        <Label htmlFor="url">
+                                                            {assetSource === 'figma' ? 'Figma URL' : 'URL'}
+                                                        </Label>
+                                                        <Input id="url" name="url" type="url" placeholder="https://" />
+                                                        <InputError message={errors.url} />
+                                                    </div>
+                                                )}
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="rights">Rights</Label>
+                                                    <Input id="rights" name="rights" />
+                                                    <InputError message={errors.rights} />
+                                                </div>
+                                                <div className="col-span-full">
+                                                    <Button type="submit" size="sm" disabled={processing}>
+                                                        Add asset
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </Form>
+                                )}
+
+                                {assets.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No assets yet.</p>
+                                ) : (
+                                    <div className="flex flex-col divide-y divide-border">
+                                        {assets.map((asset) => (
+                                            <div
+                                                key={asset.id}
+                                                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                            >
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <a
+                                                            href={asset.url ?? '#'}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-sm font-medium underline"
+                                                        >
+                                                            {asset.original_filename ?? asset.url}
+                                                        </a>
+                                                        <Badge variant="outline">{asset.source}</Badge>
+                                                    </div>
+                                                    {asset.rights && (
+                                                        <span className="text-xs text-muted-foreground">{asset.rights}</span>
+                                                    )}
+                                                </div>
+                                                {asset.can.delete && (
+                                                    <Form {...AssetController.destroy.form(asset.id)}>
                                                         {({ processing }) => (
                                                             <Button type="submit" size="sm" variant="outline" disabled={processing}>
                                                                 <Trash2 />

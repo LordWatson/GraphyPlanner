@@ -2,14 +2,20 @@
 
 namespace App\Providers;
 
+use App\Contracts\AssetStorage;
+use App\Models\Asset;
 use App\Models\BrandBrain;
+use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\SocialAccount;
+use App\Policies\AssetPolicy;
 use App\Policies\BrandBrainPolicy;
+use App\Policies\CampaignPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\SocialAccountPolicy;
+use App\Services\LocalAssetStorage;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +30,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Local disk today (config('assets.disk'), "public" by default); swap this
+        // binding for an S3-backed implementation once Phase 1/2 needs signed-URL
+        // uploads (spec §10) — no caller of App\Contracts\AssetStorage needs to change.
+        $this->app->bind(AssetStorage::class, LocalAssetStorage::class);
     }
 
     /**
@@ -38,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BrandBrain::class, BrandBrainPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
         Gate::policy(SocialAccount::class, SocialAccountPolicy::class);
+        Gate::policy(Campaign::class, CampaignPolicy::class);
+        Gate::policy(Asset::class, AssetPolicy::class);
     }
 
     /**

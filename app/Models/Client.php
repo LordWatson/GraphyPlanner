@@ -99,6 +99,22 @@ class Client extends Model
     }
 
     /**
+     * @return HasMany<Campaign, $this>
+     */
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
+    /**
+     * @return HasMany<Asset, $this>
+     */
+    public function assets(): HasMany
+    {
+        return $this->hasMany(Asset::class);
+    }
+
+    /**
      * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
      *
      * @return array{status: \App\Enums\ClientHealth, reason: string}

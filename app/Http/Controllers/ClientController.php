@@ -9,6 +9,8 @@ use App\Enums\ClientStatus;
 use App\Enums\InvoiceStatus;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
+use App\Models\Asset;
+use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\SocialAccount;
@@ -77,6 +79,12 @@ class ClientController extends Controller
         $canViewBilling = $user->can('viewBilling', $client);
 
         $canViewSocialAccounts = $user->can('viewAny', [SocialAccount::class, $client]);
+        $canViewCampaigns = $user->can('viewAny', [Campaign::class, $client]);
+        $canViewAssets = $user->can('viewAny', [Asset::class, $client]);
+
+        $campaigns = $canViewCampaigns
+            ? $client->campaigns()->latest()->get()
+            : collect();
 
         return Inertia::render('clients/show', [
             'client' => $this->transform($client, $canViewBilling),
@@ -85,6 +93,8 @@ class ClientController extends Controller
                 'delete' => $user->can('delete', $client),
                 'createInvoice' => $user->can('create', [Invoice::class, $client]),
                 'createSocialAccount' => $user->can('create', [SocialAccount::class, $client]),
+                'createCampaign' => $user->can('create', [Campaign::class, $client]),
+                'createAsset' => $user->can('create', [Asset::class, $client]),
             ],
             'invoices' => $canViewBilling
                 ? $client->invoices()
@@ -97,6 +107,15 @@ class ClientController extends Controller
                     ->latest()
                     ->get()
                     ->map(fn (SocialAccount $socialAccount) => $this->transformSocialAccount($socialAccount, $user))
+                : [],
+            'campaigns' => $canViewCampaigns
+                ? $campaigns->map(fn (Campaign $campaign) => $this->transformCampaign($campaign, $user))
+                : [],
+            'assets' => $canViewAssets
+                ? $client->assets()
+                    ->latest()
+                    ->get()
+                    ->map(fn (Asset $asset) => $this->transformAsset($asset, $user))
                 : [],
         ]);
     }
@@ -214,6 +233,52 @@ class ClientController extends Controller
             'can' => [
                 'update' => $user->can('update', $socialAccount),
                 'delete' => $user->can('delete', $socialAccount),
+            ],
+        ];
+    }
+
+    /**
+     * Transform a campaign model into an array for the client page.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformCampaign(Campaign $campaign, User $user): array
+    {
+        return [
+            'id' => $campaign->id,
+            'name' => $campaign->name,
+            'status' => $campaign->status->value,
+            'start_date' => $campaign->start_date?->toDateString(),
+            'end_date' => $campaign->end_date?->toDateString(),
+            'goal' => $campaign->goal,
+            'notes' => $campaign->notes,
+            'can' => [
+                'update' => $user->can('update', $campaign),
+                'delete' => $user->can('delete', $campaign),
+            ],
+        ];
+    }
+
+    /**
+     * Transform an asset model into an array for the client page.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformAsset(Asset $asset, User $user): array
+    {
+        return [
+            'id' => $asset->id,
+            'campaign_id' => $asset->campaign_id,
+            'source' => $asset->source->value,
+            'type' => $asset->type?->value,
+            'url' => $asset->url,
+            'original_filename' => $asset->original_filename,
+            'mime_type' => $asset->mime_type,
+            'size' => $asset->size,
+            'rights' => $asset->rights,
+            'variant_group_id' => $asset->variant_group_id,
+            'can' => [
+                'delete' => $user->can('delete', $asset),
             ],
         ];
     }
