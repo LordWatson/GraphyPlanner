@@ -100,17 +100,6 @@ export default function Dashboard({ summary, invoiceTotals }: DashboardProps) {
                         )}
                     </div>
                 )}
-                <div className="relative flex min-h-[30vh] flex-1 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
-                    <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.04]"
-                    />
-                    <p className="text-sm font-medium">Nothing to show yet</p>
-                    <p className="max-w-sm text-xs text-muted-foreground">
-                        Once you add clients and schedule posts, activity and upcoming deadlines will
-                        appear here.
-                    </p>
-                </div>
             </div>
         </>
     );
