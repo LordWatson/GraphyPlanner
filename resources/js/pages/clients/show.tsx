@@ -1,5 +1,27 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ChevronDown, NotebookPen, Pencil, Trash2 } from 'lucide-react';
+import {
+    Building2,
+    CalendarDays,
+    ChevronDown,
+    Clapperboard,
+    Facebook,
+    FileImage,
+    Figma,
+    Globe,
+    Instagram,
+    Languages,
+    Link2,
+    Linkedin,
+    Mail,
+    Music2,
+    NotebookPen,
+    Pencil,
+    Receipt,
+    Share2,
+    Trash2,
+    UploadCloud,
+    Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 import AssetController from '@/actions/App/Http/Controllers/AssetController';
 import CampaignController from '@/actions/App/Http/Controllers/CampaignController';
@@ -137,6 +159,19 @@ const assetSourceOptions = [
     { value: 'url', label: 'External URL' },
 ];
 
+const platformIcon: Record<string, typeof Instagram> = {
+    instagram: Instagram,
+    tiktok: Music2,
+    facebook: Facebook,
+    linkedin: Linkedin,
+};
+
+const assetSourceIcon: Record<string, typeof UploadCloud> = {
+    upload: UploadCloud,
+    figma: Figma,
+    url: Link2,
+};
+
 export default function ClientShow({
     client,
     can,
@@ -165,110 +200,126 @@ export default function ClientShow({
     const [assetsOpen, setAssetsOpen] = useState(false);
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
 
+    const metaChips: { icon: typeof Globe; label: string }[] = [
+        client.website ? { icon: Globe, label: client.website } : null,
+        client.industry ? { icon: Building2, label: client.industry } : null,
+        client.countries && client.countries.length > 0
+            ? { icon: Globe, label: client.countries.join(', ') }
+            : null,
+        client.default_language ? { icon: Languages, label: client.default_language } : null,
+        client.start_date ? { icon: CalendarDays, label: `Since ${client.start_date}` } : null,
+        client.approval_email ? { icon: Mail, label: client.approval_email } : null,
+        client.retainer_amount !== null
+            ? { icon: Wallet, label: `${client.retainer_amount}${client.billing_cycle ? ` / ${client.billing_cycle}` : ''}` }
+            : null,
+    ].filter((chip): chip is { icon: typeof Globe; label: string } => chip !== null);
+
+    const outstandingInvoiceTotal = invoices
+        .filter((invoice) => invoice.status !== 'paid')
+        .reduce((total, invoice) => total + Number(invoice.amount), 0);
+
+    const statCards = [
+        { icon: Share2, label: 'Social accounts', value: socialAccounts.length, hint: 'Connected platforms' },
+        { icon: Clapperboard, label: 'Campaigns', value: campaigns.length, hint: 'Total campaigns' },
+        { icon: FileImage, label: 'Assets', value: assets.length, hint: 'Uploads & links on file' },
+        {
+            icon: Receipt,
+            label: 'Outstanding',
+            value: outstandingInvoiceTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
+        },
+    ];
+
     return (
         <>
             <Head title={client.name} />
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
-                <div className="flex items-start justify-between">
-                    <Heading title={client.name} description={client.legal_name ?? undefined} />
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={editBrandBrain(client.id)}>
-                                <NotebookPen />
-                                Brand brain
-                            </Link>
-                        </Button>
-                        {can.update && (
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={edit(client.id)}>
-                                    <Pencil />
-                                    Edit
-                                </Link>
-                            </Button>
-                        )}
-                        {can.delete && (
-                            <Form {...ClientController.destroy.form(client.id)}>
-                                {({ processing }) => (
-                                    <Button
-                                        type="submit"
-                                        variant="destructive"
-                                        size="sm"
-                                        disabled={processing}
-                                    >
-                                        <Trash2 />
-                                        Delete
+                <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm">
+                    <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-brand opacity-[0.08]" />
+                    <div className="relative flex flex-col gap-4">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <Heading title={client.name} description={client.legal_name ?? undefined} />
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={editBrandBrain(client.id)}>
+                                        <NotebookPen />
+                                        Brand brain
+                                    </Link>
+                                </Button>
+                                {can.update && (
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href={edit(client.id)}>
+                                            <Pencil />
+                                            Edit
+                                        </Link>
                                     </Button>
                                 )}
-                            </Form>
-                        )}
-                    </div>
-                </div>
-
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                    <div className="flex flex-wrap items-center gap-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Status</span>
-                            <Badge variant={statusVariant[client.status] ?? 'outline'}>
-                                {client.status}
-                            </Badge>
+                                {can.delete && (
+                                    <Form {...ClientController.destroy.form(client.id)}>
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                variant="destructive"
+                                                size="sm"
+                                                disabled={processing}
+                                            >
+                                                <Trash2 />
+                                                Delete
+                                            </Button>
+                                        )}
+                                    </Form>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Health</span>
-                            <Badge
-                                variant={healthVariant[client.health] ?? 'outline'}
-                                title={client.health_reason}
-                            >
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={statusVariant[client.status] ?? 'outline'}>{client.status}</Badge>
+                            <Badge variant={healthVariant[client.health] ?? 'outline'} title={client.health_reason}>
                                 {client.health}
                             </Badge>
                             <span className="text-xs text-muted-foreground">{client.health_reason}</span>
                         </div>
+
+                        {metaChips.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-3 text-sm">
+                                {metaChips.map(({ icon: Icon, label }, index) => (
+                                    <span
+                                        key={`${label}-${index}`}
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-foreground"
+                                    >
+                                        <Icon className="size-3.5 text-primary" />
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {client.notes_internal && (
+                            <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
+                                <span className="text-xs font-medium text-muted-foreground">Internal notes</span>
+                                <p className="mt-1 text-sm whitespace-pre-wrap">{client.notes_internal}</p>
+                            </div>
+                        )}
                     </div>
+                </div>
 
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                        <div>
-                            <dt className="text-xs text-muted-foreground">Website</dt>
-                            <dd>{client.website ?? '—'}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs text-muted-foreground">Industry</dt>
-                            <dd>{client.industry ?? '—'}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs text-muted-foreground">Countries</dt>
-                            <dd>{client.countries?.join(', ') || '—'}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs text-muted-foreground">Default language</dt>
-                            <dd>{client.default_language ?? '—'}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs text-muted-foreground">Start date</dt>
-                            <dd>{client.start_date ?? '—'}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs text-muted-foreground">Approval email</dt>
-                            <dd>{client.approval_email ?? '—'}</dd>
-                        </div>
-                        {client.retainer_amount !== null && (
-                            <div>
-                                <dt className="text-xs text-muted-foreground">Retainer amount</dt>
-                                <dd className="tabular-nums">{client.retainer_amount}</dd>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {statCards.map(({ icon: Icon, label, value, hint }) => (
+                        <div
+                            key={label}
+                            className="relative flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm"
+                        >
+                            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <Icon className="size-4" />
+                                </span>
+                                <span className="text-xs">{label}</span>
                             </div>
-                        )}
-                        {client.billing_cycle !== null && (
-                            <div>
-                                <dt className="text-xs text-muted-foreground">Billing cycle</dt>
-                                <dd>{client.billing_cycle}</dd>
-                            </div>
-                        )}
-                    </dl>
-
-                    {client.notes_internal && (
-                        <dl>
-                            <dt className="text-xs text-muted-foreground">Internal notes</dt>
-                            <dd className="mt-1 text-sm whitespace-pre-wrap">{client.notes_internal}</dd>
-                        </dl>
-                    )}
+                            <span className="text-2xl font-semibold tabular-nums">{value}</span>
+                            <span className="text-xs text-muted-foreground">{hint}</span>
+                        </div>
+                    ))}
                 </div>
 
                 {socialAccounts !== undefined && (
@@ -279,7 +330,12 @@ export default function ClientShow({
                             onClick={() => setSocialAccountsOpen((open) => !open)}
                             aria-expanded={socialAccountsOpen}
                         >
-                            <Heading title="Social accounts" description="Platforms this client posts to" />
+                            <div className="flex items-center gap-3">
+                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <Share2 className="size-4" />
+                                </span>
+                                <Heading title="Social accounts" description="Platforms this client posts to" />
+                            </div>
                             <ChevronDown
                                 className={`size-4 shrink-0 text-muted-foreground transition-transform ${socialAccountsOpen ? 'rotate-180' : ''}`}
                             />
@@ -339,36 +395,43 @@ export default function ClientShow({
                                 {socialAccounts.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No social accounts yet.</p>
                                 ) : (
-                                    <div className="flex flex-col divide-y divide-border">
-                                        {socialAccounts.map((account) => (
-                                            <div
-                                                key={account.id}
-                                                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                                            >
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium">{account.handle}</span>
-                                                        <Badge variant="outline">{account.platform}</Badge>
-                                                        <Badge variant={connectionStatusVariant[account.connection_status] ?? 'outline'}>
-                                                            {account.connection_status}
-                                                        </Badge>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {socialAccounts.map((account) => {
+                                            const PlatformIcon = platformIcon[account.platform] ?? Share2;
+                                            return (
+                                                <div
+                                                    key={account.id}
+                                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                            <PlatformIcon className="size-4" />
+                                                        </span>
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium">{account.handle}</span>
+                                                                <Badge variant={connectionStatusVariant[account.connection_status] ?? 'outline'}>
+                                                                    {account.connection_status}
+                                                                </Badge>
+                                                            </div>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {account.display_name ?? account.handle} · {account.timezone}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {account.display_name ?? account.handle} · {account.timezone}
-                                                    </span>
+                                                    {account.can.delete && (
+                                                        <Form {...SocialAccountController.destroy.form(account.id)}>
+                                                            {({ processing }) => (
+                                                                <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                                    <Trash2 />
+                                                                    Remove
+                                                                </Button>
+                                                            )}
+                                                        </Form>
+                                                    )}
                                                 </div>
-                                                {account.can.delete && (
-                                                    <Form {...SocialAccountController.destroy.form(account.id)}>
-                                                        {({ processing }) => (
-                                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
-                                                                <Trash2 />
-                                                                Remove
-                                                            </Button>
-                                                        )}
-                                                    </Form>
-                                                )}
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </>
@@ -384,7 +447,12 @@ export default function ClientShow({
                             onClick={() => setCampaignsOpen((open) => !open)}
                             aria-expanded={campaignsOpen}
                         >
-                            <Heading title="Campaigns" description="Marketing campaigns for this client" />
+                            <div className="flex items-center gap-3">
+                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <Clapperboard className="size-4" />
+                                </span>
+                                <Heading title="Campaigns" description="Marketing campaigns for this client" />
+                            </div>
                             <ChevronDown
                                 className={`size-4 shrink-0 text-muted-foreground transition-transform ${campaignsOpen ? 'rotate-180' : ''}`}
                             />
@@ -438,24 +506,29 @@ export default function ClientShow({
                                 {campaigns.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No campaigns yet.</p>
                                 ) : (
-                                    <div className="flex flex-col divide-y divide-border">
+                                    <div className="grid gap-3 sm:grid-cols-2">
                                         {campaigns.map((campaign) => (
                                             <div
                                                 key={campaign.id}
-                                                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
                                             >
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium">{campaign.name}</span>
-                                                        <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'}>
-                                                            {campaign.status}
-                                                        </Badge>
-                                                    </div>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {campaign.start_date ?? '—'}
-                                                        {campaign.end_date ? ` – ${campaign.end_date}` : ''}
-                                                        {campaign.goal ? ` · ${campaign.goal}` : ''}
+                                                <div className="flex items-center gap-3">
+                                                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                        <Clapperboard className="size-4" />
                                                     </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium">{campaign.name}</span>
+                                                            <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'}>
+                                                                {campaign.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {campaign.start_date ?? '—'}
+                                                            {campaign.end_date ? ` – ${campaign.end_date}` : ''}
+                                                            {campaign.goal ? ` · ${campaign.goal}` : ''}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                                 {campaign.can.delete && (
                                                     <Form {...CampaignController.destroy.form(campaign.id)}>
@@ -484,7 +557,12 @@ export default function ClientShow({
                             onClick={() => setAssetsOpen((open) => !open)}
                             aria-expanded={assetsOpen}
                         >
-                            <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
+                            <div className="flex items-center gap-3">
+                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <FileImage className="size-4" />
+                                </span>
+                                <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
+                            </div>
                             <ChevronDown
                                 className={`size-4 shrink-0 text-muted-foreground transition-transform ${assetsOpen ? 'rotate-180' : ''}`}
                             />
@@ -554,27 +632,34 @@ export default function ClientShow({
                                 {assets.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No assets yet.</p>
                                 ) : (
-                                    <div className="flex flex-col divide-y divide-border">
-                                        {assets.map((asset) => (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {assets.map((asset) => {
+                                            const SourceIcon = assetSourceIcon[asset.source] ?? FileImage;
+                                            return (
                                             <div
                                                 key={asset.id}
-                                                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
                                             >
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <a
-                                                            href={asset.url ?? '#'}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="text-sm font-medium underline"
-                                                        >
-                                                            {asset.original_filename ?? asset.url}
-                                                        </a>
-                                                        <Badge variant="outline">{asset.source}</Badge>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                        <SourceIcon className="size-4" />
+                                                    </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <a
+                                                                href={asset.url ?? '#'}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="text-sm font-medium underline"
+                                                            >
+                                                                {asset.original_filename ?? asset.url}
+                                                            </a>
+                                                            <Badge variant="outline">{asset.source}</Badge>
+                                                        </div>
+                                                        {asset.rights && (
+                                                            <span className="text-xs text-muted-foreground">{asset.rights}</span>
+                                                        )}
                                                     </div>
-                                                    {asset.rights && (
-                                                        <span className="text-xs text-muted-foreground">{asset.rights}</span>
-                                                    )}
                                                 </div>
                                                 {asset.can.delete && (
                                                     <Form {...AssetController.destroy.form(asset.id)}>
@@ -587,7 +672,8 @@ export default function ClientShow({
                                                     </Form>
                                                 )}
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </>
@@ -603,7 +689,12 @@ export default function ClientShow({
                             onClick={() => setBillingHistoryOpen((open) => !open)}
                             aria-expanded={billingHistoryOpen}
                         >
-                            <Heading title="Billing history" description="Invoices raised for this client" />
+                            <div className="flex items-center gap-3">
+                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <Receipt className="size-4" />
+                                </span>
+                                <Heading title="Billing history" description="Invoices raised for this client" />
+                            </div>
                             <ChevronDown
                                 className={`size-4 shrink-0 text-muted-foreground transition-transform ${billingHistoryOpen ? 'rotate-180' : ''}`}
                             />
@@ -652,28 +743,33 @@ export default function ClientShow({
                         {invoices.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No invoices yet.</p>
                         ) : (
-                            <div className="flex flex-col divide-y divide-border">
+                            <div className="grid gap-3">
                                 {invoices.map((invoice) => (
                                     <div
                                         key={invoice.id}
-                                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
                                     >
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">{invoice.invoice_number}</span>
-                                                <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'}>
-                                                    {invoice.status}
-                                                </Badge>
-                                            </div>
-                                            <span className="text-xs text-muted-foreground">
-                                                Issued {invoice.issue_date}
-                                                {invoice.due_date ? ` · Due ${invoice.due_date}` : ''}
-                                                {invoice.sent_at ? ` · Sent ${invoice.sent_at}` : ''}
-                                                {invoice.paid_at ? ` · Paid ${invoice.paid_at}` : ''}
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                <Receipt className="size-4" />
                                             </span>
-                                            {invoice.description && (
-                                                <span className="text-xs text-muted-foreground">{invoice.description}</span>
-                                            )}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium">{invoice.invoice_number}</span>
+                                                    <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'}>
+                                                        {invoice.status}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Issued {invoice.issue_date}
+                                                    {invoice.due_date ? ` · Due ${invoice.due_date}` : ''}
+                                                    {invoice.sent_at ? ` · Sent ${invoice.sent_at}` : ''}
+                                                    {invoice.paid_at ? ` · Paid ${invoice.paid_at}` : ''}
+                                                </span>
+                                                {invoice.description && (
+                                                    <span className="text-xs text-muted-foreground">{invoice.description}</span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className="tabular-nums text-sm font-medium">
