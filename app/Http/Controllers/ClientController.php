@@ -6,6 +6,7 @@ use App\Actions\Clients\CreateClientAction;
 use App\Actions\Clients\UpdateClientAction;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
+use App\Enums\InvoiceStatus;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
@@ -175,8 +176,8 @@ class ClientController extends Controller
             'sent_at' => $invoice->sent_at?->toIso8601String(),
             'paid_at' => $invoice->paid_at?->toIso8601String(),
             'can' => [
-                'send' => $user->can('send', $invoice),
-                'mark_paid' => $user->can('markPaid', $invoice),
+                'send' => $invoice->status === InvoiceStatus::Draft && $user->can('send', $invoice),
+                'mark_paid' => $invoice->status === InvoiceStatus::Sent && $user->can('markPaid', $invoice),
             ],
         ];
     }

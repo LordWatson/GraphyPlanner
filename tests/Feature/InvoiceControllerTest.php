@@ -120,6 +120,28 @@ class InvoiceControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page->where('invoices', []));
     }
 
+    public function test_paid_invoice_does_not_expose_send_or_mark_paid_actions(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'status' => InvoiceStatus::Paid,
+            'sent_at' => now()->subDay(),
+            'paid_at' => now(),
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('clients.show', $client));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('invoices.0.id', $invoice->id)
+            ->where('invoices.0.can.send', false)
+            ->where('invoices.0.can.mark_paid', false)
+        );
+    }
+
     public function test_user_from_another_org_cannot_send_an_invoice(): void
     {
         $org = Organization::factory()->create();
