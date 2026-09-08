@@ -11,6 +11,8 @@ type ClientRow = {
     industry: string | null;
     status: string;
     default_language: string | null;
+    health: string;
+    health_reason: string;
 };
 
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
@@ -18,6 +20,12 @@ const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outli
     paused: 'warning',
     offboarding: 'secondary',
     archived: 'outline',
+};
+
+const healthVariant: Record<string, 'success' | 'warning' | 'destructive'> = {
+    green: 'success',
+    amber: 'warning',
+    red: 'destructive',
 };
 
 export default function ClientsIndex({
@@ -68,6 +76,7 @@ export default function ClientsIndex({
                                     <th className="px-4 py-2 font-medium">Industry</th>
                                     <th className="px-4 py-2 font-medium">Language</th>
                                     <th className="px-4 py-2 font-medium">Status</th>
+                                    <th className="px-4 py-2 font-medium">Health</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -93,6 +102,14 @@ export default function ClientsIndex({
                                         <td className="px-4 py-2">
                                             <Badge variant={statusVariant[client.status] ?? 'outline'}>
                                                 {client.status}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <Badge
+                                                variant={healthVariant[client.health] ?? 'outline'}
+                                                title={client.health_reason}
+                                            >
+                                                {client.health}
                                             </Badge>
                                         </td>
                                     </tr>

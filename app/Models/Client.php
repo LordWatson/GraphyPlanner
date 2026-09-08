@@ -71,4 +71,14 @@ class Client extends Model
     {
         return $this->belongsTo(User::class, 'owner_user_id');
     }
+
+    /**
+     * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
+     *
+     * @return array{status: \App\Enums\ClientHealth, reason: string}
+     */
+    public function health(): array
+    {
+        return app(\App\Services\ClientHealthService::class)->compute($this);
+    }
 }

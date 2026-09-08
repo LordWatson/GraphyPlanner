@@ -121,6 +121,8 @@ class ClientController extends Controller
      */
     private function transform(Client $client, bool $canViewBilling): array
     {
+        $health = $client->health();
+
         return [
             'id' => $client->id,
             'name' => $client->name,
@@ -137,6 +139,8 @@ class ClientController extends Controller
             'default_language' => $client->default_language,
             'notes_internal' => $client->notes_internal,
             'approval_email' => $client->approval_email,
+            'health' => $health['status']->value,
+            'health_reason' => $health['reason'],
         ];
     }
 }

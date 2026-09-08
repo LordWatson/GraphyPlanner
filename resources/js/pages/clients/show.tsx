@@ -21,6 +21,8 @@ type ClientData = {
     default_language: string | null;
     notes_internal: string | null;
     approval_email: string | null;
+    health: string;
+    health_reason: string;
 };
 
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
@@ -28,6 +30,12 @@ const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outli
     paused: 'warning',
     offboarding: 'secondary',
     archived: 'outline',
+};
+
+const healthVariant: Record<string, 'success' | 'warning' | 'destructive'> = {
+    green: 'success',
+    amber: 'warning',
+    red: 'destructive',
 };
 
 export default function ClientShow({
@@ -71,11 +79,23 @@ export default function ClientShow({
                 </div>
 
                 <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Status</span>
-                        <Badge variant={statusVariant[client.status] ?? 'outline'}>
-                            {client.status}
-                        </Badge>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Status</span>
+                            <Badge variant={statusVariant[client.status] ?? 'outline'}>
+                                {client.status}
+                            </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Health</span>
+                            <Badge
+                                variant={healthVariant[client.health] ?? 'outline'}
+                                title={client.health_reason}
+                            >
+                                {client.health}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{client.health_reason}</span>
+                        </div>
                     </div>
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
