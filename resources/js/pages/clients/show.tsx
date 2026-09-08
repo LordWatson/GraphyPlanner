@@ -78,7 +78,7 @@ export default function ClientShow({
     return (
         <>
             <Head title={client.name} />
-            <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4">
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
                 <div className="flex items-start justify-between">
                     <Heading title={client.name} description={client.legal_name ?? undefined} />
                     <div className="flex items-center gap-2">
