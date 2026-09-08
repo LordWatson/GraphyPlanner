@@ -24,7 +24,7 @@ class OrganizationSeeder extends Seeder
         );
 
         User::query()
-            ->whereIn('email', ['test@example.com', 'alexander.watson.work@gmail.com'])
+            ->whereIn('email', ['test@example.com', 'alexander.watson.work@gmail.com', 'rseklani@gmail.com'])
             ->update([
                 'org_id' => $organization->id,
                 'role' => Role::Owner,
