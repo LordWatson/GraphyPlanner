@@ -1,5 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { NotebookPen, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, NotebookPen, Pencil, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import InvoiceController from '@/actions/App/Http/Controllers/InvoiceController';
 import Heading from '@/components/heading';
@@ -72,6 +73,8 @@ export default function ClientShow({
     can: { update: boolean; delete: boolean; createInvoice: boolean };
     invoices: InvoiceData[];
 }) {
+    const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
+
     return (
         <>
             <Head title={client.name} />
@@ -180,8 +183,20 @@ export default function ClientShow({
 
                 {invoices !== undefined && (
                     <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <Heading title="Billing history" description="Invoices raised for this client" />
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                            onClick={() => setBillingHistoryOpen((open) => !open)}
+                            aria-expanded={billingHistoryOpen}
+                        >
+                            <Heading title="Billing history" description="Invoices raised for this client" />
+                            <ChevronDown
+                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${billingHistoryOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
 
+                        {billingHistoryOpen && (
+                        <>
                         {can.createInvoice && (
                             <Form
                                 {...InvoiceController.store.form(client.id)}
@@ -272,6 +287,8 @@ export default function ClientShow({
                                     </div>
                                 ))}
                             </div>
+                        )}
+                        </>
                         )}
                     </div>
                 )}
