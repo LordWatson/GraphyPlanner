@@ -9,6 +9,8 @@ use App\Enums\ClientStatus;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
+use App\Models\Invoice;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -69,12 +71,22 @@ class ClientController extends Controller
     {
         $this->authorize('view', $client);
 
+        $user = $request->user();
+        $canViewBilling = $user->can('viewBilling', $client);
+
         return Inertia::render('clients/show', [
-            'client' => $this->transform($client, $request->user()->can('viewBilling', $client)),
+            'client' => $this->transform($client, $canViewBilling),
             'can' => [
-                'update' => $request->user()->can('update', $client),
-                'delete' => $request->user()->can('delete', $client),
+                'update' => $user->can('update', $client),
+                'delete' => $user->can('delete', $client),
+                'createInvoice' => $user->can('create', [Invoice::class, $client]),
             ],
+            'invoices' => $canViewBilling
+                ? $client->invoices()
+                    ->latest('issue_date')
+                    ->get()
+                    ->map(fn (Invoice $invoice) => $this->transformInvoice($invoice, $user))
+                : [],
         ]);
     }
 
@@ -141,6 +153,31 @@ class ClientController extends Controller
             'approval_email' => $client->approval_email,
             'health' => $health['status']->value,
             'health_reason' => $health['reason'],
+        ];
+    }
+
+    /**
+     * Transform an invoice model into an array for the invoice history list.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformInvoice(Invoice $invoice, User $user): array
+    {
+        return [
+            'id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'status' => $invoice->status->value,
+            'amount' => $invoice->amount,
+            'currency' => $invoice->currency,
+            'issue_date' => $invoice->issue_date->toDateString(),
+            'due_date' => $invoice->due_date?->toDateString(),
+            'description' => $invoice->description,
+            'sent_at' => $invoice->sent_at?->toIso8601String(),
+            'paid_at' => $invoice->paid_at?->toIso8601String(),
+            'can' => [
+                'send' => $user->can('send', $invoice),
+                'mark_paid' => $user->can('markPaid', $invoice),
+            ],
         ];
     }
 }

@@ -1,9 +1,13 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { NotebookPen, Pencil, Trash2 } from 'lucide-react';
 import ClientController from '@/actions/App/Http/Controllers/ClientController';
+import InvoiceController from '@/actions/App/Http/Controllers/InvoiceController';
 import Heading from '@/components/heading';
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index } from '@/routes/clients';
 
@@ -26,6 +30,20 @@ type ClientData = {
     health_reason: string;
 };
 
+type InvoiceData = {
+    id: number;
+    invoice_number: string;
+    status: 'draft' | 'sent' | 'paid';
+    amount: string;
+    currency: string;
+    issue_date: string;
+    due_date: string | null;
+    description: string | null;
+    sent_at: string | null;
+    paid_at: string | null;
+    can: { send: boolean; mark_paid: boolean };
+};
+
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
     active: 'success',
     paused: 'warning',
@@ -39,12 +57,20 @@ const healthVariant: Record<string, 'success' | 'warning' | 'destructive'> = {
     red: 'destructive',
 };
 
+const invoiceStatusVariant: Record<string, 'secondary' | 'warning' | 'success'> = {
+    draft: 'secondary',
+    sent: 'warning',
+    paid: 'success',
+};
+
 export default function ClientShow({
     client,
     can,
+    invoices,
 }: {
     client: ClientData;
-    can: { update: boolean; delete: boolean };
+    can: { update: boolean; delete: boolean; createInvoice: boolean };
+    invoices: InvoiceData[];
 }) {
     return (
         <>
@@ -151,6 +177,104 @@ export default function ClientShow({
                         </dl>
                     )}
                 </div>
+
+                {invoices !== undefined && (
+                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        <Heading title="Billing history" description="Invoices raised for this client" />
+
+                        {can.createInvoice && (
+                            <Form
+                                {...InvoiceController.store.form(client.id)}
+                                resetOnSuccess
+                                className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="amount">Amount</Label>
+                                            <Input id="amount" name="amount" type="number" step="0.01" min="0.01" required />
+                                            <InputError message={errors.amount} />
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="issue_date">Issue date</Label>
+                                            <Input id="issue_date" name="issue_date" type="date" required />
+                                            <InputError message={errors.issue_date} />
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="due_date">Due date</Label>
+                                            <Input id="due_date" name="due_date" type="date" />
+                                            <InputError message={errors.due_date} />
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="description">Description</Label>
+                                            <Input id="description" name="description" />
+                                            <InputError message={errors.description} />
+                                        </div>
+                                        <div className="col-span-full">
+                                            <Button type="submit" size="sm" disabled={processing}>
+                                                Create invoice
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </Form>
+                        )}
+
+                        {invoices.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No invoices yet.</p>
+                        ) : (
+                            <div className="flex flex-col divide-y divide-border">
+                                {invoices.map((invoice) => (
+                                    <div
+                                        key={invoice.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                    >
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">{invoice.invoice_number}</span>
+                                                <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'}>
+                                                    {invoice.status}
+                                                </Badge>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                Issued {invoice.issue_date}
+                                                {invoice.due_date ? ` · Due ${invoice.due_date}` : ''}
+                                                {invoice.sent_at ? ` · Sent ${invoice.sent_at}` : ''}
+                                                {invoice.paid_at ? ` · Paid ${invoice.paid_at}` : ''}
+                                            </span>
+                                            {invoice.description && (
+                                                <span className="text-xs text-muted-foreground">{invoice.description}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="tabular-nums text-sm font-medium">
+                                                {invoice.currency} {invoice.amount}
+                                            </span>
+                                            {invoice.can.send && (
+                                                <Form {...InvoiceController.send.form(invoice.id)}>
+                                                    {({ processing }) => (
+                                                        <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                            Send
+                                                        </Button>
+                                                    )}
+                                                </Form>
+                                            )}
+                                            {invoice.can.mark_paid && (
+                                                <Form {...InvoiceController.markPaid.form(invoice.id)}>
+                                                    {({ processing }) => (
+                                                        <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                            Mark paid
+                                                        </Button>
+                                                    )}
+                                                </Form>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     );

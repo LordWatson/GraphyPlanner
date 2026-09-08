@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Models\BrandBrain;
 use App\Models\Client;
+use App\Models\Invoice;
 use App\Policies\BrandBrainPolicy;
 use App\Policies\ClientPolicy;
+use App\Policies\InvoicePolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(BrandBrain::class, BrandBrainPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
     }
 
     /**
