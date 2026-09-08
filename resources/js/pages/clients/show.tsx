@@ -109,6 +109,7 @@ export default function ClientShow({
     socialAccounts: SocialAccountData[];
 }) {
     const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
+    const [socialAccountsOpen, setSocialAccountsOpen] = useState(false);
 
     return (
         <>
@@ -218,14 +219,26 @@ export default function ClientShow({
 
                 {socialAccounts !== undefined && (
                     <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <Heading title="Social accounts" description="Platforms this client posts to" />
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                            onClick={() => setSocialAccountsOpen((open) => !open)}
+                            aria-expanded={socialAccountsOpen}
+                        >
+                            <Heading title="Social accounts" description="Platforms this client posts to" />
+                            <ChevronDown
+                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${socialAccountsOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
 
-                        {can.createSocialAccount && (
-                            <Form
-                                {...SocialAccountController.store.form(client.id)}
-                                resetOnSuccess
-                                className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
-                            >
+                        {socialAccountsOpen && (
+                            <>
+                                {can.createSocialAccount && (
+                                    <Form
+                                        {...SocialAccountController.store.form(client.id)}
+                                        resetOnSuccess
+                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                    >
                                 {({ processing, errors }) => (
                                     <>
                                         <div className="grid gap-1">
@@ -265,44 +278,46 @@ export default function ClientShow({
                                             </Button>
                                         </div>
                                     </>
-                                )}
-                            </Form>
-                        )}
-
-                        {socialAccounts.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No social accounts yet.</p>
-                        ) : (
-                            <div className="flex flex-col divide-y divide-border">
-                                {socialAccounts.map((account) => (
-                                    <div
-                                        key={account.id}
-                                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                                    >
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">{account.handle}</span>
-                                                <Badge variant="outline">{account.platform}</Badge>
-                                                <Badge variant={connectionStatusVariant[account.connection_status] ?? 'outline'}>
-                                                    {account.connection_status}
-                                                </Badge>
-                                            </div>
-                                            <span className="text-xs text-muted-foreground">
-                                                {account.display_name ?? account.handle} · {account.timezone}
-                                            </span>
-                                        </div>
-                                        {account.can.delete && (
-                                            <Form {...SocialAccountController.destroy.form(account.id)}>
-                                                {({ processing }) => (
-                                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
-                                                        <Trash2 />
-                                                        Remove
-                                                    </Button>
-                                                )}
-                                            </Form>
                                         )}
+                                    </Form>
+                                )}
+
+                                {socialAccounts.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No social accounts yet.</p>
+                                ) : (
+                                    <div className="flex flex-col divide-y divide-border">
+                                        {socialAccounts.map((account) => (
+                                            <div
+                                                key={account.id}
+                                                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                                            >
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium">{account.handle}</span>
+                                                        <Badge variant="outline">{account.platform}</Badge>
+                                                        <Badge variant={connectionStatusVariant[account.connection_status] ?? 'outline'}>
+                                                            {account.connection_status}
+                                                        </Badge>
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {account.display_name ?? account.handle} · {account.timezone}
+                                                    </span>
+                                                </div>
+                                                {account.can.delete && (
+                                                    <Form {...SocialAccountController.destroy.form(account.id)}>
+                                                        {({ processing }) => (
+                                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                                <Trash2 />
+                                                                Remove
+                                                            </Button>
+                                                        )}
+                                                    </Form>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
