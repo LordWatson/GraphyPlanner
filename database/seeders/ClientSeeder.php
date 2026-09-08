@@ -27,10 +27,10 @@ class ClientSeeder extends Seeder
         $owner = User::firstWhere('email', 'test@example.com');
 
         $acme = Client::updateOrCreate(
-            ['org_id' => $organization->id, 'name' => 'Acme Corp'],
+            ['org_id' => $organization->id, 'name' => 'Recommendo'],
             [
-                'legal_name' => 'Acme Corporation Ltd',
-                'website' => 'https://acme.test',
+                'legal_name' => 'Recommendo',
+                'website' => 'https://recommendo.test',
                 'industry' => 'Retail',
                 'countries' => ['US', 'CA'],
                 'status' => ClientStatus::Active,
@@ -41,15 +41,15 @@ class ClientSeeder extends Seeder
                 'tags' => ['retail', 'priority'],
                 'default_language' => 'en',
                 'notes_internal' => 'Key account, weekly check-ins.',
-                'approval_email' => 'approvals@acme.test',
+                'approval_email' => 'approvals@recommendo.test',
             ]
         );
 
         Client::updateOrCreate(
-            ['org_id' => $organization->id, 'name' => 'Nimbus Studios'],
+            ['org_id' => $organization->id, 'name' => 'Frzn'],
             [
-                'legal_name' => 'Nimbus Studios Inc',
-                'website' => 'https://nimbusstudios.test',
+                'legal_name' => 'Frzn',
+                'website' => 'https://frzn.test',
                 'industry' => 'Entertainment',
                 'countries' => ['GB'],
                 'status' => ClientStatus::Paused,
@@ -60,26 +60,7 @@ class ClientSeeder extends Seeder
                 'tags' => ['media'],
                 'default_language' => 'en',
                 'notes_internal' => 'Paused pending contract renewal.',
-                'approval_email' => 'contact@nimbusstudios.test',
-            ]
-        );
-
-        Client::updateOrCreate(
-            ['org_id' => $organization->id, 'name' => 'Blue Harbor Cafe'],
-            [
-                'legal_name' => null,
-                'website' => 'https://blueharborcafe.test',
-                'industry' => 'Food & Beverage',
-                'countries' => ['US'],
-                'status' => ClientStatus::Offboarding,
-                'owner_user_id' => $owner?->id,
-                'start_date' => now()->subMonths(18)->toDateString(),
-                'retainer_amount' => 800,
-                'billing_cycle' => BillingCycle::ProjectBased,
-                'tags' => ['local', 'hospitality'],
-                'default_language' => 'en',
-                'notes_internal' => 'Wrapping down engagement this quarter.',
-                'approval_email' => 'owner@blueharborcafe.test',
+                'approval_email' => 'contact@frzn.test',
             ]
         );
 

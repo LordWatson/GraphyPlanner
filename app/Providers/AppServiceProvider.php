@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\BrandBrain;
 use App\Models\Client;
+use App\Policies\BrandBrainPolicy;
 use App\Policies\ClientPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         Gate::policy(Client::class, ClientPolicy::class);
+        Gate::policy(BrandBrain::class, BrandBrainPolicy::class);
     }
 
     /**

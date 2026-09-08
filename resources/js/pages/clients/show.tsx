@@ -1,9 +1,10 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { NotebookPen, Pencil, Trash2 } from 'lucide-react';
 import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index } from '@/routes/clients';
 
 type ClientData = {
@@ -52,6 +53,12 @@ export default function ClientShow({
                 <div className="flex items-start justify-between">
                     <Heading title={client.name} description={client.legal_name ?? undefined} />
                     <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={editBrandBrain(client.id)}>
+                                <NotebookPen />
+                                Brand brain
+                            </Link>
+                        </Button>
                         {can.update && (
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={edit(client.id)}>
