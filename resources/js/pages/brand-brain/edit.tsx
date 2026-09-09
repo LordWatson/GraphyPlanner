@@ -1,6 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
 import BrandBrainController from '@/actions/App/Http/Controllers/BrandBrainController';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,8 +41,21 @@ export default function BrandBrainEdit({
     return (
         <>
             <Head title={`Brand brain — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
-                <Heading title="Brand brain" description={`Voice, audience, and creative rules for ${client.name}`} />
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
+                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                    />
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                            <span className="text-gradient-brand">Brand brain</span>
+                        </h1>
+                        <p className="max-w-xl text-sm text-muted-foreground">
+                            Voice, audience, and creative rules for {client.name}.
+                        </p>
+                    </div>
+                </div>
 
                 <Form {...BrandBrainController.update.form(client.id)} className="space-y-6">
                     {({ processing, errors }) => (

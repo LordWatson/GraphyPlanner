@@ -294,8 +294,8 @@ export default function ClientShow({
         <>
             <Head title={client.name} />
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm">
-                    <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-brand opacity-[0.08]" />
+                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                    <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]" />
                     <div className="relative flex flex-col gap-4">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <Heading title={client.name} description={client.legal_name ?? undefined} />
@@ -371,12 +371,12 @@ export default function ClientShow({
                         >
                             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
                             <div className="flex items-center gap-2 text-muted-foreground">
-                                <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                <span className="flex size-8 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
                                     <Icon className="size-4" />
                                 </span>
                                 <span className="text-xs">{label}</span>
                             </div>
-                            <span className="text-2xl font-semibold tabular-nums">{value}</span>
+                            <span className="text-3xl font-bold tabular-nums">{value}</span>
                             <span className="text-xs text-muted-foreground">{hint}</span>
                         </div>
                     ))}

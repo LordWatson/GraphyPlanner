@@ -59,23 +59,37 @@ export default function Dashboard({ summary, invoiceTotals, upcomingPosts }: Das
         <>
             <Head title="Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
+                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                    />
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                            <span className="text-gradient-brand">Studio overview</span>
+                        </h1>
+                        <p className="max-w-xl text-sm text-muted-foreground">
+                            A snapshot of every client, brand, and post moving through the pipeline right now.
+                        </p>
+                    </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-3">
                     {summaryCards.map(({ icon: Icon, label, hint, value }) => (
                         <div
                             key={label}
-                            className="relative flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm"
+                            className="relative flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
                         >
                             <span
                                 aria-hidden
                                 className="absolute inset-x-0 top-0 h-1 bg-gradient-brand"
                             />
                             <div className="flex items-center gap-2 text-muted-foreground">
-                                <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                <span className="flex size-8 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
                                     <Icon className="size-4" />
                                 </span>
                                 <span className="text-xs">{label}</span>
                             </div>
-                            <span className="text-2xl font-semibold tabular-nums">{value}</span>
+                            <span className="text-3xl font-bold tabular-nums">{value}</span>
                             <span className="text-xs text-muted-foreground">{hint}</span>
                         </div>
                     ))}

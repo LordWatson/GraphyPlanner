@@ -182,8 +182,20 @@ export default function PostEdit({
                         <ArrowLeft className="size-4" />
                         Back to {client.name}
                     </Link>
+                </div>
+
+                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                    />
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <Heading title="Post editor" description={`Client: ${client.name}`} />
+                        <div className="flex flex-col gap-1">
+                            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                                <span className="text-gradient-brand">Post editor</span>
+                            </h1>
+                            <p className="max-w-xl text-sm text-muted-foreground">Client: {client.name}</p>
+                        </div>
                         <div className="flex items-center gap-2">
                             <Badge variant={postStatusVariant[post.status] ?? 'outline'}>{post.status_label}</Badge>
                             {post.campaign_name && (

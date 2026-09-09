@@ -1,6 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
 import { Building2, Plus } from 'lucide-react';
-import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { create, index, show } from '@/routes/clients';
@@ -39,11 +38,21 @@ export default function ClientsIndex({
         <>
             <Head title="Clients" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex items-center justify-between">
-                    <Heading
-                        title="Clients"
-                        description="Manage the clients your team works with"
+                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
                     />
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                            <span className="text-gradient-brand">Client roster</span>
+                        </h1>
+                        <p className="max-w-xl text-sm text-muted-foreground">
+                            Every brand your team manages, with health and status at a glance.
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center justify-end">
                     {can.create && (
                         <Button asChild>
                             <Link href={create()}>
