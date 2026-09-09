@@ -9,6 +9,7 @@ use App\Mail\ClientReviewRequestedMail;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
+use App\Models\PostComment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -78,6 +79,29 @@ class ReviewControllerTest extends TestCase
         $this->assertSame(PostStatus::Approved, $post->status);
         $this->assertNull($post->approvals()->first()->user_id);
         $this->assertSame('Looks great!', $post->approvals()->first()->comment);
+    }
+
+    public function test_the_review_message_and_only_non_internal_comments_are_visible_on_the_review_page(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'status' => PostStatus::WaitingClient,
+            'review_message' => 'Please check the caption tone before approving.',
+        ]);
+        PostComment::factory()->for($post)->create(['body' => 'Visible to client', 'internal_only' => false]);
+        PostComment::factory()->for($post)->create(['body' => 'Internal-only note', 'internal_only' => true]);
+        ['token' => $token] = (new CreateReviewTokenAction)($client, $post);
+
+        $this->get(route('review.show', $token))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('review/show')
+                ->where('post.review_message', 'Please check the caption tone before approving.')
+                ->where('post.comments.0.body', 'Visible to client')
+                ->missing('post.comments.1')
+            );
     }
 
     public function test_an_invalid_token_is_not_found(): void

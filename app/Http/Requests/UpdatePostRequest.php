@@ -25,6 +25,7 @@ class UpdatePostRequest extends FormRequest
             'approval_mode' => ['nullable', new Enum(ApprovalMode::class)],
             'campaign_id' => ['nullable', 'integer', 'exists:campaigns,id'],
             'master_caption' => ['nullable', 'string'],
+            'review_message' => ['nullable', 'string'],
             'hashtags' => ['nullable', 'array'],
             'hashtags.*' => ['string'],
             'music' => ['nullable', 'array'],

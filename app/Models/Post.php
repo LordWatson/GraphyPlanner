@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property PostStatus $status
  * @property ApprovalMode $approval_mode
  * @property string|null $master_caption
+ * @property string|null $review_message
  * @property array<int, string>|null $hashtags
  * @property array<string, mixed>|null $music
  * @property array<string, mixed>|null $location
@@ -31,7 +32,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'created_by', 'status', 'approval_mode',
-    'master_caption', 'hashtags', 'music', 'location', 'checklist_snapshot',
+    'master_caption', 'review_message', 'hashtags', 'music', 'location', 'checklist_snapshot',
 ])]
 class Post extends Model
 {

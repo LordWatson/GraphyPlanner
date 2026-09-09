@@ -64,6 +64,7 @@ class PostEditorControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->put(route('posts.update', $post), [
             'master_caption' => 'Updated caption',
+            'review_message' => 'Please double-check the hashtags before approving.',
             'asset_ids' => [$asset->id],
             'targets' => [
                 [
@@ -78,6 +79,7 @@ class PostEditorControllerTest extends TestCase
 
         $post->refresh();
         $this->assertSame('Updated caption', $post->master_caption);
+        $this->assertSame('Please double-check the hashtags before approving.', $post->review_message);
         $this->assertSame([$asset->id], $post->assets()->pluck('assets.id')->all());
 
         $target = $post->targets()->firstOrFail();

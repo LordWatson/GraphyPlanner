@@ -28,6 +28,16 @@
                                 good to go, or if you'd like any changes.
                             </p>
 
+                            @if ($post->review_message)
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; margin:0 0 24px;">
+                                    <tr>
+                                        <td style="padding:16px 18px; font-size:14px; line-height:1.6; color:#3730a3;">
+                                            {{ $post->review_message }}
+                                        </td>
+                                    </tr>
+                                </table>
+                            @endif
+
                             @if ($post->master_caption)
                                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; margin:0 0 24px;">
                                     <tr>

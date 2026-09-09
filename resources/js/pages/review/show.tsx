@@ -20,15 +20,24 @@ type TargetData = {
     scheduled_local_time: string | null;
 };
 
+type CommentData = {
+    id: number;
+    user_name: string | null;
+    body: string;
+    created_at: string | null;
+};
+
 type PostData = {
     id: number;
     status: string;
     status_label: string;
     master_caption: string | null;
+    review_message: string | null;
     hashtags: string[];
     assets: AssetData[];
     targets: TargetData[];
     can_decide: boolean;
+    comments: CommentData[];
 };
 
 const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline' | 'destructive'> = {
@@ -75,6 +84,12 @@ export default function ReviewShow({
                             <Badge variant={postStatusVariant[post.status] ?? 'outline'}>{post.status_label}</Badge>
                         </div>
 
+                        {post.review_message && (
+                            <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                                {post.review_message}
+                            </div>
+                        )}
+
                         {post.master_caption && (
                             <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap">{post.master_caption}</p>
                         )}
@@ -118,6 +133,20 @@ export default function ReviewShow({
                             </div>
                         )}
                     </div>
+
+                    {post.comments.length > 0 && (
+                        <div className="rounded-xl border border-border bg-card p-6 shadow-lg shadow-black/[0.03]">
+                            <p className="mb-3 text-sm font-medium">Comments</p>
+                            <div className="flex flex-col gap-3">
+                                {post.comments.map((comment) => (
+                                    <div key={comment.id} className="rounded-md border border-border bg-muted/20 p-3 text-sm">
+                                        <p className="whitespace-pre-wrap">{comment.body}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">{comment.user_name ?? 'Team'}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {post.can_decide ? (
                         <Form

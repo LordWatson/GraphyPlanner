@@ -145,6 +145,7 @@ class PostController extends Controller
             'status_label' => $post->status->label(),
             'approval_mode' => $post->approval_mode->value,
             'master_caption' => $post->master_caption,
+            'review_message' => $post->review_message,
             'hashtags' => $post->hashtags ?? [],
             'music' => $post->music,
             'location' => $post->location,

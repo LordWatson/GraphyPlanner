@@ -76,6 +76,7 @@ type PostData = {
     status_label: string;
     approval_mode: string;
     master_caption: string | null;
+    review_message: string | null;
     hashtags: string[];
     music: Record<string, unknown> | null;
     location: Record<string, unknown> | null;
@@ -237,6 +238,7 @@ export default function PostEdit({
     can: { update: boolean; comment: boolean };
 }) {
     const [caption, setCaption] = useState(post.master_caption ?? '');
+    // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
     const [hashtagsText, setHashtagsText] = useState((post.hashtags ?? []).join(', '));
     const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>(post.assets.map((asset) => asset.id));
     const [targetRows, setTargetRows] = useState<Record<number, { date: string; time: string }>>(
@@ -330,6 +332,22 @@ export default function PostEdit({
                                     />
                                     <InputError message={errors.master_caption} />
                                 </div>
+
+                                {/* Message to client — commented out for now, may be re-added later.
+                                <div className="grid gap-1">
+                                    <Label htmlFor="review_message">Message to client</Label>
+                                    <textarea
+                                        id="review_message"
+                                        name="review_message"
+                                        rows={3}
+                                        value={reviewMessage}
+                                        onChange={(e) => setReviewMessage(e.target.value)}
+                                        placeholder="Optional note shown to the client alongside the review request email..."
+                                        className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                    />
+                                    <InputError message={errors.review_message} />
+                                </div>
+                                */}
 
                                 <div className="grid gap-1">
                                     <Label htmlFor="hashtags_text">Hashtags (comma-separated)</Label>

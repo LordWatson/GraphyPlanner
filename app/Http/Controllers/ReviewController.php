@@ -34,6 +34,7 @@ class ReviewController extends Controller
                 'status' => $post->status->value,
                 'status_label' => $post->status->label(),
                 'master_caption' => $post->master_caption,
+                'review_message' => $post->review_message,
                 'hashtags' => $post->hashtags ?? [],
                 'assets' => $post->assets->map(fn ($asset) => [
                     'id' => $asset->id,
@@ -48,6 +49,16 @@ class ReviewController extends Controller
                     'scheduled_local_time' => $target->scheduled_local_time,
                 ])->values(),
                 'can_decide' => $post->status === PostStatus::WaitingClient,
+                'comments' => $post->comments
+                    ->where('internal_only', false)
+                    ->sortByDesc('created_at')
+                    ->map(fn ($comment) => [
+                        'id' => $comment->id,
+                        'user_name' => $comment->user?->name,
+                        'body' => $comment->body,
+                        'created_at' => $comment->created_at?->toIso8601String(),
+                    ])
+                    ->values(),
             ],
         ]);
     }
@@ -87,9 +98,9 @@ class ReviewController extends Controller
         }
 
         $post = $reviewToken->post_id
-            ? $reviewToken->post()->with(['client', 'targets.socialAccount', 'assets'])->first()
+            ? $reviewToken->post()->with(['client', 'targets.socialAccount', 'assets', 'comments.user'])->first()
             : $reviewToken->client->posts()
-                ->with(['client', 'targets.socialAccount', 'assets'])
+                ->with(['client', 'targets.socialAccount', 'assets', 'comments.user'])
                 ->where('status', PostStatus::WaitingClient)
                 ->latest()
                 ->first();
