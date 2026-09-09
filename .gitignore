@@ -36,3 +36,4 @@ yarn-error.log
 /public/vendor/log-viewer/img/log-viewer-64.png
 /public/vendor/log-viewer/img/log-viewer-128.png
 /public/fonts-manifest.dev.json
+composer.lock
