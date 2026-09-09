@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -90,5 +91,64 @@ class Post extends Model
     public function targets(): HasMany
     {
         return $this->hasMany(PostTarget::class);
+    }
+
+    /**
+     * @return HasMany<PostActivityLog, $this>
+     */
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(PostActivityLog::class);
+    }
+
+    /**
+     * @return HasMany<PostApproval, $this>
+     */
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(PostApproval::class);
+    }
+
+    /**
+     * @return HasMany<PostComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(PostComment::class);
+    }
+
+    /**
+     * @return HasMany<ReviewToken, $this>
+     */
+    public function reviewTokens(): HasMany
+    {
+        return $this->hasMany(ReviewToken::class);
+    }
+
+    /**
+     * Media attached to this post (Step 0.10 editor UI). Reuses assets already uploaded/linked to
+     * the post's client rather than duplicating storage.
+     *
+     * @return BelongsToMany<Asset, $this>
+     */
+    public function assets(): BelongsToMany
+    {
+        return $this->belongsToMany(Asset::class, 'post_assets');
+    }
+
+    /**
+     * The distinct set of platforms targeted by this post's `PostTarget`s, used by the §6
+     * checklist's "media present" rule (text-only-capable platforms don't require media).
+     *
+     * @return array<int, \App\Enums\Platform>
+     */
+    public function targetPlatforms(): array
+    {
+        return $this->targets
+            ->map(fn (PostTarget $target) => $target->socialAccount?->platform)
+            ->filter()
+            ->unique(fn ($platform) => $platform->value)
+            ->values()
+            ->all();
     }
 }

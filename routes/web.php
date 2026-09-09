@@ -50,6 +50,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('clients/{client}/posts', [PostController::class, 'store'])
         ->name('clients.posts.store');
+    Route::get('posts/{post}/edit', [PostController::class, 'edit'])
+        ->name('posts.edit');
+    Route::put('posts/{post}', [PostController::class, 'update'])
+        ->name('posts.update');
+    Route::post('posts/{post}/transition', [PostController::class, 'transition'])
+        ->name('posts.transition');
+    Route::post('posts/{post}/comments', [PostController::class, 'comment'])
+        ->name('posts.comments.store');
 });
 
 require __DIR__.'/settings.php';

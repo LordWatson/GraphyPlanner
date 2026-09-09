@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Post;
@@ -59,5 +60,32 @@ class PostPolicy
     {
         return $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist], true);
+    }
+
+    /**
+     * Determine whether the user can transition a post to the given status.
+     *
+     * Client reviewers may only decide on a post that is `waiting_client` for their own client,
+     * moving it to `approved` or `changes_requested` (the review-portal actions, spec §3/§0.13).
+     * Everyone else is limited to the org's internal roles allowed to edit content.
+     */
+    public function transition(User $user, Post $post, PostStatus $to): bool
+    {
+        if ($user->role === Role::ClientReviewer) {
+            return $user->client_id === $post->client_id
+                && $post->status === PostStatus::WaitingClient
+                && in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true);
+        }
+
+        return $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
+     * Determine whether the user can comment on a post.
+     */
+    public function comment(User $user, Post $post): bool
+    {
+        return $this->view($user, $post);
     }
 }

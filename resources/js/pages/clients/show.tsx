@@ -249,7 +249,7 @@ export default function ClientShow({
     const [socialAccountsOpen, setSocialAccountsOpen] = useState(false);
     const [campaignsOpen, setCampaignsOpen] = useState(false);
     const [assetsOpen, setAssetsOpen] = useState(false);
-    const [postsOpen, setPostsOpen] = useState(true);
+    const [postsOpen, setPostsOpen] = useState(false);
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
     const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<number[]>([]);
 
@@ -749,6 +749,12 @@ export default function ClientShow({
                                                             <span className="text-xs text-muted-foreground">{post.campaign_name}</span>
                                                         )}
                                                     </div>
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={PostController.edit(post.id)}>
+                                                            <Pencil />
+                                                            Open editor
+                                                        </Link>
+                                                    </Button>
                                                 </div>
                                                 {post.master_caption && (
                                                     <p className="text-sm">{post.master_caption}</p>
