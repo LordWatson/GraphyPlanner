@@ -105,4 +105,19 @@ class PostPolicy
             Role::ClientReviewer,
         ], true);
     }
+
+    /**
+     * Determine whether the user can view the Home / needs-attention dashboard (Step 0.12).
+     * Unlike the calendar, this is an internal ops view (failed publishes, missing media,
+     * disconnected accounts) with no client-facing purpose, so `Role::ClientReviewer` is excluded.
+     */
+    public function viewHome(User $user): bool
+    {
+        return in_array($user->role, [
+            Role::Owner,
+            Role::Strategist,
+            Role::Designer,
+            Role::Viewer,
+        ], true);
+    }
 }

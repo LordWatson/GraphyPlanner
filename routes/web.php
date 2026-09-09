@@ -6,6 +6,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\SocialAccountController;
@@ -17,6 +18,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
+
+    Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
 
     Route::resource('clients', ClientController::class);
 

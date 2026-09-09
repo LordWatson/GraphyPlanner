@@ -141,6 +141,7 @@ class DashboardTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->has('upcomingPosts', 1)
             ->where('upcomingPosts.0.post_id', $post->id)
+            ->where('summary.scheduledPosts', 1)
         );
     }
 
@@ -178,6 +179,7 @@ class DashboardTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->has('upcomingPosts', 1)
             ->where('upcomingPosts.0.post_id', $ownPost->id)
+            ->where('summary.scheduledPosts', 1)
         );
     }
 }

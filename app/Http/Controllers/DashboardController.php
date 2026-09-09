@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Invoices\GetMonthlyInvoiceTotalsAction;
+use App\Actions\Posts\GetUpcomingPostCountAction;
 use App\Actions\Posts\GetUpcomingPostOccurrencesAction;
 use App\Enums\Role;
 use App\Models\Client;
@@ -20,6 +21,7 @@ class DashboardController extends Controller
         Request $request,
         GetMonthlyInvoiceTotalsAction $getMonthlyInvoiceTotals,
         GetUpcomingPostOccurrencesAction $getUpcomingPostOccurrences,
+        GetUpcomingPostCountAction $getUpcomingPostCount,
     ): Response {
         $user = $request->user();
 
@@ -34,7 +36,9 @@ class DashboardController extends Controller
             'summary' => [
                 'clients' => $clientsCount,
                 'brands' => 0,
-                'scheduledPosts' => 0,
+                'scheduledPosts' => $canViewCalendar
+                    ? $getUpcomingPostCount($user)
+                    : 0,
             ],
             'invoiceTotals' => $canViewInvoiceTotals
                 ? $getMonthlyInvoiceTotals($user->org_id)
