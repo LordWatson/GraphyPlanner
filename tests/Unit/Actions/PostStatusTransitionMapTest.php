@@ -20,6 +20,7 @@ class PostStatusTransitionMapTest extends TestCase
         $this->assertTrue(PostStatusTransitionMap::isAllowed(PostStatus::Draft, PostStatus::InternalReview));
         $this->assertTrue(PostStatusTransitionMap::isAllowed(PostStatus::WaitingClient, PostStatus::Approved));
         $this->assertTrue(PostStatusTransitionMap::isAllowed(PostStatus::WaitingClient, PostStatus::ChangesRequested));
+        $this->assertTrue(PostStatusTransitionMap::isAllowed(PostStatus::ChangesRequested, PostStatus::InternalReview));
     }
 
     public function test_invalid_transitions_are_rejected(): void

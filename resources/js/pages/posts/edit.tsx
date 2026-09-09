@@ -1,14 +1,19 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import {
     ArrowLeft,
+    ArrowRight,
     CheckCircle2,
+    ChevronDown,
     Circle,
     Facebook,
+    History,
     Instagram,
     Linkedin,
     Lock,
+    MessageSquareQuote,
     Music2,
     Share2,
+    User,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -17,8 +22,10 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { show as showClient } from '@/routes/clients';
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
@@ -114,6 +121,66 @@ const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'o
     failed: 'destructive',
     archived: 'outline',
 };
+
+function formatStatusLabel(status: string | null): string {
+    if (!status) {
+        return '—';
+    }
+
+    return status
+        .split('_')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+function ActivityLogEntry({ log }: { log: ActivityLogData }) {
+    const [open, setOpen] = useState(false);
+    const hasNote = Boolean(log.note && log.note.trim().length > 0);
+    const preview = hasNote ? (log.note as string).slice(0, 80) : null;
+    const isTruncated = hasNote && (log.note as string).length > 80;
+
+    return (
+        <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border bg-muted/20">
+            <CollapsibleTrigger asChild>
+                <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 p-2.5 text-left text-sm hover:bg-muted/40"
+                >
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <User className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="font-medium">{log.user_name ?? 'System'}</span>
+                        <Badge variant={postStatusVariant[log.from_status ?? ''] ?? 'outline'} className="hidden sm:inline-flex">
+                            {formatStatusLabel(log.from_status)}
+                        </Badge>
+                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                        <Badge variant={postStatusVariant[log.to_status] ?? 'outline'}>{formatStatusLabel(log.to_status)}</Badge>
+                        {hasNote && (
+                            <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
+                                <MessageSquareQuote className="mr-1 inline size-3.5" />
+                                {preview}
+                                {isTruncated ? '…' : ''}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{log.created_at}</span>
+                        {hasNote && (
+                            <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                        )}
+                    </div>
+                </button>
+            </CollapsibleTrigger>
+            {hasNote && (
+                <CollapsibleContent className="border-t border-border/60 px-2.5 py-2 text-sm">
+                    <div className="flex items-start gap-2">
+                        <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <p className="whitespace-pre-wrap text-muted-foreground">{log.note}</p>
+                    </div>
+                </CollapsibleContent>
+            )}
+        </Collapsible>
+    );
+}
 
 export default function PostEdit({
     post,
@@ -511,20 +578,18 @@ export default function PostEdit({
                 </div>
 
                 <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading title="Activity log" description="Every status transition, oldest last" />
+                    <Heading
+                        title="Activity log"
+                        description="Every status transition, oldest last — click an entry to see full details"
+                    />
                     <div className="grid gap-2">
                         {post.activity_logs.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No activity yet.</p>
+                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <History className="size-4" />
+                                No activity yet.
+                            </p>
                         ) : (
-                            post.activity_logs.map((log) => (
-                                <div key={log.id} className="flex items-center justify-between gap-2 text-sm">
-                                    <span>
-                                        {log.user_name ?? 'System'}: {log.from_status ?? '—'} → {log.to_status}
-                                        {log.note ? ` — “${log.note}”` : ''}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">{log.created_at}</span>
-                                </div>
-                            ))
+                            post.activity_logs.map((log) => <ActivityLogEntry key={log.id} log={log} />)
                         )}
                     </div>
                 </div>

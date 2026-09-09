@@ -34,6 +34,7 @@ class PostStatusTransitionMap
             PostStatus::Archived->value,
         ],
         PostStatus::ChangesRequested->value => [
+            PostStatus::InternalReview->value,
             PostStatus::Draft->value,
             PostStatus::Archived->value,
         ],
