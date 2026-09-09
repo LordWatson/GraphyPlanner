@@ -133,6 +133,45 @@ function formatStatusLabel(status: string | null): string {
         .join(' ');
 }
 
+function CommentEntry({ comment }: { comment: CommentData }) {
+    const [open, setOpen] = useState(false);
+    const body = comment.body ?? '';
+    const preview = body.slice(0, 80);
+    const isTruncated = body.length > 80;
+
+    return (
+        <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border bg-muted/20">
+            <CollapsibleTrigger asChild>
+                <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 p-2.5 text-left text-sm hover:bg-muted/40"
+                >
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <User className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="font-medium">{comment.user_name ?? 'Unknown'}</span>
+                        {comment.internal_only && <Badge variant="secondary">Internal</Badge>}
+                        <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
+                            <MessageSquareQuote className="mr-1 inline size-3.5" />
+                            {preview}
+                            {isTruncated ? '…' : ''}
+                        </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{comment.created_at}</span>
+                        <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                    </div>
+                </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-t border-border/60 px-2.5 py-2 text-sm">
+                <div className="flex items-start gap-2">
+                    <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <p className="whitespace-pre-wrap text-muted-foreground">{comment.body}</p>
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
+    );
+}
+
 function ActivityLogEntry({ log }: { log: ActivityLogData }) {
     const [open, setOpen] = useState(false);
     const hasNote = Boolean(log.note && log.note.trim().length > 0);
@@ -528,7 +567,10 @@ export default function PostEdit({
                 )}
 
                 <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading title="Comments" description="Internal notes are never visible to client reviewers" />
+                    <Heading
+                        title="Comments"
+                        description="Internal notes are never visible to client reviewers — click a comment to see full details"
+                    />
                     {can.comment && (
                         <Form
                             {...PostController.comment.form(post.id)}
@@ -559,20 +601,12 @@ export default function PostEdit({
                     )}
                     <div className="grid gap-2">
                         {post.comments.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No comments yet.</p>
+                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <MessageSquareQuote className="size-4" />
+                                No comments yet.
+                            </p>
                         ) : (
-                            post.comments.map((c) => (
-                                <div key={c.id} className="rounded-md border border-border bg-muted/20 p-2 text-sm">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="font-medium">{c.user_name ?? 'Unknown'}</span>
-                                        <div className="flex items-center gap-2">
-                                            {c.internal_only && <Badge variant="secondary">Internal</Badge>}
-                                            <span className="text-xs text-muted-foreground">{c.created_at}</span>
-                                        </div>
-                                    </div>
-                                    <p>{c.body}</p>
-                                </div>
-                            ))
+                            post.comments.map((c) => <CommentEntry key={c.id} comment={c} />)
                         )}
                     </div>
                 </div>
