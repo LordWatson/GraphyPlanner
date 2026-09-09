@@ -6,6 +6,8 @@ use App\Enums\InvoiceStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\Post;
+use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -106,5 +108,76 @@ class DashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page->where('invoiceTotals', []));
+    }
+
+    public function test_dashboard_shows_upcoming_posts_scheduled_in_the_next_seven_days()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $user->org_id, 'timezone' => 'UTC']);
+
+        $post = Post::factory()->for($client)->create(['org_id' => $user->org_id]);
+        $post->targets()->create([
+            'social_account_id' => $account->id,
+            'scheduled_local_date' => now()->addDays(2)->toDateString(),
+            'scheduled_local_time' => '09:00',
+            'scheduled_at_utc' => now()->addDays(2),
+        ]);
+
+        // A target scheduled beyond the 7-day window must not appear.
+        $farPost = Post::factory()->for($client)->create(['org_id' => $user->org_id]);
+        $farPost->targets()->create([
+            'social_account_id' => $account->id,
+            'scheduled_local_date' => now()->addDays(30)->toDateString(),
+            'scheduled_local_time' => '09:00',
+            'scheduled_at_utc' => now()->addDays(30),
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('upcomingPosts', 1)
+            ->where('upcomingPosts.0.post_id', $post->id)
+        );
+    }
+
+    public function test_client_reviewer_only_sees_their_own_clients_upcoming_posts()
+    {
+        $reviewer = User::factory()->role(Role::ClientReviewer)->create();
+        $ownClient = Client::factory()->create(['org_id' => $reviewer->org_id]);
+        $reviewer->forceFill(['client_id' => $ownClient->id])->save();
+        $otherClient = Client::factory()->create(['org_id' => $reviewer->org_id]);
+
+        $ownAccount = SocialAccount::factory()->for($ownClient)->create(['org_id' => $reviewer->org_id, 'timezone' => 'UTC']);
+        $otherAccount = SocialAccount::factory()->for($otherClient)->create(['org_id' => $reviewer->org_id, 'timezone' => 'UTC']);
+
+        $ownPost = Post::factory()->for($ownClient)->create(['org_id' => $reviewer->org_id]);
+        $ownPost->targets()->create([
+            'social_account_id' => $ownAccount->id,
+            'scheduled_local_date' => now()->addDay()->toDateString(),
+            'scheduled_local_time' => '09:00',
+            'scheduled_at_utc' => now()->addDay(),
+        ]);
+
+        $otherPost = Post::factory()->for($otherClient)->create(['org_id' => $reviewer->org_id]);
+        $otherPost->targets()->create([
+            'social_account_id' => $otherAccount->id,
+            'scheduled_local_date' => now()->addDay()->toDateString(),
+            'scheduled_local_time' => '09:00',
+            'scheduled_at_utc' => now()->addDay(),
+        ]);
+
+        $this->actingAs($reviewer);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('upcomingPosts', 1)
+            ->where('upcomingPosts.0.post_id', $ownPost->id)
+        );
     }
 }
