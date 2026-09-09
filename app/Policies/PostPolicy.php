@@ -88,4 +88,21 @@ class PostPolicy
     {
         return $this->view($user, $post);
     }
+
+    /**
+     * Determine whether the user can view the org-wide calendar (Step 0.11). Every role that can
+     * see posts at all may open the calendar; a `Role::ClientReviewer` may open it too, but the
+     * `CalendarController` query itself scopes their results down to their own `client_id` (same
+     * restriction pattern as `viewAny`/`view`).
+     */
+    public function viewCalendar(User $user): bool
+    {
+        return in_array($user->role, [
+            Role::Owner,
+            Role::Strategist,
+            Role::Designer,
+            Role::Viewer,
+            Role::ClientReviewer,
+        ], true);
+    }
 }
