@@ -9,10 +9,16 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PostController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SocialAccountController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
+
+// Step 0.13: the client review portal is unauthenticated — access is granted purely by
+// possession of a valid `ReviewToken`, never a logged-in session (spec §10/§12).
+Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
+Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

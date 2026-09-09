@@ -18,13 +18,18 @@ class TransitionPostStatusAction
      *
      * Callers must authorize the transition (via `PostPolicy::transition`) before invoking this
      * action — it only enforces that the transition is a legal state-machine move.
+     *
+     * `$user` is nullable to support the unauthenticated Step 0.13 review portal (a client reviewer
+     * acting via a `ReviewToken` rather than a logged-in session) — the resulting activity log/
+     * approval rows simply record a null `user_id` in that case.
      */
     public function __invoke(
         Post $post,
         PostStatus $to,
-        User $user,
+        ?User $user,
         ?string $comment = null,
         EvaluatePostChecklistAction $evaluateChecklist = new EvaluatePostChecklistAction,
+        SendClientReviewRequestedEmailAction $sendClientReviewRequestedEmail = new SendClientReviewRequestedEmailAction,
     ): Post {
         if (! PostStatusTransitionMap::isAllowed($post->status, $to)) {
             throw new \InvalidArgumentException(
@@ -32,7 +37,7 @@ class TransitionPostStatusAction
             );
         }
 
-        return DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist) {
+        return DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist, $sendClientReviewRequestedEmail) {
             $from = $post->status;
 
             // Keep the §6 checklist snapshot fresh on every transition, so the editor UI can
@@ -43,7 +48,7 @@ class TransitionPostStatusAction
             ]);
 
             $post->activityLogs()->create([
-                'user_id' => $user->id,
+                'user_id' => $user?->id,
                 'from_status' => $from,
                 'to_status' => $to,
                 'note' => $comment,
@@ -51,7 +56,7 @@ class TransitionPostStatusAction
 
             if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
                 $post->approvals()->create([
-                    'user_id' => $user->id,
+                    'user_id' => $user?->id,
                     'decision' => $to === PostStatus::Approved
                         ? ApprovalDecision::Approved
                         : ApprovalDecision::ChangesRequested,
@@ -61,10 +66,16 @@ class TransitionPostStatusAction
 
             Log::info('Post status transitioned', [
                 'post_id' => $post->id,
-                'user_id' => $user->id,
+                'user_id' => $user?->id,
                 'from_status' => $from->value,
                 'to_status' => $to->value,
             ]);
+
+            // Step 0.13: notify the client by email (via Resend) with the review-portal link
+            // whenever a post lands in `waiting_client`, so they always have a fresh, valid token.
+            if ($to === PostStatus::WaitingClient) {
+                $sendClientReviewRequestedEmail($post);
+            }
 
             return $post->refresh();
         });
