@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Actions\Organizations;
+
+use App\Models\Organization;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class UpdateOrganizationSettingsAction
+{
+    /**
+     * Update the organization's settings (default timezone, Upload-Post key, xAI key).
+     *
+     * Keys are only ever written when present in $data (an empty/omitted value leaves
+     * the currently stored key untouched, so the form never needs to redisplay a secret
+     * to "keep" it).
+     *
+     * @param  array{default_timezone: string, upload_post_key?: string|null, xai_key?: string|null}  $data
+     */
+    public function __invoke(Organization $organization, array $data): Organization
+    {
+        return DB::transaction(function () use ($organization, $data) {
+            $organization->default_timezone = $data['default_timezone'];
+
+            if (! empty($data['upload_post_key'])) {
+                $organization->upload_post_key = $data['upload_post_key'];
+            }
+
+            if (! empty($data['xai_key'])) {
+                $organization->xai_key = $data['xai_key'];
+            }
+
+            $organization->save();
+
+            Log::info('Organization settings updated', [
+                'org_id' => $organization->id,
+                'upload_post_key_updated' => ! empty($data['upload_post_key']),
+                'xai_key_updated' => ! empty($data['xai_key']),
+            ]);
+
+            return $organization;
+        });
+    }
+}
