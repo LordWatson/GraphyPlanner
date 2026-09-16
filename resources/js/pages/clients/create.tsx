@@ -1,5 +1,4 @@
 import { Form, Head } from '@inertiajs/react';
-import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { create, index } from '@/routes/clients';
+import { create, index, store } from '@/routes/clients';
 
 type Option = { value: string; label: string };
 
@@ -32,7 +31,7 @@ export default function ClientCreate({
                     description="Create a new client record"
                 />
 
-                <Form {...ClientController.store.form()} className="space-y-6">
+                <Form {...store.form()} className="space-y-6">
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">

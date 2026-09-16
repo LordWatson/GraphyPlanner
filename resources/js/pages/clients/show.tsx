@@ -24,12 +24,6 @@ import {
     Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
-import AssetController from '@/actions/App/Http/Controllers/AssetController';
-import CampaignController from '@/actions/App/Http/Controllers/CampaignController';
-import ClientController from '@/actions/App/Http/Controllers/ClientController';
-import InvoiceController from '@/actions/App/Http/Controllers/InvoiceController';
-import PostController from '@/actions/App/Http/Controllers/PostController';
-import SocialAccountController from '@/actions/App/Http/Controllers/SocialAccountController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +38,17 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
-import { edit, index } from '@/routes/clients';
+import { edit, index, destroy as destroyClient } from '@/routes/clients';
+import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
+import { destroy as destroySocialAccount } from '@/routes/social-accounts';
+import { store as storeCampaign } from '@/routes/clients/campaigns';
+import { destroy as destroyCampaign } from '@/routes/campaigns';
+import { store as storePost } from '@/routes/clients/posts';
+import { edit as editPost } from '@/routes/posts';
+import { store as storeAsset } from '@/routes/clients/assets';
+import { destroy as destroyAsset } from '@/routes/assets';
+import { store as storeInvoice } from '@/routes/clients/invoices';
+import { send as sendInvoice, markPaid as markPaidInvoice } from '@/routes/invoices';
 
 type ClientData = {
     id: number;
@@ -315,7 +319,7 @@ export default function ClientShow({
                                     </Button>
                                 )}
                                 {can.delete && (
-                                    <Form {...ClientController.destroy.form(client.id)}>
+                                    <Form {...destroyClient.form(client.id)}>
                                         {({ processing }) => (
                                             <Button
                                                 type="submit"
@@ -405,7 +409,7 @@ export default function ClientShow({
                             <>
                                 {can.createSocialAccount && (
                                     <Form
-                                        {...SocialAccountController.store.form(client.id)}
+                                        {...storeSocialAccount.form(client.id)}
                                         resetOnSuccess
                                         className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
                                     >
@@ -480,7 +484,7 @@ export default function ClientShow({
                                                         </div>
                                                     </div>
                                                     {account.can.delete && (
-                                                        <Form {...SocialAccountController.destroy.form(account.id)}>
+                                                        <Form {...destroySocialAccount.form(account.id)}>
                                                             {({ processing }) => (
                                                                 <Button type="submit" size="sm" variant="outline" disabled={processing}>
                                                                     <Trash2 />
@@ -522,7 +526,7 @@ export default function ClientShow({
                             <>
                                 {can.createCampaign && (
                                     <Form
-                                        {...CampaignController.store.form(client.id)}
+                                        {...storeCampaign.form(client.id)}
                                         resetOnSuccess
                                         className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
                                     >
@@ -591,7 +595,7 @@ export default function ClientShow({
                                                     </div>
                                                 </div>
                                                 {campaign.can.delete && (
-                                                    <Form {...CampaignController.destroy.form(campaign.id)}>
+                                                    <Form {...destroyCampaign.form(campaign.id)}>
                                                         {({ processing }) => (
                                                             <Button type="submit" size="sm" variant="outline" disabled={processing}>
                                                                 <Trash2 />
@@ -632,7 +636,7 @@ export default function ClientShow({
                             <>
                                 {can.createPost && (
                                     <Form
-                                        {...PostController.store.form(client.id)}
+                                        {...storePost.form(client.id)}
                                         resetOnSuccess
                                         onSuccess={() => setSelectedTargetAccounts([])}
                                         className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
@@ -750,7 +754,7 @@ export default function ClientShow({
                                                         )}
                                                     </div>
                                                     <Button variant="outline" size="sm" asChild>
-                                                        <Link href={PostController.edit(post.id)}>
+                                                        <Link href={editPost(post.id)}>
                                                             <Pencil />
                                                             Open editor
                                                         </Link>
@@ -808,7 +812,7 @@ export default function ClientShow({
                             <>
                                 {can.createAsset && (
                                     <Form
-                                        {...AssetController.store.form(client.id)}
+                                        {...storeAsset.form(client.id)}
                                         resetOnSuccess
                                         className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
                                         encType="multipart/form-data"
@@ -898,7 +902,7 @@ export default function ClientShow({
                                                     </div>
                                                 </div>
                                                 {asset.can.delete && (
-                                                    <Form {...AssetController.destroy.form(asset.id)}>
+                                                    <Form {...destroyAsset.form(asset.id)}>
                                                         {({ processing }) => (
                                                             <Button type="submit" size="sm" variant="outline" disabled={processing}>
                                                                 <Trash2 />
@@ -940,7 +944,7 @@ export default function ClientShow({
                         <>
                         {can.createInvoice && (
                             <Form
-                                {...InvoiceController.store.form(client.id)}
+                                {...storeInvoice.form(client.id)}
                                 resetOnSuccess
                                 className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
                             >
@@ -1012,7 +1016,7 @@ export default function ClientShow({
                                                 {invoice.currency} {invoice.amount}
                                             </span>
                                             {invoice.can.send && (
-                                                <Form {...InvoiceController.send.form(invoice.id)}>
+                                                <Form {...sendInvoice.form(invoice.id)}>
                                                     {({ processing }) => (
                                                         <Button type="submit" size="sm" variant="outline" disabled={processing}>
                                                             Send
@@ -1021,7 +1025,7 @@ export default function ClientShow({
                                                 </Form>
                                             )}
                                             {invoice.can.mark_paid && (
-                                                <Form {...InvoiceController.markPaid.form(invoice.id)}>
+                                                <Form {...markPaidInvoice.form(invoice.id)}>
                                                     {({ processing }) => (
                                                         <Button type="submit" size="sm" variant="outline" disabled={processing}>
                                                             Mark paid

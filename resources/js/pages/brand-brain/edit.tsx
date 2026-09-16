@@ -1,11 +1,11 @@
 import { Form, Head } from '@inertiajs/react';
-import BrandBrainController from '@/actions/App/Http/Controllers/BrandBrainController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { index } from '@/routes/clients';
+import { update } from '@/routes/clients/brand-brain';
 
 type BrandBrainData = {
     voice: { tone?: string; personality?: string; do_nots?: string[] } | null;
@@ -57,7 +57,7 @@ export default function BrandBrainEdit({
                     </div>
                 </div>
 
-                <Form {...BrandBrainController.update.form(client.id)} className="space-y-6">
+                <Form {...update.form(client.id)} className="space-y-6">
                     {({ processing, errors }) => (
                         <>
                             <Tabs defaultValue="voice">

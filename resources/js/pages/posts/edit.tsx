@@ -17,7 +17,6 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
-import PostController from '@/actions/App/Http/Controllers/PostController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +26,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { show as showClient } from '@/routes/clients';
+import { update as updatePost, transition as transitionPost } from '@/routes/posts';
+import { store as storeComment } from '@/routes/posts/comments';
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
 
@@ -315,7 +316,7 @@ export default function PostEdit({
 
                 {can.update && (
                     <Form
-                        {...PostController.update.form(post.id)}
+                        {...updatePost.form(post.id)}
                         className="grid gap-4 rounded-lg border border-border bg-card p-4"
                     >
                         {({ processing, errors }) => (
@@ -555,7 +556,7 @@ export default function PostEdit({
                         <Heading title="Move status" description="Only legal, authorized transitions are shown" />
                         <div className="flex flex-wrap gap-2">
                             {allowedTransitions.map((transitionOption) => (
-                                <Form key={transitionOption.value} {...PostController.transition.form(post.id)}>
+                                <Form key={transitionOption.value} {...transitionPost.form(post.id)}>
                                     {({ processing, errors }) => (
                                         <div className="grid gap-1">
                                             <input type="hidden" name="to" value={transitionOption.value} />
@@ -591,7 +592,7 @@ export default function PostEdit({
                     />
                     {can.comment && (
                         <Form
-                            {...PostController.comment.form(post.id)}
+                            {...storeComment.form(post.id)}
                             resetOnSuccess
                             className="grid gap-2 rounded-md border border-dashed border-border p-3"
                         >

@@ -1,5 +1,4 @@
 import { Form, Head } from '@inertiajs/react';
-import ClientController from '@/actions/App/Http/Controllers/ClientController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { index } from '@/routes/clients';
+import { index, update } from '@/routes/clients';
 
 type Option = { value: string; label: string };
 
@@ -47,7 +46,7 @@ export default function ClientEdit({
                 <Heading title={`Edit ${client.name}`} description="Update client details" />
 
                 <Form
-                    {...ClientController.update.form(client.id)}
+                    {...update.form(client.id)}
                     options={{ preserveScroll: true }}
                     className="space-y-6"
                 >

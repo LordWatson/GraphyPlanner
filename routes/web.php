@@ -72,4 +72,61 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.comments.store');
 });
 
+// Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen
+// "Preview Studio" fixture org (via the `preview` middleware, which also signs the visitor in as
+// that org's owner) and hard-blocked from ever writing — the same middleware rejects every
+// non-GET request with a 403 before any controller runs, including these write endpoints, which
+// are kept here on purpose so the §12 acceptance test can assert the rejection.
+Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(function () {
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
+
+    Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
+
+    Route::resource('clients', ClientController::class);
+
+    Route::get('clients/{client}/brand-brain', [BrandBrainController::class, 'edit'])
+        ->name('clients.brand-brain.edit');
+    Route::put('clients/{client}/brand-brain', [BrandBrainController::class, 'update'])
+        ->name('clients.brand-brain.update');
+
+    Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
+        ->name('clients.invoices.store');
+    Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
+        ->name('invoices.send');
+    Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
+        ->name('invoices.mark-paid');
+
+    Route::post('clients/{client}/social-accounts', [SocialAccountController::class, 'store'])
+        ->name('clients.social-accounts.store');
+    Route::put('social-accounts/{socialAccount}', [SocialAccountController::class, 'update'])
+        ->name('social-accounts.update');
+    Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
+        ->name('social-accounts.destroy');
+
+    Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
+        ->name('clients.campaigns.store');
+    Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])
+        ->name('campaigns.update');
+    Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
+        ->name('campaigns.destroy');
+
+    Route::post('clients/{client}/assets', [AssetController::class, 'store'])
+        ->name('clients.assets.store');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])
+        ->name('assets.destroy');
+
+    Route::post('clients/{client}/posts', [PostController::class, 'store'])
+        ->name('clients.posts.store');
+    Route::get('posts/{post}/edit', [PostController::class, 'edit'])
+        ->name('posts.edit');
+    Route::put('posts/{post}', [PostController::class, 'update'])
+        ->name('posts.update');
+    Route::post('posts/{post}/transition', [PostController::class, 'transition'])
+        ->name('posts.transition');
+    Route::post('posts/{post}/comments', [PostController::class, 'comment'])
+        ->name('posts.comments.store');
+});
+
 require __DIR__.'/settings.php';
