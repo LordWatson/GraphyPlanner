@@ -47,13 +47,6 @@ class TransitionPostStatusAction
                 'checklist_snapshot' => $evaluateChecklist($post),
             ]);
 
-            $post->activityLogs()->create([
-                'user_id' => $user?->id,
-                'from_status' => $from,
-                'to_status' => $to,
-                'note' => $comment,
-            ]);
-
             if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
                 $post->approvals()->create([
                     'user_id' => $user?->id,
@@ -73,9 +66,19 @@ class TransitionPostStatusAction
 
             // Step 0.13: notify the client by email (via Resend) with the review-portal link
             // whenever a post lands in `waiting_client`, so they always have a fresh, valid token.
-            if ($to === PostStatus::WaitingClient) {
-                $sendClientReviewRequestedEmail($post);
-            }
+            // The resulting signed URL is recorded on the activity log below so an org user can
+            // see it and re-send the email later without needing to re-check the client's inbox.
+            $reviewUrl = $to === PostStatus::WaitingClient
+                ? $sendClientReviewRequestedEmail($post)
+                : null;
+
+            $post->activityLogs()->create([
+                'user_id' => $user?->id,
+                'from_status' => $from,
+                'to_status' => $to,
+                'note' => $comment,
+                'review_url' => $reviewUrl,
+            ]);
 
             return $post->refresh();
         });

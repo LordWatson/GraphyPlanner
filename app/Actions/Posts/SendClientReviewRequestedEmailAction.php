@@ -15,11 +15,14 @@ class SendClientReviewRequestedEmailAction
      * Issue a fresh `ReviewToken` scoped to the post's client and email the client (via Resend)
      * the Step 0.13 review-portal link. Silently skipped (with a warning log) when the client has
      * no `approval_email` on file, so a missing address never blocks the status transition itself.
+     *
+     * @return string|null the signed review-portal URL that was emailed, or `null` when the email
+     *                      was skipped (so the caller can record it on the resulting activity log).
      */
     public function __invoke(
         Post $post,
         CreateReviewTokenAction $createReviewToken = new CreateReviewTokenAction,
-    ): void {
+    ): ?string {
         $client = $post->client;
 
         if (blank($client?->approval_email)) {
@@ -28,7 +31,7 @@ class SendClientReviewRequestedEmailAction
                 'post_id' => $post->id,
             ]);
 
-            return;
+            return null;
         }
 
         ['token' => $plainToken] = $createReviewToken($client, $post);
@@ -41,5 +44,7 @@ class SendClientReviewRequestedEmailAction
             'client_id' => $client->id,
             'post_id' => $post->id,
         ]);
+
+        return $reviewUrl;
     }
 }

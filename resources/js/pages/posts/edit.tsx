@@ -29,7 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { show as showClient } from '@/routes/clients';
-import { update as updatePost, transition as transitionPost } from '@/routes/posts';
+import { activityLogs as postActivityLogs, update as updatePost, transition as transitionPost } from '@/routes/posts';
 import { store as storeComment } from '@/routes/posts/comments';
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
@@ -52,6 +52,7 @@ type ActivityLogData = {
     from_status: string | null;
     to_status: string;
     note: string | null;
+    review_url: string | null;
     created_at: string | null;
 };
 
@@ -177,9 +178,13 @@ function CommentEntry({ comment }: { comment: CommentData }) {
     );
 }
 
-function ActivityLogEntry({ log }: { log: ActivityLogData }) {
+function ActivityLogEntry({ log, postId, canResend }: { log: ActivityLogData; postId: number; canResend: boolean }) {
     const [open, setOpen] = useState(false);
     const hasNote = Boolean(log.note && log.note.trim().length > 0);
+    const hasReviewUrl = Boolean(log.review_url);
+    const hasDetails = hasNote || hasReviewUrl;
+    // Keep the collapsed preview short and non-breaking so a long note (or an embedded URL) never
+    // overflows the row — the full text is only ever rendered once expanded below.
     const preview = hasNote ? (log.note as string).slice(0, 80) : null;
     const isTruncated = hasNote && (log.note as string).length > 80;
 
@@ -208,18 +213,36 @@ function ActivityLogEntry({ log }: { log: ActivityLogData }) {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         <span className="text-xs text-muted-foreground">{log.created_at}</span>
-                        {hasNote && (
+                        {hasDetails && (
                             <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
                         )}
                     </div>
                 </button>
             </CollapsibleTrigger>
-            {hasNote && (
+            {hasDetails && (
                 <CollapsibleContent className="border-t border-border/60 px-2.5 py-2 text-sm">
-                    <div className="flex items-start gap-2">
-                        <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        <p className="whitespace-pre-wrap text-muted-foreground">{log.note}</p>
-                    </div>
+                    {hasNote && (
+                        <div className="flex items-start gap-2">
+                            <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                            <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap text-muted-foreground">{log.note}</p>
+                        </div>
+                    )}
+                    {hasReviewUrl && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
+                                Review link: <a href={log.review_url as string} className="underline" target="_blank" rel="noreferrer">{log.review_url}</a>
+                            </span>
+                            {canResend && (
+                                <Form {...postActivityLogs.resendReviewEmail.form([postId, log.id])}>
+                                    {({ processing }) => (
+                                        <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                            Resend email
+                                        </Button>
+                                    )}
+                                </Form>
+                            )}
+                        </div>
+                    )}
                 </CollapsibleContent>
             )}
         </Collapsible>
@@ -239,7 +262,7 @@ export default function PostEdit({
     targetAccounts: TargetAccountData[];
     availableAssets: AvailableAssetData[];
     allowedTransitions: { value: string; label: string }[];
-    can: { update: boolean; comment: boolean };
+    can: { update: boolean; comment: boolean; resend_review_email: boolean };
 }) {
     const [caption, setCaption] = useState(post.master_caption ?? '');
     // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
@@ -678,7 +701,9 @@ export default function PostEdit({
                                 No activity yet.
                             </p>
                         ) : (
-                            post.activity_logs.map((log) => <ActivityLogEntry key={log.id} log={log} />)
+                            post.activity_logs.map((log) => (
+                                <ActivityLogEntry key={log.id} log={log} postId={post.id} canResend={can.resend_review_email} />
+                            ))
                         )}
                     </div>
                 </div>

@@ -70,6 +70,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.transition');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
+    Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
+        ->name('posts.activity-logs.resend-review-email');
 });
 
 // Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen
@@ -127,6 +129,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('posts.transition');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
+    Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
+        ->name('posts.activity-logs.resend-review-email');
 });
 
 require __DIR__.'/settings.php';

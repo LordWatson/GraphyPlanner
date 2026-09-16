@@ -17,10 +17,11 @@ use Illuminate\Support\Carbon;
  * @property PostStatus|null $from_status
  * @property PostStatus $to_status
  * @property string|null $note
+ * @property string|null $review_url
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['post_id', 'user_id', 'from_status', 'to_status', 'note'])]
+#[Fillable(['post_id', 'user_id', 'from_status', 'to_status', 'note', 'review_url'])]
 class PostActivityLog extends Model
 {
     /** @use HasFactory<PostActivityLogFactory> */

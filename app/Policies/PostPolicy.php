@@ -90,6 +90,16 @@ class PostPolicy
     }
 
     /**
+     * Determine whether the user can re-send a stored review-portal link email (from a
+     * `waiting_client` activity log entry) to the client. Uses the same roles as `update`, since
+     * this is an org-side action to help the client re-discover the review link.
+     */
+    public function resendReviewEmail(User $user, Post $post): bool
+    {
+        return $this->update($user, $post);
+    }
+
+    /**
      * Determine whether the user can view the org-wide calendar (Step 0.11). Every role that can
      * see posts at all may open the calendar; a `Role::ClientReviewer` may open it too, but the
      * `CalendarController` query itself scopes their results down to their own `client_id` (same

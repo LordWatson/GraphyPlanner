@@ -6,6 +6,7 @@ use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Actions\Posts\PostStatusTransitionMap;
+use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
 use App\Enums\PostStatus;
@@ -15,6 +16,7 @@ use App\Http\Requests\TransitionPostRequest;
 use App\Http\Requests\UpdatePostRequest;
 use App\Models\Client;
 use App\Models\Post;
+use App\Models\PostActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -79,6 +81,7 @@ class PostController extends Controller
             'can' => [
                 'update' => $user->can('update', $post),
                 'comment' => $user->can('comment', $post),
+                'resend_review_email' => $user->can('resendReviewEmail', $post),
             ],
         ]);
     }
@@ -130,6 +133,24 @@ class PostController extends Controller
     }
 
     /**
+     * Re-send the review-portal link email recorded on a `waiting_client` activity log entry, so
+     * an org user can help a client who lost/never received the original message.
+     */
+    public function resendReviewEmail(
+        Post $post,
+        PostActivityLog $activityLog,
+        ResendClientReviewEmailAction $action,
+    ): RedirectResponse {
+        $this->authorize('resendReviewEmail', $post);
+
+        abort_unless($activityLog->post_id === $post->id, 404);
+
+        $action($activityLog);
+
+        return to_route('posts.edit', $post);
+    }
+
+    /**
      * Transform a post model into the full payload expected by the `posts/edit` editor UI.
      *
      * @return array<string, mixed>
@@ -173,6 +194,7 @@ class PostController extends Controller
                 'from_status' => $log->from_status?->value,
                 'to_status' => $log->to_status->value,
                 'note' => $log->note,
+                'review_url' => $log->review_url,
                 'created_at' => $log->created_at?->toIso8601String(),
             ])->values(),
             'approvals' => $post->approvals->sortByDesc('created_at')->map(fn ($approval) => [
