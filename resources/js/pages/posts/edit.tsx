@@ -29,7 +29,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { show as showClient } from '@/routes/clients';
-import { activityLogs as postActivityLogs, update as updatePost, transition as transitionPost } from '@/routes/posts';
+import { update as updatePost, transition as transitionPost } from '@/routes/posts';
+import postActivityLogs from '@/routes/posts/activity-logs';
 import { store as storeComment } from '@/routes/posts/comments';
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
