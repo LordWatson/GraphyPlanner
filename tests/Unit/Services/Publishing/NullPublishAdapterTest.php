@@ -19,8 +19,10 @@ class NullPublishAdapterTest extends TestCase
         $this->assertInstanceOf(PublishAdapter::class, new NullPublishAdapter);
     }
 
-    public function test_it_is_bound_as_the_default_publish_adapter(): void
+    public function test_it_can_be_bound_as_the_publish_adapter(): void
     {
+        $this->app->bind(PublishAdapter::class, NullPublishAdapter::class);
+
         $this->assertInstanceOf(NullPublishAdapter::class, app(PublishAdapter::class));
     }
 

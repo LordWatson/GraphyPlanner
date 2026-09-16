@@ -21,7 +21,7 @@ use App\Policies\OrganizationPolicy;
 use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Services\LocalAssetStorage;
-use App\Services\Publishing\NullPublishAdapter;
+use App\Services\Publishing\UploadPostAdapter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -41,11 +41,10 @@ class AppServiceProvider extends ServiceProvider
         // uploads (spec §10) — no caller of App\Contracts\AssetStorage needs to change.
         $this->app->bind(AssetStorage::class, LocalAssetStorage::class);
 
-        // No real vendor yet (Step 1.1) — swap this binding for the
-        // Upload-Post adapter once Step 1.2 implements PublishAdapter
-        // against their API. No caller of App\Contracts\PublishAdapter needs
-        // to change.
-        $this->app->bind(PublishAdapter::class, NullPublishAdapter::class);
+        // Upload-Post adapter (Step 1.2) bound against the PublishAdapter contract (Step 1.1).
+        // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule
+        // endpoint, webhook sync, and health integration still land in Steps 1.3-1.6.
+        $this->app->bind(PublishAdapter::class, UploadPostAdapter::class);
     }
 
     /**

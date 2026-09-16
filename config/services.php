@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    // Upload-Post (Phase 1 publish vendor, spec §7/§7.1). The per-request API key comes from
+    // each organization's `upload_post_key` (Step 0.15), not from an env var here.
+    'upload_post' => [
+        'base_url' => env('UPLOAD_POST_BASE_URL', 'https://api.upload-post.com/api'),
+    ],
+
 ];
