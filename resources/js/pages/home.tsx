@@ -109,7 +109,7 @@ export default function Home({ items }: HomeProps) {
                         className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
                     />
                     <div className="flex flex-col gap-1">
-                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
                             <span className="text-gradient-brand">Needs attention</span>
                         </h1>
                         <p className="max-w-xl text-sm text-muted-foreground">
