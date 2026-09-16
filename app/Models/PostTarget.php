@@ -16,11 +16,13 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $scheduled_local_date
  * @property string|null $scheduled_local_time
  * @property Carbon|null $scheduled_at_utc
+ * @property Carbon|null $reminder_sent_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc',
+    'reminder_sent_at',
 ])]
 class PostTarget extends Model
 {
@@ -35,6 +37,7 @@ class PostTarget extends Model
         return [
             'scheduled_local_date' => 'date',
             'scheduled_at_utc' => 'datetime',
+            'reminder_sent_at' => 'datetime',
         ];
     }
 
