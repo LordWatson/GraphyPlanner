@@ -8,10 +8,12 @@ import {
     Facebook,
     History,
     Instagram,
+    ListChecks,
     Linkedin,
     Lock,
     MessageSquareQuote,
     Music2,
+    Pencil,
     Share2,
     User,
     XCircle,
@@ -24,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { show as showClient } from '@/routes/clients';
 import { update as updatePost, transition as transitionPost } from '@/routes/posts';
@@ -278,6 +281,7 @@ export default function PostEdit({
     };
 
     const targetEntries = Object.entries(targetRows);
+    const [activeTab, setActiveTab] = useState('editor');
 
     return (
         <>
@@ -314,7 +318,33 @@ export default function PostEdit({
                     </div>
                 </div>
 
-                {can.update && (
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
+                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
+                        <TabsTrigger value="editor">
+                            <Pencil />
+                            Editor
+                        </TabsTrigger>
+                        <TabsTrigger value="checklist">
+                            <ListChecks />
+                            Checklist &amp; status
+                        </TabsTrigger>
+                        <TabsTrigger value="comments">
+                            <MessageSquareQuote />
+                            Comments
+                            {post.comments.length > 0 && (
+                                <Badge variant="secondary" className="ml-1">
+                                    {post.comments.length}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger value="activity">
+                            <History />
+                            Activity log
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="editor" className="grid gap-4">
+                    {can.update && (
                     <Form
                         {...updatePost.form(post.id)}
                         className="grid gap-4 rounded-lg border border-border bg-card p-4"
@@ -527,8 +557,10 @@ export default function PostEdit({
                             </>
                         )}
                     </Form>
-                )}
+                    )}
+                    </TabsContent>
 
+                    <TabsContent value="checklist" className="grid gap-4">
                 <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
                     <Heading
                         title="Pre-schedule checklist"
@@ -584,7 +616,9 @@ export default function PostEdit({
                         </div>
                     </div>
                 )}
+                    </TabsContent>
 
+                    <TabsContent value="comments" className="grid gap-4">
                 <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
                     <Heading
                         title="Comments"
@@ -629,7 +663,9 @@ export default function PostEdit({
                         )}
                     </div>
                 </div>
+                    </TabsContent>
 
+                    <TabsContent value="activity" className="grid gap-4">
                 <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
                     <Heading
                         title="Activity log"
@@ -646,6 +682,8 @@ export default function PostEdit({
                         )}
                     </div>
                 </div>
+                    </TabsContent>
+                </Tabs>
             </div>
         </>
     );

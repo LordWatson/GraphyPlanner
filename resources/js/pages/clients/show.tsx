@@ -2,7 +2,6 @@ import { Form, Head, Link } from '@inertiajs/react';
 import {
     Building2,
     CalendarDays,
-    ChevronDown,
     Clapperboard,
     Facebook,
     FileImage,
@@ -37,6 +36,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index, destroy as destroyClient } from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
@@ -249,11 +249,7 @@ export default function ClientShow({
     posts: PostData[];
     targetAccounts: TargetAccountData[];
 }) {
-    const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
-    const [socialAccountsOpen, setSocialAccountsOpen] = useState(false);
-    const [campaignsOpen, setCampaignsOpen] = useState(false);
-    const [assetsOpen, setAssetsOpen] = useState(false);
-    const [postsOpen, setPostsOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('social-accounts');
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
     const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<number[]>([]);
 
@@ -282,15 +278,16 @@ export default function ClientShow({
         .reduce((total, invoice) => total + Number(invoice.amount), 0);
 
     const statCards = [
-        { icon: Share2, label: 'Social accounts', value: socialAccounts.length, hint: 'Connected platforms' },
-        { icon: Clapperboard, label: 'Campaigns', value: campaigns.length, hint: 'Total campaigns' },
-        { icon: Send, label: 'Posts', value: posts.length, hint: 'Scheduled & published' },
-        { icon: FileImage, label: 'Assets', value: assets.length, hint: 'Uploads & links on file' },
+        { icon: Share2, label: 'Social accounts', value: socialAccounts.length, hint: 'Connected platforms', tab: 'social-accounts' },
+        { icon: Clapperboard, label: 'Campaigns', value: campaigns.length, hint: 'Total campaigns', tab: 'campaigns' },
+        { icon: Send, label: 'Posts', value: posts.length, hint: 'Scheduled & published', tab: 'posts' },
+        { icon: FileImage, label: 'Assets', value: assets.length, hint: 'Uploads & links on file', tab: 'assets' },
         {
             icon: Receipt,
             label: 'Outstanding',
             value: outstandingInvoiceTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
+            tab: 'billing',
         },
     ];
 
@@ -368,10 +365,15 @@ export default function ClientShow({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    {statCards.map(({ icon: Icon, label, value, hint }) => (
-                        <div
+                    {statCards.map(({ icon: Icon, label, value, hint, tab }) => (
+                        <button
+                            type="button"
                             key={label}
-                            className="relative flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm"
+                            onClick={() => setActiveTab(tab)}
+                            aria-current={activeTab === tab}
+                            className={`relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left shadow-sm transition-colors ${
+                                activeTab === tab ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'
+                            }`}
                         >
                             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
                             <div className="flex items-center gap-2 text-muted-foreground">
@@ -382,30 +384,41 @@ export default function ClientShow({
                             </div>
                             <span className="text-3xl font-bold tabular-nums">{value}</span>
                             <span className="text-xs text-muted-foreground">{hint}</span>
-                        </div>
+                        </button>
                     ))}
                 </div>
 
-                {socialAccounts !== undefined && (
-                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 text-left"
-                            onClick={() => setSocialAccountsOpen((open) => !open)}
-                            aria-expanded={socialAccountsOpen}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <Share2 className="size-4" />
-                                </span>
-                                <Heading title="Social accounts" description="Platforms this client posts to" />
-                            </div>
-                            <ChevronDown
-                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${socialAccountsOpen ? 'rotate-180' : ''}`}
-                            />
-                        </button>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
+                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
+                        <TabsTrigger value="social-accounts">
+                            <Share2 />
+                            Social accounts
+                        </TabsTrigger>
+                        <TabsTrigger value="campaigns">
+                            <Clapperboard />
+                            Campaigns
+                        </TabsTrigger>
+                        <TabsTrigger value="posts">
+                            <Send />
+                            Posts
+                        </TabsTrigger>
+                        <TabsTrigger value="assets">
+                            <FileImage />
+                            Assets
+                        </TabsTrigger>
+                        <TabsTrigger value="billing">
+                            <Receipt />
+                            Billing
+                        </TabsTrigger>
+                    </TabsList>
 
-                        {socialAccountsOpen && (
+                    <TabsContent
+                        value="social-accounts"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Social accounts" description="Platforms this client posts to" />
+
+                        <>
                             <>
                                 {can.createSocialAccount && (
                                     <Form
@@ -456,7 +469,7 @@ export default function ClientShow({
                                     </Form>
                                 )}
 
-                                {socialAccounts.length === 0 ? (
+                            {socialAccounts.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No social accounts yet.</p>
                                 ) : (
                                     <div className="grid gap-3 sm:grid-cols-2">
@@ -499,30 +512,16 @@ export default function ClientShow({
                                     </div>
                                 )}
                             </>
-                        )}
-                    </div>
-                )}
+                        </>
+                    </TabsContent>
 
-                {campaigns !== undefined && (
-                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 text-left"
-                            onClick={() => setCampaignsOpen((open) => !open)}
-                            aria-expanded={campaignsOpen}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <Clapperboard className="size-4" />
-                                </span>
-                                <Heading title="Campaigns" description="Marketing campaigns for this client" />
-                            </div>
-                            <ChevronDown
-                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${campaignsOpen ? 'rotate-180' : ''}`}
-                            />
-                        </button>
+                    <TabsContent
+                        value="campaigns"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Campaigns" description="Marketing campaigns for this client" />
 
-                        {campaignsOpen && (
+                        <>
                             <>
                                 {can.createCampaign && (
                                     <Form
@@ -567,7 +566,7 @@ export default function ClientShow({
                                     </Form>
                                 )}
 
-                                {campaigns.length === 0 ? (
+                            {campaigns.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No campaigns yet.</p>
                                 ) : (
                                     <div className="grid gap-3 sm:grid-cols-2">
@@ -609,30 +608,16 @@ export default function ClientShow({
                                     </div>
                                 )}
                             </>
-                        )}
-                    </div>
-                )}
+                        </>
+                    </TabsContent>
 
-                {posts !== undefined && (
-                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 text-left"
-                            onClick={() => setPostsOpen((open) => !open)}
-                            aria-expanded={postsOpen}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <Send className="size-4" />
-                                </span>
-                                <Heading title="Posts" description="Scheduled content across social accounts" />
-                            </div>
-                            <ChevronDown
-                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${postsOpen ? 'rotate-180' : ''}`}
-                            />
-                        </button>
+                    <TabsContent
+                        value="posts"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Posts" description="Scheduled content across social accounts" />
 
-                        {postsOpen && (
+                        <>
                             <>
                                 {can.createPost && (
                                     <Form
@@ -735,7 +720,7 @@ export default function ClientShow({
                                     </Form>
                                 )}
 
-                                {posts.length === 0 ? (
+                            {posts.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No posts yet.</p>
                                 ) : (
                                     <div className="grid gap-3">
@@ -785,30 +770,16 @@ export default function ClientShow({
                                     </div>
                                 )}
                             </>
-                        )}
-                    </div>
-                )}
+                        </>
+                    </TabsContent>
 
-                {assets !== undefined && (
-                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 text-left"
-                            onClick={() => setAssetsOpen((open) => !open)}
-                            aria-expanded={assetsOpen}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <FileImage className="size-4" />
-                                </span>
-                                <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
-                            </div>
-                            <ChevronDown
-                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${assetsOpen ? 'rotate-180' : ''}`}
-                            />
-                        </button>
+                    <TabsContent
+                        value="assets"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
 
-                        {assetsOpen && (
+                        <>
                             <>
                                 {can.createAsset && (
                                     <Form
@@ -869,7 +840,7 @@ export default function ClientShow({
                                     </Form>
                                 )}
 
-                                {assets.length === 0 ? (
+                            {assets.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No assets yet.</p>
                                 ) : (
                                     <div className="grid gap-3 sm:grid-cols-2">
@@ -917,30 +888,15 @@ export default function ClientShow({
                                     </div>
                                 )}
                             </>
-                        )}
-                    </div>
-                )}
+                        </>
+                    </TabsContent>
 
-                {invoices !== undefined && (
-                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 text-left"
-                            onClick={() => setBillingHistoryOpen((open) => !open)}
-                            aria-expanded={billingHistoryOpen}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <Receipt className="size-4" />
-                                </span>
-                                <Heading title="Billing history" description="Invoices raised for this client" />
-                            </div>
-                            <ChevronDown
-                                className={`size-4 shrink-0 text-muted-foreground transition-transform ${billingHistoryOpen ? 'rotate-180' : ''}`}
-                            />
-                        </button>
+                    <TabsContent
+                        value="billing"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Billing history" description="Invoices raised for this client" />
 
-                        {billingHistoryOpen && (
                         <>
                         {can.createInvoice && (
                             <Form
@@ -1039,9 +995,8 @@ export default function ClientShow({
                             </div>
                         )}
                         </>
-                        )}
-                    </div>
-                )}
+                    </TabsContent>
+                </Tabs>
             </div>
         </>
     );
