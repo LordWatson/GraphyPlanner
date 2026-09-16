@@ -20,6 +20,10 @@ Route::inertia('/', 'welcome')->name('home');
 Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
 Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
 
+// Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
+// connect flow, so this must be reachable without a session, just like the review portal above.
+Route::get('social-accounts/callback', [SocialAccountController::class, 'callback'])->name('social-accounts.callback');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
@@ -47,6 +51,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('social-accounts.update');
     Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
         ->name('social-accounts.destroy');
+    Route::post('social-accounts/{socialAccount}/connect', [SocialAccountController::class, 'connect'])
+        ->name('social-accounts.connect');
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
@@ -106,6 +112,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('social-accounts.update');
     Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
         ->name('social-accounts.destroy');
+    Route::post('social-accounts/{socialAccount}/connect', [SocialAccountController::class, 'connect'])
+        ->name('social-accounts.connect');
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');

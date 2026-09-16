@@ -4,6 +4,7 @@ namespace App\Services\Publishing;
 
 use App\Contracts\PublishAdapter;
 use App\Enums\AssetType;
+use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Models\Post;
 use App\Models\PostTarget;
@@ -13,33 +14,139 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
- * PublishAdapter implementation for Upload-Post (spec §7/§7.1), Step 1.2. Each organization's
+ * PublishAdapter implementation for Upload-Post (spec §7/§7.1). Each organization's
  * `upload_post_key` (Step 0.15) is used as the vendor API key, so every request is authenticated
  * per-org rather than via a shared app-wide credential.
  *
- * `connectAccount()`/`handleCallback()`/`cancel()`/`health()` are interim stubs here — the real
- * connect flow, cancellation, and health/token-expiry checks land in Steps 1.3, 1.5, and 1.6
- * respectively. This step's scope is `publish()`'s per-platform field mapping only.
+ * `connectAccount()`/`handleCallback()` implement the Step 1.3 account connect flow against
+ * Upload-Post's JWT-based hosted linking page. `cancel()`/`health()` remain interim/partial —
+ * real cancellation lands in Step 1.5, and `health()`'s use in the token-expiry integration lands
+ * in Step 1.6.
  */
 class UploadPostAdapter implements PublishAdapter
 {
     public function __construct(private readonly ?string $baseUrl = null) {}
 
+    /**
+     * Ask Upload-Post to generate a hosted "connect" link for this account (spec §7, Step 1.3).
+     * The link's `redirect_url` carries the account id so `handleCallback()` can identify which
+     * SocialAccount to update once the user finishes linking on Upload-Post's side.
+     */
     public function connectAccount(SocialAccount $account): string
     {
-        // Interim: Upload-Post's hosted connect flow is wired up properly in Step 1.3.
-        return sprintf('%s/uploadposts/users/generate-jwt', $this->baseUrl());
+        $username = $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id;
+
+        $this->ensureProfileExists($account, $username);
+
+        Log::info('Requesting Upload-Post connect link', ['social_account_id' => $account->id]);
+
+        try {
+            $response = $this->client($account)->post('/uploadposts/users/generate-jwt', [
+                'username' => $username,
+                'redirect_url' => route('social-accounts.callback', ['social_account_id' => $account->id]),
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Upload-Post connect request failed', [
+                'social_account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new RuntimeException('Unable to start the Upload-Post connect flow: '.$e->getMessage(), previous: $e);
+        }
+
+        if (! $response->successful()) {
+            Log::warning('Upload-Post connect request rejected', [
+                'social_account_id' => $account->id,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            throw new RuntimeException('Upload-Post rejected the connect request: '.($response->json('error') ?? $response->body()));
+        }
+
+        return (string) ($response->json('access_url') ?? $response->json('url'));
     }
 
     /**
+     * Upload-Post's `generate-jwt` endpoint only issues a linking token for a profile that
+     * already exists — it doesn't implicitly create one, so `connectAccount()` must create the
+     * profile via `POST /uploadposts/users` first (spec §7, Step 1.3 bugfix). A response
+     * indicating the profile already exists is treated as success (idempotent).
+     */
+    private function ensureProfileExists(SocialAccount $account, string $username): void
+    {
+        try {
+            $response = $this->client($account)->post('/uploadposts/users', [
+                'username' => $username,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Upload-Post profile creation request failed', [
+                'social_account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new RuntimeException('Unable to start the Upload-Post connect flow: '.$e->getMessage(), previous: $e);
+        }
+
+        if ($response->successful()) {
+            return;
+        }
+
+        $alreadyExists = str_contains(strtolower((string) $response->json('error_code')), 'exist')
+            || str_contains(strtolower((string) ($response->json('error') ?? $response->body())), 'already exist');
+
+        if ($alreadyExists) {
+            return;
+        }
+
+        Log::warning('Upload-Post profile creation rejected', [
+            'social_account_id' => $account->id,
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
+
+        throw new RuntimeException('Upload-Post rejected the profile creation request: '.($response->json('error') ?? $response->body()));
+    }
+
+    /**
+     * Persist the externalProfileId and flip connectionStatus once Upload-Post redirects the user
+     * back to `redirect_url` (spec §7, Step 1.3). The account id travels round-trip via the query
+     * string set in connectAccount(), since Upload-Post's callback query shape doesn't carry it.
+     *
      * @param  array<string, mixed>  $query
      */
     public function handleCallback(array $query): void
     {
-        // Persisting externalProfileId/connectionStatus from the callback lands in Step 1.3.
+        $accountId = $query['social_account_id'] ?? null;
+
+        if (! $accountId) {
+            Log::warning('Upload-Post callback missing social_account_id', ['query' => $query]);
+
+            return;
+        }
+
+        $account = SocialAccount::find($accountId);
+
+        if (! $account) {
+            Log::warning('Upload-Post callback referenced an unknown social account', ['social_account_id' => $accountId]);
+
+            return;
+        }
+
+        $account->update([
+            'external_profile_id' => $query['profile'] ?? $query['username'] ?? $account->external_profile_id,
+            'connection_status' => ConnectionStatus::Connected,
+            'connected_at' => now(),
+        ]);
+
+        Log::info('Upload-Post account connected', [
+            'social_account_id' => $account->id,
+            'external_profile_id' => $account->external_profile_id,
+        ]);
     }
 
     /**
@@ -255,8 +362,11 @@ class UploadPostAdapter implements PublishAdapter
     {
         $apiKey = $account->organization?->upload_post_key ?? '';
 
+        // Upload-Post's API authenticates via an `Apikey` scheme, not the standard OAuth
+        // `Bearer` scheme, so `withToken()` (which always sends `Bearer <token>`) can't be used
+        // here — see https://docs.upload-post.com/api/reference.
         return Http::baseUrl($this->baseUrl())
-            ->withToken($apiKey)
+            ->withHeaders(['Authorization' => 'Apikey '.$apiKey])
             ->acceptJson();
     }
 

@@ -252,6 +252,7 @@ class ClientController extends Controller
             'can' => [
                 'update' => $user->can('update', $socialAccount),
                 'delete' => $user->can('delete', $socialAccount),
+                'connect' => $user->can('update', $socialAccount),
             ],
         ];
     }

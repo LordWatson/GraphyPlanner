@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class SocialAccountControllerTest extends TestCase
@@ -131,6 +132,75 @@ class SocialAccountControllerTest extends TestCase
 
         $response->assertRedirect(route('clients.show', $client));
         $this->assertDatabaseMissing('social_accounts', ['id' => $account->id]);
+    }
+
+    public function test_owner_can_start_the_connect_flow_and_receives_the_vendor_url_as_json(): void
+    {
+        Http::fake([
+            '*/uploadposts/users/generate-jwt' => Http::response(['access_url' => 'https://upload-post.test/connect/abc'], 200),
+            '*/uploadposts/users' => Http::response(['success' => true], 200),
+        ]);
+
+        $org = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $response = $this->actingAs($owner)->post(route('social-accounts.connect', $account));
+
+        $response->assertOk();
+        $response->assertJson(['url' => 'https://upload-post.test/connect/abc']);
+    }
+
+    public function test_connect_flow_returns_a_json_error_when_the_vendor_rejects_the_request(): void
+    {
+        Http::fake([
+            '*/uploadposts/users' => Http::response(['success' => false, 'error' => 'Profile limit reached'], 422),
+        ]);
+
+        $org = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $response = $this->actingAs($owner)->post(route('social-accounts.connect', $account));
+
+        $response->assertStatus(422);
+        $response->assertJsonStructure(['message']);
+    }
+
+    public function test_designer_cannot_start_the_connect_flow(): void
+    {
+        $org = Organization::factory()->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $response = $this->actingAs($designer)->post(route('social-accounts.connect', $account));
+
+        $response->assertForbidden();
+    }
+
+    public function test_the_vendor_callback_persists_the_external_profile_id_and_connects_the_account(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'connection_status' => ConnectionStatus::NotConnected,
+        ]);
+
+        $response = $this->get(route('social-accounts.callback', [
+            'social_account_id' => $account->id,
+            'profile' => 'vendor-profile-123',
+        ]));
+
+        $response->assertOk();
+        $response->assertViewIs('social-accounts.connected');
+        $response->assertViewHas('connected', true);
+        $this->assertSame('vendor-profile-123', $account->fresh()->external_profile_id);
+        $this->assertSame(ConnectionStatus::Connected, $account->fresh()->connection_status);
+        $this->assertNotNull($account->fresh()->connected_at);
     }
 
     public function test_client_reviewer_sees_social_accounts_scoped_to_their_client(): void

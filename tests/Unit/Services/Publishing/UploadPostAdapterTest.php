@@ -4,6 +4,7 @@ namespace Tests\Unit\Services\Publishing;
 
 use App\Contracts\PublishAdapter;
 use App\Enums\AssetType;
+use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Models\Asset;
 use App\Models\Organization;
@@ -14,6 +15,7 @@ use App\Services\Publishing\UploadPostAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 use Tests\TestCase;
 
 class UploadPostAdapterTest extends TestCase
@@ -59,7 +61,7 @@ class UploadPostAdapterTest extends TestCase
 
         Http::assertSent(function ($request) {
             return $request->url() === 'https://api.upload-post.com/api/uploadposts/schedule'
-                && $request->hasHeader('Authorization', 'Bearer org-secret-key')
+                && $request->hasHeader('Authorization', 'Apikey org-secret-key')
                 && $request['user'] === 'ext-acct-1'
                 && $request['title'] === 'Hello world'
                 && $request['platform'] === [Platform::LinkedIn->value]
@@ -140,6 +142,122 @@ class UploadPostAdapterTest extends TestCase
         });
 
         $this->assertContains('tiktok_is_ai_generated', $results->first()->skippedFields);
+    }
+
+    public function test_connect_account_returns_the_vendor_access_url(): void
+    {
+        Http::fake([
+            '*/uploadposts/users/generate-jwt' => Http::response(['access_url' => 'https://upload-post.test/connect/abc'], 200),
+            '*/uploadposts/users' => Http::response(['success' => true], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'external_account_id' => 'ext-acct-1',
+        ]);
+
+        $url = (new UploadPostAdapter)->connectAccount($account);
+
+        $this->assertSame('https://upload-post.test/connect/abc', $url);
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.upload-post.com/api/uploadposts/users'
+                && $request->hasHeader('Authorization', 'Apikey org-secret-key')
+                && $request['username'] === 'ext-acct-1';
+        });
+        Http::assertSent(function ($request) use ($account) {
+            return $request->url() === 'https://api.upload-post.com/api/uploadposts/users/generate-jwt'
+                && $request->hasHeader('Authorization', 'Apikey org-secret-key')
+                && $request['username'] === 'ext-acct-1'
+                && str_contains((string) $request['redirect_url'], (string) $account->id);
+        });
+    }
+
+    public function test_connect_account_creates_the_profile_when_it_does_not_exist_yet(): void
+    {
+        Http::fake([
+            '*/uploadposts/users/generate-jwt' => Http::response(['access_url' => 'https://upload-post.test/connect/abc'], 200),
+            '*/uploadposts/users' => Http::response(['success' => true, 'message' => 'Profile created'], 201),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'external_account_id' => 'ext-acct-1',
+        ]);
+
+        $url = (new UploadPostAdapter)->connectAccount($account);
+
+        $this->assertSame('https://upload-post.test/connect/abc', $url);
+    }
+
+    public function test_connect_account_treats_an_already_existing_profile_as_success(): void
+    {
+        Http::fake([
+            '*/uploadposts/users/generate-jwt' => Http::response(['access_url' => 'https://upload-post.test/connect/abc'], 200),
+            '*/uploadposts/users' => Http::response(['success' => false, 'error' => 'Profile already exists', 'error_code' => 'PROFILE_ALREADY_EXISTS'], 409),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'external_account_id' => 'ext-acct-1',
+        ]);
+
+        $url = (new UploadPostAdapter)->connectAccount($account);
+
+        $this->assertSame('https://upload-post.test/connect/abc', $url);
+    }
+
+    public function test_connect_account_throws_when_profile_creation_fails_for_another_reason(): void
+    {
+        Http::fake([
+            '*/uploadposts/users' => Http::response(['success' => false, 'error' => 'Profile limit reached', 'error_code' => 'PROFILE_LIMIT_REACHED'], 422),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+
+        $this->expectException(RuntimeException::class);
+
+        (new UploadPostAdapter)->connectAccount($account);
+    }
+
+    public function test_connect_account_throws_when_the_vendor_rejects_the_request(): void
+    {
+        Http::fake([
+            '*/uploadposts/users' => Http::response(['success' => true], 200),
+            '*/uploadposts/users/generate-jwt' => Http::response(['error' => 'Invalid key'], 401),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'bad-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+
+        $this->expectException(RuntimeException::class);
+
+        (new UploadPostAdapter)->connectAccount($account);
+    }
+
+    public function test_handle_callback_persists_the_external_profile_id_and_connects_the_account(): void
+    {
+        $account = SocialAccount::factory()->create(['connection_status' => ConnectionStatus::NotConnected]);
+
+        (new UploadPostAdapter)->handleCallback([
+            'social_account_id' => $account->id,
+            'profile' => 'vendor-profile-123',
+        ]);
+
+        $account->refresh();
+        $this->assertSame('vendor-profile-123', $account->external_profile_id);
+        $this->assertSame(ConnectionStatus::Connected, $account->connection_status);
+        $this->assertNotNull($account->connected_at);
+    }
+
+    public function test_handle_callback_is_a_no_op_when_the_social_account_id_is_missing(): void
+    {
+        $account = SocialAccount::factory()->create(['connection_status' => ConnectionStatus::NotConnected]);
+
+        (new UploadPostAdapter)->handleCallback(['profile' => 'vendor-profile-123']);
+
+        $account->refresh();
+        $this->assertSame(ConnectionStatus::NotConnected, $account->connection_status);
     }
 
     public function test_publish_returns_a_failed_target_result_when_the_vendor_rejects_the_request(): void

@@ -61,7 +61,6 @@ class DemoContentSeeder extends Seeder
                     'language' => $client->default_language ?? 'en',
                     'country' => 'US',
                     'connection_status' => ConnectionStatus::Connected,
-                    'connected_at' => now()->subWeeks(2),
                 ]
             );
         });

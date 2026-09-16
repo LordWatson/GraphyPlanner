@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, router } from '@inertiajs/react';
 import {
     Building2,
     CalendarDays,
@@ -22,7 +22,8 @@ import {
     UploadCloud,
     Wallet,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index, destroy as destroyClient } from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
-import { destroy as destroySocialAccount } from '@/routes/social-accounts';
+import { destroy as destroySocialAccount, connect as connectSocialAccount } from '@/routes/social-accounts';
 import { store as storeCampaign } from '@/routes/clients/campaigns';
 import { destroy as destroyCampaign } from '@/routes/campaigns';
 import { store as storePost } from '@/routes/clients/posts';
@@ -92,7 +93,7 @@ type SocialAccountData = {
     language: string | null;
     country: string | null;
     connection_status: string;
-    can: { update: boolean; delete: boolean };
+    can: { update: boolean; delete: boolean; connect: boolean };
 };
 
 type CampaignData = {
@@ -202,6 +203,17 @@ const platformIcon: Record<string, typeof Instagram> = {
     linkedin: Linkedin,
 };
 
+/**
+ * Reads Laravel's `XSRF-TOKEN` cookie so the plain `fetch()` call in `handleConnect` below can
+ * authenticate as a normal stateful request, mirroring what Inertia's own `<Form>`/`router` calls
+ * do automatically via axios.
+ */
+function getXsrfTokenFromCookie(): string {
+    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
 const assetSourceIcon: Record<string, typeof UploadCloud> = {
     upload: UploadCloud,
     figma: Figma,
@@ -252,11 +264,79 @@ export default function ClientShow({
     const [activeTab, setActiveTab] = useState('social-accounts');
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
     const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<number[]>([]);
+    const [connectingAccountId, setConnectingAccountId] = useState<number | null>(null);
 
     const toggleTargetAccount = (id: number) => {
         setSelectedTargetAccounts((current) =>
             current.includes(id) ? current.filter((accountId) => accountId !== id) : [...current, id],
         );
+    };
+
+    // The vendor's hosted connect flow finishes in the popup opened by `handleConnect` below, not
+    // in this tab, so we listen for the confirmation `postMessage` it sends (see
+    // `resources/views/social-accounts/connected.blade.php`) and refresh the accounts list here.
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+
+            if (event.data?.type === 'graphy:social-account-connected') {
+                router.reload({ only: ['socialAccounts'] });
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
+    // Opens the vendor's hosted connect page in a separate popup/tab (instead of taking over this
+    // one), and refreshes the social accounts list once that popup is closed as a fallback in case
+    // the `postMessage` confirmation above didn't arrive.
+    const handleConnect = async (accountId: number) => {
+        setConnectingAccountId(accountId);
+
+        const popup = window.open('about:blank', `graphy-connect-${accountId}`);
+
+        try {
+            const response = await fetch(connectSocialAccount.url(accountId), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
+                },
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.url) {
+                popup?.close();
+                toast.error(data.message ?? 'Unable to start the Upload-Post connect flow.');
+                return;
+            }
+
+            if (popup) {
+                popup.location.href = data.url;
+
+                const interval = window.setInterval(() => {
+                    if (popup.closed) {
+                        window.clearInterval(interval);
+                        router.reload({ only: ['socialAccounts'] });
+                    }
+                }, 1000);
+            } else {
+                // Popup was blocked — fall back to a plain new tab.
+                window.open(data.url, '_blank');
+            }
+        } catch {
+            popup?.close();
+            toast.error('Unable to start the Upload-Post connect flow.');
+        } finally {
+            setConnectingAccountId(null);
+        }
     };
 
     const metaChips: { icon: typeof Globe; label: string }[] = [
@@ -478,14 +558,14 @@ export default function ClientShow({
                                             return (
                                                 <div
                                                     key={account.id}
-                                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
                                                 >
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex min-w-0 items-center gap-3">
                                                         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                                                             <PlatformIcon className="size-4" />
                                                         </span>
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2">
+                                                        <div className="flex min-w-0 flex-col gap-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
                                                                 <span className="text-sm font-medium">{account.handle}</span>
                                                                 <Badge variant={connectionStatusVariant[account.connection_status] ?? 'outline'}>
                                                                     {account.connection_status}
@@ -496,16 +576,37 @@ export default function ClientShow({
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    {account.can.delete && (
-                                                        <Form {...destroySocialAccount.form(account.id)}>
-                                                            {({ processing }) => (
-                                                                <Button type="submit" size="sm" variant="outline" disabled={processing}>
-                                                                    <Trash2 />
-                                                                    Remove
-                                                                </Button>
-                                                            )}
-                                                        </Form>
-                                                    )}
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        {account.can.connect && account.connection_status !== 'connected' && (
+                                                            <Button
+                                                                type="button"
+                                                                size="icon"
+                                                                variant="outline"
+                                                                disabled={connectingAccountId === account.id}
+                                                                title="Connect"
+                                                                onClick={() => handleConnect(account.id)}
+                                                            >
+                                                                <Link2 />
+                                                                <span className="sr-only">Connect</span>
+                                                            </Button>
+                                                        )}
+                                                        {account.can.delete && (
+                                                            <Form {...destroySocialAccount.form(account.id)}>
+                                                                {({ processing }) => (
+                                                                    <Button
+                                                                        type="submit"
+                                                                        size="icon"
+                                                                        variant="outline"
+                                                                        disabled={processing}
+                                                                        title="Remove"
+                                                                    >
+                                                                        <Trash2 />
+                                                                        <span className="sr-only">Remove</span>
+                                                                    </Button>
+                                                                )}
+                                                            </Form>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         })}
