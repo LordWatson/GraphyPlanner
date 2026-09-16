@@ -92,10 +92,10 @@ const attentionIcons = {
     missing_media: ImageOff,
 } as const;
 
-const healthBadgeVariant: Record<ClientHealthRow['status'], 'destructive' | 'secondary' | 'outline'> = {
+const healthBadgeVariant: Record<ClientHealthRow['status'], 'destructive' | 'warning' | 'success'> = {
     red: 'destructive',
-    amber: 'secondary',
-    green: 'outline',
+    amber: 'warning',
+    green: 'success',
 };
 
 export default function Dashboard({
