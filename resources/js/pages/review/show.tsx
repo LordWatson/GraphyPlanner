@@ -74,7 +74,7 @@ export default function ReviewShow({
                 <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 pb-16">
                     <div className="flex flex-col gap-2">
                         <p className="text-sm text-muted-foreground">Reviewing for {client.name}</p>
-                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
                             <span className="text-gradient-brand">Content ready for your review</span>
                         </h1>
                     </div>

@@ -328,7 +328,7 @@ export default function PostEdit({
                     />
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex flex-col gap-1">
-                            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                            <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
                                 <span className="text-gradient-brand">Post editor</span>
                             </h1>
                             <p className="max-w-xl text-sm text-muted-foreground">Client: {client.name}</p>

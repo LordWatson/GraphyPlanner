@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ClientStatus;
+use App\Enums\ConnectionStatus;
 use App\Enums\InvoiceStatus;
+use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Invoice;
@@ -180,6 +183,87 @@ class DashboardTest extends TestCase
             ->has('upcomingPosts', 1)
             ->where('upcomingPosts.0.post_id', $ownPost->id)
             ->where('summary.scheduledPosts', 1)
+        );
+    }
+
+    public function test_dashboard_shows_needs_attention_items_and_summary_count()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+
+        $failedPost = Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Failed,
+        ]);
+
+        SocialAccount::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'connection_status' => ConnectionStatus::TokenExpired,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('needsAttentionItems', 2)
+            ->where('summary.needsAttention', 2)
+            ->where('needsAttentionItems.0.post_id', $failedPost->id)
+        );
+    }
+
+    public function test_dashboard_shows_client_health_summary()
+    {
+        $user = User::factory()->create();
+        Client::factory()->create([
+            'org_id' => $user->org_id,
+            'status' => ClientStatus::Offboarding,
+        ]);
+        Client::factory()->create([
+            'org_id' => $user->org_id,
+            'status' => ClientStatus::Active,
+            'owner_user_id' => $user->id,
+            'retainer_amount' => 1000,
+            'billing_cycle' => \App\Enums\BillingCycle::Monthly,
+            'start_date' => now(),
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('clientHealth', 2)
+            ->where('clientHealth.0.status', 'red')
+        );
+    }
+
+    public function test_dashboard_shows_unapproved_drafts_and_summary_count()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+
+        $draft = Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Draft,
+        ]);
+
+        Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Published,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('unapprovedDraftsList', 1)
+            ->where('unapprovedDraftsList.0.post_id', $draft->id)
+            ->where('summary.unapprovedDrafts', 1)
         );
     }
 }
