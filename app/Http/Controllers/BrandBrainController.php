@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Actions\BrandBrains\UpdateBrandBrainAction;
+use App\Actions\BrandBrains\UploadBrandPersonaAction;
 use App\Http\Requests\UpdateBrandBrainRequest;
+use App\Http\Requests\UploadBrandPersonaRequest;
 use App\Models\BrandBrain;
 use App\Models\Client;
 use App\Policies\BrandBrainPolicy;
@@ -38,6 +40,8 @@ class BrandBrainController extends Controller
                 'music_policy' => $brandBrain->music_policy,
                 'hashtag_policy' => $brandBrain->hashtag_policy,
                 'content_pillars' => $brandBrain->content_pillars,
+                'persona_url' => $brandBrain->persona_url,
+                'persona_original_filename' => $brandBrain->persona_original_filename,
             ],
             'can' => [
                 'update' => $policy->update($request->user(), $client),
@@ -51,6 +55,16 @@ class BrandBrainController extends Controller
     public function update(UpdateBrandBrainRequest $request, Client $client, UpdateBrandBrainAction $action): RedirectResponse
     {
         $action($client, $request->validated());
+
+        return to_route('clients.brand-brain.edit', $client);
+    }
+
+    /**
+     * Upload (or overwrite) the Brand Persona PDF for the given client.
+     */
+    public function uploadPersona(UploadBrandPersonaRequest $request, Client $client, UploadBrandPersonaAction $action): RedirectResponse
+    {
+        $action($client, $request->file('persona'));
 
         return to_route('clients.brand-brain.edit', $client);
     }

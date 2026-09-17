@@ -8,6 +8,8 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BrandBrainControllerTest extends TestCase
@@ -113,5 +115,82 @@ class BrandBrainControllerTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('clients.brand-brain.edit', $otherClient));
 
         $response->assertForbidden();
+    }
+
+    public function test_owner_can_upload_a_brand_persona_pdf(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $file = UploadedFile::fake()->create('persona.pdf', 100, 'application/pdf');
+
+        $response = $this->actingAs($owner)->post(route('clients.brand-brain.persona.store', $client), [
+            'persona' => $file,
+        ]);
+
+        $response->assertRedirect(route('clients.brand-brain.edit', $client));
+
+        $brandBrain = BrandBrain::firstWhere('client_id', $client->id);
+        $this->assertNotNull($brandBrain);
+        $this->assertSame('persona.pdf', $brandBrain->persona_original_filename);
+        $this->assertNotNull($brandBrain->persona_path);
+        Storage::disk('public')->assertExists($brandBrain->persona_path);
+    }
+
+    public function test_uploading_a_new_brand_persona_replaces_the_old_file(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $this->actingAs($owner)->post(route('clients.brand-brain.persona.store', $client), [
+            'persona' => UploadedFile::fake()->create('first.pdf', 100, 'application/pdf'),
+        ]);
+
+        $brandBrain = BrandBrain::firstWhere('client_id', $client->id);
+        $oldPath = $brandBrain->persona_path;
+        Storage::disk('public')->assertExists($oldPath);
+
+        $this->actingAs($owner)->post(route('clients.brand-brain.persona.store', $client), [
+            'persona' => UploadedFile::fake()->create('second.pdf', 100, 'application/pdf'),
+        ]);
+
+        Storage::disk('public')->assertMissing($oldPath);
+        $this->assertSame('second.pdf', $brandBrain->fresh()->persona_original_filename);
+    }
+
+    public function test_designer_cannot_upload_a_brand_persona_pdf(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($designer)->post(route('clients.brand-brain.persona.store', $client), [
+            'persona' => UploadedFile::fake()->create('persona.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_brand_persona_upload_rejects_non_pdf_files(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($owner)->post(route('clients.brand-brain.persona.store', $client), [
+            'persona' => UploadedFile::fake()->create('persona.png', 100, 'image/png'),
+        ]);
+
+        $response->assertSessionHasErrors('persona');
     }
 }

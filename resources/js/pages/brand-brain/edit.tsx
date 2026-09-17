@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { index } from '@/routes/clients';
 import { update } from '@/routes/clients/brand-brain';
+import { store as storePersona } from '@/routes/clients/brand-brain/persona';
 
 type BrandBrainData = {
     voice: { tone?: string; personality?: string; do_nots?: string[] } | null;
@@ -20,6 +22,8 @@ type BrandBrainData = {
     music_policy: { allowed_genres?: string[]; disallowed_genres?: string[]; notes?: string } | null;
     hashtag_policy: { always_use?: string[]; never_use?: string[]; rotation_notes?: string } | null;
     content_pillars: string[] | null;
+    persona_url: string | null;
+    persona_original_filename: string | null;
 };
 
 function toLines(items?: string[] | null): string {
@@ -38,6 +42,8 @@ export default function BrandBrainEdit({
     brandBrain: BrandBrainData;
     can: { update: boolean };
 }) {
+    const [activeTab, setActiveTab] = useState('voice');
+
     return (
         <>
             <Head title={`Brand brain — ${client.name}`} />
@@ -57,20 +63,21 @@ export default function BrandBrainEdit({
                     </div>
                 </div>
 
-                <Form {...update.form(client.id)} className="space-y-6">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                    <TabsList>
+                        <TabsTrigger value="voice">Voice</TabsTrigger>
+                        <TabsTrigger value="audience">Audience</TabsTrigger>
+                        <TabsTrigger value="offer">Offer</TabsTrigger>
+                        <TabsTrigger value="visual">Visual</TabsTrigger>
+                        <TabsTrigger value="music">Music policy</TabsTrigger>
+                        <TabsTrigger value="hashtags">Hashtag policy</TabsTrigger>
+                        <TabsTrigger value="pillars">Content pillars</TabsTrigger>
+                        <TabsTrigger value="persona">Brand persona</TabsTrigger>
+                    </TabsList>
+
+                    <Form {...update.form(client.id)} className="space-y-6">
                     {({ processing, errors }) => (
                         <>
-                            <Tabs defaultValue="voice">
-                                <TabsList>
-                                    <TabsTrigger value="voice">Voice</TabsTrigger>
-                                    <TabsTrigger value="audience">Audience</TabsTrigger>
-                                    <TabsTrigger value="offer">Offer</TabsTrigger>
-                                    <TabsTrigger value="visual">Visual</TabsTrigger>
-                                    <TabsTrigger value="music">Music policy</TabsTrigger>
-                                    <TabsTrigger value="hashtags">Hashtag policy</TabsTrigger>
-                                    <TabsTrigger value="pillars">Content pillars</TabsTrigger>
-                                </TabsList>
-
                                 <TabsContent value="voice" className="space-y-4 pt-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="voice_tone">Tone</Label>
@@ -305,16 +312,56 @@ export default function BrandBrainEdit({
                                         <InputError message={errors.content_pillars} />
                                     </div>
                                 </TabsContent>
-                            </Tabs>
 
-                            {can.update && (
+                            {can.update && activeTab !== 'persona' && (
                                 <div className="flex items-center gap-4">
                                     <Button disabled={processing}>Save brand brain</Button>
                                 </div>
                             )}
                         </>
                     )}
-                </Form>
+                    </Form>
+
+                    <TabsContent value="persona" className="space-y-4 pt-4">
+                        {brandBrain.persona_url && (
+                            <div className="grid gap-2">
+                                <Label>Current brand persona</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    {brandBrain.persona_original_filename ?? 'brand-persona.pdf'}
+                                </p>
+                                <iframe
+                                    src={brandBrain.persona_url}
+                                    title="Brand persona PDF"
+                                    className="h-[70vh] w-full rounded-md border border-border"
+                                />
+                            </div>
+                        )}
+
+                        {can.update && (
+                            <Form
+                                {...storePersona.form(client.id)}
+                                encType="multipart/form-data"
+                                resetOnSuccess
+                                className="grid gap-2"
+                            >
+                                {({ processing: uploadProcessing, errors: uploadErrors }) => (
+                                    <>
+                                        <Label htmlFor="persona">
+                                            {brandBrain.persona_url ? 'Replace brand persona PDF' : 'Upload brand persona PDF'}
+                                        </Label>
+                                        <Input id="persona" name="persona" type="file" accept="application/pdf" />
+                                        <InputError message={uploadErrors.persona} />
+                                        <div>
+                                            <Button type="submit" size="sm" disabled={uploadProcessing}>
+                                                {brandBrain.persona_url ? 'Replace file' : 'Upload file'}
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </Form>
+                        )}
+                    </TabsContent>
+                </Tabs>
             </div>
         </>
     );

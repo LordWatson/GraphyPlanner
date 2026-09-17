@@ -37,6 +37,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.brand-brain.edit');
     Route::put('clients/{client}/brand-brain', [BrandBrainController::class, 'update'])
         ->name('clients.brand-brain.update');
+    Route::post('clients/{client}/brand-brain/persona', [BrandBrainController::class, 'uploadPersona'])
+        ->name('clients.brand-brain.persona.store');
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');
@@ -98,6 +100,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('clients.brand-brain.edit');
     Route::put('clients/{client}/brand-brain', [BrandBrainController::class, 'update'])
         ->name('clients.brand-brain.update');
+    Route::post('clients/{client}/brand-brain/persona', [BrandBrainController::class, 'uploadPersona'])
+        ->name('clients.brand-brain.persona.store');
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');

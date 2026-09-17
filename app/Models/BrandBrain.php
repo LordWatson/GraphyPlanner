@@ -19,11 +19,18 @@ use Illuminate\Support\Carbon;
  * @property array{allowed_genres: array<int, string>, disallowed_genres: array<int, string>, notes: ?string}|null $music_policy
  * @property array{always_use: array<int, string>, never_use: array<int, string>, rotation_notes: ?string}|null $hashtag_policy
  * @property array<int, string>|null $content_pillars
+ * @property string|null $persona_disk
+ * @property string|null $persona_path
+ * @property string|null $persona_url
+ * @property string|null $persona_original_filename
+ * @property string|null $persona_mime_type
+ * @property int|null $persona_size
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'client_id', 'voice', 'audience', 'offer', 'visual', 'music_policy', 'hashtag_policy', 'content_pillars',
+    'persona_disk', 'persona_path', 'persona_url', 'persona_original_filename', 'persona_mime_type', 'persona_size',
 ])]
 class BrandBrain extends Model
 {
@@ -52,6 +59,14 @@ class BrandBrain extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Whether a Brand Persona PDF has been uploaded for this brand brain.
+     */
+    public function hasPersona(): bool
+    {
+        return $this->persona_disk !== null && $this->persona_path !== null;
     }
 
     /**
