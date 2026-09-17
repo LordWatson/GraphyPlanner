@@ -59,6 +59,7 @@ class ClientController extends Controller
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
             'languages' => LanguageOptions::options(),
+            'owners' => $this->ownerOptions($request),
         ]);
     }
 
@@ -155,6 +156,7 @@ class ClientController extends Controller
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
             'languages' => LanguageOptions::options(),
+            'owners' => $this->ownerOptions($request),
         ]);
     }
 
@@ -178,6 +180,21 @@ class ClientController extends Controller
         $client->delete();
 
         return to_route('clients.index');
+    }
+
+    /**
+     * List the organization's users that can be assigned as a client owner.
+     *
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function ownerOptions(Request $request): array
+    {
+        return User::query()
+            ->where('org_id', $request->user()->org_id)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (User $user) => ['value' => (string) $user->id, 'label' => $user->name])
+            ->all();
     }
 
     /**

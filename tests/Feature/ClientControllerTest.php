@@ -73,6 +73,84 @@ class ClientControllerTest extends TestCase
         $this->assertSame('New Name', $client->fresh()->name);
     }
 
+    public function test_create_and_edit_forms_expose_org_scoped_owner_options(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $otherOrg = Organization::factory()->create();
+        $otherOrgUser = User::factory()->for($otherOrg, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $createResponse = $this->actingAs($owner)->get(route('clients.create'));
+        $createResponse->assertOk();
+        $createResponse->assertInertia(function ($page) use ($owner, $otherOrgUser) {
+            $ownerIds = collect($page->toArray()['props']['owners'])->pluck('value');
+            $this->assertTrue($ownerIds->contains((string) $owner->id));
+            $this->assertFalse($ownerIds->contains((string) $otherOrgUser->id));
+
+            return $page;
+        });
+
+        $editResponse = $this->actingAs($owner)->get(route('clients.edit', $client));
+        $editResponse->assertOk();
+        $editResponse->assertInertia(function ($page) use ($owner) {
+            $ownerIds = collect($page->toArray()['props']['owners'])->pluck('value');
+            $this->assertTrue($ownerIds->contains((string) $owner->id));
+
+            return $page;
+        });
+    }
+
+    public function test_owner_can_assign_a_client_owner_through_the_ui(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $assignee = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['owner_user_id' => null]);
+
+        $response = $this->actingAs($owner)->put(route('clients.update', $client), [
+            'name' => $client->name,
+            'status' => 'active',
+            'owner_user_id' => $assignee->id,
+        ]);
+
+        $response->assertRedirect(route('clients.show', $client));
+        $this->assertSame($assignee->id, $client->fresh()->owner_user_id);
+    }
+
+    public function test_owner_can_clear_a_client_owner_through_the_ui(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['owner_user_id' => $owner->id]);
+
+        $response = $this->actingAs($owner)->put(route('clients.update', $client), [
+            'name' => $client->name,
+            'status' => 'active',
+            'owner_user_id' => '',
+        ]);
+
+        $response->assertRedirect(route('clients.show', $client));
+        $this->assertNull($client->fresh()->owner_user_id);
+    }
+
+    public function test_owner_cannot_assign_a_user_from_another_organization_as_client_owner(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $otherOrg = Organization::factory()->create();
+        $otherOrgUser = User::factory()->for($otherOrg, 'organization')->role(Role::Owner)->create();
+
+        $response = $this->actingAs($owner)->put(route('clients.update', $client), [
+            'name' => $client->name,
+            'status' => 'active',
+            'owner_user_id' => $otherOrgUser->id,
+        ]);
+
+        $response->assertInvalid('owner_user_id');
+    }
+
     public function test_client_reviewer_cannot_see_billing_fields_when_viewing_their_client(): void
     {
         $org = Organization::factory()->create();

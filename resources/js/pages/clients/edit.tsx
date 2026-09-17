@@ -22,6 +22,7 @@ type ClientData = {
     website: string | null;
     industry: string | null;
     status: string;
+    owner_user_id: number | null;
     start_date: string | null;
     retainer_amount: string | null;
     billing_cycle: string | null;
@@ -35,11 +36,13 @@ export default function ClientEdit({
     statuses,
     billingCycles,
     languages,
+    owners,
 }: {
     client: ClientData;
     statuses: Option[];
     billingCycles: Option[];
     languages: Option[];
+    owners: Option[];
 }) {
     return (
         <>
@@ -49,6 +52,10 @@ export default function ClientEdit({
 
                 <Form
                     {...update.form(client.id)}
+                    transform={(data) => ({
+                        ...data,
+                        owner_user_id: data.owner_user_id === 'none' ? '' : data.owner_user_id,
+                    })}
                     options={{ preserveScroll: true }}
                     className="space-y-6"
                 >
@@ -93,6 +100,27 @@ export default function ClientEdit({
                                     </SelectContent>
                                 </Select>
                                 <InputError message={errors.status} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="owner_user_id">Owner</Label>
+                                <Select
+                                    name="owner_user_id"
+                                    defaultValue={client.owner_user_id ? String(client.owner_user_id) : 'none'}
+                                >
+                                    <SelectTrigger id="owner_user_id" className="w-full">
+                                        <SelectValue placeholder="Select an owner" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No owner</SelectItem>
+                                        {owners.map((owner) => (
+                                            <SelectItem key={owner.value} value={owner.value}>
+                                                {owner.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.owner_user_id} />
                             </div>
 
                             <div className="grid gap-2">

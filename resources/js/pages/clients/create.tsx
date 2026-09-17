@@ -19,10 +19,12 @@ export default function ClientCreate({
     statuses,
     billingCycles,
     languages,
+    owners,
 }: {
     statuses: Option[];
     billingCycles: Option[];
     languages: Option[];
+    owners: Option[];
 }) {
     return (
         <>
@@ -33,7 +35,14 @@ export default function ClientCreate({
                     description="Create a new client record"
                 />
 
-                <Form {...store.form()} className="space-y-6">
+                <Form
+                    {...store.form()}
+                    transform={(data) => ({
+                        ...data,
+                        owner_user_id: data.owner_user_id === 'none' ? '' : data.owner_user_id,
+                    })}
+                    className="space-y-6"
+                >
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
@@ -75,6 +84,24 @@ export default function ClientCreate({
                                     </SelectContent>
                                 </Select>
                                 <InputError message={errors.status} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="owner_user_id">Owner</Label>
+                                <Select name="owner_user_id" defaultValue="none">
+                                    <SelectTrigger id="owner_user_id" className="w-full">
+                                        <SelectValue placeholder="Select an owner" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No owner</SelectItem>
+                                        {owners.map((owner) => (
+                                            <SelectItem key={owner.value} value={owner.value}>
+                                                {owner.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.owner_user_id} />
                             </div>
 
                             <div className="grid gap-2">
