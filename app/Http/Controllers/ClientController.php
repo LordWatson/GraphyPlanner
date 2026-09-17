@@ -16,6 +16,8 @@ use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Support\Options\LanguageOptions;
+use App\Support\Options\TimezoneOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -56,6 +58,7 @@ class ClientController extends Controller
         return Inertia::render('clients/create', [
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
+            'languages' => LanguageOptions::options(),
         ]);
     }
 
@@ -136,6 +139,7 @@ class ClientController extends Controller
                     'timezone' => $socialAccount->timezone,
                 ])
                 : [],
+            'timezones' => $canViewSocialAccounts ? TimezoneOptions::options() : [],
         ]);
     }
 
@@ -150,6 +154,7 @@ class ClientController extends Controller
             'client' => $this->transform($client, $request->user()->can('viewBilling', $client)),
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
+            'languages' => LanguageOptions::options(),
         ]);
     }
 

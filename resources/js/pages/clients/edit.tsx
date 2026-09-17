@@ -34,10 +34,12 @@ export default function ClientEdit({
     client,
     statuses,
     billingCycles,
+    languages,
 }: {
     client: ClientData;
     statuses: Option[];
     billingCycles: Option[];
+    languages: Option[];
 }) {
     return (
         <>
@@ -131,11 +133,18 @@ export default function ClientEdit({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="default_language">Default language</Label>
-                                <Input
-                                    id="default_language"
-                                    name="default_language"
-                                    defaultValue={client.default_language ?? ''}
-                                />
+                                <Select name="default_language" defaultValue={client.default_language ?? undefined}>
+                                    <SelectTrigger id="default_language" className="w-full">
+                                        <SelectValue placeholder="Select a language" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {languages.map((language) => (
+                                            <SelectItem key={language.value} value={language.value}>
+                                                {language.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <InputError message={errors.default_language} />
                             </div>
 

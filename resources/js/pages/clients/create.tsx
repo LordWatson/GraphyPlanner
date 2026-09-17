@@ -18,9 +18,11 @@ type Option = { value: string; label: string };
 export default function ClientCreate({
     statuses,
     billingCycles,
+    languages,
 }: {
     statuses: Option[];
     billingCycles: Option[];
+    languages: Option[];
 }) {
     return (
         <>
@@ -112,7 +114,18 @@ export default function ClientCreate({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="default_language">Default language</Label>
-                                <Input id="default_language" name="default_language" placeholder="en" />
+                                <Select name="default_language">
+                                    <SelectTrigger id="default_language" className="w-full">
+                                        <SelectValue placeholder="Select a language" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {languages.map((language) => (
+                                            <SelectItem key={language.value} value={language.value}>
+                                                {language.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <InputError message={errors.default_language} />
                             </div>
 

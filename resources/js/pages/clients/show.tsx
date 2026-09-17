@@ -243,6 +243,7 @@ export default function ClientShow({
     assets,
     posts,
     targetAccounts,
+    timezones,
 }: {
     client: ClientData;
     can: {
@@ -258,6 +259,7 @@ export default function ClientShow({
     socialAccounts: SocialAccountData[];
     campaigns: CampaignData[];
     assets: AssetData[];
+    timezones: { value: string; label: string }[];
     posts: PostData[];
     targetAccounts: TargetAccountData[];
 }) {
@@ -536,7 +538,18 @@ export default function ClientShow({
                                         </div>
                                         <div className="grid gap-1">
                                             <Label htmlFor="timezone">Timezone (IANA)</Label>
-                                            <Input id="timezone" name="timezone" placeholder="Europe/Amsterdam" required />
+                                            <Select name="timezone">
+                                                <SelectTrigger id="timezone" className="w-full">
+                                                    <SelectValue placeholder="Select a timezone" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {timezones.map((timezone) => (
+                                                        <SelectItem key={timezone.value} value={timezone.value}>
+                                                            {timezone.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                             <InputError message={errors.timezone} />
                                         </div>
                                         <div className="col-span-full">
