@@ -1,5 +1,5 @@
-import { Link } from '@inertiajs/react';
-import { BookOpen, Building2, CalendarDays, FolderGit2, LayoutGrid, ListChecks } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, Building2, CalendarDays, FolderGit2, LayoutGrid, ListChecks, UserSquare2 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -15,7 +15,28 @@ import {
 } from '@/components/ui/sidebar';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as clientsIndex } from '@/routes/clients';
-import type { NavItem } from '@/types';
+import { dashboard as portalDashboard } from '@/routes/portal';
+import type { Auth, NavItem } from '@/types';
+
+// `Role::ClientReviewer` cannot use these org-internal items (see `ClientPolicy::viewAny` and
+// `PostPolicy::viewHome`) — they get a link into their own client portal instead.
+const clientReviewerNavItems: NavItem[] = [
+    {
+        title: 'Home',
+        href: dashboard(),
+        icon: LayoutGrid,
+    },
+    {
+        title: 'Calendar',
+        href: calendar(),
+        icon: CalendarDays,
+    },
+    {
+        title: 'Client portal',
+        href: portalDashboard(),
+        icon: UserSquare2,
+    },
+];
 
 const mainNavItems: NavItem[] = [
     {
@@ -54,6 +75,9 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const items = auth.user.role === 'client_reviewer' ? clientReviewerNavItems : mainNavItems;
+
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
@@ -69,7 +93,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={items} />
             </SidebarContent>
 
             <SidebarFooter>

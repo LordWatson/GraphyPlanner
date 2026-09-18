@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { calendar } from '@/routes';
 import { edit as editPost } from '@/routes/posts';
+import { show as portalPostShow } from '@/routes/portal/posts';
+import type { Auth } from '@/types';
 
 type Option = { value: string; label: string };
 type NamedOption = { id: number; name: string };
@@ -110,6 +112,8 @@ export default function Calendar({ occurrences, orgTimezone, filters, filterOpti
     const [view, setView] = useState<View>('month');
     const [tzMode, setTzMode] = useState<TimezoneMode>('account');
     const [anchor, setAnchor] = useState<Date>(new Date());
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const isClientReviewer = auth.user.role === 'client_reviewer';
 
     const display = (occurrence: Occurrence): OccurrenceDisplay =>
         tzMode === 'account' ? occurrence.account_local : occurrence.org_timezone;
@@ -142,7 +146,7 @@ export default function Calendar({ occurrences, orgTimezone, filters, filterOpti
         return (
             <Link
                 key={occurrence.target_id}
-                href={editPost(occurrence.post_id)}
+                href={isClientReviewer ? portalPostShow(occurrence.post_id) : editPost(occurrence.post_id)}
                 className="flex flex-col gap-0.5 rounded-md border border-border bg-card px-2 py-1 text-xs hover:bg-muted/50"
             >
                 <div className="flex items-center justify-between gap-1">

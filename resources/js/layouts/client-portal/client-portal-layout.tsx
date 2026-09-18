@@ -1,10 +1,10 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { CalendarCheck2, Receipt } from 'lucide-react';
+import { Building2, CalendarCheck2, Receipt } from 'lucide-react';
 
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/routes';
-import { dashboard as portalDashboard } from '@/routes/portal';
+import { company as portalCompany, dashboard as portalDashboard } from '@/routes/portal';
 import { index as portalInvoicesIndex } from '@/routes/portal/invoices';
 import { index as portalPostsIndex } from '@/routes/portal/posts';
 
@@ -28,6 +28,7 @@ export default function ClientPortalLayout({
         { title: 'Dashboard', href: portalDashboard(), icon: CalendarCheck2 },
         { title: 'Posts & approvals', href: portalPostsIndex(), icon: CalendarCheck2 },
         { title: 'Invoices', href: portalInvoicesIndex(), icon: Receipt },
+        { title: 'Company', href: portalCompany(), icon: Building2 },
     ];
 
     return (

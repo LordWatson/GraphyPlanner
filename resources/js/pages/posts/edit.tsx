@@ -368,6 +368,85 @@ export default function PostEdit({
                     </TabsList>
 
                     <TabsContent value="editor" className="grid gap-4">
+                    {!can.update && (
+                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        <div className="grid gap-1">
+                            <Label>Master caption</Label>
+                            <p className="rounded-md border border-border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
+                                {post.master_caption || <span className="text-muted-foreground">No caption yet.</span>}
+                            </p>
+                        </div>
+
+                        <div className="grid gap-1">
+                            <Label>Hashtags</Label>
+                            {post.hashtags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {post.hashtags.map((tag) => (
+                                        <Badge key={tag} variant="secondary">{tag}</Badge>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No hashtags.</p>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Target accounts</Label>
+                            {post.targets.length > 0 ? (
+                                <div className="grid gap-2">
+                                    {post.targets.map((target) => {
+                                        const AccountIcon = platformIcon[target.platform ?? ''] ?? Share2;
+
+                                        return (
+                                            <div
+                                                key={target.id}
+                                                className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 p-2.5 text-sm"
+                                            >
+                                                <AccountIcon className="size-4 text-primary" />
+                                                <span className="font-medium">{target.handle ?? '—'}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {target.scheduled_local_date ?? '—'} {target.scheduled_local_time ?? ''}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No target accounts selected.</p>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid gap-1">
+                                <Label>Music</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    {(post.music?.name as string) || 'Not set'}
+                                </p>
+                            </div>
+                            <div className="grid gap-1">
+                                <Label>Location</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    {(post.location?.name as string) || 'Not set'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Media</Label>
+                            {post.assets.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {post.assets.map((asset) => (
+                                        <Badge key={asset.id} variant="outline">
+                                            {asset.original_filename ?? `Asset #${asset.id}`}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No media attached.</p>
+                            )}
+                        </div>
+                    </div>
+                    )}
                     {can.update && (
                     <Form
                         {...updatePost.form(post.id)}
