@@ -390,7 +390,7 @@ export default function ClientShow({
         {
             icon: UserPlus,
             label: 'Portal access',
-            value: invitations.filter((invitation) => invitation.is_pending).length,
+            value: invitations.filter((invitation) => invitation.accepted_at !== null && invitation.revoked_at === null).length,
             hint: `${invitations.length} invitation${invitations.length === 1 ? '' : 's'} total`,
             tab: 'invitations',
         },
