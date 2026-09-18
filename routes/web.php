@@ -5,6 +5,7 @@ use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
@@ -20,6 +21,12 @@ Route::inertia('/', 'welcome')->name('home');
 // possession of a valid `ReviewToken`, never a logged-in session (spec §10/§12).
 Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
 Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
+
+// Step 6.2: accepting a client portal invitation is unauthenticated — access is granted purely
+// by possession of a valid, unexpired, unrevoked, unaccepted `ClientInvitation` token, mirroring
+// the review portal above.
+Route::get('client-invite/{token}', [ClientInvitationAcceptController::class, 'show'])->name('client-invite.show');
+Route::post('client-invite/{token}', [ClientInvitationAcceptController::class, 'store'])->name('client-invite.store');
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
 // connect flow, so this must be reachable without a session, just like the review portal above.
