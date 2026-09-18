@@ -868,7 +868,16 @@ export default function ClientShow({
                                         {posts.map((post) => (
                                             <div
                                                 key={post.id}
-                                                className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3"
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={() => router.visit(editPost(post.id).url)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        router.visit(editPost(post.id).url);
+                                                    }
+                                                }}
+                                                className="flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3 transition-colors hover:border-primary/50 hover:bg-muted/40"
                                             >
                                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
@@ -879,12 +888,10 @@ export default function ClientShow({
                                                             <span className="text-xs text-muted-foreground">{post.campaign_name}</span>
                                                         )}
                                                     </div>
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link href={editPost(post.id)}>
-                                                            <Pencil />
-                                                            Open editor
-                                                        </Link>
-                                                    </Button>
+                                                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                        <Pencil className="size-3.5" />
+                                                        Open editor
+                                                    </span>
                                                 </div>
                                                 {post.master_caption && (
                                                     <p className="text-sm">{post.master_caption}</p>
