@@ -10,6 +10,9 @@ use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\Portal\PortalDashboardController;
+use App\Http\Controllers\Portal\PortalInvoiceController;
+use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SocialAccountController;
@@ -94,6 +97,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.invitations.store');
     Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
         ->name('invitations.destroy');
+});
+
+// Step 6.3: the client portal is a real, authenticated session (unlike the token-based
+// `/review/:token` and `/client-invite/:token` links above) — every route here is guarded by the
+// `portal` middleware, which requires a `Role::ClientReviewer` session and scopes any bound
+// `{post}`/`{invoice}` to that user's own `client_id`.
+Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'portal'])->group(function () {
+    Route::get('/', [PortalDashboardController::class, 'index'])->name('dashboard');
+    Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
+    Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
 });
 
 // Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen

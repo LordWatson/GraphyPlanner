@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureClientPortalAccess;
 use App\Http\Middleware\EnsurePreviewMode;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'preview' => EnsurePreviewMode::class,
+            'portal' => EnsureClientPortalAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
