@@ -143,36 +143,43 @@ function formatStatusLabel(status: string | null): string {
 function CommentEntry({ comment }: { comment: CommentData }) {
     const [open, setOpen] = useState(false);
     const body = comment.body ?? '';
-    const preview = body.slice(0, 80);
-    const isTruncated = body.length > 80;
+    const preview = body.slice(0, 90);
+    const isTruncated = body.length > 90;
 
     return (
-        <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border bg-muted/20">
+        <Collapsible
+            open={open}
+            onOpenChange={setOpen}
+            className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/30"
+        >
             <CollapsibleTrigger asChild>
-                <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 p-2.5 text-left text-sm hover:bg-muted/40"
-                >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <User className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="font-medium">{comment.user_name ?? 'Unknown'}</span>
-                        {comment.internal_only && <Badge variant="secondary">Internal</Badge>}
-                        <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
-                            <MessageSquareQuote className="mr-1 inline size-3.5" />
-                            {preview}
-                            {isTruncated ? '…' : ''}
-                        </span>
+                <button type="button" className="flex w-full items-start gap-3 p-3.5 text-left text-sm hover:bg-muted/30">
+                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                        <User className="size-4 text-muted-foreground" />
+                    </span>
+                    <div className="grid min-w-0 flex-1 gap-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{comment.user_name ?? 'Unknown'}</span>
+                            {comment.internal_only && <Badge variant="secondary">Internal</Badge>}
+                            <span className="text-xs text-muted-foreground">{comment.created_at}</span>
+                        </div>
+                        {!open && (
+                            <span className="min-w-0 truncate text-xs text-muted-foreground">
+                                <MessageSquareQuote className="mr-1 inline size-3.5" />
+                                {preview}
+                                {isTruncated ? '…' : ''}
+                            </span>
+                        )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{comment.created_at}</span>
-                        <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
-                    </div>
+                    <ChevronDown className={cn('mt-1 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
                 </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-t border-border/60 px-2.5 py-2 text-sm">
+            <CollapsibleContent className="border-t border-border/60 bg-muted/10 py-3 pr-3.5 pl-[3.25rem] text-sm">
                 <div className="flex items-start gap-2">
                     <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <p className="whitespace-pre-wrap text-muted-foreground">{comment.body}</p>
+                    <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                        {comment.body}
+                    </p>
                 </div>
             </CollapsibleContent>
         </Collapsible>
@@ -186,64 +193,80 @@ function ActivityLogEntry({ log, postId, canResend }: { log: ActivityLogData; po
     const hasDetails = hasNote || hasReviewUrl;
     // Keep the collapsed preview short and non-breaking so a long note (or an embedded URL) never
     // overflows the row — the full text is only ever rendered once expanded below.
-    const preview = hasNote ? (log.note as string).slice(0, 80) : null;
-    const isTruncated = hasNote && (log.note as string).length > 80;
+    const preview = hasNote ? (log.note as string).slice(0, 90) : null;
+    const isTruncated = hasNote && (log.note as string).length > 90;
 
     return (
-        <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border bg-muted/20">
+        <Collapsible
+            open={open}
+            onOpenChange={setOpen}
+            className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/30"
+        >
             <CollapsibleTrigger asChild>
                 <button
                     type="button"
-                    className="flex w-full items-center justify-between gap-2 p-2.5 text-left text-sm hover:bg-muted/40"
+                    disabled={!hasDetails}
+                    className={cn(
+                        'flex w-full items-start gap-3 p-3.5 text-left text-sm',
+                        hasDetails ? 'hover:bg-muted/30' : 'cursor-default',
+                    )}
                 >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <User className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="font-medium">{log.user_name ?? 'System'}</span>
-                        <Badge variant={postStatusVariant[log.from_status ?? ''] ?? 'outline'} className="hidden sm:inline-flex">
-                            {formatStatusLabel(log.from_status)}
-                        </Badge>
-                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                        <Badge variant={postStatusVariant[log.to_status] ?? 'outline'}>{formatStatusLabel(log.to_status)}</Badge>
-                        {hasNote && (
-                            <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
+                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                        <History className="size-4 text-muted-foreground" />
+                    </span>
+                    <div className="grid min-w-0 flex-1 gap-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{log.user_name ?? 'System'}</span>
+                            <span className="flex items-center gap-1.5">
+                                <Badge variant={postStatusVariant[log.from_status ?? ''] ?? 'outline'}>
+                                    {formatStatusLabel(log.from_status)}
+                                </Badge>
+                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                                <Badge variant={postStatusVariant[log.to_status] ?? 'outline'}>{formatStatusLabel(log.to_status)}</Badge>
+                            </span>
+                            <span className="text-xs text-muted-foreground">{log.created_at}</span>
+                        </div>
+                        {hasNote && !open && (
+                            <span className="min-w-0 truncate text-xs text-muted-foreground">
                                 <MessageSquareQuote className="mr-1 inline size-3.5" />
                                 {preview}
                                 {isTruncated ? '…' : ''}
                             </span>
                         )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{log.created_at}</span>
-                        {hasDetails && (
-                            <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
-                        )}
-                    </div>
+                    {hasDetails && (
+                        <ChevronDown className={cn('mt-1 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                    )}
                 </button>
             </CollapsibleTrigger>
             {hasDetails && (
-                <CollapsibleContent className="border-t border-border/60 px-2.5 py-2 text-sm">
-                    {hasNote && (
-                        <div className="flex items-start gap-2">
-                            <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                            <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap text-muted-foreground">{log.note}</p>
-                        </div>
-                    )}
-                    {hasReviewUrl && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
-                                Review link: <a href={log.review_url as string} className="underline" target="_blank" rel="noreferrer">{log.review_url}</a>
-                            </span>
-                            {canResend && (
-                                <Form {...postActivityLogs.resendReviewEmail.form([postId, log.id])}>
-                                    {({ processing }) => (
-                                        <Button type="submit" size="sm" variant="outline" disabled={processing}>
-                                            Resend email
-                                        </Button>
-                                    )}
-                                </Form>
-                            )}
-                        </div>
-                    )}
+                <CollapsibleContent className="border-t border-border/60 bg-muted/10 py-3 pr-3.5 pl-[3.25rem] text-sm">
+                    <div className="grid gap-3">
+                        {hasNote && (
+                            <div className="flex items-start gap-2">
+                                <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                                    {log.note}
+                                </p>
+                            </div>
+                        )}
+                        {hasReviewUrl && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
+                                    Review link: <a href={log.review_url as string} className="underline" target="_blank" rel="noreferrer">{log.review_url}</a>
+                                </span>
+                                {canResend && (
+                                    <Form {...postActivityLogs.resendReviewEmail.form([postId, log.id])}>
+                                        {({ processing }) => (
+                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                Resend email
+                                            </Button>
+                                        )}
+                                    </Form>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </CollapsibleContent>
             )}
         </Collapsible>
@@ -755,7 +778,7 @@ export default function PostEdit({
                             )}
                         </Form>
                     )}
-                    <div className="grid gap-2">
+                    <div className="grid gap-3">
                         {post.comments.length === 0 ? (
                             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                 <MessageSquareQuote className="size-4" />
@@ -774,7 +797,7 @@ export default function PostEdit({
                         title="Activity log"
                         description="Every status transition, oldest last — click an entry to see full details"
                     />
-                    <div className="grid gap-2">
+                    <div className="grid gap-3">
                         {post.activity_logs.length === 0 ? (
                             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                 <History className="size-4" />
