@@ -5,6 +5,7 @@ import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/routes';
 import { dashboard as portalDashboard } from '@/routes/portal';
+import { index as portalPostsIndex } from '@/routes/portal/posts';
 
 /**
  * Step 6.3 — the client portal's shell. Deliberately distinct from `AppSidebarLayout`: no
@@ -23,7 +24,8 @@ export default function ClientPortalLayout({
     const { client } = usePage().props as unknown as { client?: { name: string } };
 
     const navItems = [
-        { title: 'Posts & approvals', href: portalDashboard(), icon: CalendarCheck2 },
+        { title: 'Dashboard', href: portalDashboard(), icon: CalendarCheck2 },
+        { title: 'Posts & approvals', href: portalPostsIndex(), icon: CalendarCheck2 },
         { title: 'Invoices', href: portalDashboard(), icon: Receipt },
     ];
 

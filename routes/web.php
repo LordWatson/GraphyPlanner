@@ -105,7 +105,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // `{post}`/`{invoice}` to that user's own `client_id`.
 Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'portal'])->group(function () {
     Route::get('/', [PortalDashboardController::class, 'index'])->name('dashboard');
+    Route::get('posts', [PortalPostController::class, 'index'])->name('posts.index');
     Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
+    Route::post('posts/{post}/decide', [PortalPostController::class, 'decide'])->name('posts.decide');
+    Route::post('posts/{post}/comments', [PortalPostController::class, 'comment'])->name('posts.comments.store');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
 });
 
