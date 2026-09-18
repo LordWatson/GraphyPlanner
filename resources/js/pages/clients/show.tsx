@@ -20,6 +20,7 @@ import {
     Share2,
     Trash2,
     UploadCloud,
+    UserPlus,
     Wallet,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -50,6 +51,8 @@ import { store as storeAsset } from '@/routes/clients/assets';
 import { destroy as destroyAsset } from '@/routes/assets';
 import { store as storeInvoice } from '@/routes/clients/invoices';
 import { send as sendInvoice, markPaid as markPaidInvoice } from '@/routes/invoices';
+import { store as storeInvitation } from '@/routes/clients/invitations';
+import { destroy as destroyInvitation } from '@/routes/invitations';
 
 type ClientData = {
     id: number;
@@ -151,6 +154,16 @@ type TargetAccountData = {
     timezone: string;
 };
 
+type InvitationData = {
+    id: number;
+    email: string;
+    expires_at: string;
+    accepted_at: string | null;
+    revoked_at: string | null;
+    is_pending: boolean;
+    can: { delete: boolean };
+};
+
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
     active: 'success',
     paused: 'warning',
@@ -244,6 +257,7 @@ export default function ClientShow({
     posts,
     targetAccounts,
     timezones,
+    invitations,
 }: {
     client: ClientData;
     can: {
@@ -254,6 +268,7 @@ export default function ClientShow({
         createCampaign: boolean;
         createAsset: boolean;
         createPost: boolean;
+        createInvitation: boolean;
     };
     invoices: InvoiceData[];
     socialAccounts: SocialAccountData[];
@@ -262,6 +277,7 @@ export default function ClientShow({
     timezones: { value: string; label: string }[];
     posts: PostData[];
     targetAccounts: TargetAccountData[];
+    invitations: InvitationData[];
 }) {
     const [activeTab, setActiveTab] = useState('social-accounts');
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
@@ -371,6 +387,13 @@ export default function ClientShow({
             hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
             tab: 'billing',
         },
+        {
+            icon: UserPlus,
+            label: 'Portal access',
+            value: invitations.filter((invitation) => invitation.is_pending).length,
+            hint: `${invitations.length} invitation${invitations.length === 1 ? '' : 's'} total`,
+            tab: 'invitations',
+        },
     ];
 
     return (
@@ -446,7 +469,7 @@ export default function ClientShow({
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
                     {statCards.map(({ icon: Icon, label, value, hint, tab }) => (
                         <button
                             type="button"
@@ -491,6 +514,10 @@ export default function ClientShow({
                         <TabsTrigger value="billing">
                             <Receipt />
                             Billing
+                        </TabsTrigger>
+                        <TabsTrigger value="invitations">
+                            <UserPlus />
+                            Portal access
                         </TabsTrigger>
                     </TabsList>
 
@@ -1104,6 +1131,95 @@ export default function ClientShow({
                                                 </Form>
                                             )}
                                         </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        </>
+                    </TabsContent>
+
+                    <TabsContent
+                        value="invitations"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Client portal access" description="Invite a named contact at this client to their own login" />
+
+                        <>
+                        {can.createInvitation && (
+                            <Form
+                                {...storeInvitation.form(client.id)}
+                                resetOnSuccess
+                                className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="col-span-2 grid gap-1">
+                                            <Label htmlFor="email">Email</Label>
+                                            <Input id="email" name="email" type="email" required />
+                                            <InputError message={errors.email} />
+                                        </div>
+                                        <div className="col-span-full">
+                                            <Button type="submit" size="sm" disabled={processing}>
+                                                <UserPlus />
+                                                Send invitation
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </Form>
+                        )}
+
+                        {invitations.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No invitations sent yet.</p>
+                        ) : (
+                            <div className="grid gap-3">
+                                {invitations.map((invitation) => (
+                                    <div
+                                        key={invitation.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                <UserPlus className="size-4" />
+                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium">{invitation.email}</span>
+                                                    <Badge
+                                                        variant={
+                                                            invitation.accepted_at
+                                                                ? 'success'
+                                                                : invitation.revoked_at
+                                                                  ? 'secondary'
+                                                                  : invitation.is_pending
+                                                                    ? 'warning'
+                                                                    : 'outline'
+                                                        }
+                                                    >
+                                                        {invitation.accepted_at
+                                                            ? 'accepted'
+                                                            : invitation.revoked_at
+                                                              ? 'revoked'
+                                                              : invitation.is_pending
+                                                                ? 'pending'
+                                                                : 'expired'}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Expires {invitation.expires_at}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {invitation.can.delete && (
+                                            <Form {...destroyInvitation.form(invitation.id)}>
+                                                {({ processing }) => (
+                                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                        <Trash2 />
+                                                        Revoke
+                                                    </Button>
+                                                )}
+                                            </Form>
+                                        )}
                                     </div>
                                 ))}
                             </div>

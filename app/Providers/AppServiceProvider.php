@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\BrandBrain;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\ClientInvitation;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Post;
@@ -15,6 +16,7 @@ use App\Models\SocialAccount;
 use App\Policies\AssetPolicy;
 use App\Policies\BrandBrainPolicy;
 use App\Policies\CampaignPolicy;
+use App\Policies\ClientInvitationPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\OrganizationPolicy;
@@ -55,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         Gate::policy(Client::class, ClientPolicy::class);
+        Gate::policy(ClientInvitation::class, ClientInvitationPolicy::class);
         Gate::policy(BrandBrain::class, BrandBrainPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
         Gate::policy(SocialAccount::class, SocialAccountPolicy::class);

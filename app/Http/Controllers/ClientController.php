@@ -12,6 +12,7 @@ use App\Http\Requests\UpdateClientRequest;
 use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\ClientInvitation;
 use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
@@ -87,6 +88,7 @@ class ClientController extends Controller
         $canViewCampaigns = $user->can('viewAny', [Campaign::class, $client]);
         $canViewAssets = $user->can('viewAny', [Asset::class, $client]);
         $canViewPosts = $user->can('viewAny', [Post::class, $client]);
+        $canViewInvitations = $user->can('viewAny', [ClientInvitation::class, $client]);
 
         $campaigns = $canViewCampaigns
             ? $client->campaigns()->latest()->get()
@@ -106,6 +108,7 @@ class ClientController extends Controller
                 'createCampaign' => $user->can('create', [Campaign::class, $client]),
                 'createAsset' => $user->can('create', [Asset::class, $client]),
                 'createPost' => $user->can('create', [Post::class, $client]),
+                'createInvitation' => $user->can('create', [ClientInvitation::class, $client]),
             ],
             'invoices' => $canViewBilling
                 ? $client->invoices()
@@ -141,6 +144,12 @@ class ClientController extends Controller
                 ])
                 : [],
             'timezones' => $canViewSocialAccounts ? TimezoneOptions::options() : [],
+            'invitations' => $canViewInvitations
+                ? $client->invitations()
+                    ->latest()
+                    ->get()
+                    ->map(fn (ClientInvitation $invitation) => $this->transformInvitation($invitation, $user))
+                : [],
         ]);
     }
 
@@ -329,6 +338,28 @@ class ClientController extends Controller
             'can' => [
                 'update' => $user->can('update', $post),
                 'delete' => $user->can('delete', $post),
+            ],
+        ];
+    }
+
+    /**
+     * Transform a client invitation into an array for the client page. Deliberately never
+     * includes the token or its hash — only `App\Actions\ClientInvitations\CreateClientInvitationAction`
+     * ever sees the plain token, and it never gets persisted or rendered.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformInvitation(ClientInvitation $invitation, User $user): array
+    {
+        return [
+            'id' => $invitation->id,
+            'email' => $invitation->email,
+            'expires_at' => $invitation->expires_at->toIso8601String(),
+            'accepted_at' => $invitation->accepted_at?->toIso8601String(),
+            'revoked_at' => $invitation->revoked_at?->toIso8601String(),
+            'is_pending' => $invitation->isPending(),
+            'can' => [
+                'delete' => $invitation->isPending() && $user->can('delete', $invitation),
             ],
         ];
     }

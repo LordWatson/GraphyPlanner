@@ -5,6 +5,7 @@ use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
@@ -80,6 +81,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+
+    // Step 6.1: client portal invitations (Owner/Strategist only, see ClientInvitationPolicy).
+    Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
+        ->name('clients.invitations.store');
+    Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
+        ->name('invitations.destroy');
 });
 
 // Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen
@@ -143,6 +150,11 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+
+    Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
+        ->name('clients.invitations.store');
+    Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
+        ->name('invitations.destroy');
 });
 
 require __DIR__.'/settings.php';

@@ -123,6 +123,14 @@ class Client extends Model
     }
 
     /**
+     * @return HasMany<ClientInvitation, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(ClientInvitation::class);
+    }
+
+    /**
      * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
      *
      * @return array{status: \App\Enums\ClientHealth, reason: string}
