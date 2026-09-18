@@ -5,6 +5,7 @@ import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/routes';
 import { dashboard as portalDashboard } from '@/routes/portal';
+import { index as portalInvoicesIndex } from '@/routes/portal/invoices';
 import { index as portalPostsIndex } from '@/routes/portal/posts';
 
 /**
@@ -26,7 +27,7 @@ export default function ClientPortalLayout({
     const navItems = [
         { title: 'Dashboard', href: portalDashboard(), icon: CalendarCheck2 },
         { title: 'Posts & approvals', href: portalPostsIndex(), icon: CalendarCheck2 },
-        { title: 'Invoices', href: portalDashboard(), icon: Receipt },
+        { title: 'Invoices', href: portalInvoicesIndex(), icon: Receipt },
     ];
 
     return (

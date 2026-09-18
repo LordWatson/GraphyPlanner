@@ -9,12 +9,14 @@ type InvoiceData = {
     status_label: string;
     amount: string;
     currency: string;
+    issue_date: string;
     due_date: string | null;
+    is_unpaid: boolean;
 };
 
 /**
- * Step 6.3 — minimal scoped invoice view proving the portal's isolation guarantee. The full
- * read-only invoices list lands in Step 6.6.
+ * Step 6.6 — read-only detail for a single invoice inside the client portal, linked from the
+ * invoices list. No create/edit/send/mark-paid actions are exposed here.
  */
 export default function PortalInvoiceShow({ invoice }: { invoice: InvoiceData }) {
     return (
@@ -22,11 +24,12 @@ export default function PortalInvoiceShow({ invoice }: { invoice: InvoiceData })
             <Heading title={`Invoice ${invoice.invoice_number}`} />
 
             <div className="mt-6 rounded-xl border border-border bg-card p-6 shadow-lg shadow-black/[0.03]">
-                <Badge variant="outline">{invoice.status_label}</Badge>
+                <Badge variant={invoice.is_unpaid ? 'warning' : 'success'}>{invoice.is_unpaid ? 'Unpaid' : invoice.status_label}</Badge>
                 <p className="mt-4 text-sm">
                     {invoice.currency} {invoice.amount}
                 </p>
-                {invoice.due_date && <p className="mt-1 text-xs text-muted-foreground">Due {invoice.due_date}</p>}
+                <p className="mt-1 text-xs text-muted-foreground">Issued {invoice.issue_date}</p>
+                {invoice.due_date && <p className="text-xs text-muted-foreground">Due {invoice.due_date}</p>}
             </div>
         </ClientPortalLayout>
     );

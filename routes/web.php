@@ -109,6 +109,7 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'porta
     Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
     Route::post('posts/{post}/decide', [PortalPostController::class, 'decide'])->name('posts.decide');
     Route::post('posts/{post}/comments', [PortalPostController::class, 'comment'])->name('posts.comments.store');
+    Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
 });
 
