@@ -39,6 +39,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index, destroy as destroyClient } from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
@@ -263,6 +264,8 @@ export default function ClientShow({
     can: {
         update: boolean;
         delete: boolean;
+        viewBilling: boolean;
+        viewInvitations: boolean;
         createInvoice: boolean;
         createSocialAccount: boolean;
         createCampaign: boolean;
@@ -380,20 +383,28 @@ export default function ClientShow({
         { icon: Clapperboard, label: 'Campaigns', value: campaigns.length, hint: 'Total campaigns', tab: 'campaigns' },
         { icon: Send, label: 'Posts', value: posts.length, hint: 'Scheduled & published', tab: 'posts' },
         { icon: FileImage, label: 'Assets', value: assets.length, hint: 'Uploads & links on file', tab: 'assets' },
-        {
-            icon: Receipt,
-            label: 'Outstanding',
-            value: outstandingInvoiceTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
-            tab: 'billing',
-        },
-        {
-            icon: UserPlus,
-            label: 'Portal access',
-            value: invitations.filter((invitation) => invitation.accepted_at !== null && invitation.revoked_at === null).length,
-            hint: `${invitations.length} invitation${invitations.length === 1 ? '' : 's'} total`,
-            tab: 'invitations',
-        },
+        ...(can.viewBilling
+            ? [
+                  {
+                      icon: Receipt,
+                      label: 'Outstanding',
+                      value: outstandingInvoiceTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                      hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
+                      tab: 'billing',
+                  },
+              ]
+            : []),
+        ...(can.viewInvitations
+            ? [
+                  {
+                      icon: UserPlus,
+                      label: 'Portal access',
+                      value: invitations.filter((invitation) => invitation.accepted_at !== null && invitation.revoked_at === null).length,
+                      hint: `${invitations.length} invitation${invitations.length === 1 ? '' : 's'} total`,
+                      tab: 'invitations',
+                  },
+              ]
+            : []),
     ];
 
     return (
@@ -469,7 +480,12 @@ export default function ClientShow({
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                <div
+                    className={cn(
+                        'grid gap-4 sm:grid-cols-2',
+                        statCards.length >= 6 ? 'lg:grid-cols-6' : statCards.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
+                    )}
+                >
                     {statCards.map(({ icon: Icon, label, value, hint, tab }) => (
                         <button
                             type="button"
@@ -511,14 +527,18 @@ export default function ClientShow({
                             <FileImage />
                             Assets
                         </TabsTrigger>
-                        <TabsTrigger value="billing">
-                            <Receipt />
-                            Billing
-                        </TabsTrigger>
-                        <TabsTrigger value="invitations">
-                            <UserPlus />
-                            Portal access
-                        </TabsTrigger>
+                        {can.viewBilling && (
+                            <TabsTrigger value="billing">
+                                <Receipt />
+                                Billing
+                            </TabsTrigger>
+                        )}
+                        {can.viewInvitations && (
+                            <TabsTrigger value="invitations">
+                                <UserPlus />
+                                Portal access
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     <TabsContent
@@ -1044,6 +1064,7 @@ export default function ClientShow({
                         </>
                     </TabsContent>
 
+                    {can.viewBilling && (
                     <TabsContent
                         value="billing"
                         className="grid gap-4 rounded-lg border border-border bg-card p-4"
@@ -1149,7 +1170,9 @@ export default function ClientShow({
                         )}
                         </>
                     </TabsContent>
+                    )}
 
+                    {can.viewInvitations && (
                     <TabsContent
                         value="invitations"
                         className="grid gap-4 rounded-lg border border-border bg-card p-4"
@@ -1238,6 +1261,7 @@ export default function ClientShow({
                         )}
                         </>
                     </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </>

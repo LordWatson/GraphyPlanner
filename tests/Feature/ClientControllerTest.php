@@ -167,6 +167,25 @@ class ClientControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page->where('client.retainer_amount', null));
     }
 
+    public function test_designer_cannot_see_billing_or_portal_access_on_the_client_show_page(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create([
+            'retainer_amount' => 5000,
+        ]);
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+
+        $response = $this->actingAs($designer)->get(route('clients.show', $client));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('client.retainer_amount', null)
+            ->where('can.viewBilling', false)
+            ->where('can.viewInvitations', false)
+            ->where('invoices', [])
+            ->where('invitations', []));
+    }
+
     public function test_client_reviewer_cannot_view_another_clients_page(): void
     {
         $org = Organization::factory()->create();

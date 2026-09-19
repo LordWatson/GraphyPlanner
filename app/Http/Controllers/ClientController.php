@@ -103,6 +103,8 @@ class ClientController extends Controller
             'can' => [
                 'update' => $user->can('update', $client),
                 'delete' => $user->can('delete', $client),
+                'viewBilling' => $canViewBilling,
+                'viewInvitations' => $canViewInvitations,
                 'createInvoice' => $user->can('create', [Invoice::class, $client]),
                 'createSocialAccount' => $user->can('create', [SocialAccount::class, $client]),
                 'createCampaign' => $user->can('create', [Campaign::class, $client]),
