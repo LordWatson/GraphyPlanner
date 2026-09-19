@@ -55,4 +55,12 @@ class Organization extends Model
     {
         return $this->hasMany(Client::class, 'org_id');
     }
+
+    /**
+     * @return HasMany<StaffInvitation, $this>
+     */
+    public function staffInvitations(): HasMany
+    {
+        return $this->hasMany(StaffInvitation::class, 'org_id');
+    }
 }

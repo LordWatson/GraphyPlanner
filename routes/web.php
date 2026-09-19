@@ -18,6 +18,9 @@ use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SocialAccountController;
+use App\Http\Controllers\StaffController;
+use App\Http\Controllers\StaffInvitationAcceptController;
+use App\Http\Controllers\StaffInvitationController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -32,6 +35,12 @@ Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review
 // the review portal above.
 Route::get('client-invite/{token}', [ClientInvitationAcceptController::class, 'show'])->name('client-invite.show');
 Route::post('client-invite/{token}', [ClientInvitationAcceptController::class, 'store'])->name('client-invite.store');
+
+// Accepting a staff invitation is unauthenticated — access is granted purely by possession of a
+// valid, unexpired, unrevoked, unaccepted `StaffInvitation` token, mirroring the client portal
+// invitation flow above.
+Route::get('staff-invite/{token}', [StaffInvitationAcceptController::class, 'show'])->name('staff-invite.show');
+Route::post('staff-invite/{token}', [StaffInvitationAcceptController::class, 'store'])->name('staff-invite.store');
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
 // connect flow, so this must be reachable without a session, just like the review portal above.
@@ -105,6 +114,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.invitations.store');
     Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
         ->name('invitations.destroy');
+
+    // The Staff module (Owner-only, see StaffPolicy): a real CRUD resource over the org's
+    // `User` records, alongside the invitation flow that creates them.
+    Route::resource('staff', StaffController::class)->only(['index', 'show', 'edit', 'update', 'destroy']);
+    Route::post('staff/invitations', [StaffInvitationController::class, 'store'])->name('staff.invitations.store');
+    Route::delete('staff/invitations/{invitation}', [StaffInvitationController::class, 'destroy'])->name('staff.invitations.destroy');
 });
 
 // Step 6.3: the client portal is a real, authenticated session (unlike the token-based

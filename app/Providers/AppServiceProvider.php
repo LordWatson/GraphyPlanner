@@ -13,6 +13,8 @@ use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
+use App\Models\StaffInvitation;
+use App\Models\User;
 use App\Policies\AssetPolicy;
 use App\Policies\BrandBrainPolicy;
 use App\Policies\CampaignPolicy;
@@ -22,6 +24,8 @@ use App\Policies\InvoicePolicy;
 use App\Policies\OrganizationPolicy;
 use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
+use App\Policies\StaffInvitationPolicy;
+use App\Policies\StaffPolicy;
 use App\Services\LocalAssetStorage;
 use App\Services\Publishing\UploadPostAdapter;
 use Carbon\CarbonImmutable;
@@ -65,6 +69,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Asset::class, AssetPolicy::class);
         Gate::policy(Post::class, PostPolicy::class);
         Gate::policy(Organization::class, OrganizationPolicy::class);
+        Gate::policy(StaffInvitation::class, StaffInvitationPolicy::class);
+        Gate::policy(User::class, StaffPolicy::class);
     }
 
     /**
