@@ -11,6 +11,7 @@ use App\Models\Post;
 use App\Models\User;
 use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostCommentAdded;
+use App\Notifications\PostCommentMentioned;
 use App\Notifications\PostWaitingForClientReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -78,6 +79,64 @@ class NotificationTest extends TestCase
         ])->assertRedirect(route('posts.edit', $post));
 
         Notification::assertNotSentTo($reviewer, PostCommentAdded::class);
+    }
+
+    public function test_mentioning_a_user_in_a_comment_notifies_them(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->actingAs($owner)->post(route('posts.comments.store', $post), [
+            'body' => "@[{$strategist->name}]({$strategist->id}) can you take a look?",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertSentTo($strategist, PostCommentMentioned::class);
+        $this->assertTrue($post->comments()->first()->mentionedUsers->contains($strategist));
+    }
+
+    public function test_mentioning_a_client_user_from_an_org_comment_notifies_them(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
+            'client_id' => $client->id,
+        ]);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->actingAs($owner)->post(route('posts.comments.store', $post), [
+            'body' => "Hey @[{$reviewer->name}]({$reviewer->id}), internal note",
+            'internal_only' => true,
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertSentTo($reviewer, PostCommentMentioned::class);
+        Notification::assertNotSentTo($reviewer, PostCommentAdded::class);
+    }
+
+    public function test_an_unmentionable_user_id_in_a_comment_body_is_ignored(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $otherOrg = Organization::factory()->create();
+        $outsider = User::factory()->for($otherOrg, 'organization')->role(Role::Owner)->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->actingAs($owner)->post(route('posts.comments.store', $post), [
+            'body' => "@[{$outsider->name}]({$outsider->id}) not really mentionable",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertNotSentTo($outsider, PostCommentMentioned::class);
+        $this->assertCount(0, $post->comments()->first()->mentionedUsers);
     }
 
     public function test_a_post_entering_waiting_client_notifies_client_portal_users(): void

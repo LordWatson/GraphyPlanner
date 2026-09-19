@@ -23,6 +23,7 @@ import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import Heading from '@/components/heading';
 import { HashtagInput } from '@/components/hashtag-input';
 import InputError from '@/components/input-error';
+import { MentionTextarea, renderCommentBody, type MentionableUser } from '@/components/mention-textarea';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -76,6 +77,7 @@ type CommentData = {
     user_name: string | null;
     body: string;
     internal_only: boolean;
+    mentioned_user_ids: number[];
     created_at: string | null;
 };
 
@@ -149,8 +151,9 @@ function formatStatusLabel(status: string | null): string {
 function CommentEntry({ comment }: { comment: CommentData }) {
     const [open, setOpen] = useState(false);
     const body = comment.body ?? '';
-    const preview = body.slice(0, 90);
-    const isTruncated = body.length > 90;
+    const plainBody = body.replace(/@\[([^\]]+)\]\(\d+\)/g, '@$1');
+    const preview = plainBody.slice(0, 90);
+    const isTruncated = plainBody.length > 90;
 
     return (
         <Collapsible
@@ -184,7 +187,7 @@ function CommentEntry({ comment }: { comment: CommentData }) {
                 <div className="flex items-start gap-2">
                     <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap leading-relaxed text-muted-foreground">
-                        {comment.body}
+                        {renderCommentBody(comment.body)}
                     </p>
                 </div>
             </CollapsibleContent>
@@ -287,6 +290,7 @@ export default function PostEdit({
     allowedTransitions,
     can,
     hashtagSuggestions,
+    mentionableUsers,
 }: {
     post: PostData;
     client: { id: number; name: string };
@@ -295,6 +299,7 @@ export default function PostEdit({
     allowedTransitions: { value: string; label: string }[];
     can: { update: boolean; comment: boolean; resend_review_email: boolean };
     hashtagSuggestions: string[];
+    mentionableUsers: MentionableUser[];
 }) {
     const [caption, setCaption] = useState(post.master_caption ?? '');
     // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
@@ -780,11 +785,11 @@ export default function PostEdit({
                         >
                             {({ processing, errors }) => (
                                 <>
-                                    <textarea
+                                    <MentionTextarea
                                         name="body"
                                         rows={2}
-                                        placeholder="Add a comment…"
-                                        className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                        placeholder="Add a comment… type @ to mention someone"
+                                        users={mentionableUsers}
                                     />
                                     <InputError message={errors.body} />
                                     <div className="flex items-center justify-between gap-2">

@@ -17,6 +17,7 @@ use App\Http\Requests\UpdatePostRequest;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Services\PostNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -39,8 +40,12 @@ class PostController extends Controller
      * schedule rows, attached media, the §6 checklist, transition controls, comments, and the
      * activity log.
      */
-    public function edit(Request $request, Post $post, EvaluatePostChecklistAction $evaluateChecklist): Response
-    {
+    public function edit(
+        Request $request,
+        Post $post,
+        EvaluatePostChecklistAction $evaluateChecklist,
+        PostNotificationService $notifications,
+    ): Response {
         $this->authorize('view', $post);
 
         $user = $request->user();
@@ -51,6 +56,7 @@ class PostController extends Controller
             'activityLogs.user',
             'approvals.user',
             'comments.user',
+            'comments.mentionedUsers',
         ]);
 
         $client = $post->client;
@@ -60,6 +66,7 @@ class PostController extends Controller
         ));
 
         $hashtagSuggestions = $this->hashtagSuggestions($client);
+        $mentionableUsers = $notifications->mentionableRecipients($post, exclude: $user);
 
         return Inertia::render('posts/edit', [
             'post' => $this->transformPostForEditor($post, $evaluateChecklist),
@@ -86,6 +93,10 @@ class PostController extends Controller
                 'resend_review_email' => $user->can('resendReviewEmail', $post),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
+            'mentionableUsers' => $mentionableUsers->map(fn ($mentionable) => [
+                'id' => $mentionable->id,
+                'name' => $mentionable->name,
+            ])->values(),
         ]);
     }
 
@@ -241,6 +252,7 @@ class PostController extends Controller
                 'user_name' => $comment->user?->name,
                 'body' => $comment->body,
                 'internal_only' => $comment->internal_only,
+                'mentioned_user_ids' => $comment->mentionedUsers->pluck('id')->values(),
                 'created_at' => $comment->created_at?->toIso8601String(),
             ])->values(),
         ];

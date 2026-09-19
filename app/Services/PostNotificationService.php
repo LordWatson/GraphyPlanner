@@ -46,6 +46,21 @@ class PostNotificationService
     }
 
     /**
+     * Every user eligible to be `@`-mentioned in a comment on this post: the org's internal
+     * users plus the post's client-portal users, optionally excluding one user (typically the
+     * comment's author). Used to populate the mention autocomplete and to validate mention
+     * tokens parsed out of a comment body before recording/notifying them.
+     *
+     * @return Collection<int, User>
+     */
+    public function mentionableRecipients(Post $post, ?User $exclude = null): Collection
+    {
+        return $this->orgRecipients($post, $exclude)
+            ->merge($this->clientPortalRecipients($post, $exclude))
+            ->values();
+    }
+
+    /**
      * Send a notification to a collection of recipients, skipping silently when empty.
      *
      * @param  Collection<int, User>  $recipients

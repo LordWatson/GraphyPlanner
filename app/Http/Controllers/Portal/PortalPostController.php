@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Portal\PortalPostDecisionRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Models\Post;
+use App\Services\PostNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -68,10 +69,10 @@ class PortalPostController extends Controller
         ]);
     }
 
-    public function show(Request $request, Post $post): Response
+    public function show(Request $request, Post $post, PostNotificationService $notifications): Response
     {
         $user = $request->user();
-        $post->load(['targets.socialAccount', 'assets', 'comments.user']);
+        $post->load(['targets.socialAccount', 'assets', 'comments.user', 'comments.mentionedUsers']);
 
         return Inertia::render('portal/posts/show', [
             'post' => [
@@ -102,6 +103,7 @@ class PortalPostController extends Controller
                         'id' => $comment->id,
                         'user_name' => $comment->user?->name,
                         'body' => $comment->body,
+                        'mentioned_user_ids' => $comment->mentionedUsers->pluck('id')->values(),
                         'created_at' => $comment->created_at?->toIso8601String(),
                     ])
                     ->values(),
@@ -111,6 +113,9 @@ class PortalPostController extends Controller
                     || $user->can('transition', [$post, PostStatus::ChangesRequested]),
                 'comment' => $user->can('comment', $post),
             ],
+            'mentionableUsers' => $notifications->mentionableRecipients($post, exclude: $user)
+                ->map(fn ($mentionable) => ['id' => $mentionable->id, 'name' => $mentionable->name])
+                ->values(),
         ]);
     }
 

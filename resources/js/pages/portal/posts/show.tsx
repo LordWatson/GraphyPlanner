@@ -4,6 +4,7 @@ import { CheckCircle2, MessageSquareWarning } from 'lucide-react';
 import { AssetPreview, type AssetPreviewData } from '@/components/asset-preview';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { MentionTextarea, renderCommentBody, type MentionableUser } from '@/components/mention-textarea';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
@@ -23,6 +24,7 @@ type CommentData = {
     id: number;
     user_name: string | null;
     body: string;
+    mentioned_user_ids: number[];
     created_at: string | null;
 };
 
@@ -51,7 +53,15 @@ const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'o
  * token-based `/review/:token` page, letting a logged-in client contact approve, request changes,
  * and leave (non-internal) comments on their own client's posts.
  */
-export default function PortalPostShow({ post, can }: { post: PostData; can: { decide: boolean; comment: boolean } }) {
+export default function PortalPostShow({
+    post,
+    can,
+    mentionableUsers,
+}: {
+    post: PostData;
+    can: { decide: boolean; comment: boolean };
+    mentionableUsers: MentionableUser[];
+}) {
     return (
         <ClientPortalLayout title={`Post #${post.id}`}>
             <Heading title={post.master_caption ? 'Post review' : `Post #${post.id}`} />
@@ -103,7 +113,7 @@ export default function PortalPostShow({ post, can }: { post: PostData; can: { d
                     <div className="flex flex-col gap-3">
                         {post.comments.map((comment) => (
                             <div key={comment.id} className="rounded-md border border-border bg-muted/20 p-3 text-sm">
-                                <p className="whitespace-pre-wrap">{comment.body}</p>
+                                <p className="whitespace-pre-wrap">{renderCommentBody(comment.body)}</p>
                                 <p className="mt-1 text-xs text-muted-foreground">{comment.user_name ?? 'Team'}</p>
                             </div>
                         ))}
@@ -169,11 +179,11 @@ export default function PortalPostShow({ post, can }: { post: PostData; can: { d
                     {({ processing, errors }) => (
                         <>
                             <p className="text-sm font-medium">Add a comment</p>
-                            <textarea
+                            <MentionTextarea
                                 name="body"
                                 rows={3}
-                                placeholder="Write a comment for the team…"
-                                className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                placeholder="Write a comment for the team… type @ to mention someone"
+                                users={mentionableUsers}
                             />
                             <InputError message={errors.body} />
                             <Button type="submit" size="sm" className="self-start" disabled={processing}>
