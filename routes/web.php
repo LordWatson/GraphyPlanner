@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
 use App\Http\Controllers\Portal\PortalDashboardController;
 use App\Http\Controllers\Portal\PortalInvoiceController;
@@ -96,6 +97,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
+    Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])
+        ->name('campaigns.show');
+    Route::get('campaigns/{campaign}/edit', [CampaignController::class, 'edit'])
+        ->name('campaigns.edit');
     Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])
         ->name('campaigns.update');
     Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
@@ -139,6 +144,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'portal'])->group(function () {
     Route::get('/', [PortalDashboardController::class, 'index'])->name('dashboard');
     Route::get('company', [PortalClientController::class, 'show'])->name('company');
+    Route::get('campaigns', [PortalCampaignController::class, 'index'])->name('campaigns.index');
+    Route::get('campaigns/{campaign}', [PortalCampaignController::class, 'show'])->name('campaigns.show');
     Route::get('posts', [PortalPostController::class, 'index'])->name('posts.index');
     Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
     Route::post('posts/{post}/decide', [PortalPostController::class, 'decide'])->name('posts.decide');
@@ -196,6 +203,10 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
+    Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])
+        ->name('campaigns.show');
+    Route::get('campaigns/{campaign}/edit', [CampaignController::class, 'edit'])
+        ->name('campaigns.edit');
     Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])
         ->name('campaigns.update');
     Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])

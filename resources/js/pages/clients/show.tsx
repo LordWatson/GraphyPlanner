@@ -45,7 +45,7 @@ import { edit, index, destroy as destroyClient } from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
 import { destroy as destroySocialAccount, connect as connectSocialAccount } from '@/routes/social-accounts';
 import { store as storeCampaign } from '@/routes/clients/campaigns';
-import { destroy as destroyCampaign } from '@/routes/campaigns';
+import { show as showCampaign, destroy as destroyCampaign } from '@/routes/campaigns';
 import { store as storePost } from '@/routes/clients/posts';
 import { edit as editPost } from '@/routes/posts';
 import { store as storeAsset } from '@/routes/clients/assets';
@@ -736,13 +736,16 @@ export default function ClientShow({
                                                 key={campaign.id}
                                                 className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
                                             >
-                                                <div className="flex items-center gap-3">
+                                                <Link
+                                                    href={showCampaign(campaign.id)}
+                                                    className="flex flex-1 items-center gap-3"
+                                                >
                                                     <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                                                         <Clapperboard className="size-4" />
                                                     </span>
                                                     <div className="flex flex-col gap-1">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">{campaign.name}</span>
+                                                            <span className="text-sm font-medium hover:underline">{campaign.name}</span>
                                                             <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'}>
                                                                 {campaign.status}
                                                             </Badge>
@@ -753,17 +756,22 @@ export default function ClientShow({
                                                             {campaign.goal ? ` · ${campaign.goal}` : ''}
                                                         </span>
                                                     </div>
+                                                </Link>
+                                                <div className="flex items-center gap-2">
+                                                    <Button asChild size="sm" variant="outline">
+                                                        <Link href={showCampaign(campaign.id)}>View</Link>
+                                                    </Button>
+                                                    {campaign.can.delete && (
+                                                        <Form {...destroyCampaign.form(campaign.id)}>
+                                                            {({ processing }) => (
+                                                                <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                                                    <Trash2 />
+                                                                    Remove
+                                                                </Button>
+                                                            )}
+                                                        </Form>
+                                                    )}
                                                 </div>
-                                                {campaign.can.delete && (
-                                                    <Form {...destroyCampaign.form(campaign.id)}>
-                                                        {({ processing }) => (
-                                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
-                                                                <Trash2 />
-                                                                Remove
-                                                            </Button>
-                                                        )}
-                                                    </Form>
-                                                )}
                                             </div>
                                         ))}
                                     </div>

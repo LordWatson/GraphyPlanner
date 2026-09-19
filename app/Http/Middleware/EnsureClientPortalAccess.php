@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\Role;
+use App\Models\Campaign;
 use App\Models\Invoice;
 use App\Models\Post;
 use Closure;
@@ -27,10 +28,10 @@ class EnsureClientPortalAccess
             abort(403, 'This area is only available to client portal contacts.');
         }
 
-        foreach (['post', 'invoice'] as $parameter) {
+        foreach (['post', 'invoice', 'campaign'] as $parameter) {
             $model = $request->route($parameter);
 
-            if (($model instanceof Post || $model instanceof Invoice) && $model->client_id !== $user->client_id) {
+            if (($model instanceof Post || $model instanceof Invoice || $model instanceof Campaign) && $model->client_id !== $user->client_id) {
                 abort(404);
             }
         }

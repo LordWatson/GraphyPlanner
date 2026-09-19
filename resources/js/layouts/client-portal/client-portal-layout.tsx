@@ -1,20 +1,18 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { Building2, CalendarCheck2, Receipt } from 'lucide-react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { Building2, CalendarCheck2, Clapperboard, Receipt } from 'lucide-react';
 
 import AppLogoIcon from '@/components/app-logo-icon';
-import { NotificationBell } from '@/components/notification-bell';
-import { Button } from '@/components/ui/button';
-import { logout } from '@/routes';
 import { company as portalCompany, dashboard as portalDashboard } from '@/routes/portal';
+import { index as portalCampaignsIndex } from '@/routes/portal/campaigns';
 import { index as portalInvoicesIndex } from '@/routes/portal/invoices';
 import { index as portalPostsIndex } from '@/routes/portal/posts';
 
 /**
  * Step 6.3 — the client portal's shell. Deliberately distinct from `AppSidebarLayout`: no
  * internal-ops chrome (no "Needs attention", Settings, other clients) — just this client's
- * identity, a nav for Posts/Approvals/Invoices, and a way to sign out. Per the brand guidelines
- * §7, this reuses the same tokens/components as the internal app but in the lighter, simplified
- * variant used by the review portal (no dark sidebar).
+ * identity and a nav for Posts/Approvals/Invoices (logout and notifications live elsewhere in
+ * the UI). Per the brand guidelines §7, this reuses the same tokens/components as the internal
+ * app but in the lighter, simplified variant used by the review portal (no dark sidebar).
  */
 export default function ClientPortalLayout({
     title,
@@ -28,6 +26,7 @@ export default function ClientPortalLayout({
     const navItems = [
         { title: 'Dashboard', href: portalDashboard(), icon: CalendarCheck2 },
         { title: 'Posts & approvals', href: portalPostsIndex(), icon: CalendarCheck2 },
+        { title: 'Campaigns', href: portalCampaignsIndex(), icon: Clapperboard },
         { title: 'Invoices', href: portalInvoicesIndex(), icon: Receipt },
         { title: 'Company', href: portalCompany(), icon: Building2 },
     ];
@@ -64,14 +63,6 @@ export default function ClientPortalLayout({
                                     {item.title}
                                 </Link>
                             ))}
-                            <Form action={logout()} method="post">
-                                {({ processing }) => (
-                                    <Button type="submit" variant="ghost" size="sm" disabled={processing}>
-                                        Log out
-                                    </Button>
-                                )}
-                            </Form>
-                            <NotificationBell />
                         </nav>
                     </div>
                 </header>

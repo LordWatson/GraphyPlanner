@@ -67,4 +67,12 @@ class Campaign extends Model
     {
         return $this->hasMany(Asset::class);
     }
+
+    /**
+     * @return HasMany<Post, $this>
+     */
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class);
+    }
 }
