@@ -7,6 +7,8 @@ use App\Contracts\PublishAdapter;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
+use App\Notifications\PostPublishFailed;
+use App\Services\PostNotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,8 +33,11 @@ class PublishPostJob implements ShouldQueue
 
     public function __construct(public readonly int $postId) {}
 
-    public function handle(PublishAdapter $adapter, TransitionPostStatusAction $transition): void
-    {
+    public function handle(
+        PublishAdapter $adapter,
+        TransitionPostStatusAction $transition,
+        PostNotificationService $notifications = new PostNotificationService,
+    ): void {
         $post = Post::with('targets.socialAccount', 'assets')->find($this->postId);
 
         if (! $post) {
@@ -87,6 +92,8 @@ class PublishPostJob implements ShouldQueue
         }
 
         $transition($post, PostStatus::Failed, null);
+
+        $notifications->send($notifications->orgRecipients($post), new PostPublishFailed($post));
 
         Log::error('PublishPostJob: post publish failed for one or more targets', [
             'post_id' => $post->id,

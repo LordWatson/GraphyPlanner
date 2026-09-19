@@ -4,9 +4,13 @@ namespace App\Actions\Posts;
 
 use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
+use App\Enums\Role;
 use App\Jobs\PublishPostJob;
 use App\Models\Post;
 use App\Models\User;
+use App\Notifications\PostApprovalDecided;
+use App\Notifications\PostWaitingForClientReview;
+use App\Services\PostNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -31,6 +35,7 @@ class TransitionPostStatusAction
         ?string $comment = null,
         EvaluatePostChecklistAction $evaluateChecklist = new EvaluatePostChecklistAction,
         SendClientReviewRequestedEmailAction $sendClientReviewRequestedEmail = new SendClientReviewRequestedEmailAction,
+        PostNotificationService $notifications = new PostNotificationService,
     ): Post {
         if (! PostStatusTransitionMap::isAllowed($post->status, $to)) {
             throw new \InvalidArgumentException(
@@ -91,7 +96,45 @@ class TransitionPostStatusAction
             $this->dispatchPublishJob($post);
         }
 
+        $this->notify($post, $to, $user, $notifications);
+
         return $post;
+    }
+
+    /**
+     * Notify the interested audience for a transition: org users when a client decides
+     * (approved/changes requested), client-portal users when a post lands in `waiting_client`.
+     */
+    private function notify(Post $post, PostStatus $to, ?User $user, PostNotificationService $notifications): void
+    {
+        if ($to === PostStatus::WaitingClient) {
+            $notifications->send(
+                $notifications->clientPortalRecipients($post),
+                new PostWaitingForClientReview($post),
+            );
+
+            return;
+        }
+
+        if (! in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
+            return;
+        }
+
+        // Only a client decision (a null user via the review portal, or a logged-in
+        // Role::ClientReviewer via the client portal) is notification-worthy here — an internal
+        // org user moving a post straight to `approved` isn't a client action.
+        if ($user !== null && $user->role !== Role::ClientReviewer) {
+            return;
+        }
+
+        $decision = $to === PostStatus::Approved
+            ? ApprovalDecision::Approved
+            : ApprovalDecision::ChangesRequested;
+
+        $notifications->send(
+            $notifications->orgRecipients($post),
+            new PostApprovalDecided($post, $decision),
+        );
     }
 
     /**

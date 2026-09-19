@@ -10,6 +10,7 @@ use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Portal\PortalClientController;
 use App\Http\Controllers\Portal\PortalDashboardController;
 use App\Http\Controllers\Portal\PortalInvoiceController;
@@ -37,6 +38,12 @@ Route::post('client-invite/{token}', [ClientInvitationAcceptController::class, '
 Route::get('social-accounts/callback', [SocialAccountController::class, 'callback'])->name('social-accounts.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Reachable by every logged-in role (including Role::ClientReviewer/portal users), unlike
+    // the internal-only routes below — the notification bell is shared across both layouts.
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');

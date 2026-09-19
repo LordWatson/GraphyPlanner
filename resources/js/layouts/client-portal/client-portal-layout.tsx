@@ -2,6 +2,7 @@ import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { Building2, CalendarCheck2, Receipt } from 'lucide-react';
 
 import AppLogoIcon from '@/components/app-logo-icon';
+import { NotificationBell } from '@/components/notification-bell';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/routes';
 import { company as portalCompany, dashboard as portalDashboard } from '@/routes/portal';
@@ -70,6 +71,7 @@ export default function ClientPortalLayout({
                                     </Button>
                                 )}
                             </Form>
+                            <NotificationBell />
                         </nav>
                     </div>
                 </header>

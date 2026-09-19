@@ -49,6 +49,10 @@ class HandleInertiaRequests extends Middleware
             'client' => $user && $user->role === Role::ClientReviewer && $user->client
                 ? ['name' => $user->client->name]
                 : null,
+            // Shared on every Inertia response so the notification bell's unread badge is always
+            // up to date without a dedicated round-trip; the dropdown's own list is lazy-loaded
+            // from `notifications.index` only once opened.
+            'unreadNotificationsCount' => $user ? $user->unreadNotifications()->count() : 0,
         ];
     }
 }

@@ -13,6 +13,7 @@ declare module '@inertiajs/core' {
             auth: Auth;
             sidebarOpen: boolean;
             preview: boolean;
+            unreadNotificationsCount: number;
             [key: string]: unknown;
         };
     }
