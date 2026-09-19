@@ -104,6 +104,8 @@ class PostEditorControllerTest extends TestCase
             'org_id' => $org->id,
             'status' => PostStatus::WaitingClient,
             'master_caption' => 'Ready for review',
+            // Post::booted() normalizes any leading "#" on save, so the stored/returned value is
+            // always bare (see PostNormalizationTest for dedicated coverage of that behavior).
             'hashtags' => ['#launch'],
         ]);
 
@@ -113,8 +115,32 @@ class PostEditorControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->where('post.id', $post->id)
             ->where('post.master_caption', 'Ready for review')
-            ->where('post.hashtags', ['#launch'])
+            ->where('post.hashtags', ['launch'])
             ->where('can.update', false)
+        );
+    }
+
+    /**
+     * The editor's hashtag picker (Instagram-style autocomplete) is fed by the client's
+     * `BrandBrain` "always use" hashtags plus every hashtag already used on the client's other
+     * posts, deduped and with any leading "#" stripped.
+     */
+    public function test_editor_exposes_hashtag_suggestions_from_brand_brain_and_past_posts(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        \App\Models\BrandBrain::factory()->for($client)->create([
+            'hashtag_policy' => ['always_use' => ['#brandalways', 'shared'], 'never_use' => [], 'rotation_notes' => null],
+        ]);
+        Post::factory()->for($client)->create(['org_id' => $org->id, 'hashtags' => ['shared', 'pastpost']]);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $response = $this->actingAs($owner)->get(route('posts.edit', $post));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('hashtagSuggestions', ['brandalways', 'shared', 'pastpost'])
         );
     }
 
@@ -129,5 +155,55 @@ class PostEditorControllerTest extends TestCase
         $response = $this->actingAs($otherDesigner)->get(route('posts.edit', $post));
 
         $response->assertForbidden();
+    }
+
+    /**
+     * A `scheduled` or `published` post is locked for content edits: the editor still opens
+     * (`view` isn't affected), but `can.update` must be false so the frontend renders it
+     * read-only until the post is moved to a different status.
+     */
+    public function test_scheduled_and_published_posts_are_locked_for_editing(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        foreach ([PostStatus::Scheduled, PostStatus::Published] as $status) {
+            $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => $status]);
+
+            $response = $this->actingAs($owner)->get(route('posts.edit', $post));
+
+            $response->assertOk();
+            $response->assertInertia(fn ($page) => $page
+                ->where('post.id', $post->id)
+                ->where('can.update', false)
+            );
+        }
+    }
+
+    /**
+     * Even a direct `PUT posts.update` request must be rejected while the post is `scheduled` or
+     * `published`, since `UpdatePostRequest` authorizes via the same `PostPolicy::update`.
+     */
+    public function test_updating_a_scheduled_or_published_post_is_forbidden(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        foreach ([PostStatus::Scheduled, PostStatus::Published] as $status) {
+            $post = Post::factory()->for($client)->create([
+                'org_id' => $org->id,
+                'status' => $status,
+                'master_caption' => 'Original caption',
+            ]);
+
+            $response = $this->actingAs($owner)->put(route('posts.update', $post), [
+                'master_caption' => 'Trying to sneak an edit in',
+            ]);
+
+            $response->assertForbidden();
+            $this->assertSame('Original caption', $post->refresh()->master_caption);
+        }
     }
 }

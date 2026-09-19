@@ -21,6 +21,7 @@ import {
 import { useState } from 'react';
 import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import Heading from '@/components/heading';
+import { HashtagInput } from '@/components/hashtag-input';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -285,6 +286,7 @@ export default function PostEdit({
     availableAssets,
     allowedTransitions,
     can,
+    hashtagSuggestions,
 }: {
     post: PostData;
     client: { id: number; name: string };
@@ -292,10 +294,11 @@ export default function PostEdit({
     availableAssets: AvailableAssetData[];
     allowedTransitions: { value: string; label: string }[];
     can: { update: boolean; comment: boolean; resend_review_email: boolean };
+    hashtagSuggestions: string[];
 }) {
     const [caption, setCaption] = useState(post.master_caption ?? '');
     // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
-    const [hashtagsText, setHashtagsText] = useState((post.hashtags ?? []).join(', '));
+    const [hashtags, setHashtags] = useState<string[]>(post.hashtags ?? []);
     const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>(post.assets.map((asset) => asset.id));
     const [targetRows, setTargetRows] = useState<Record<number, { date: string; time: string }>>(
         Object.fromEntries(
@@ -307,11 +310,6 @@ export default function PostEdit({
     );
     const [musicName, setMusicName] = useState((post.music?.name as string) ?? '');
     const [locationName, setLocationName] = useState((post.location?.name as string) ?? '');
-
-    const hashtags = hashtagsText
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0);
 
     const toggleTargetAccount = (accountId: number) => {
         setTargetRows((current) => {
@@ -400,6 +398,13 @@ export default function PostEdit({
                     <TabsContent value="editor" className="grid gap-4">
                     {!can.update && (
                     <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                        {(post.status === 'scheduled' || post.status === 'published') && (
+                            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                                <Lock className="size-4 shrink-0" />
+                                This post is {post.status_label.toLowerCase()} and is locked for editing. Move it to a
+                                different status to make changes.
+                            </div>
+                        )}
                         <div className="grid gap-1">
                             <Label>Master caption</Label>
                             <p className="rounded-md border border-border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
@@ -516,12 +521,13 @@ export default function PostEdit({
                                 */}
 
                                 <div className="grid gap-1">
-                                    <Label htmlFor="hashtags_text">Hashtags (comma-separated)</Label>
-                                    <Input
+                                    <Label htmlFor="hashtags_text">Hashtags</Label>
+                                    <HashtagInput
                                         id="hashtags_text"
-                                        value={hashtagsText}
-                                        onChange={(e) => setHashtagsText(e.target.value)}
-                                        placeholder="#launch, #reels"
+                                        value={hashtags}
+                                        onChange={setHashtags}
+                                        suggestions={hashtagSuggestions}
+                                        placeholder="Start typing a hashtag…"
                                     />
                                     {hashtags.map((tag, i) => (
                                         <input key={i} type="hidden" name={`hashtags[${i}]`} value={tag} />

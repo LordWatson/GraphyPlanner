@@ -46,6 +46,7 @@ class UploadPostAdapterTest extends TestCase
         $post = Post::factory()->create([
             'client_id' => $account->client_id,
             'master_caption' => 'Hello world',
+            // Post::booted() normalizes any leading "#" on save, so this is stored/sent as 'graphy'.
             'hashtags' => ['#graphy'],
         ]);
         $asset = Asset::factory()->create(['client_id' => $post->client_id, 'url' => 'https://cdn.test/media.jpg']);
@@ -66,7 +67,7 @@ class UploadPostAdapterTest extends TestCase
                 && $request['title'] === 'Hello world'
                 && $request['platform'] === [Platform::LinkedIn->value]
                 && $request['media_urls'] === ['https://cdn.test/media.jpg']
-                && $request['hashtags'] === ['#graphy']
+                && $request['hashtags'] === ['graphy']
                 && $request['scheduled_date'] === '2026-10-01T12:00:00+00:00'
                 && ! array_key_exists('location_id', $request->data())
                 && ! array_key_exists('tiktok_music_id', $request->data());

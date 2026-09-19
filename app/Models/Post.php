@@ -54,6 +54,26 @@ class Post extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Some users type hashtags with a leading "#" (e.g. "#launch"), others without
+        // ("launch"). Normalize on save so the stored value — and therefore every place that
+        // renders it with its own "#" prefix (review portal, publish adapters, etc.) — is
+        // consistent regardless of how the tag was entered.
+        static::saving(function (self $post) {
+            if (! is_array($post->hashtags)) {
+                return;
+            }
+
+            $post->hashtags = collect($post->hashtags)
+                ->map(fn ($tag) => ltrim(trim((string) $tag), '#'))
+                ->filter(fn ($tag) => $tag !== '')
+                ->unique()
+                ->values()
+                ->all();
+        });
+    }
+
     /**
      * @return BelongsTo<Organization, $this>
      */

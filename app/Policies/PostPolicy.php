@@ -46,9 +46,17 @@ class PostPolicy
 
     /**
      * Determine whether the user can update a post.
+     *
+     * A post that is `scheduled` or `published` is locked for content edits: its inputs must
+     * stay frozen until a user transitions it to a different status (spec §6). Status transitions
+     * themselves go through `transition()` instead, so this only blocks the content-editing form.
      */
     public function update(User $user, Post $post): bool
     {
+        if (in_array($post->status, [PostStatus::Scheduled, PostStatus::Published], true)) {
+            return false;
+        }
+
         return $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
     }

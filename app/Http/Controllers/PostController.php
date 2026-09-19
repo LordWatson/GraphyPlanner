@@ -59,6 +59,8 @@ class PostController extends Controller
             fn (PostStatus $to) => $user->can('transition', [$post, $to]),
         ));
 
+        $hashtagSuggestions = $this->hashtagSuggestions($client);
+
         return Inertia::render('posts/edit', [
             'post' => $this->transformPostForEditor($post, $evaluateChecklist),
             'client' => ['id' => $client->id, 'name' => $client->name],
@@ -83,6 +85,7 @@ class PostController extends Controller
                 'comment' => $user->can('comment', $post),
                 'resend_review_email' => $user->can('resendReviewEmail', $post),
             ],
+            'hashtagSuggestions' => $hashtagSuggestions,
         ]);
     }
 
@@ -148,6 +151,31 @@ class PostController extends Controller
         $action($activityLog);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Build the hashtag autocomplete list (Instagram-style tag picker) shown in the editor: the
+     * client's `BrandBrain` `hashtag_policy.always_use` list plus every hashtag already used
+     * across the client's other posts, deduped and capped so the suggestion list stays useful.
+     *
+     * @return array<int, string>
+     */
+    private function hashtagSuggestions(Client $client): array
+    {
+        $fromBrandBrain = collect($client->brandBrain?->hashtag_policy['always_use'] ?? []);
+
+        $fromPosts = $client->posts()
+            ->whereNotNull('hashtags')
+            ->pluck('hashtags')
+            ->flatten();
+
+        return $fromBrandBrain->merge($fromPosts)
+            ->map(fn ($tag) => ltrim(trim((string) $tag), '#'))
+            ->filter(fn ($tag) => $tag !== '')
+            ->unique()
+            ->values()
+            ->take(50)
+            ->all();
     }
 
     /**
