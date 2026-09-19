@@ -4,6 +4,7 @@ namespace App\Actions\Posts;
 
 use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
+use App\Jobs\PublishPostJob;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,7 @@ class TransitionPostStatusAction
             );
         }
 
-        return DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist, $sendClientReviewRequestedEmail) {
+        $post = DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist, $sendClientReviewRequestedEmail) {
             $from = $post->status;
 
             // Keep the §6 checklist snapshot fresh on every transition, so the editor UI can
@@ -82,5 +83,34 @@ class TransitionPostStatusAction
 
             return $post->refresh();
         });
+
+        // Step 1.4: nothing calls the vendor until this point — the §6 checklist is already
+        // re-validated server-side before `scheduled` is even a legal destination (see
+        // `TransitionPostRequest`), so it's safe to enqueue the publish job right here.
+        if ($to === PostStatus::Scheduled) {
+            $this->dispatchPublishJob($post);
+        }
+
+        return $post;
+    }
+
+    /**
+     * Enqueue `PublishPostJob`, delayed until the earliest target's `scheduled_at_utc` if that
+     * instant is still in the future (immediate dispatch otherwise, e.g. a past-due reschedule).
+     */
+    private function dispatchPublishJob(Post $post): void
+    {
+        $publishAt = $post->targets()->whereNotNull('scheduled_at_utc')->min('scheduled_at_utc');
+
+        $job = PublishPostJob::dispatch($post->id);
+
+        if ($publishAt && now()->lessThan($publishAt)) {
+            $job->delay($publishAt);
+        }
+
+        Log::info('Publish job enqueued for scheduled post', [
+            'post_id' => $post->id,
+            'publish_at' => $publishAt,
+        ]);
     }
 }

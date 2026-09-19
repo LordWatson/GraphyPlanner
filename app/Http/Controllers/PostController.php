@@ -187,6 +187,10 @@ class PostController extends Controller
                 'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),
                 'scheduled_local_time' => $target->scheduled_local_time,
                 'scheduled_at_utc' => $target->scheduled_at_utc?->toIso8601String(),
+                'status' => $target->status->value,
+                'status_label' => $target->status->label(),
+                'external_post_id' => $target->external_post_id,
+                'error' => $target->error,
             ])->values(),
             'activity_logs' => $post->activityLogs->sortByDesc('created_at')->map(fn ($log) => [
                 'id' => $log->id,

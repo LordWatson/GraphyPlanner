@@ -6,12 +6,14 @@ use App\Enums\ApprovalDecision;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Jobs\PublishPostJob;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class PostTransitionControllerTest extends TestCase
@@ -20,6 +22,8 @@ class PostTransitionControllerTest extends TestCase
 
     public function test_owner_can_move_a_post_through_the_valid_transition_chain(): void
     {
+        Queue::fake();
+
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
@@ -57,6 +61,10 @@ class PostTransitionControllerTest extends TestCase
 
         $this->assertSame(4, $post->activityLogs()->count());
         $this->assertSame(1, $post->approvals()->count());
+
+        // Step 1.4: reaching `scheduled` must enqueue the publish job — nothing calls the vendor
+        // before this point.
+        Queue::assertPushed(PublishPostJob::class, fn (PublishPostJob $job) => $job->postId === $post->id);
     }
 
     public function test_scheduling_is_blocked_when_the_checklist_has_not_passed(): void

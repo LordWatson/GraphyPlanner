@@ -45,6 +45,10 @@ type TargetData = {
     scheduled_local_date: string | null;
     scheduled_local_time: string | null;
     scheduled_at_utc: string | null;
+    status: string;
+    status_label: string;
+    external_post_id: string | null;
+    error: string | null;
 };
 
 type ActivityLogData = {
@@ -430,6 +434,14 @@ export default function PostEdit({
                                                 <span className="text-xs text-muted-foreground">
                                                     {target.scheduled_local_date ?? '—'} {target.scheduled_local_time ?? ''}
                                                 </span>
+                                                {target.status !== 'pending' && (
+                                                    <Badge variant={target.status === 'published' ? 'success' : 'destructive'}>
+                                                        {target.status_label}
+                                                    </Badge>
+                                                )}
+                                                {target.error && (
+                                                    <span className="text-xs text-destructive">{target.error}</span>
+                                                )}
                                             </div>
                                         );
                                     })}
