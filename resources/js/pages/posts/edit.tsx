@@ -19,6 +19,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -331,6 +332,8 @@ export default function PostEdit({
         );
     };
 
+    const selectedAssets = availableAssets.filter((asset) => selectedAssetIds.includes(asset.id));
+
     const targetEntries = Object.entries(targetRows);
     const [activeTab, setActiveTab] = useState('editor');
 
@@ -469,13 +472,7 @@ export default function PostEdit({
                         <div className="grid gap-2">
                             <Label>Media</Label>
                             {post.assets.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                    {post.assets.map((asset) => (
-                                        <Badge key={asset.id} variant="outline">
-                                            {asset.original_filename ?? `Asset #${asset.id}`}
-                                        </Badge>
-                                    ))}
-                                </div>
+                                <AssetPreviewCarousel assets={post.assets} />
                             ) : (
                                 <p className="text-sm text-muted-foreground">No media attached.</p>
                             )}
@@ -661,26 +658,33 @@ export default function PostEdit({
                                             No assets on this client yet — add one from the client page first.
                                         </p>
                                     ) : (
-                                        <div className="flex flex-wrap gap-2">
-                                            {availableAssets.map((asset) => {
-                                                const selected = selectedAssetIds.includes(asset.id);
+                                        <>
+                                            <div className="flex flex-wrap gap-2">
+                                                {availableAssets.map((asset) => {
+                                                    const selected = selectedAssetIds.includes(asset.id);
 
-                                                return (
-                                                    <button
-                                                        key={asset.id}
-                                                        type="button"
-                                                        onClick={() => toggleAsset(asset.id)}
-                                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                                                            selected
-                                                                ? 'border-primary bg-primary/10 text-primary'
-                                                                : 'border-border bg-muted/50 text-foreground'
-                                                        }`}
-                                                    >
-                                                        {asset.original_filename ?? `Asset #${asset.id}`}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
+                                                    return (
+                                                        <button
+                                                            key={asset.id}
+                                                            type="button"
+                                                            onClick={() => toggleAsset(asset.id)}
+                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                                                selected
+                                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                                    : 'border-border bg-muted/50 text-foreground'
+                                                            }`}
+                                                        >
+                                                            {asset.original_filename ?? `Asset #${asset.id}`}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {selectedAssets.length > 0 ? (
+                                                <AssetPreviewCarousel assets={selectedAssets} />
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">No media selected.</p>
+                                            )}
+                                        </>
                                     )}
                                     {selectedAssetIds.map((id, i) => (
                                         <input key={id} type="hidden" name={`asset_ids[${i}]`} value={id} />
