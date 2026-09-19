@@ -39,4 +39,39 @@ return [
 
     'max_upload_size_kb' => (int) env('ASSETS_MAX_UPLOAD_SIZE_KB', 51200),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Max Video Upload Size (KB)
+    |--------------------------------------------------------------------------
+    |
+    | Video files are typically much larger than images/documents, so they get
+    | their own (higher) size ceiling. `StoreAssetRequest` picks this limit
+    | instead of `max_upload_size_kb` whenever the uploaded file's mime type
+    | starts with "video/".
+    |
+    */
+
+    'max_video_upload_size_kb' => (int) env('ASSETS_MAX_VIDEO_UPLOAD_SIZE_KB', 512000),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Allowed Upload Extensions
+    |--------------------------------------------------------------------------
+    |
+    | Extensions accepted by `StoreAssetRequest` for `source = upload` assets.
+    | Kept intentionally broad (images, common video formats, and a handful of
+    | document/archive formats) rather than image-only, since Assets can back
+    | video posts (e.g. Instagram Reels/TikTok) as well as image posts.
+    |
+    */
+
+    'allowed_upload_extensions' => [
+        // Images
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'heic',
+        // Video
+        'mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v',
+        // Documents / other
+        'pdf', 'doc', 'docx', 'ppt', 'pptx', 'zip',
+    ],
+
 ];

@@ -59,6 +59,66 @@ class AssetControllerTest extends TestCase
         $this->assertDatabaseCount('assets', 1);
     }
 
+    public function test_owner_can_upload_a_video_asset(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($owner)->post(route('clients.assets.store', $client), [
+            'source' => 'upload',
+            'file' => UploadedFile::fake()->create('clip.mp4', 2048, 'video/mp4'),
+        ]);
+
+        $response->assertRedirect(route('clients.show', $client));
+        $this->assertDatabaseHas('assets', [
+            'client_id' => $client->id,
+            'org_id' => $org->id,
+            'source' => 'upload',
+            'type' => 'video',
+            'original_filename' => 'clip.mp4',
+        ]);
+
+        $asset = Asset::first();
+        Storage::disk('public')->assertExists($asset->path);
+    }
+
+    public function test_video_upload_exceeding_image_limit_but_within_video_limit_succeeds(): void
+    {
+        Storage::fake('public');
+        config(['assets.max_upload_size_kb' => 100]);
+        config(['assets.max_video_upload_size_kb' => 20000]);
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($owner)->post(route('clients.assets.store', $client), [
+            'source' => 'upload',
+            'file' => UploadedFile::fake()->create('clip.mp4', 15000, 'video/mp4'),
+        ]);
+
+        $response->assertRedirect(route('clients.show', $client));
+        $this->assertDatabaseCount('assets', 1);
+    }
+
+    public function test_upload_rejects_disallowed_file_extensions(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($owner)->post(route('clients.assets.store', $client), [
+            'source' => 'upload',
+            'file' => UploadedFile::fake()->create('script.exe', 10, 'application/x-msdownload'),
+        ]);
+
+        $response->assertSessionHasErrors('file');
+        $this->assertDatabaseCount('assets', 0);
+    }
+
     public function test_owner_can_link_a_figma_asset(): void
     {
         $org = Organization::factory()->create();

@@ -961,7 +961,12 @@ export default function ClientShow({
                                                 {assetSource === 'upload' ? (
                                                     <div className="grid gap-1">
                                                         <Label htmlFor="file">File</Label>
-                                                        <Input id="file" name="file" type="file" />
+                                                        <Input
+                                                            id="file"
+                                                            name="file"
+                                                            type="file"
+                                                            accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.zip"
+                                                        />
                                                         <InputError message={errors.file} />
                                                     </div>
                                                 ) : (

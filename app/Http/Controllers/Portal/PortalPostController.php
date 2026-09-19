@@ -86,6 +86,8 @@ class PortalPostController extends Controller
                     'url' => $asset->url,
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
+                    'source' => $asset->source?->value,
+                    'mime_type' => $asset->mime_type,
                 ])->values(),
                 'targets' => $post->targets->map(fn ($target) => [
                     'platform' => $target->socialAccount?->platform?->value,

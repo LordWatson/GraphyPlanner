@@ -4,6 +4,7 @@ namespace App\Actions\Assets;
 
 use App\Contracts\AssetStorage;
 use App\Enums\AssetSource;
+use App\Enums\AssetType;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\User;
@@ -42,6 +43,7 @@ class CreateAssetAction
 
                 $attributes = [
                     ...$attributes,
+                    'type' => $attributes['type'] ?? $this->detectType($stored['mime_type']),
                     'disk' => $stored['disk'],
                     'path' => $stored['path'],
                     'url' => $stored['url'],
@@ -63,5 +65,24 @@ class CreateAssetAction
 
             return $asset;
         });
+    }
+
+    /**
+     * Infer the `AssetType` from a stored upload's mime type when the caller didn't explicitly
+     * pick one, so downstream consumers (e.g. `UploadPostAdapter`'s Instagram REELS/IMAGE
+     * `media_type` inference) work for video uploads without requiring manual tagging.
+     */
+    private function detectType(?string $mimeType): ?AssetType
+    {
+        if ($mimeType === null) {
+            return null;
+        }
+
+        return match (true) {
+            str_starts_with($mimeType, 'image/') => AssetType::Image,
+            str_starts_with($mimeType, 'video/') => AssetType::Video,
+            $mimeType === 'application/pdf' => AssetType::Document,
+            default => AssetType::Other,
+        };
     }
 }

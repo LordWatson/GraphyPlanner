@@ -1,6 +1,7 @@
 import { Form } from '@inertiajs/react';
 import { CheckCircle2, MessageSquareWarning } from 'lucide-react';
 
+import { AssetPreview, type AssetPreviewData } from '@/components/asset-preview';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -9,12 +10,7 @@ import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
 import { store as commentOnPortalPost } from '@/routes/portal/posts/comments';
 import { decide as decideOnPortalPost } from '@/routes/portal/posts';
 
-type AssetData = {
-    id: number;
-    url: string | null;
-    original_filename: string | null;
-    type: string | null;
-};
+type AssetData = AssetPreviewData;
 
 type TargetData = {
     platform: string | null;
@@ -81,23 +77,9 @@ export default function PortalPostShow({ post, can }: { post: PostData; can: { d
 
                 {post.assets.length > 0 && (
                     <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {post.assets.map((asset) =>
-                            asset.type === 'upload' && asset.url ? (
-                                <img
-                                    key={asset.id}
-                                    src={asset.url}
-                                    alt={asset.original_filename ?? ''}
-                                    className="aspect-square w-full rounded-md border border-border object-cover"
-                                />
-                            ) : (
-                                <div
-                                    key={asset.id}
-                                    className="flex aspect-square w-full items-center justify-center rounded-md border border-border bg-muted/30 p-2 text-center text-xs text-muted-foreground"
-                                >
-                                    {asset.original_filename ?? 'Attachment'}
-                                </div>
-                            ),
-                        )}
+                        {post.assets.map((asset) => (
+                            <AssetPreview key={asset.id} asset={asset} />
+                        ))}
                     </div>
                 )}
 
