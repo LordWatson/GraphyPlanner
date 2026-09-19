@@ -51,7 +51,7 @@ import { edit as editPost } from '@/routes/posts';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { destroy as destroyAsset } from '@/routes/assets';
 import { store as storeInvoice } from '@/routes/clients/invoices';
-import { send as sendInvoice, markPaid as markPaidInvoice } from '@/routes/invoices';
+import { show as showInvoice, send as sendInvoice, markPaid as markPaidInvoice } from '@/routes/invoices';
 import { store as storeInvitation } from '@/routes/clients/invitations';
 import { destroy as destroyInvitation } from '@/routes/invitations';
 
@@ -85,7 +85,7 @@ type InvoiceData = {
     description: string | null;
     sent_at: string | null;
     paid_at: string | null;
-    can: { send: boolean; mark_paid: boolean };
+    can: { send: boolean; mark_paid: boolean; update: boolean; delete: boolean };
 };
 
 type SocialAccountData = {
@@ -1125,7 +1125,9 @@ export default function ClientShow({
                                             </span>
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium">{invoice.invoice_number}</span>
+                                                    <Link href={showInvoice(invoice.id)} className="text-sm font-medium underline">
+                                                        {invoice.invoice_number}
+                                                    </Link>
                                                     <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'}>
                                                         {invoice.status}
                                                     </Badge>

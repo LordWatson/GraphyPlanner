@@ -54,6 +54,8 @@ class PortalInvoiceController extends Controller
             'issue_date' => $invoice->issue_date->toDateString(),
             'due_date' => $invoice->due_date?->toDateString(),
             'is_unpaid' => $invoice->status !== InvoiceStatus::Paid,
+            'pdf_url' => $invoice->pdf_url,
+            'pdf_original_filename' => $invoice->pdf_original_filename,
         ];
     }
 }

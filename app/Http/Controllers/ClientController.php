@@ -259,6 +259,8 @@ class ClientController extends Controller
             'can' => [
                 'send' => $invoice->status === InvoiceStatus::Draft && $user->can('send', $invoice),
                 'mark_paid' => $invoice->status === InvoiceStatus::Sent && $user->can('markPaid', $invoice),
+                'update' => $user->can('update', $invoice),
+                'delete' => $user->can('delete', $invoice),
             ],
         ];
     }

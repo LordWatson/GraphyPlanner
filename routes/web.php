@@ -70,6 +70,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
+        ->name('invoices.show');
+    Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
+        ->name('invoices.edit');
+    Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])
+        ->name('invoices.update');
+    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
+        ->name('invoices.destroy');
+    Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
+        ->name('invoices.pdf.store');
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
         ->name('invoices.send');
     Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
@@ -160,6 +170,16 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
+        ->name('invoices.show');
+    Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
+        ->name('invoices.edit');
+    Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])
+        ->name('invoices.update');
+    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
+        ->name('invoices.destroy');
+    Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
+        ->name('invoices.pdf.store');
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
         ->name('invoices.send');
     Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
