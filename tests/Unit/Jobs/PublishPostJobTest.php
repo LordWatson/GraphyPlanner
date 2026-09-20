@@ -22,7 +22,7 @@ class PublishPostJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_publishes_every_target_and_marks_the_post_published_when_all_targets_succeed(): void
+    public function test_it_publishes_every_target_and_keeps_the_post_publishing_pending_vendor_confirmation_when_all_targets_are_accepted(): void
     {
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
@@ -47,8 +47,11 @@ class PublishPostJobTest extends TestCase
         $post->refresh();
         $target->refresh();
 
-        $this->assertSame(PostStatus::Published, $post->status);
-        $this->assertSame(PostTargetStatus::Published, $target->status);
+        // The vendor only accepted the request here — it may still be queued/scheduled for
+        // delivery — so the post/target only move to `published` once `SyncPublishStatusAction`
+        // (webhook or poll fallback) confirms actual delivery.
+        $this->assertSame(PostStatus::Publishing, $post->status);
+        $this->assertSame(PostTargetStatus::Pending, $target->status);
         $this->assertSame('ext-123', $target->external_post_id);
         $this->assertNull($target->error);
     }

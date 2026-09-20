@@ -24,8 +24,12 @@ use Illuminate\Support\Facades\Log;
  * `TransitionPostRequest` before the `scheduled` transition is even allowed).
  *
  * Moves the post to `publishing`, calls `PublishAdapter::publish()` for every target's
- * `SocialAccount`, records each target's `TargetResult` (external id or raw vendor error), then
- * moves the post to `published` (all targets ok) or `failed` (any target failed).
+ * `SocialAccount`, and records each target's `TargetResult` (external id or raw vendor error).
+ * A `TargetResult::ok` only means the vendor *accepted* the request — it may still be queued or
+ * scheduled for later delivery on their end — so accepted targets stay `pending` and the post
+ * stays `publishing` until `SyncPublishStatusAction` (via the Upload-Post webhook, or the
+ * `PollPendingPublishStatusesAction` fallback) confirms actual delivery and moves the post to
+ * `published`. Any target rejected outright here still moves the post straight to `failed`.
  */
 class PublishPostJob implements ShouldQueue
 {
@@ -73,8 +77,12 @@ class PublishPostJob implements ShouldQueue
 
         DB::transaction(function () use ($post, $results) {
             foreach ($results as $result) {
+                // A successful result here only means the vendor *accepted* the request (it may
+                // still be queued/scheduled on their side, especially for a future-dated post) —
+                // the target stays `pending` until the webhook (or `PollPendingPublishStatusesAction`
+                // fallback) confirms the vendor actually delivered it, via `SyncPublishStatusAction`.
                 $post->targets->firstWhere('social_account_id', $result->accountId)?->update([
-                    'status' => $result->ok ? PostTargetStatus::Published : PostTargetStatus::Failed,
+                    'status' => $result->ok ? PostTargetStatus::Pending : PostTargetStatus::Failed,
                     'external_post_id' => $result->externalPostId,
                     'error' => $result->error,
                 ]);
@@ -84,9 +92,12 @@ class PublishPostJob implements ShouldQueue
         $allOk = $results->isNotEmpty() && $results->every(fn ($result) => $result->ok);
 
         if ($allOk) {
-            $transition($post, PostStatus::Published, null);
-
-            Log::info('PublishPostJob: post published successfully', ['post_id' => $post->id]);
+            // The post stays `publishing` — it isn't `published` until the vendor confirms
+            // actual delivery (see `SyncPublishStatusAction`), which can happen well after the
+            // vendor accepted the request (e.g. a scheduled post it hasn't posted yet).
+            Log::info('PublishPostJob: post accepted by vendor, awaiting delivery confirmation', [
+                'post_id' => $post->id,
+            ]);
 
             return;
         }

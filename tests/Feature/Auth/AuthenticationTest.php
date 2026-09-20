@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Enums\Role;
+use App\Models\Client;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
@@ -30,6 +32,36 @@ class AuthenticationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_client_reviewers_are_redirected_to_the_portal_after_login()
+    {
+        $client = Client::factory()->create();
+        $user = User::factory()->role(Role::ClientReviewer)->create(['client_id' => $client->id]);
+
+        $response = $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('portal.dashboard', absolute: false));
+    }
+
+    public function test_client_reviewers_are_redirected_to_the_intended_url_after_login()
+    {
+        $client = Client::factory()->create();
+        $user = User::factory()->role(Role::ClientReviewer)->create(['client_id' => $client->id]);
+
+        $this->withSession(['url.intended' => route('portal.company', absolute: false)]);
+
+        $response = $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('portal.company', absolute: false));
     }
 
     public function test_users_with_two_factor_enabled_are_redirected_to_two_factor_challenge()

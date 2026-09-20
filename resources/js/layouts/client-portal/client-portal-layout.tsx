@@ -22,6 +22,8 @@ export default function ClientPortalLayout({
     children: React.ReactNode;
 }) {
     const { client } = usePage().props as unknown as { client?: { name: string } };
+    const { url: currentUrl } = usePage();
+    const currentPath = currentUrl.split('?')[0];
 
     const navItems = [
         { title: 'Dashboard', href: portalDashboard(), icon: CalendarCheck2 },
@@ -30,6 +32,14 @@ export default function ClientPortalLayout({
         { title: 'Invoices', href: portalInvoicesIndex(), icon: Receipt },
         { title: 'Company', href: portalCompany(), icon: Building2 },
     ];
+
+    const isActive = (href: { url: string }) => {
+        const itemPath = href.url.split('?')[0];
+
+        return itemPath === portalDashboard().url
+            ? currentPath === itemPath
+            : currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
+    };
 
     return (
         <>
@@ -53,16 +63,25 @@ export default function ClientPortalLayout({
                         </div>
 
                         <nav className="flex items-center gap-1">
-                            {navItems.map((item) => (
-                                <Link
-                                    key={item.title}
-                                    href={item.href}
-                                    className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                >
-                                    <item.icon className="size-4" />
-                                    {item.title}
-                                </Link>
-                            ))}
+                            {navItems.map((item) => {
+                                const active = isActive(item.href);
+
+                                return (
+                                    <Link
+                                        key={item.title}
+                                        href={item.href}
+                                        aria-current={active ? 'page' : undefined}
+                                        className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                                            active
+                                                ? 'bg-primary/10 text-primary'
+                                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                        }`}
+                                    >
+                                        <item.icon className="size-4" />
+                                        {item.title}
+                                    </Link>
+                                );
+                            })}
                         </nav>
                     </div>
                 </header>
