@@ -500,6 +500,19 @@ class UploadPostAdapter implements PublishAdapter
      */
     private function applyInstagramFields(Post $post, array &$fields, array &$sent, array &$skipped): void
     {
+        // Upload-Post has no generic `hashtags` upload parameter for Instagram (confirmed
+        // against https://docs.upload-post.com/api/reference — it only appears on the unrelated
+        // TikTok hashtag-suggestions endpoint), so the plain `hashtags`/`hashtags[]` field built
+        // in buildFields() is silently ignored by the vendor for this platform, and the tags
+        // never show up on the published post. Instagram captions carry hashtags as literal
+        // `#tag` text, so they're appended (bare tags re-prefixed with `#`, per `Post::booted()`'s
+        // normalization) to the caption actually sent as `instagram_title` here.
+        if (! empty($post->hashtags)) {
+            $hashtagText = collect($post->hashtags)->map(fn ($tag) => '#'.$tag)->implode(' ');
+            $fields['instagram_title'] = trim($fields['title']."\n\n".$hashtagText);
+            $sent[] = 'instagram_title';
+        }
+
         $locationId = $post->location['id'] ?? null;
         if ($locationId) {
             $fields['location_id'] = $locationId;

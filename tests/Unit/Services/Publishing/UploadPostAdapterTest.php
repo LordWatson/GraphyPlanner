@@ -140,6 +140,49 @@ class UploadPostAdapterTest extends TestCase
     }
 
     /**
+     * Regression test: Upload-Post has no generic `hashtags` upload parameter for Instagram, so
+     * the plain `hashtags`/`hashtags[]` field sent for every platform was silently ignored by the
+     * vendor and hashtags never appeared on the published Instagram post, even though the caption
+     * and media worked as expected. Hashtags must instead be appended (as literal `#tag` text) to
+     * the caption sent via the Instagram-specific `instagram_title` field.
+     */
+    public function test_instagram_publish_appends_hashtags_to_the_instagram_caption(): void
+    {
+        Http::fake([
+            '*/upload' => Http::response(['request_id' => 'up-ig-hashtags'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::Instagram,
+        ]);
+        $post = Post::factory()->create([
+            'client_id' => $account->client_id,
+            'master_caption' => 'Hello world',
+            // Post::booted() normalizes any leading "#" on save, so this is stored as 'graphy'/'launch'.
+            'hashtags' => ['#graphy', 'launch'],
+        ]);
+        $asset = Asset::factory()->create([
+            'client_id' => $post->client_id,
+            'type' => AssetType::Video,
+            'url' => 'https://cdn.test/reel.mp4',
+        ]);
+        $post->assets()->attach($asset);
+        $post->load('assets');
+
+        $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+        Http::assertSent(function ($request) {
+            $fields = self::multipartFieldsByName($request);
+
+            return $fields['title'] === ['Hello world']
+                && $fields['instagram_title'] === ["Hello world\n\n#graphy #launch"];
+        });
+
+        $this->assertContains('instagram_title', $results->first()->sentFields);
+    }
+
+    /**
      * Regression test: a photo asset stored on our own `public` disk previously had its `url`
      * sent to Upload-Post as a plain field, which is unreachable when APP_URL is a local-only dev
      * domain (e.g. `*.test`) — the vendor rejected the request with a generic "Photo files or
