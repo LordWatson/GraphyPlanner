@@ -22,6 +22,7 @@ type OrganizationProps = {
         default_timezone: string;
         default_currency: string;
         has_upload_post_key: boolean;
+        has_upload_post_webhook_secret: boolean;
         has_xai_key: boolean;
     };
     currencies: Option[];
@@ -120,6 +121,30 @@ export default function Organization({ organization, currencies }: OrganizationP
                                 <InputError
                                     className="mt-2"
                                     message={errors.upload_post_key}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="upload_post_webhook_secret">
+                                    Upload-Post webhook secret
+                                </Label>
+
+                                <Input
+                                    id="upload_post_webhook_secret"
+                                    type="password"
+                                    className="mt-1 block w-full"
+                                    name="upload_post_webhook_secret"
+                                    autoComplete="off"
+                                    placeholder={
+                                        organization.has_upload_post_webhook_secret
+                                            ? 'Secret is set — leave blank to keep it'
+                                            : 'Not set — copy the whsec_... value from the Upload-Post notifications dashboard'
+                                    }
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.upload_post_webhook_secret}
                                 />
                             </div>
 

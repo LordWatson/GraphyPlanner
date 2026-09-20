@@ -17,12 +17,13 @@ use Illuminate\Support\Carbon;
  * @property string $default_timezone
  * @property string $default_currency
  * @property string|null $upload_post_key
+ * @property string|null $upload_post_webhook_secret
  * @property string|null $xai_key
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'upload_post_key', 'xai_key'])]
-#[Hidden(['upload_post_key', 'xai_key'])]
+#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
+#[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
@@ -37,6 +38,7 @@ class Organization extends Model
     {
         return [
             'upload_post_key' => 'encrypted',
+            'upload_post_webhook_secret' => 'encrypted',
             'xai_key' => 'encrypted',
         ];
     }

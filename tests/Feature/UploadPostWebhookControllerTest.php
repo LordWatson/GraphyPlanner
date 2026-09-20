@@ -16,6 +16,9 @@ class UploadPostWebhookControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * @return array{0: Post, 1: \App\Models\PostTarget, 2: Organization}
+     */
     private function createPendingTarget(PostStatus $postStatus = PostStatus::Publishing): array
     {
         $org = Organization::factory()->create();
@@ -25,10 +28,10 @@ class UploadPostWebhookControllerTest extends TestCase
         $target = $post->targets()->create([
             'social_account_id' => $account->id,
             'status' => PostTargetStatus::Pending,
-            'external_post_id' => 'up-123',
+            'external_post_id' => 'job-123',
         ]);
 
-        return [$post, $target];
+        return [$post, $target, $org];
     }
 
     public function test_a_success_payload_transitions_a_publishing_post_to_published(): void
@@ -36,8 +39,10 @@ class UploadPostWebhookControllerTest extends TestCase
         [$post, $target] = $this->createPendingTarget();
 
         $response = $this->postJson('/webhooks/upload-post', [
-            'request_id' => 'up-123',
-            'status' => 'success',
+            'event' => 'upload_completed',
+            'job_id' => 'job-123',
+            'platform' => 'linkedin',
+            'result' => ['success' => true],
         ]);
 
         $response->assertOk();
@@ -50,9 +55,10 @@ class UploadPostWebhookControllerTest extends TestCase
         [$post, $target] = $this->createPendingTarget();
 
         $response = $this->postJson('/webhooks/upload-post', [
-            'request_id' => 'up-123',
-            'status' => 'failed',
-            'error' => 'Rejected by platform',
+            'event' => 'upload_completed',
+            'job_id' => 'job-123',
+            'platform' => 'linkedin',
+            'result' => ['success' => false, 'error' => 'Rejected by platform'],
         ]);
 
         $response->assertOk();
@@ -66,14 +72,18 @@ class UploadPostWebhookControllerTest extends TestCase
 
     public function test_it_rejects_a_payload_with_an_invalid_signature_when_a_secret_is_configured(): void
     {
-        config(['services.upload_post.webhook_secret' => 'shh-secret']);
-
-        [$post] = $this->createPendingTarget();
+        [$post, , $org] = $this->createPendingTarget();
+        $org->update(['upload_post_webhook_secret' => 'shh-secret']);
 
         $response = $this->postJson('/webhooks/upload-post', [
-            'request_id' => 'up-123',
-            'status' => 'success',
-        ], ['X-Upload-Post-Signature' => 'wrong-signature']);
+            'event' => 'upload_completed',
+            'job_id' => 'job-123',
+            'platform' => 'linkedin',
+            'result' => ['success' => true],
+        ], [
+            'X-Upload-Post-Signature' => 'sha256=wrong-signature',
+            'X-Upload-Post-Timestamp' => (string) time(),
+        ]);
 
         $response->assertStatus(401);
         $this->assertSame(PostStatus::Publishing, $post->refresh()->status);
@@ -81,32 +91,79 @@ class UploadPostWebhookControllerTest extends TestCase
 
     public function test_it_accepts_a_payload_with_a_valid_signature(): void
     {
-        config(['services.upload_post.webhook_secret' => 'shh-secret']);
+        [$post, , $org] = $this->createPendingTarget();
+        $org->update(['upload_post_webhook_secret' => 'shh-secret']);
 
-        [$post] = $this->createPendingTarget();
-
-        $payload = ['request_id' => 'up-123', 'status' => 'success'];
+        $payload = [
+            'event' => 'upload_completed',
+            'job_id' => 'job-123',
+            'platform' => 'linkedin',
+            'result' => ['success' => true],
+        ];
         $body = json_encode($payload);
-        $signature = hash_hmac('sha256', $body, 'shh-secret');
+        $timestamp = (string) time();
+        $signature = 'sha256='.hash_hmac('sha256', "{$timestamp}.{$body}", 'shh-secret');
 
         $response = $this->call('POST', '/webhooks/upload-post', [], [], [], [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X-Upload-Post-Signature' => $signature,
+            'HTTP_X-Upload-Post-Timestamp' => $timestamp,
         ], $body);
 
         $response->assertOk();
         $this->assertSame(PostStatus::Published, $post->refresh()->status);
     }
 
-    public function test_it_acknowledges_a_payload_for_an_unknown_external_post_id_without_error(): void
+    public function test_it_rejects_a_payload_with_a_stale_timestamp(): void
+    {
+        [$post, , $org] = $this->createPendingTarget();
+        $org->update(['upload_post_webhook_secret' => 'shh-secret']);
+
+        $payload = [
+            'event' => 'upload_completed',
+            'job_id' => 'job-123',
+            'platform' => 'linkedin',
+            'result' => ['success' => true],
+        ];
+        $body = json_encode($payload);
+        $timestamp = (string) (time() - 3600);
+        $signature = 'sha256='.hash_hmac('sha256', "{$timestamp}.{$body}", 'shh-secret');
+
+        $response = $this->call('POST', '/webhooks/upload-post', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X-Upload-Post-Signature' => $signature,
+            'HTTP_X-Upload-Post-Timestamp' => $timestamp,
+        ], $body);
+
+        $response->assertStatus(401);
+        $this->assertSame(PostStatus::Publishing, $post->refresh()->status);
+    }
+
+    public function test_it_acknowledges_a_payload_for_an_unknown_job_id_without_error(): void
     {
         $this->createPendingTarget();
 
         $response = $this->postJson('/webhooks/upload-post', [
-            'request_id' => 'unknown-id',
-            'status' => 'success',
+            'event' => 'upload_completed',
+            'job_id' => 'unknown-id',
+            'platform' => 'linkedin',
+            'result' => ['success' => true],
         ]);
 
         $response->assertOk();
+    }
+
+    public function test_it_acknowledges_unrelated_events_without_action(): void
+    {
+        [$post] = $this->createPendingTarget();
+
+        $response = $this->postJson('/webhooks/upload-post', [
+            'event' => 'social_account_connected',
+            'job_id' => 'job-123',
+            'platform' => 'linkedin',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(PostStatus::Publishing, $post->refresh()->status);
     }
 }

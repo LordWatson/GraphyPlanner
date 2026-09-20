@@ -183,17 +183,28 @@ class UploadPostAdapter implements PublishAdapter
 
     /**
      * Step 1.5 poll fallback: asks Upload-Post for the current outcome of a previously accepted
-     * publish, in case the webhook never arrives. Upload-Post's real status-lookup endpoint
-     * wasn't available in this repo, so this targets the vendor's documented "posts" resource by
-     * id (`GET /uploadposts/posts/{externalPostId}`) — revisit against the real API/sandbox once
-     * known (see `.junie/modules/publishing.md`). Returns null (still processing/unknown) rather
-     * than a failed `TargetResult` whenever the outcome can't be determined, so a poller never
-     * mistakes "don't know yet" for "failed".
+     * publish, in case the webhook never arrives. Per the real "Upload Status" endpoint
+     * (`GET /uploadposts/status?request_id=...|job_id=...`, see
+     * https://docs.upload-post.com/api/upload-status), `$externalPostId` may be either kind of
+     * id depending on how the original publish was submitted (`request_id` for `async_upload`,
+     * `job_id` for scheduled posts) — both query params are sent so either id resolves correctly
+     * without the caller having to know which flavor it captured.
+     *
+     * The vendor's top-level `status` only tracks aggregate progress across every platform in
+     * the job, so when the response's per-platform `results[]` includes an entry for this
+     * account's platform, that entry's `success`/`message` is used instead — otherwise the
+     * top-level `status`/`message` is the best available signal. Returns null (still
+     * processing/unknown, including `pending`/`queued`/`processing`/`in_progress`/`not_found`)
+     * rather than a failed `TargetResult` whenever the outcome can't be determined, so a poller
+     * never mistakes "don't know yet" for "failed".
      */
     public function checkStatus(SocialAccount $account, string $externalPostId): ?TargetResult
     {
         try {
-            $response = $this->client($account)->get("/uploadposts/posts/{$externalPostId}");
+            $response = $this->client($account)->get('/uploadposts/status', [
+                'request_id' => $externalPostId,
+                'job_id' => $externalPostId,
+            ]);
         } catch (Throwable $e) {
             Log::warning('Upload-Post status check failed', [
                 'social_account_id' => $account->id,
@@ -217,19 +228,33 @@ class UploadPostAdapter implements PublishAdapter
 
         $status = strtolower((string) ($response->json('status') ?? ''));
 
-        if (! in_array($status, ['success', 'completed', 'published', 'failed', 'error'], true)) {
-            // Still processing on the vendor's side, or an unrecognized shape — leave the target
-            // pending rather than guessing.
+        if (! in_array($status, ['completed', 'failed'], true)) {
+            // pending / queued / processing / in_progress / not_found (or an unrecognized
+            // shape) — the vendor hasn't resolved it yet, try again on the next poll.
             return null;
         }
 
-        $ok = in_array($status, ['success', 'completed', 'published'], true);
+        $results = collect($response->json('results') ?? []);
+        $platformResult = $results->first(fn ($result) => ($result['platform'] ?? null) === $account->platform->value);
+
+        if ($platformResult !== null) {
+            $ok = (bool) ($platformResult['success'] ?? false);
+
+            return new TargetResult(
+                accountId: $account->id,
+                ok: $ok,
+                externalPostId: $externalPostId,
+                error: $ok ? null : ($platformResult['message'] ?? $response->json('message')),
+            );
+        }
+
+        $ok = $status === 'completed';
 
         return new TargetResult(
             accountId: $account->id,
             ok: $ok,
             externalPostId: $externalPostId,
-            error: $ok ? null : ($response->json('error') ?? $response->body()),
+            error: $ok ? null : ($response->json('message') ?? $response->body()),
         );
     }
 
@@ -302,7 +327,10 @@ class UploadPostAdapter implements PublishAdapter
         return new TargetResult(
             accountId: $account->id,
             ok: true,
-            externalPostId: (string) ($response->json('request_id') ?? $response->json('id')),
+            // A scheduled post (the `scheduled_date` field above) returns `job_id`; an immediate
+            // upload returns `request_id` — either is accepted back by the real status endpoint
+            // (see `checkStatus()`).
+            externalPostId: (string) ($response->json('job_id') ?? $response->json('request_id') ?? $response->json('id')),
             sentFields: $sent,
             skippedFields: $skipped,
         );

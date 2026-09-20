@@ -348,49 +348,90 @@ class UploadPostAdapterTest extends TestCase
         $this->assertNull($result->externalPostId);
     }
 
-    public function test_check_status_returns_a_resolved_target_result_when_the_vendor_reports_success(): void
+    public function test_check_status_returns_a_resolved_target_result_using_the_matching_platform_result(): void
     {
         Http::fake([
-            '*/uploadposts/posts/up-123' => Http::response(['status' => 'success'], 200),
+            '*/uploadposts/status*' => Http::response([
+                'job_id' => 'job-123',
+                'status' => 'completed',
+                'results' => [
+                    ['platform' => 'linkedin', 'success' => true, 'message' => 'Published'],
+                ],
+            ], 200),
         ]);
 
         $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
-        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+        $account = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::LinkedIn]);
 
-        $result = (new UploadPostAdapter)->checkStatus($account, 'up-123');
+        $result = (new UploadPostAdapter)->checkStatus($account, 'job-123');
 
         $this->assertNotNull($result);
         $this->assertTrue($result->ok);
-        $this->assertSame('up-123', $result->externalPostId);
-        Http::assertSent(fn ($request) => $request->url() === 'https://api.upload-post.com/api/uploadposts/posts/up-123'
+        $this->assertSame('job-123', $result->externalPostId);
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://api.upload-post.com/api/uploadposts/status')
+            && $request['job_id'] === 'job-123'
+            && $request['request_id'] === 'job-123'
             && $request->hasHeader('Authorization', 'Apikey org-secret-key'));
     }
 
-    public function test_check_status_returns_a_failed_target_result_when_the_vendor_reports_failure(): void
+    public function test_check_status_returns_a_failed_target_result_when_the_matching_platform_result_failed(): void
     {
         Http::fake([
-            '*/uploadposts/posts/up-123' => Http::response(['status' => 'failed', 'error' => 'Rejected by platform'], 200),
+            '*/uploadposts/status*' => Http::response([
+                'status' => 'completed',
+                'results' => [
+                    ['platform' => 'linkedin', 'success' => false, 'message' => 'Rejected by platform'],
+                ],
+            ], 200),
         ]);
 
         $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
-        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+        $account = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::LinkedIn]);
 
-        $result = (new UploadPostAdapter)->checkStatus($account, 'up-123');
+        $result = (new UploadPostAdapter)->checkStatus($account, 'job-123');
 
         $this->assertNotNull($result);
         $this->assertFalse($result->ok);
         $this->assertSame('Rejected by platform', $result->error);
     }
 
+    public function test_check_status_falls_back_to_the_top_level_status_when_no_platform_result_matches(): void
+    {
+        Http::fake([
+            '*/uploadposts/status*' => Http::response(['status' => 'failed', 'message' => 'Upload appears to have failed'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::LinkedIn]);
+
+        $result = (new UploadPostAdapter)->checkStatus($account, 'job-123');
+
+        $this->assertNotNull($result);
+        $this->assertFalse($result->ok);
+        $this->assertSame('Upload appears to have failed', $result->error);
+    }
+
     public function test_check_status_returns_null_while_still_processing(): void
     {
         Http::fake([
-            '*/uploadposts/posts/up-123' => Http::response(['status' => 'processing'], 200),
+            '*/uploadposts/status*' => Http::response(['status' => 'processing'], 200),
         ]);
 
         $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
         $account = SocialAccount::factory()->for($organization, 'organization')->create();
 
-        $this->assertNull((new UploadPostAdapter)->checkStatus($account, 'up-123'));
+        $this->assertNull((new UploadPostAdapter)->checkStatus($account, 'job-123'));
+    }
+
+    public function test_check_status_returns_null_when_the_vendor_reports_not_found(): void
+    {
+        Http::fake([
+            '*/uploadposts/status*' => Http::response(['status' => 'not_found'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+
+        $this->assertNull((new UploadPostAdapter)->checkStatus($account, 'job-123'));
     }
 }

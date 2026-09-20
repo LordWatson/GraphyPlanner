@@ -28,6 +28,7 @@ class OrganizationController extends Controller
                 'default_timezone' => $organization->default_timezone,
                 'default_currency' => $organization->default_currency,
                 'has_upload_post_key' => filled($organization->upload_post_key),
+                'has_upload_post_webhook_secret' => filled($organization->upload_post_webhook_secret),
                 'has_xai_key' => filled($organization->xai_key),
             ],
             'currencies' => CurrencyOptions::options(),

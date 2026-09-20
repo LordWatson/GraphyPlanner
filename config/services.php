@@ -36,15 +36,12 @@ return [
     ],
 
     // Upload-Post (Phase 1 publish vendor, spec §7/§7.1). The per-request API key comes from
-    // each organization's `upload_post_key` (Step 0.15), not from an env var here.
+    // each organization's `upload_post_key` (Step 0.15), not from an env var here. Likewise,
+    // the webhook signing secret (Step 1.5) comes from each organization's
+    // `upload_post_webhook_secret` — Upload-Post issues one secret per account, not a single
+    // app-wide one, so there's no env var/config key for it here.
     'upload_post' => [
         'base_url' => env('UPLOAD_POST_BASE_URL', 'https://api.upload-post.com/api'),
-
-        // Step 1.5: shared secret used to verify the `X-Upload-Post-Signature` header on
-        // `POST /webhooks/upload-post`. Left empty in local/dev until Upload-Post issues one —
-        // the webhook controller logs a warning and skips verification when unset rather than
-        // rejecting every request.
-        'webhook_secret' => env('UPLOAD_POST_WEBHOOK_SECRET', ''),
     ],
 
 ];

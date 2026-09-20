@@ -15,7 +15,7 @@ class UpdateOrganizationSettingsAction
      * the currently stored key untouched, so the form never needs to redisplay a secret
      * to "keep" it).
      *
-     * @param  array{default_timezone: string, default_currency: string, upload_post_key?: string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -27,6 +27,10 @@ class UpdateOrganizationSettingsAction
                 $organization->upload_post_key = $data['upload_post_key'];
             }
 
+            if (! empty($data['upload_post_webhook_secret'])) {
+                $organization->upload_post_webhook_secret = $data['upload_post_webhook_secret'];
+            }
+
             if (! empty($data['xai_key'])) {
                 $organization->xai_key = $data['xai_key'];
             }
@@ -36,6 +40,7 @@ class UpdateOrganizationSettingsAction
             Log::info('Organization settings updated', [
                 'org_id' => $organization->id,
                 'upload_post_key_updated' => ! empty($data['upload_post_key']),
+                'upload_post_webhook_secret_updated' => ! empty($data['upload_post_webhook_secret']),
                 'xai_key_updated' => ! empty($data['xai_key']),
             ]);
 
