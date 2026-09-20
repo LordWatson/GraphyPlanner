@@ -1,8 +1,9 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
+import { formatCurrency } from '@/lib/currency';
 import { show as portalInvoicesShow } from '@/routes/portal/invoices';
 
 type InvoiceRow = {
@@ -22,6 +23,8 @@ type InvoiceRow = {
  * unpaid ones clearly flagged. No create/edit/send/mark-paid actions are exposed here.
  */
 export default function PortalInvoicesIndex({ invoices }: { invoices: InvoiceRow[] }) {
+    const { currency } = usePage().props;
+
     return (
         <ClientPortalLayout title="Invoices">
             <Heading title="Invoices" description="Your billing history for this account." />
@@ -43,7 +46,7 @@ export default function PortalInvoicesIndex({ invoices }: { invoices: InvoiceRow
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium">
-                                    {invoice.currency} {invoice.amount}
+                                    {formatCurrency(invoice.amount, currency)}
                                 </span>
                                 <Badge variant={invoice.is_unpaid ? 'warning' : 'success'} className="whitespace-nowrap text-[10px]">
                                     {invoice.is_unpaid ? 'Unpaid' : invoice.status_label}

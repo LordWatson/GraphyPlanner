@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Actions\Organizations\UpdateOrganizationSettingsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\OrganizationSettingsUpdateRequest;
+use App\Support\Options\CurrencyOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -25,9 +26,11 @@ class OrganizationController extends Controller
             'organization' => [
                 'name' => $organization->name,
                 'default_timezone' => $organization->default_timezone,
+                'default_currency' => $organization->default_currency,
                 'has_upload_post_key' => filled($organization->upload_post_key),
                 'has_xai_key' => filled($organization->xai_key),
             ],
+            'currencies' => CurrencyOptions::options(),
         ]);
     }
 

@@ -24,6 +24,9 @@ class CreateInvoiceAction
                 'client_id' => $client->id,
                 'invoice_number' => $this->nextInvoiceNumber($client),
                 'status' => InvoiceStatus::Draft,
+                // Always billed in the organization's default currency (spec: no per-invoice
+                // currency override, no conversions).
+                'currency' => $client->organization->default_currency,
             ]);
 
             Log::info('Invoice created', [

@@ -9,14 +9,17 @@ use Illuminate\Support\Facades\Log;
 class UpdateInvoiceAction
 {
     /**
-     * Update an invoice's editable details (amount, currency, dates, description). Status,
-     * invoice_number, org_id, and client_id are never touched here.
+     * Update an invoice's editable details (amount, dates, description). Status, invoice_number,
+     * org_id, client_id, and currency (always the organization's default_currency — no
+     * per-invoice override) are never touched here.
      *
      * @param  array<string, mixed>  $data
      */
     public function __invoke(Invoice $invoice, array $data): Invoice
     {
         return DB::transaction(function () use ($invoice, $data) {
+            unset($data['currency']);
+
             $invoice->update($data);
 
             Log::info('Invoice updated', [

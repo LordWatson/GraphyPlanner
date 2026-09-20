@@ -1,6 +1,8 @@
+import { usePage } from '@inertiajs/react';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
+import { formatCurrency } from '@/lib/currency';
 
 type InvoiceData = {
     id: number;
@@ -21,6 +23,8 @@ type InvoiceData = {
  * invoices list. No create/edit/send/mark-paid actions are exposed here.
  */
 export default function PortalInvoiceShow({ invoice }: { invoice: InvoiceData }) {
+    const { currency } = usePage().props;
+
     return (
         <ClientPortalLayout title={`Invoice ${invoice.invoice_number}`}>
             <Heading title={`Invoice ${invoice.invoice_number}`} />
@@ -28,7 +32,7 @@ export default function PortalInvoiceShow({ invoice }: { invoice: InvoiceData })
             <div className="mt-6 rounded-xl border border-border bg-card p-6 shadow-lg shadow-black/[0.03]">
                 <Badge variant={invoice.is_unpaid ? 'warning' : 'success'}>{invoice.is_unpaid ? 'Unpaid' : invoice.status_label}</Badge>
                 <p className="mt-4 text-sm">
-                    {invoice.currency} {invoice.amount}
+                    {formatCurrency(invoice.amount, currency)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">Issued {invoice.issue_date}</p>
                 {invoice.due_date && <p className="text-xs text-muted-foreground">Due {invoice.due_date}</p>}

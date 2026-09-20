@@ -14,6 +14,7 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             preview: boolean;
             unreadNotificationsCount: number;
+            currency: string;
             [key: string]: unknown;
         };
     }

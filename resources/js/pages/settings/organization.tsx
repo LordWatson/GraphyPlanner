@@ -5,18 +5,29 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { edit } from '@/routes/organization';
+
+type Option = { value: string; label: string };
 
 type OrganizationProps = {
     organization: {
         name: string;
         default_timezone: string;
+        default_currency: string;
         has_upload_post_key: boolean;
         has_xai_key: boolean;
     };
+    currencies: Option[];
 };
 
-export default function Organization({ organization }: OrganizationProps) {
+export default function Organization({ organization, currencies }: OrganizationProps) {
     return (
         <>
             <Head title="Organization settings" />
@@ -27,7 +38,7 @@ export default function Organization({ organization }: OrganizationProps) {
                 <Heading
                     variant="small"
                     title="Organization"
-                    description="Manage your organization's default timezone and publish-adapter keys (Owner only)"
+                    description="Manage your organization's default timezone, default currency, and publish-adapter keys (Owner only)"
                 />
 
                 <Form
@@ -58,6 +69,33 @@ export default function Organization({ organization }: OrganizationProps) {
                                 <InputError
                                     className="mt-2"
                                     message={errors.default_timezone}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="default_currency">
+                                    Default currency
+                                </Label>
+
+                                <Select
+                                    name="default_currency"
+                                    defaultValue={organization.default_currency}
+                                >
+                                    <SelectTrigger id="default_currency" className="w-full">
+                                        <SelectValue placeholder="Select a currency" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {currencies.map((currency) => (
+                                            <SelectItem key={currency.value} value={currency.value}>
+                                                {currency.value} — {currency.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.default_currency}
                                 />
                             </div>
 

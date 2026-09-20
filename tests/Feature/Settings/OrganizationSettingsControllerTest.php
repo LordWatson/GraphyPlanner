@@ -28,8 +28,10 @@ class OrganizationSettingsControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('settings/organization')
             ->where('organization.default_timezone', $user->organization->default_timezone)
+            ->where('organization.default_currency', $user->organization->default_currency)
             ->where('organization.has_upload_post_key', false)
             ->where('organization.has_xai_key', false)
+            ->has('currencies')
         );
     }
 
@@ -48,6 +50,7 @@ class OrganizationSettingsControllerTest extends TestCase
 
         $response = $this->actingAs($user)->put(route('organization.update'), [
             'default_timezone' => 'Europe/Berlin',
+            'default_currency' => 'EUR',
             'upload_post_key' => 'up-secret-key',
             'xai_key' => 'xai-secret-key',
         ]);
@@ -56,6 +59,7 @@ class OrganizationSettingsControllerTest extends TestCase
 
         $organization = $user->organization->fresh();
         $this->assertSame('Europe/Berlin', $organization->default_timezone);
+        $this->assertSame('EUR', $organization->default_currency);
         $this->assertSame('up-secret-key', $organization->upload_post_key);
         $this->assertSame('xai-secret-key', $organization->xai_key);
     }
@@ -70,6 +74,7 @@ class OrganizationSettingsControllerTest extends TestCase
 
         $response = $this->actingAs($user)->put(route('organization.update'), [
             'default_timezone' => 'UTC',
+            'default_currency' => 'USD',
             'upload_post_key' => '',
             'xai_key' => '',
         ]);
@@ -87,6 +92,7 @@ class OrganizationSettingsControllerTest extends TestCase
 
         $response = $this->actingAs($user)->put(route('organization.update'), [
             'default_timezone' => 'Europe/Berlin',
+            'default_currency' => 'EUR',
         ]);
 
         $response->assertForbidden();
@@ -100,6 +106,7 @@ class OrganizationSettingsControllerTest extends TestCase
         $response = $this->actingAs($owner)->put(route('organization.update'), [
             'org_id' => $otherOrganization->id,
             'default_timezone' => 'Europe/Berlin',
+            'default_currency' => 'EUR',
         ]);
 
         $response->assertRedirect(route('organization.edit'));

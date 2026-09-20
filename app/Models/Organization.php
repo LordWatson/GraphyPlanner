@@ -15,12 +15,13 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $slug
  * @property string $default_timezone
+ * @property string $default_currency
  * @property string|null $upload_post_key
  * @property string|null $xai_key
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'upload_post_key', 'xai_key'])]
+#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'upload_post_key', 'xai_key'])]
 #[Hidden(['upload_post_key', 'xai_key'])]
 class Organization extends Model
 {

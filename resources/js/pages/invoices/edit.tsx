@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ type InvoiceData = {
 };
 
 export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData; client: { id: number; name: string } }) {
+    const { currency } = usePage().props;
+
     return (
         <>
             <Head title={`Edit invoice ${invoice.invoice_number} — ${client.name}`} />
@@ -71,8 +73,8 @@ export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData;
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor="currency">Currency</Label>
-                                    <Input id="currency" name="currency" defaultValue={invoice.currency} maxLength={3} />
-                                    <InputError message={errors.currency} />
+                                    <Input id="currency" value={currency} disabled readOnly />
+                                    <p className="text-xs text-muted-foreground">Set at the organization level.</p>
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor="issue_date">Issue date</Label>

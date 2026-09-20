@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { AlertTriangle, CalendarDays, Clock, ImageOff, RefreshCw, Users, WifiOff } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -92,12 +92,6 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
 });
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-});
-
 const attentionIcons = {
     failed: AlertTriangle,
     disconnected: WifiOff,
@@ -120,6 +114,14 @@ export default function Dashboard({
     unapprovedDraftsList,
     publishReliability,
 }: DashboardProps) {
+    const { currency } = usePage().props;
+
+    const currencyFormatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+    });
+
     const summaryCards = [
         { icon: AlertTriangle, label: 'Needs attention', hint: 'Items that need a decision today', value: summary.needsAttention },
         { icon: CalendarDays, label: 'Scheduled next 24h', hint: 'Posts going out soon', value: summary.scheduledNext24h },

@@ -21,7 +21,6 @@ class UpdateInvoiceRequest extends FormRequest
     {
         return [
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'currency' => ['nullable', 'string', 'size:3'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
             'description' => ['nullable', 'string'],

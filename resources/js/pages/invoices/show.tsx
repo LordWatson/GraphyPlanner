@@ -1,8 +1,9 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { ArrowLeft, Pencil, Receipt, Trash2 } from 'lucide-react';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/currency';
 import { index as indexClients, show as showClient } from '@/routes/clients';
 import { edit as editInvoice, destroy as destroyInvoice, send as sendInvoice, markPaid as markPaidInvoice } from '@/routes/invoices';
 
@@ -37,6 +38,8 @@ export default function InvoiceShow({
     client: { id: number; name: string };
     can: { update: boolean; delete: boolean; send: boolean; mark_paid: boolean };
 }) {
+    const { currency } = usePage().props;
+
     return (
         <>
             <Head title={`Invoice ${invoice.invoice_number} — ${client.name}`} />
@@ -78,7 +81,7 @@ export default function InvoiceShow({
                         <div className="grid gap-1">
                             <span className="text-xs text-muted-foreground">Amount</span>
                             <span className="text-sm font-medium tabular-nums">
-                                {invoice.currency} {invoice.amount}
+                                {formatCurrency(invoice.amount, currency)}
                             </span>
                         </div>
                         <div className="grid gap-1">

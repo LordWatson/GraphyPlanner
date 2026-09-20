@@ -9,18 +9,19 @@ use Illuminate\Support\Facades\Log;
 class UpdateOrganizationSettingsAction
 {
     /**
-     * Update the organization's settings (default timezone, Upload-Post key, xAI key).
+     * Update the organization's settings (default timezone, default currency, Upload-Post key, xAI key).
      *
      * Keys are only ever written when present in $data (an empty/omitted value leaves
      * the currently stored key untouched, so the form never needs to redisplay a secret
      * to "keep" it).
      *
-     * @param  array{default_timezone: string, upload_post_key?: string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, upload_post_key?: string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
         return DB::transaction(function () use ($organization, $data) {
             $organization->default_timezone = $data['default_timezone'];
+            $organization->default_currency = $data['default_currency'];
 
             if (! empty($data['upload_post_key'])) {
                 $organization->upload_post_key = $data['upload_post_key'];

@@ -22,6 +22,7 @@ class OrganizationSettingsUpdateRequest extends FormRequest
     {
         return [
             'default_timezone' => ['required', 'timezone:all'],
+            'default_currency' => ['required', 'string', 'size:3'],
             'upload_post_key' => ['nullable', 'string', 'max:2048'],
             'xai_key' => ['nullable', 'string', 'max:2048'],
         ];

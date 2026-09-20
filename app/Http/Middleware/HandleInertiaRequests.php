@@ -53,6 +53,9 @@ class HandleInertiaRequests extends Middleware
             // up to date without a dedicated round-trip; the dropdown's own list is lazy-loaded
             // from `notifications.index` only once opened.
             'unreadNotificationsCount' => $user ? $user->unreadNotifications()->count() : 0,
+            // The organization's default currency (ISO 4217 code), shared so every page can
+            // format currency fields consistently without re-fetching the organization.
+            'currency' => $user?->organization?->default_currency ?? 'USD',
         ];
     }
 }

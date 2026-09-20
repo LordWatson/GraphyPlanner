@@ -1,4 +1,4 @@
-import { Form, Head, Link, router } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Building2,
     CalendarDays,
@@ -39,6 +39,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatCurrency, formatCurrencyCompact } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index, destroy as destroyClient } from '@/routes/clients';
@@ -282,6 +284,7 @@ export default function ClientShow({
     targetAccounts: TargetAccountData[];
     invitations: InvitationData[];
 }) {
+    const { currency } = usePage().props;
     const [activeTab, setActiveTab] = useState('social-accounts');
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
     const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<number[]>([]);
@@ -370,7 +373,7 @@ export default function ClientShow({
         client.start_date ? { icon: CalendarDays, label: `Since ${client.start_date}` } : null,
         client.approval_email ? { icon: Mail, label: client.approval_email } : null,
         client.retainer_amount !== null
-            ? { icon: Wallet, label: `${client.retainer_amount}${client.billing_cycle ? ` / ${client.billing_cycle}` : ''}` }
+            ? { icon: Wallet, label: `${formatCurrency(client.retainer_amount, currency)}${client.billing_cycle ? ` / ${client.billing_cycle}` : ''}` }
             : null,
     ].filter((chip): chip is { icon: typeof Globe; label: string } => chip !== null);
 
@@ -388,7 +391,8 @@ export default function ClientShow({
                   {
                       icon: Receipt,
                       label: 'Outstanding',
-                      value: outstandingInvoiceTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                      value: formatCurrencyCompact(outstandingInvoiceTotal, currency),
+                      fullValue: formatCurrency(outstandingInvoiceTotal, currency),
                       hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
                       tab: 'billing',
                   },
@@ -486,7 +490,7 @@ export default function ClientShow({
                         statCards.length >= 6 ? 'lg:grid-cols-6' : statCards.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
                     )}
                 >
-                    {statCards.map(({ icon: Icon, label, value, hint, tab }) => (
+                    {statCards.map(({ icon: Icon, label, value, hint, tab, fullValue }) => (
                         <button
                             type="button"
                             key={label}
@@ -503,7 +507,16 @@ export default function ClientShow({
                                 </span>
                                 <span className="text-xs">{label}</span>
                             </div>
-                            <span className="text-3xl font-bold tabular-nums">{value}</span>
+                            {fullValue ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="truncate text-3xl font-bold tabular-nums">{value}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">{fullValue}</TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <span className="truncate text-3xl font-bold tabular-nums">{value}</span>
+                            )}
                             <span className="text-xs text-muted-foreground">{hint}</span>
                         </button>
                     ))}
@@ -1153,7 +1166,7 @@ export default function ClientShow({
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className="tabular-nums text-sm font-medium">
-                                                {invoice.currency} {invoice.amount}
+                                                {formatCurrency(invoice.amount, currency)}
                                             </span>
                                             {invoice.can.send && (
                                                 <Form {...sendInvoice.form(invoice.id)}>
