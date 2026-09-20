@@ -49,4 +49,13 @@ interface PublishAdapter
      * vendor (e.g. to detect an expired token).
      */
     public function health(SocialAccount $account): bool;
+
+    /**
+     * Poll the vendor for the final outcome of a previously accepted publish
+     * (Step 1.5's webhook fallback). Returns null when the vendor hasn't
+     * resolved the post yet (still processing) or doesn't support polling,
+     * so the caller should try again later rather than treating null as a
+     * failure.
+     */
+    public function checkStatus(SocialAccount $account, string $externalPostId): ?TargetResult;
 }

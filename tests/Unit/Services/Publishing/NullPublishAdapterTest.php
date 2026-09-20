@@ -70,4 +70,11 @@ class NullPublishAdapterTest extends TestCase
 
         $this->assertFalse((new NullPublishAdapter)->health($account));
     }
+
+    public function test_check_status_returns_null(): void
+    {
+        $account = SocialAccount::factory()->create();
+
+        $this->assertNull((new NullPublishAdapter)->checkStatus($account, 'external-post-id'));
+    }
 }

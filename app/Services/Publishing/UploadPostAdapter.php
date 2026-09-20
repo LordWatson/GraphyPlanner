@@ -181,6 +181,58 @@ class UploadPostAdapter implements PublishAdapter
         }
     }
 
+    /**
+     * Step 1.5 poll fallback: asks Upload-Post for the current outcome of a previously accepted
+     * publish, in case the webhook never arrives. Upload-Post's real status-lookup endpoint
+     * wasn't available in this repo, so this targets the vendor's documented "posts" resource by
+     * id (`GET /uploadposts/posts/{externalPostId}`) — revisit against the real API/sandbox once
+     * known (see `.junie/modules/publishing.md`). Returns null (still processing/unknown) rather
+     * than a failed `TargetResult` whenever the outcome can't be determined, so a poller never
+     * mistakes "don't know yet" for "failed".
+     */
+    public function checkStatus(SocialAccount $account, string $externalPostId): ?TargetResult
+    {
+        try {
+            $response = $this->client($account)->get("/uploadposts/posts/{$externalPostId}");
+        } catch (Throwable $e) {
+            Log::warning('Upload-Post status check failed', [
+                'social_account_id' => $account->id,
+                'external_post_id' => $externalPostId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if (! $response->successful()) {
+            Log::warning('Upload-Post status check rejected', [
+                'social_account_id' => $account->id,
+                'external_post_id' => $externalPostId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        $status = strtolower((string) ($response->json('status') ?? ''));
+
+        if (! in_array($status, ['success', 'completed', 'published', 'failed', 'error'], true)) {
+            // Still processing on the vendor's side, or an unrecognized shape — leave the target
+            // pending rather than guessing.
+            return null;
+        }
+
+        $ok = in_array($status, ['success', 'completed', 'published'], true);
+
+        return new TargetResult(
+            accountId: $account->id,
+            ok: $ok,
+            externalPostId: $externalPostId,
+            error: $ok ? null : ($response->json('error') ?? $response->body()),
+        );
+    }
+
     private function publishToTarget(Post $post, SocialAccount $account): TargetResult
     {
         [$fields, $sent, $skipped] = $this->buildFields($post, $account);

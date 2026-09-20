@@ -50,4 +50,9 @@ class NullPublishAdapter implements PublishAdapter
     {
         return false;
     }
+
+    public function checkStatus(SocialAccount $account, string $externalPostId): ?TargetResult
+    {
+        return null;
+    }
 }

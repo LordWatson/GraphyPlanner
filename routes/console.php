@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Warns organization users by email about posts due to publish in the next few days.
 Schedule::command('posts:send-upcoming-reminders')->dailyAt('08:00');
+
+// Step 1.5 fallback: catches any post stuck in `publishing` because the Upload-Post webhook
+// never arrived.
+Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes();

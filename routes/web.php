@@ -22,6 +22,7 @@ use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationAcceptController;
 use App\Http\Controllers\StaffInvitationController;
+use App\Http\Controllers\UploadPostWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -46,6 +47,12 @@ Route::post('staff-invite/{token}', [StaffInvitationAcceptController::class, 'st
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
 // connect flow, so this must be reachable without a session, just like the review portal above.
 Route::get('social-accounts/callback', [SocialAccountController::class, 'callback'])->name('social-accounts.callback');
+
+// Step 1.5: Upload-Post posts its publish-outcome webhook here — no session/CSRF token is
+// available from a server-to-server vendor call, so this is public (verified instead via the
+// `X-Upload-Post-Signature` header, see `UploadPostWebhookController`) and excluded from CSRF
+// verification (see `bootstrap/app.php`).
+Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle'])->name('webhooks.upload-post');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Reachable by every logged-in role (including Role::ClientReviewer/portal users), unlike

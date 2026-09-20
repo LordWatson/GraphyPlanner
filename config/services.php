@@ -39,6 +39,12 @@ return [
     // each organization's `upload_post_key` (Step 0.15), not from an env var here.
     'upload_post' => [
         'base_url' => env('UPLOAD_POST_BASE_URL', 'https://api.upload-post.com/api'),
+
+        // Step 1.5: shared secret used to verify the `X-Upload-Post-Signature` header on
+        // `POST /webhooks/upload-post`. Left empty in local/dev until Upload-Post issues one —
+        // the webhook controller logs a warning and skips verification when unset rather than
+        // rejecting every request.
+        'webhook_secret' => env('UPLOAD_POST_WEBHOOK_SECRET', ''),
     ],
 
 ];

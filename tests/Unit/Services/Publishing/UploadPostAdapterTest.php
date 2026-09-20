@@ -347,4 +347,50 @@ class UploadPostAdapterTest extends TestCase
         $this->assertSame('Invalid caption', $result->error);
         $this->assertNull($result->externalPostId);
     }
+
+    public function test_check_status_returns_a_resolved_target_result_when_the_vendor_reports_success(): void
+    {
+        Http::fake([
+            '*/uploadposts/posts/up-123' => Http::response(['status' => 'success'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+
+        $result = (new UploadPostAdapter)->checkStatus($account, 'up-123');
+
+        $this->assertNotNull($result);
+        $this->assertTrue($result->ok);
+        $this->assertSame('up-123', $result->externalPostId);
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.upload-post.com/api/uploadposts/posts/up-123'
+            && $request->hasHeader('Authorization', 'Apikey org-secret-key'));
+    }
+
+    public function test_check_status_returns_a_failed_target_result_when_the_vendor_reports_failure(): void
+    {
+        Http::fake([
+            '*/uploadposts/posts/up-123' => Http::response(['status' => 'failed', 'error' => 'Rejected by platform'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+
+        $result = (new UploadPostAdapter)->checkStatus($account, 'up-123');
+
+        $this->assertNotNull($result);
+        $this->assertFalse($result->ok);
+        $this->assertSame('Rejected by platform', $result->error);
+    }
+
+    public function test_check_status_returns_null_while_still_processing(): void
+    {
+        Http::fake([
+            '*/uploadposts/posts/up-123' => Http::response(['status' => 'processing'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create();
+
+        $this->assertNull((new UploadPostAdapter)->checkStatus($account, 'up-123'));
+    }
 }
