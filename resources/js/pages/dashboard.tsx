@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, CalendarDays, Clock, ImageOff, Users, WifiOff } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Clock, ImageOff, RefreshCw, Users, WifiOff } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,18 @@ type InvoiceMonthlyTotal = {
     label: string;
     invoiced: number;
     paid: number;
+};
+
+type PublishReliabilityMonth = {
+    month: string;
+    label: string;
+    failed: number;
+    published: number;
+};
+
+type PublishReliability = {
+    monthly: PublishReliabilityMonth[];
+    averageAttemptsToSuccess: number | null;
 };
 
 type UpcomingPostOccurrence = {
@@ -71,6 +83,7 @@ type DashboardProps = {
     needsAttentionItems: NeedsAttentionRow[];
     clientHealth: ClientHealthRow[];
     unapprovedDraftsList: UnapprovedDraftRow[];
+    publishReliability: PublishReliability;
 };
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -105,6 +118,7 @@ export default function Dashboard({
     needsAttentionItems,
     clientHealth,
     unapprovedDraftsList,
+    publishReliability,
 }: DashboardProps) {
     const summaryCards = [
         { icon: AlertTriangle, label: 'Needs attention', hint: 'Items that need a decision today', value: summary.needsAttention },
@@ -114,6 +128,13 @@ export default function Dashboard({
     ];
 
     const hasInvoiceData = invoiceTotals.some((month) => month.invoiced > 0 || month.paid > 0);
+    const totalInvoiced = invoiceTotals.reduce((sum, month) => sum + month.invoiced, 0);
+    const totalPaid = invoiceTotals.reduce((sum, month) => sum + month.paid, 0);
+
+    const publishReliabilityMonthly = publishReliability.monthly;
+    const hasPublishReliabilityData = publishReliabilityMonthly.some(
+        (month) => month.failed > 0 || month.published > 0,
+    );
 
     return (
         <>
@@ -250,18 +271,44 @@ export default function Dashboard({
                             <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
                                 <span
                                     aria-hidden
+                                    className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.05]"
+                                />
+                                <span
+                                    aria-hidden
                                     className="absolute inset-x-0 top-0 h-1 bg-gradient-brand"
                                 />
-                                <div className="flex flex-col gap-1">
-                                    <h2 className="text-sm font-semibold">Invoice revenue</h2>
-                                    <p className="text-xs text-muted-foreground">
-                                        Invoiced vs. paid amounts over the last {invoiceTotals.length} months
-                                    </p>
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="flex flex-col gap-1">
+                                        <h2 className="text-sm font-semibold">Invoice revenue</h2>
+                                        <p className="text-xs text-muted-foreground">
+                                            Invoiced vs. paid amounts over the last {invoiceTotals.length} months
+                                        </p>
+                                    </div>
+                                    {hasInvoiceData && (
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-2xl font-bold tabular-nums text-gradient-brand">
+                                                {currencyFormatter.format(totalPaid)}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                of {currencyFormatter.format(totalInvoiced)} invoiced
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                                 {hasInvoiceData ? (
                                     <div className="h-64 w-full">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={invoiceTotals}>
+                                            <BarChart data={invoiceTotals} barGap={4}>
+                                                <defs>
+                                                    <linearGradient id="invoiceGradient" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.9} />
+                                                        <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.5} />
+                                                    </linearGradient>
+                                                    <linearGradient id="paidGradient" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={1} />
+                                                        <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0.65} />
+                                                    </linearGradient>
+                                                </defs>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                                                 <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                                                 <YAxis
@@ -270,10 +317,18 @@ export default function Dashboard({
                                                     axisLine={false}
                                                     tickFormatter={(value: number) => currencyFormatter.format(value)}
                                                 />
-                                                <Tooltip formatter={(value) => currencyFormatter.format(Number(value))} />
-                                                <Legend wrapperStyle={{ fontSize: 12 }} />
-                                                <Bar dataKey="invoiced" name="Invoiced" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-                                                <Bar dataKey="paid" name="Paid" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                                                <Tooltip
+                                                    cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
+                                                    contentStyle={{
+                                                        borderRadius: 'var(--radius)',
+                                                        borderColor: 'var(--color-border)',
+                                                        fontSize: 12,
+                                                    }}
+                                                    formatter={(value) => currencyFormatter.format(Number(value))}
+                                                />
+                                                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                                                <Bar dataKey="invoiced" name="Invoiced" fill="url(#invoiceGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                                <Bar dataKey="paid" name="Paid" fill="url(#paidGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -320,6 +375,59 @@ export default function Dashboard({
                                     No posts scheduled in the next 7 days.
                                 </p>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {hasPublishReliabilityData && (
+                    <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
+                        <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex flex-col gap-1">
+                                <h2 className="text-sm font-semibold">Publish reliability</h2>
+                                <p className="text-xs text-muted-foreground">
+                                    Failed vs. successful publish attempts over the last {publishReliabilityMonthly.length} months
+                                </p>
+                            </div>
+                            {publishReliability.averageAttemptsToSuccess !== null && (
+                                <div className="flex flex-col items-end">
+                                    <span className="flex items-center gap-1 text-2xl font-bold tabular-nums text-gradient-brand">
+                                        <RefreshCw className="size-4 text-primary" />
+                                        {publishReliability.averageAttemptsToSuccess.toFixed(2)}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">avg. attempts per successful publish</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={publishReliabilityMonthly} barGap={4}>
+                                    <defs>
+                                        <linearGradient id="failedGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="var(--color-destructive)" stopOpacity={0.9} />
+                                            <stop offset="100%" stopColor="var(--color-destructive)" stopOpacity={0.5} />
+                                        </linearGradient>
+                                        <linearGradient id="publishedGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={1} />
+                                            <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0.65} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                                    <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <Tooltip
+                                        cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
+                                        contentStyle={{
+                                            borderRadius: 'var(--radius)',
+                                            borderColor: 'var(--color-border)',
+                                            fontSize: 12,
+                                        }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                                    <Bar dataKey="failed" name="Failed" fill="url(#failedGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                    <Bar dataKey="published" name="Published" fill="url(#publishedGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
                 )}

@@ -6,6 +6,7 @@ use App\Actions\Dashboard\GetClientHealthSummaryAction;
 use App\Actions\Dashboard\GetDashboardNeedsAttentionListAction;
 use App\Actions\Dashboard\GetUnapprovedDraftsAction;
 use App\Actions\Invoices\GetMonthlyInvoiceTotalsAction;
+use App\Actions\Posts\GetPublishReliabilityStatsAction;
 use App\Actions\Posts\GetUpcomingPostCountAction;
 use App\Actions\Posts\GetUpcomingPostOccurrencesAction;
 use App\Enums\ClientStatus;
@@ -30,6 +31,7 @@ class DashboardController extends Controller
         GetDashboardNeedsAttentionListAction $getDashboardNeedsAttentionList,
         GetClientHealthSummaryAction $getClientHealthSummary,
         GetUnapprovedDraftsAction $getUnapprovedDrafts,
+        GetPublishReliabilityStatsAction $getPublishReliabilityStats,
     ): Response {
         $user = $request->user();
 
@@ -87,6 +89,9 @@ class DashboardController extends Controller
             'unapprovedDraftsList' => $canViewCalendar
                 ? $getUnapprovedDrafts($user)
                 : [],
+            'publishReliability' => $canViewCalendar
+                ? $getPublishReliabilityStats($user->org_id)
+                : ['monthly' => [], 'averageAttemptsToSuccess' => null],
         ]);
     }
 }

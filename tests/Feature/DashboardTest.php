@@ -10,6 +10,7 @@ use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Post;
+use App\Models\PostActivityLog;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -264,6 +265,45 @@ class DashboardTest extends TestCase
             ->has('unapprovedDraftsList', 1)
             ->where('unapprovedDraftsList.0.post_id', $draft->id)
             ->where('summary.unapprovedDrafts', 1)
+        );
+    }
+
+    public function test_dashboard_shows_publish_reliability_stats()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+
+        $post = Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Published,
+        ]);
+
+        PostActivityLog::factory()->for($post)->create([
+            'to_status' => PostStatus::Failed,
+            'created_at' => now(),
+        ]);
+        PostActivityLog::factory()->for($post)->create([
+            'to_status' => PostStatus::Published,
+            'created_at' => now(),
+        ]);
+
+        // A post from another organization must not be counted.
+        $otherPost = Post::factory()->create(['status' => PostStatus::Published]);
+        PostActivityLog::factory()->for($otherPost)->create([
+            'to_status' => PostStatus::Published,
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('publishReliability.monthly', 6)
+            ->where('publishReliability.monthly.5.failed', 1)
+            ->where('publishReliability.monthly.5.published', 1)
+            ->where('publishReliability.averageAttemptsToSuccess', 2)
         );
     }
 }
