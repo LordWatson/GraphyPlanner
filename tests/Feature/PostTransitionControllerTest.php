@@ -67,6 +67,44 @@ class PostTransitionControllerTest extends TestCase
         Queue::assertPushed(PublishPostJob::class, fn (PublishPostJob $job) => $job->postId === $post->id);
     }
 
+    public function test_a_failed_post_can_be_moved_back_to_scheduled_and_is_requeued_with_a_clean_target(): void
+    {
+        Queue::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Failed]);
+
+        $account = SocialAccount::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'platform' => Platform::LinkedIn,
+        ]);
+        $target = $post->targets()->create([
+            'social_account_id' => $account->id,
+            'scheduled_local_date' => now()->addDay()->toDateString(),
+            'scheduled_local_time' => '09:00',
+            'scheduled_at_utc' => now()->addDay(),
+            'status' => \App\Enums\PostTargetStatus::Failed,
+            'external_post_id' => null,
+            'error' => 'Method Not Allowed',
+        ]);
+
+        $response = $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::Scheduled->value,
+        ]);
+
+        $response->assertRedirect(route('posts.edit', $post));
+        $post->refresh();
+        $target->refresh();
+
+        $this->assertSame(PostStatus::Scheduled, $post->status);
+        $this->assertSame(\App\Enums\PostTargetStatus::Pending, $target->status);
+        $this->assertNull($target->error);
+
+        Queue::assertPushed(PublishPostJob::class, fn (PublishPostJob $job) => $job->postId === $post->id);
+    }
+
     public function test_scheduling_is_blocked_when_the_checklist_has_not_passed(): void
     {
         $org = Organization::factory()->create();

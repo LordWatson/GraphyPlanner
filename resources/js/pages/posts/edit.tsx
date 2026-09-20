@@ -452,9 +452,6 @@ export default function PostEdit({
                                                         {target.status_label}
                                                     </Badge>
                                                 )}
-                                                {target.error && (
-                                                    <span className="text-xs text-destructive">{target.error}</span>
-                                                )}
                                             </div>
                                         );
                                     })}

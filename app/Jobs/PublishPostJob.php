@@ -91,14 +91,27 @@ class PublishPostJob implements ShouldQueue
             return;
         }
 
-        $transition($post, PostStatus::Failed, null);
+        $failures = $results->reject(fn ($result) => $result->ok)->values();
+
+        // Surface the vendor error(s) on the activity log entry (rather than only next to the
+        // relevant target/social account) so it's visible in one place alongside every other
+        // status change, and so it's still there even after the target rows are reset on retry.
+        $errorNote = $failures
+            ->map(function ($result) use ($post) {
+                $account = $post->targets->firstWhere('social_account_id', $result->accountId)?->socialAccount;
+                $label = $account ? "{$account->platform->value} ({$account->handle})" : "account #{$result->accountId}";
+
+                return "{$label}: {$result->error}";
+            })
+            ->implode("\n");
+
+        $transition($post, PostStatus::Failed, null, $errorNote ?: null);
 
         $notifications->send($notifications->orgRecipients($post), new PostPublishFailed($post));
 
         Log::error('PublishPostJob: post publish failed for one or more targets', [
             'post_id' => $post->id,
-            'errors' => $results
-                ->reject(fn ($result) => $result->ok)
+            'errors' => $failures
                 ->map(fn ($result) => ['account_id' => $result->accountId, 'error' => $result->error])
                 ->values()
                 ->all(),

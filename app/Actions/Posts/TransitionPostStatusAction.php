@@ -4,6 +4,7 @@ namespace App\Actions\Posts;
 
 use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
 use App\Enums\Role;
 use App\Jobs\PublishPostJob;
 use App\Models\Post;
@@ -52,6 +53,18 @@ class TransitionPostStatusAction
                 'status' => $to,
                 'checklist_snapshot' => $evaluateChecklist($post),
             ]);
+
+            // Re-queuing a previously `failed` post must give every target a clean slate —
+            // otherwise the old vendor error/external id would keep showing next to the target
+            // even though a fresh publish attempt is about to run (the error itself is preserved
+            // on the activity log entry created below instead).
+            if ($from === PostStatus::Failed && $to === PostStatus::Scheduled) {
+                $post->targets()->update([
+                    'status' => PostTargetStatus::Pending,
+                    'external_post_id' => null,
+                    'error' => null,
+                ]);
+            }
 
             if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
                 $post->approvals()->create([

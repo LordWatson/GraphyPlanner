@@ -6,6 +6,7 @@ use App\Contracts\PublishAdapter;
 use App\Enums\AssetType;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
+use App\Models\Asset;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
@@ -14,6 +15,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -182,15 +184,36 @@ class UploadPostAdapter implements PublishAdapter
     private function publishToTarget(Post $post, SocialAccount $account): TargetResult
     {
         [$fields, $sent, $skipped] = $this->buildFields($post, $account);
+        $endpoint = $this->resolveUploadEndpoint($post);
 
         Log::info('Publishing post via Upload-Post', [
             'post_id' => $post->id,
             'social_account_id' => $account->id,
             'platform' => $account->platform->value,
+            'endpoint' => $endpoint,
         ]);
 
         try {
-            $response = $this->client($account)->post('/uploadposts/schedule', $fields);
+            // The upload/upload_photos endpoints only recognize the vendor's documented fields
+            // (e.g. `user`, `platform[]`, `photos[]`) when sent as multipart/form-data — sending
+            // them as JSON (the Http client's default) silently drops every field and the vendor
+            // replies with a generic "Username required in form data" error. upload_text has no
+            // file-ish fields and is documented as JSON, so it's left untouched.
+            if ($endpoint === '/upload_text') {
+                $response = $this->client($account)->post($endpoint, $fields);
+            } else {
+                $request = $this->client($account)->asMultipart();
+
+                // Assets stored on a disk we control are attached as real multipart files rather
+                // than sent as a `video`/`photos[]` URL — the app's own APP_URL can be a
+                // local-only dev domain (e.g. `*.test`) that Upload-Post's servers can never
+                // reach, which the vendor rejects with a generic "required"/"not allowed" error
+                // even though a URL was technically present. Assets with no local disk/path (e.g.
+                // externally-linked) still fall back to sending their URL as before.
+                $this->attachLocalMediaFiles($request, $post, $fields);
+
+                $response = $request->post($endpoint, $this->toMultipartFields($fields));
+            }
         } catch (Throwable $e) {
             Log::error('Upload-Post publish request failed', [
                 'post_id' => $post->id,
@@ -234,6 +257,105 @@ class UploadPostAdapter implements PublishAdapter
     }
 
     /**
+     * Upload-Post has no single generic "publish" endpoint — the request must be sent to the
+     * media-appropriate endpoint (video / photos / text-only), see
+     * https://docs.upload-post.com/api/reference. A post with at least one video asset uses the
+     * video endpoint (only the first video is sent, matching that endpoint's single-file
+     * contract); image-only posts use the photos endpoint (all image URLs, as a carousel);
+     * posts with no assets fall back to the text-only endpoint.
+     */
+    private function resolveUploadEndpoint(Post $post): string
+    {
+        if ($post->assets->contains(fn ($asset) => $asset->type === AssetType::Video)) {
+            return '/upload';
+        }
+
+        if ($post->assets->contains(fn ($asset) => $asset->type === AssetType::Image)) {
+            return '/upload_photos';
+        }
+
+        return '/upload_text';
+    }
+
+    /**
+     * Attach any locally-stored video/image assets to the request as real multipart files
+     * (rather than a URL Upload-Post would have to fetch itself), removing the corresponding
+     * `video`/`photos` entry from `$fields` so it isn't also sent as a (redundant, and possibly
+     * unreachable) URL. Assets with no local disk/path — e.g. genuinely external links — are left
+     * in `$fields` to be sent as a URL, unchanged.
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    private function attachLocalMediaFiles(PendingRequest $request, Post $post, array &$fields): void
+    {
+        /** @var Asset|null $videoAsset */
+        $videoAsset = $post->assets->firstWhere('type', AssetType::Video);
+
+        if ($videoAsset && $this->hasLocalFile($videoAsset)) {
+            $request->attach('video', Storage::disk($videoAsset->disk)->get($videoAsset->path), $this->assetFilename($videoAsset));
+            unset($fields['video']);
+        }
+
+        /** @var Collection<int, Asset> $imageAssets */
+        $imageAssets = $post->assets->where('type', AssetType::Image)->values();
+
+        if ($imageAssets->isEmpty()) {
+            return;
+        }
+
+        $localImages = $imageAssets->filter(fn (Asset $asset): bool => $this->hasLocalFile($asset));
+        $remoteImageUrls = $imageAssets->reject(fn (Asset $asset): bool => $this->hasLocalFile($asset))
+            ->pluck('url')->filter()->values()->all();
+
+        foreach ($localImages as $asset) {
+            $request->attach('photos[]', Storage::disk($asset->disk)->get($asset->path), $this->assetFilename($asset));
+        }
+
+        if ($remoteImageUrls !== []) {
+            $fields['photos'] = $remoteImageUrls;
+        } else {
+            unset($fields['photos']);
+        }
+    }
+
+    private function hasLocalFile(Asset $asset): bool
+    {
+        return filled($asset->disk) && filled($asset->path) && Storage::disk($asset->disk)->exists($asset->path);
+    }
+
+    private function assetFilename(Asset $asset): string
+    {
+        return $asset->original_filename ?: basename((string) $asset->path);
+    }
+
+    /**
+     * Convert the associative `buildFields()` payload into the list-of-parts shape Upload-Post's
+     * multipart endpoints expect: array values become repeated `name[]` parts (e.g. `platform[]`,
+     * `photos[]`), matching the vendor's documented `-F` examples.
+     *
+     * @param  array<string, mixed>  $fields
+     * @return array<int, array{name: string, contents: string}>
+     */
+    private function toMultipartFields(array $fields): array
+    {
+        $parts = [];
+
+        foreach ($fields as $name => $value) {
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    $parts[] = ['name' => "{$name}[]", 'contents' => (string) $item];
+                }
+
+                continue;
+            }
+
+            $parts[] = ['name' => $name, 'contents' => (string) $value];
+        }
+
+        return $parts;
+    }
+
+    /**
      * Build the Upload-Post request payload for a single target, tracking which fields were
      * actually sent vs. skipped (missing source data) per spec §7's `TargetResult` shape.
      *
@@ -261,12 +383,17 @@ class UploadPostAdapter implements PublishAdapter
             $skipped[] = 'scheduled_date';
         }
 
-        $mediaUrls = $post->assets->pluck('url')->filter()->values()->all();
-        if ($mediaUrls !== []) {
-            $fields['media_urls'] = $mediaUrls;
-            $sent[] = 'media_urls';
+        $videoUrl = $post->assets->firstWhere('type', AssetType::Video)?->url;
+        $imageUrls = $post->assets->where('type', AssetType::Image)->pluck('url')->filter()->values()->all();
+
+        if ($videoUrl) {
+            $fields['video'] = $videoUrl;
+            $sent[] = 'video';
+        } elseif ($imageUrls !== []) {
+            $fields['photos'] = $imageUrls;
+            $sent[] = 'photos';
         } else {
-            $skipped[] = 'media_urls';
+            $skipped[] = 'media';
         }
 
         if (! empty($post->hashtags)) {

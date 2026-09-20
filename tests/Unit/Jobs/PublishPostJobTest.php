@@ -77,6 +77,12 @@ class PublishPostJobTest extends TestCase
         $this->assertSame(PostStatus::Failed, $post->status);
         $this->assertSame(PostTargetStatus::Failed, $target->status);
         $this->assertSame('Vendor rejected the request', $target->error);
+
+        // The vendor error must be recorded on the activity log entry, not only on the target,
+        // so it's visible in one place alongside every other status change.
+        $log = $post->activityLogs()->latest('id')->firstOrFail();
+        $this->assertSame(PostStatus::Failed, $log->to_status);
+        $this->assertStringContainsString('Vendor rejected the request', (string) $log->note);
     }
 
     public function test_it_skips_a_post_that_is_no_longer_scheduled(): void
