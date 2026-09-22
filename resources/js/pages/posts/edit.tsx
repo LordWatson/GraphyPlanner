@@ -24,6 +24,7 @@ import Heading from '@/components/heading';
 import { HashtagInput } from '@/components/hashtag-input';
 import InputError from '@/components/input-error';
 import { MentionTextarea, renderCommentBody, type MentionableUser } from '@/components/mention-textarea';
+import { SocialPostPreview } from '@/components/social-post-preview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -340,10 +341,25 @@ export default function PostEdit({
     const targetEntries = Object.entries(targetRows);
     const [activeTab, setActiveTab] = useState('editor');
 
+    // Live preview targets: the accounts currently selected in the form (or, read-only, the
+    // post's saved targets), each paired with its platform/handle so `SocialPostPreview` can
+    // render the right mockup. Kept separate from `targetEntries` (which drives the schedule
+    // rows) since the preview only needs platform/handle, not date/time.
+    const previewTargets = can.update
+        ? targetEntries
+              .map(([accountIdStr]) => targetAccounts.find((a) => a.id === Number(accountIdStr)))
+              .filter((a): a is TargetAccountData => Boolean(a))
+              .map((a) => ({ id: a.id, platform: a.platform, handle: a.handle }))
+        : post.targets.map((t) => ({ id: t.social_account_id, platform: t.platform ?? '', handle: t.handle ?? '' }));
+
+    const [previewTargetId, setPreviewTargetId] = useState<number | string | null>(previewTargets[0]?.id ?? null);
+    const activePreviewTarget = previewTargets.find((t) => t.id === previewTargetId) ?? previewTargets[0] ?? null;
+    const previewAssets = can.update ? selectedAssets : post.assets;
+
     return (
         <>
             <Head title={`Edit post — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4">
                 <div className="flex flex-col gap-4">
                     <Link
                         href={showClient(client.id)}
@@ -400,7 +416,8 @@ export default function PostEdit({
                         </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="editor" className="grid gap-4">
+                    <TabsContent value="editor" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+                    <div className="grid gap-4">
                     {!can.update && (
                     <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
                         {(post.status === 'scheduled' || post.status === 'published') && (
@@ -708,6 +725,54 @@ export default function PostEdit({
                         )}
                     </Form>
                     )}
+                    </div>
+
+                    <div className="grid gap-3 lg:sticky lg:top-4">
+                        <div className="rounded-lg border border-border bg-card p-4">
+                            <Heading title="Live preview" description="A quick look at how the post will render — not pixel-perfect" />
+                            {previewTargets.length > 1 && (
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                    {previewTargets.map((t) => {
+                                        const Icon = platformIcon[t.platform] ?? Share2;
+                                        const selected = t.id === activePreviewTarget?.id;
+
+                                        return (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                onClick={() => setPreviewTargetId(t.id)}
+                                                className={cn(
+                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                                                    selected
+                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                        : 'border-border bg-muted/50 text-foreground',
+                                                )}
+                                            >
+                                                <Icon className="size-3.5" />
+                                                {t.handle}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            <div className="mt-4 flex justify-center">
+                                {activePreviewTarget ? (
+                                    <SocialPostPreview
+                                        target={activePreviewTarget}
+                                        caption={can.update ? caption : post.master_caption ?? ''}
+                                        hashtags={can.update ? hashtags : post.hashtags}
+                                        assets={previewAssets}
+                                        musicName={can.update ? musicName : (post.music?.name as string) ?? ''}
+                                        locationName={can.update ? locationName : (post.location?.name as string) ?? ''}
+                                    />
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">
+                                        Select a target account to preview the post.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                     </TabsContent>
 
                     <TabsContent value="checklist" className="grid gap-4">
