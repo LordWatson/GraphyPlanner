@@ -324,7 +324,7 @@ export function SocialPostPreview({
     }, [platform, target.handle, caption, hashtags, assets, musicName, locationName]);
 
     return (
-        <div className={cn('flex flex-col items-center gap-2', className)}>
+        <div className={cn('flex w-full flex-col items-center gap-2', className)}>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {(() => {
                     const Icon = platformIcon[platform] ?? Share2;
