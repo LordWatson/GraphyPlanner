@@ -82,11 +82,15 @@ class UploadPostAdapterTest extends TestCase
         Http::assertSent(function ($request) {
             $fields = self::multipartFieldsByName($request);
 
+            // `title` itself now carries the appended hashtag text (per
+            // applyHashtagCaptionOverride()), so it's no longer just the bare caption.
+            $spacer = implode("\n", array_fill(0, 8, '-'));
+
             return $request->url() === 'https://api.upload-post.com/api/upload_photos'
                 && $request->hasHeader('Authorization', 'Apikey org-secret-key')
                 && $request->isMultipart()
                 && $fields['user'] === ['ext-acct-1']
-                && $fields['title'] === ['Hello world']
+                && $fields['title'] === ["Hello world\n{$spacer}\n#graphy"]
                 && $fields['platform[]'] === [Platform::LinkedIn->value]
                 && $fields['photos[]'] === ['https://cdn.test/media.jpg']
                 && $fields['hashtags[]'] === ['graphy']
@@ -140,7 +144,7 @@ class UploadPostAdapterTest extends TestCase
     }
 
     /**
-     * Regression test: Upload-Post has no generic `hashtags` upload parameter for Instagram, so
+     * Regression test: Upload-Post has no generic `hashtags` upload parameter for any platform, so
      * the plain `hashtags`/`hashtags[]` field sent for every platform was silently ignored by the
      * vendor and hashtags never appeared on the published Instagram post, even though the caption
      * and media worked as expected. Hashtags must instead be appended (as literal `#tag` text) to
@@ -175,11 +179,63 @@ class UploadPostAdapterTest extends TestCase
         Http::assertSent(function ($request) {
             $fields = self::multipartFieldsByName($request);
 
-            return $fields['title'] === ['Hello world']
-                && $fields['instagram_title'] === ["Hello world\n\n#graphy #launch"];
+            $spacer = implode("\n", array_fill(0, 8, '-'));
+
+            return $fields['title'] === ["Hello world\n{$spacer}\n#graphy #launch"]
+                && $fields['instagram_title'] === ["Hello world\n{$spacer}\n#graphy #launch"]
+                // Upload-Post's docs explicitly say the generic `description` field is ignored
+                // for Instagram, so it must not be sent for this platform.
+                && ! array_key_exists('description', $fields);
         });
 
         $this->assertContains('instagram_title', $results->first()->sentFields);
+        $this->assertNotContains('description', $results->first()->sentFields);
+    }
+
+    /**
+     * Regression test: the Instagram-only hashtag-append fix left TikTok/LinkedIn/Facebook with
+     * no working hashtags at all, since Upload-Post has no generic `hashtags` upload parameter for
+     * any platform — only Instagram's caption carried the appended `#tag` text. Per Upload-Post's
+     * docs, TikTok/Facebook/LinkedIn actually render the generic `description` field (not
+     * `[platform]_title`) as the post's visible body text, so both must carry the caption+hashtags.
+     */
+    public function test_tiktok_facebook_and_linkedin_publish_append_hashtags_to_their_own_title_override(): void
+    {
+        Http::fake([
+            '*/upload_text' => Http::response(['request_id' => 'up-hashtags'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $spacer = implode("\n", array_fill(0, 8, '-'));
+
+        foreach ([
+            [Platform::TikTok, 'tiktok_title'],
+            [Platform::Facebook, 'facebook_title'],
+            [Platform::LinkedIn, 'linkedin_title'],
+        ] as [$platform, $titleField]) {
+            $account = SocialAccount::factory()->for($organization, 'organization')->create([
+                'platform' => $platform,
+            ]);
+            $post = Post::factory()->create([
+                'client_id' => $account->client_id,
+                'master_caption' => 'Hello world',
+                'hashtags' => ['#graphy', 'launch'],
+            ]);
+            $post->load('assets');
+
+            $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+            Http::assertSent(function ($request) use ($titleField, $spacer) {
+                $data = $request->data();
+
+                return ($data['title'] ?? null) === "Hello world\n{$spacer}\n#graphy #launch"
+                    && ($data[$titleField] ?? null) === "Hello world\n{$spacer}\n#graphy #launch"
+                    && ($data['description'] ?? null) === "Hello world\n{$spacer}\n#graphy #launch";
+            });
+
+            $this->assertContains($titleField, $results->first()->sentFields);
+            $this->assertContains('description', $results->first()->sentFields);
+        }
     }
 
     /**

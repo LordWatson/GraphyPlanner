@@ -483,14 +483,82 @@ class UploadPostAdapter implements PublishAdapter
             $skipped[] = 'hashtags';
         }
 
+        $this->applyHashtagCaptionOverride($account->platform, $post, $fields, $sent);
+
         match ($account->platform) {
             Platform::Instagram => $this->applyInstagramFields($post, $fields, $sent, $skipped),
             Platform::TikTok => $this->applyTikTokFields($post, $fields, $sent, $skipped),
-            // LinkedIn/Facebook: caption + media + schedule only, per spec §7.1.
+            // LinkedIn/Facebook: caption + media + schedule only (plus the hashtag-carrying
+            // title override applied above), per spec §7.1.
             Platform::LinkedIn, Platform::Facebook => null,
         };
 
         return [$fields, $sent, $skipped];
+    }
+
+    /**
+     * Upload-Post has no generic `hashtags` upload parameter for *any* platform (confirmed
+     * against https://docs.upload-post.com/api/reference — the only `hashtags` field that exists
+     * anywhere in the API is on the unrelated TikTok hashtag-suggestions endpoint), so the plain
+     * `hashtags`/`hashtags[]` field built above is silently ignored by the vendor everywhere, and
+     * tags never show up on the published post regardless of platform. Every platform's caption
+     * carries hashtags as literal `#tag` text instead, appended (bare tags re-prefixed with `#`,
+     * per `Post::booted()`'s normalization) to the caption, separated by the common "dot-dash"
+     * spacer (eight lines each containing a single `-`) so the hashtag block is visually pushed
+     * below the caption's "more" fold instead of cluttering it.
+     *
+     * Per the user's follow-up report and the vendor's own `-F 'title="Check out our new launch!
+     * #tech #startup #launch"'` example (https://docs.upload-post.com/api/reference), the plain
+     * `title` field — the one always sent to every platform, and the one every `[platform]_title`
+     * override documented-ly falls back to when absent — is itself expected to carry inline
+     * hashtags directly, no separate override/description field required. The generic `title`
+     * field built in `buildFields()` is therefore overwritten here (in place, so every downstream
+     * consumer — including the per-platform `[platform]_title` overrides below, which still exist
+     * for platforms that otherwise ignore `title`/`description`, e.g. Instagram) with the caption +
+     * spacer + hashtag text, instead of only ever touching a secondary override field.
+     *
+     * The per-platform overrides are still sent alongside it (same caption+hashtags text) since
+     * some platforms (Instagram in particular) are documented to render `[platform]_title` as the
+     * real caption instead of the generic `title`/`description` — see the per-platform tables in
+     * https://docs.upload-post.com/api/upload-video and https://docs.upload-post.com/api/upload-photo.
+     * Instagram explicitly ignores the generic `description` field, so it is deliberately not sent
+     * there; TikTok/Facebook/LinkedIn do render `description` as their body text, so it's sent too.
+     *
+     * @param  array<string, mixed>  $fields
+     * @param  array<int, string>  $sent
+     */
+    private function applyHashtagCaptionOverride(Platform $platform, Post $post, array &$fields, array &$sent): void
+    {
+        if (empty($post->hashtags)) {
+            return;
+        }
+
+        $hashtagText = collect($post->hashtags)->map(fn ($tag) => '#'.$tag)->implode(' ');
+        $spacer = implode("\n", array_fill(0, 8, '-'));
+        $caption = trim($fields['title'])."\n".$spacer."\n".$hashtagText;
+
+        // The generic `title` field itself must carry the hashtags — per the vendor's own docs
+        // example, this is the documented, expected way to get hashtags onto a post, and it's
+        // also what every `[platform]_title` override falls back to when not explicitly set.
+        $fields['title'] = $caption;
+
+        $titleField = match ($platform) {
+            Platform::Instagram => 'instagram_title',
+            Platform::TikTok => 'tiktok_title',
+            Platform::Facebook => 'facebook_title',
+            Platform::LinkedIn => 'linkedin_title',
+        };
+
+        $fields[$titleField] = $caption;
+        $sent[] = $titleField;
+
+        // Instagram explicitly ignores `description` (docs: "The global description field is
+        // ignored for Instagram uploads") — skip sending it there. Every other platform actually
+        // renders `description` as the post's body text, so it must carry the same caption.
+        if ($platform !== Platform::Instagram) {
+            $fields['description'] = $caption;
+            $sent[] = 'description';
+        }
     }
 
     /**
@@ -500,19 +568,8 @@ class UploadPostAdapter implements PublishAdapter
      */
     private function applyInstagramFields(Post $post, array &$fields, array &$sent, array &$skipped): void
     {
-        // Upload-Post has no generic `hashtags` upload parameter for Instagram (confirmed
-        // against https://docs.upload-post.com/api/reference — it only appears on the unrelated
-        // TikTok hashtag-suggestions endpoint), so the plain `hashtags`/`hashtags[]` field built
-        // in buildFields() is silently ignored by the vendor for this platform, and the tags
-        // never show up on the published post. Instagram captions carry hashtags as literal
-        // `#tag` text, so they're appended (bare tags re-prefixed with `#`, per `Post::booted()`'s
-        // normalization) to the caption actually sent as `instagram_title` here.
-        if (! empty($post->hashtags)) {
-            $hashtagText = collect($post->hashtags)->map(fn ($tag) => '#'.$tag)->implode(' ');
-            $fields['instagram_title'] = trim($fields['title']."\n\n".$hashtagText);
-            $sent[] = 'instagram_title';
-        }
-
+        // Hashtag handling (via `instagram_title`) is centralized in
+        // applyHashtagCaptionOverride(), called from buildFields() for every platform.
         $locationId = $post->location['id'] ?? null;
         if ($locationId) {
             $fields['location_id'] = $locationId;
