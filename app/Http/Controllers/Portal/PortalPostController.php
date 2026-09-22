@@ -82,6 +82,8 @@ class PortalPostController extends Controller
                 'master_caption' => $post->master_caption,
                 'review_message' => $post->review_message,
                 'hashtags' => $post->hashtags ?? [],
+                'music' => $post->music,
+                'location' => $post->location,
                 'assets' => $post->assets->map(fn ($asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
@@ -91,6 +93,7 @@ class PortalPostController extends Controller
                     'mime_type' => $asset->mime_type,
                 ])->values(),
                 'targets' => $post->targets->map(fn ($target) => [
+                    'social_account_id' => $target->social_account_id,
                     'platform' => $target->socialAccount?->platform?->value,
                     'handle' => $target->socialAccount?->handle,
                     'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),

@@ -1,23 +1,34 @@
 import { Form } from '@inertiajs/react';
-import { CheckCircle2, MessageSquareWarning } from 'lucide-react';
+import { CheckCircle2, Facebook, Instagram, Linkedin, MessageSquareWarning, Music2, Share2 } from 'lucide-react';
+import { useState } from 'react';
 
-import { AssetPreview, type AssetPreviewData } from '@/components/asset-preview';
+import { type AssetPreviewData } from '@/components/asset-preview';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { MentionTextarea, renderCommentBody, type MentionableUser } from '@/components/mention-textarea';
+import { SocialPostPreview } from '@/components/social-post-preview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
+import { cn } from '@/lib/utils';
 import { store as commentOnPortalPost } from '@/routes/portal/posts/comments';
 import { decide as decideOnPortalPost } from '@/routes/portal/posts';
 
 type AssetData = AssetPreviewData;
 
 type TargetData = {
+    social_account_id: number | null;
     platform: string | null;
     handle: string | null;
     scheduled_local_date: string | null;
     scheduled_local_time: string | null;
+};
+
+const platformIcon: Record<string, typeof Instagram> = {
+    instagram: Instagram,
+    tiktok: Music2,
+    facebook: Facebook,
+    linkedin: Linkedin,
 };
 
 type CommentData = {
@@ -35,6 +46,8 @@ type PostData = {
     master_caption: string | null;
     review_message: string | null;
     hashtags: string[];
+    music: { name?: string } | null;
+    location: { id?: string; name?: string } | null;
     assets: AssetData[];
     targets: TargetData[];
     comments: CommentData[];
@@ -62,6 +75,18 @@ export default function PortalPostShow({
     can: { decide: boolean; comment: boolean };
     mentionableUsers: MentionableUser[];
 }) {
+    // Live preview targets: the post's saved targets, each paired with its platform/handle so
+    // `SocialPostPreview` can render the right mockup — mirrors the read-only path of the
+    // internal editor's live preview (`posts/edit.tsx`).
+    const previewTargets = post.targets.map((t, i) => ({
+        id: t.social_account_id ?? i,
+        platform: t.platform ?? '',
+        handle: t.handle ?? '',
+    }));
+
+    const [previewTargetId, setPreviewTargetId] = useState<number | string | null>(previewTargets[0]?.id ?? null);
+    const activePreviewTarget = previewTargets.find((t) => t.id === previewTargetId) ?? previewTargets[0] ?? null;
+
     return (
         <ClientPortalLayout title={`Post #${post.id}`}>
             <Heading title={post.master_caption ? 'Post review' : `Post #${post.id}`} />
@@ -77,24 +102,8 @@ export default function PortalPostShow({
                     </div>
                 )}
 
-                {post.master_caption && (
-                    <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap">{post.master_caption}</p>
-                )}
-
-                {post.hashtags.length > 0 && (
-                    <p className="mb-4 text-sm text-primary">{post.hashtags.map((tag) => `#${tag}`).join(' ')}</p>
-                )}
-
-                {post.assets.length > 0 && (
-                    <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {post.assets.map((asset) => (
-                            <AssetPreview key={asset.id} asset={asset} />
-                        ))}
-                    </div>
-                )}
-
                 {post.targets.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="mb-4 flex flex-wrap gap-2">
                         {post.targets.map((target, i) => (
                             <span
                                 key={i}
@@ -104,6 +113,48 @@ export default function PortalPostShow({
                             </span>
                         ))}
                     </div>
+                )}
+
+                {activePreviewTarget ? (
+                    <>
+                        {previewTargets.length > 1 && (
+                            <div className="mb-3 flex flex-wrap gap-1.5">
+                                {previewTargets.map((t) => {
+                                    const Icon = platformIcon[t.platform] ?? Share2;
+                                    const selected = t.id === activePreviewTarget?.id;
+
+                                    return (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => setPreviewTargetId(t.id)}
+                                            className={cn(
+                                                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                                                selected
+                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                    : 'border-border bg-muted/50 text-foreground',
+                                            )}
+                                        >
+                                            <Icon className="size-3.5" />
+                                            {t.handle}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        <div className="flex justify-center">
+                            <SocialPostPreview
+                                target={activePreviewTarget}
+                                caption={post.master_caption ?? ''}
+                                hashtags={post.hashtags}
+                                assets={post.assets}
+                                musicName={post.music?.name ?? ''}
+                                locationName={post.location?.name ?? ''}
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <p className="text-sm text-muted-foreground">No target account is set for this post yet.</p>
                 )}
             </div>
 
