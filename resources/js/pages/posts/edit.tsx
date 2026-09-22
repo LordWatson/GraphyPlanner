@@ -11,6 +11,7 @@ import {
     ListChecks,
     Linkedin,
     Lock,
+    Maximize2,
     MessageSquareQuote,
     Music2,
     Pencil,
@@ -28,6 +29,7 @@ import { SocialPostPreview } from '@/components/social-post-preview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -355,6 +357,7 @@ export default function PostEdit({
     const [previewTargetId, setPreviewTargetId] = useState<number | string | null>(previewTargets[0]?.id ?? null);
     const activePreviewTarget = previewTargets.find((t) => t.id === previewTargetId) ?? previewTargets[0] ?? null;
     const previewAssets = can.update ? selectedAssets : post.assets;
+    const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
 
     return (
         <>
@@ -729,7 +732,21 @@ export default function PostEdit({
 
                     <div className="grid gap-3 lg:sticky lg:top-4">
                         <div className="rounded-lg border border-border bg-card p-4">
-                            <Heading title="Live preview" description="A quick look at how the post will render — not pixel-perfect" />
+                            <div className="flex items-start justify-between gap-2">
+                                <Heading title="Live preview" description="A quick look at how the post will render — not pixel-perfect" />
+                                {activePreviewTarget && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="shrink-0"
+                                        onClick={() => setIsPreviewFullscreen(true)}
+                                        aria-label="View live preview in fullscreen"
+                                    >
+                                        <Maximize2 className="size-4" />
+                                    </Button>
+                                )}
+                            </div>
                             {previewTargets.length > 1 && (
                                 <div className="mt-3 flex flex-wrap gap-1.5">
                                     {previewTargets.map((t) => {
@@ -773,6 +790,55 @@ export default function PostEdit({
                             </div>
                         </div>
                     </div>
+
+                    <Dialog open={isPreviewFullscreen} onOpenChange={setIsPreviewFullscreen}>
+                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                            <DialogHeader>
+                                <DialogTitle>Live preview{activePreviewTarget ? ` — ${activePreviewTarget.handle}` : ''}</DialogTitle>
+                            </DialogHeader>
+                            {previewTargets.length > 1 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {previewTargets.map((t) => {
+                                        const Icon = platformIcon[t.platform] ?? Share2;
+                                        const selected = t.id === activePreviewTarget?.id;
+
+                                        return (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                onClick={() => setPreviewTargetId(t.id)}
+                                                className={cn(
+                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                                                    selected
+                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                        : 'border-border bg-muted/50 text-foreground',
+                                                )}
+                                            >
+                                                <Icon className="size-3.5" />
+                                                {t.handle}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            <div className="flex justify-center py-2">
+                                {activePreviewTarget ? (
+                                    <SocialPostPreview
+                                        target={activePreviewTarget}
+                                        caption={can.update ? caption : post.master_caption ?? ''}
+                                        hashtags={can.update ? hashtags : post.hashtags}
+                                        assets={previewAssets}
+                                        musicName={can.update ? musicName : (post.music?.name as string) ?? ''}
+                                        locationName={can.update ? locationName : (post.location?.name as string) ?? ''}
+                                    />
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">
+                                        Select a target account to preview the post.
+                                    </p>
+                                )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                     </TabsContent>
 
                     <TabsContent value="checklist" className="grid gap-4">
