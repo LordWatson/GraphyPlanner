@@ -16,10 +16,12 @@ import {
     Music2,
     Pencil,
     Share2,
+    UploadCloud,
     User,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import Heading from '@/components/heading';
 import { HashtagInput } from '@/components/hashtag-input';
@@ -34,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { store as storeAsset } from '@/routes/clients/assets';
 import { show as showClient } from '@/routes/clients';
 import { update as updatePost, transition as transitionPost } from '@/routes/posts';
 import postActivityLogs from '@/routes/posts/activity-logs';
@@ -139,6 +142,16 @@ const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'o
     failed: 'destructive',
     archived: 'outline',
 };
+
+/**
+ * Reads Laravel's `XSRF-TOKEN` cookie so the plain `fetch()` call in `handleAssetUpload` below can
+ * authenticate as a normal stateful request, mirroring the same helper on the client show page.
+ */
+function getXsrfTokenFromCookie(): string {
+    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+
+    return match ? decodeURIComponent(match[1]) : '';
+}
 
 function formatStatusLabel(status: string | null): string {
     if (!status) {
@@ -300,7 +313,7 @@ export default function PostEdit({
     targetAccounts: TargetAccountData[];
     availableAssets: AvailableAssetData[];
     allowedTransitions: { value: string; label: string }[];
-    can: { update: boolean; comment: boolean; resend_review_email: boolean };
+    can: { update: boolean; comment: boolean; resend_review_email: boolean; create_asset: boolean };
     hashtagSuggestions: string[];
     mentionableUsers: MentionableUser[];
 }) {
@@ -308,6 +321,12 @@ export default function PostEdit({
     // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
     const [hashtags, setHashtags] = useState<string[]>(post.hashtags ?? []);
     const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>(post.assets.map((asset) => asset.id));
+    // Assets uploaded inline from this editor (via the "Upload asset" widget below) are merged
+    // into the picker list on the fly, without a full page reload, so the rest of the in-progress
+    // form (caption, hashtags, schedule rows, etc.) isn't lost.
+    const [assets, setAssets] = useState<AvailableAssetData[]>(availableAssets);
+    const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+    const assetFileInputRef = useRef<HTMLInputElement>(null);
     const [targetRows, setTargetRows] = useState<Record<number, { date: string; time: string }>>(
         Object.fromEntries(
             post.targets.map((target) => [
@@ -338,7 +357,55 @@ export default function PostEdit({
         );
     };
 
-    const selectedAssets = availableAssets.filter((asset) => selectedAssetIds.includes(asset.id));
+    // Lets the user upload a brand-new asset without leaving the post editor (previously they had
+    // to flick over to the client's Assets tab first). Posts straight to the same asset-store
+    // endpoint the client page uses, but as a JSON request so the response can be merged into the
+    // in-memory asset list instead of redirecting away and losing any unsaved editor changes.
+    const handleAssetUpload = async (file: File) => {
+        setIsUploadingAsset(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('source', 'upload');
+            formData.append('file', file);
+            if (post.campaign_id) {
+                formData.append('campaign_id', String(post.campaign_id));
+            }
+
+            const response = await fetch(storeAsset.url(client.id), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.asset) {
+                const message = typeof data?.message === 'string' ? data.message : 'Unable to upload the asset.';
+                toast.error(message);
+                return;
+            }
+
+            const asset: AvailableAssetData = data.asset;
+            setAssets((current) => [asset, ...current]);
+            setSelectedAssetIds((current) => [...current, asset.id]);
+            toast.success('Asset uploaded and added to this post.');
+        } catch {
+            toast.error('Unable to upload the asset.');
+        } finally {
+            setIsUploadingAsset(false);
+            if (assetFileInputRef.current) {
+                assetFileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const selectedAssets = assets.filter((asset) => selectedAssetIds.includes(asset.id));
 
     const targetEntries = Object.entries(targetRows);
     const [activeTab, setActiveTab] = useState('editor');
@@ -681,14 +748,41 @@ export default function PostEdit({
 
                                 <div className="grid gap-2">
                                     <Label>Media</Label>
-                                    {availableAssets.length === 0 ? (
+                                    {can.create_asset && (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                ref={assetFileInputRef}
+                                                type="file"
+                                                id="new_asset_file"
+                                                className="hidden"
+                                                accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.zip"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        void handleAssetUpload(file);
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={isUploadingAsset}
+                                                onClick={() => assetFileInputRef.current?.click()}
+                                            >
+                                                <UploadCloud className="size-4" />
+                                                {isUploadingAsset ? 'Uploading…' : 'Upload asset'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                    {assets.length === 0 ? (
                                         <p className="text-sm text-muted-foreground">
-                                            No assets on this client yet — add one from the client page first.
+                                            No assets on this client yet — upload one above.
                                         </p>
                                     ) : (
                                         <>
                                             <div className="flex flex-wrap gap-2">
-                                                {availableAssets.map((asset) => {
+                                                {assets.map((asset) => {
                                                     const selected = selectedAssetIds.includes(asset.id);
 
                                                     return (

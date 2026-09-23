@@ -38,7 +38,26 @@ class PostEditorControllerTest extends TestCase
             ->where('post.checklist.passed', false)
             ->has('allowedTransitions', 2)
             ->where('can.update', true)
+            ->where('can.create_asset', true)
         );
+    }
+
+    /**
+     * `can.create_asset` powers the editor's inline "Upload asset" widget (so users can add media
+     * without leaving the post editor) — it must reflect `AssetPolicy::create` for the acting
+     * user/client, e.g. false for a `Viewer` who isn't allowed to create assets.
+     */
+    public function test_viewer_cannot_create_assets_from_the_editor(): void
+    {
+        $org = Organization::factory()->create();
+        $viewer = User::factory()->for($org, 'organization')->role(Role::Viewer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $response = $this->actingAs($viewer)->get(route('posts.edit', $post));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('can.create_asset', false));
     }
 
     /**

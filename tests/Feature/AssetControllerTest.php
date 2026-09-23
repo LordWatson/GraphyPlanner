@@ -42,6 +42,31 @@ class AssetControllerTest extends TestCase
         Storage::disk('public')->assertExists($asset->path);
     }
 
+    public function test_json_request_returns_the_created_asset_instead_of_redirecting(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($owner)->postJson(route('clients.assets.store', $client), [
+            'source' => 'upload',
+            'file' => UploadedFile::fake()->image('cover.jpg'),
+        ]);
+
+        $response->assertCreated();
+        $asset = Asset::first();
+        $response->assertJson([
+            'asset' => [
+                'id' => $asset->id,
+                'url' => $asset->url,
+                'original_filename' => 'cover.jpg',
+                'type' => 'image',
+            ],
+        ]);
+    }
+
     public function test_designer_can_upload_an_asset(): void
     {
         Storage::fake('public');

@@ -14,6 +14,7 @@ use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\TransitionPostRequest;
 use App\Http\Requests\UpdatePostRequest;
+use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
@@ -91,6 +92,7 @@ class PostController extends Controller
                 'update' => $user->can('update', $post),
                 'comment' => $user->can('comment', $post),
                 'resend_review_email' => $user->can('resendReviewEmail', $post),
+                'create_asset' => $user->can('create', [Asset::class, $client]),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
             'mentionableUsers' => $mentionableUsers->map(fn ($mentionable) => [
