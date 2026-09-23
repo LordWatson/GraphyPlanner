@@ -533,4 +533,51 @@ class UploadPostAdapterTest extends TestCase
 
         $this->assertNull((new UploadPostAdapter)->checkStatus($account, 'job-123'));
     }
+
+    /**
+     * Step 1.7 — a disabled rollout stage must never reach the vendor at all: `publish()`
+     * returns a failed `TargetResult` explaining why, without any HTTP call.
+     */
+    public function test_publish_returns_a_failed_target_result_without_calling_the_vendor_when_the_stage_is_disabled(): void
+    {
+        Http::fake();
+
+        \Illuminate\Support\Facades\Config::set('publishing.rollout.'.\App\Enums\PlatformRolloutStage::TikTok->value, false);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::TikTok,
+        ]);
+        $post = Post::factory()->create(['client_id' => $account->client_id]);
+        $post->load('assets');
+
+        $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+        $result = $results->first();
+        $this->assertFalse($result->ok);
+        $this->assertStringContainsString('TikTok', $result->error);
+        $this->assertStringContainsString('not yet enabled', $result->error);
+        Http::assertNothingSent();
+    }
+
+    public function test_publish_calls_the_vendor_when_the_stage_is_enabled(): void
+    {
+        Http::fake([
+            '*/upload_text' => Http::response(['request_id' => 'up-enabled'], 200),
+        ]);
+
+        \Illuminate\Support\Facades\Config::set('publishing.rollout.'.\App\Enums\PlatformRolloutStage::TikTok->value, true);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::TikTok,
+        ]);
+        $post = Post::factory()->create(['client_id' => $account->client_id]);
+        $post->load('assets');
+
+        $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+        $this->assertTrue($results->first()->ok);
+        Http::assertSentCount(1);
+    }
 }

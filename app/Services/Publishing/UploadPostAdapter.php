@@ -10,6 +10,7 @@ use App\Models\Asset;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\Publishing\TargetResult;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
@@ -31,7 +32,10 @@ use Throwable;
  */
 class UploadPostAdapter implements PublishAdapter
 {
-    public function __construct(private readonly ?string $baseUrl = null) {}
+    public function __construct(
+        private readonly ?string $baseUrl = null,
+        private readonly PlatformRolloutGate $rolloutGate = new PlatformRolloutGate,
+    ) {}
 
     /**
      * Ask Upload-Post to generate a hosted "connect" link for this account (spec §7, Step 1.3).
@@ -260,6 +264,25 @@ class UploadPostAdapter implements PublishAdapter
 
     private function publishToTarget(Post $post, SocialAccount $account): TargetResult
     {
+        // Step 1.7: platform rollout gate — never calls the vendor for a stage that hasn't been
+        // enabled yet (Instagram feed -> Reels -> TikTok -> Facebook -> LinkedIn, in order).
+        $stage = $this->rolloutGate->stageFor($post, $account);
+
+        if (! $this->rolloutGate->stageEnabled($stage)) {
+            Log::info('Upload-Post publish skipped: rollout stage not yet enabled', [
+                'post_id' => $post->id,
+                'social_account_id' => $account->id,
+                'platform' => $account->platform->value,
+                'rollout_stage' => $stage->value,
+            ]);
+
+            return new TargetResult(
+                accountId: $account->id,
+                ok: false,
+                error: "Publishing to {$stage->label()} is not yet enabled (Step 1.7 rollout).",
+            );
+        }
+
         [$fields, $sent, $skipped] = $this->buildFields($post, $account);
         $endpoint = $this->resolveUploadEndpoint($post);
 
