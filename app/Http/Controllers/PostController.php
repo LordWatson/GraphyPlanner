@@ -9,7 +9,10 @@ use App\Actions\Posts\PostStatusTransitionMap;
 use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
+use App\Actions\Publishing\SearchMusicAction;
+use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\TransitionPostRequest;
@@ -18,8 +21,10 @@ use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Services\PostNotificationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\Enum;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -162,6 +167,45 @@ class PostController extends Controller
         $action($activityLog);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step 1.8.4 — the editor's per-platform music/sound search field calls this to look up real
+     * tracks via SearchMusicAction (bound to MusicProvider). Only Instagram/TikTok have any real
+     * vendor lookup (Step 1.8.2) — any other platform is rejected before ever reaching the action.
+     */
+    public function musicSearch(Request $request, Post $post, SearchMusicAction $action): JsonResponse
+    {
+        $this->authorize('view', $post);
+
+        $validated = $request->validate([
+            'query' => ['required', 'string', 'min:1', 'max:200'],
+            'platform' => ['required', new Enum(Platform::class)],
+        ]);
+
+        $platform = Platform::from($validated['platform']);
+
+        if (! in_array($platform, [Platform::Instagram, Platform::TikTok], true)) {
+            return response()->json(['tracks' => []]);
+        }
+
+        try {
+            $tracks = $action($validated['query'], $platform);
+        } catch (MusicProviderUnavailableException $e) {
+            // Surface the real reason (no connected account, vendor rejection, etc.) to the
+            // editor instead of silently returning an unexplained empty result — see
+            // UploadPostMusicProvider for what raises this.
+            return response()->json(['tracks' => [], 'error' => $e->getMessage()]);
+        }
+
+        return response()->json([
+            'tracks' => $tracks->map(fn ($track) => [
+                'id' => $track->id,
+                'name' => $track->name,
+                'artist' => $track->artist,
+                'preview_url' => $track->previewUrl,
+            ])->values(),
+        ]);
     }
 
     /**

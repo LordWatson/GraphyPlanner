@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\AssetStorage;
+use App\Contracts\MusicProvider;
 use App\Contracts\PublishAdapter;
 use App\Models\Asset;
 use App\Models\BrandBrain;
@@ -28,6 +29,7 @@ use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
 use App\Services\LocalAssetStorage;
 use App\Services\Publishing\UploadPostAdapter;
+use App\Services\Publishing\UploadPostMusicProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +53,11 @@ class AppServiceProvider extends ServiceProvider
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule
         // endpoint, webhook sync, and health integration still land in Steps 1.3-1.6.
         $this->app->bind(PublishAdapter::class, UploadPostAdapter::class);
+
+        // Upload-Post music/sound-library provider (Step 1.8.2) bound against the MusicProvider
+        // contract (Step 1.8.1). No caller of App\Contracts\MusicProvider needs to change; the
+        // SearchMusicAction/editor music picker still land in Steps 1.8.3/1.8.4.
+        $this->app->bind(MusicProvider::class, UploadPostMusicProvider::class);
     }
 
     /**

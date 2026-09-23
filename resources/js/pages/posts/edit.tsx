@@ -15,6 +15,7 @@ import {
     MessageSquareQuote,
     Music2,
     Pencil,
+    Search,
     Share2,
     User,
     XCircle,
@@ -35,9 +36,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { show as showClient } from '@/routes/clients';
-import { update as updatePost, transition as transitionPost } from '@/routes/posts';
+import { musicSearch as musicSearchRoute, update as updatePost, transition as transitionPost } from '@/routes/posts';
 import postActivityLogs from '@/routes/posts/activity-logs';
 import { store as storeComment } from '@/routes/posts/comments';
+
+type MusicTrackResult = { id: string; name: string; artist: string | null };
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
 
@@ -316,7 +319,13 @@ export default function PostEdit({
             ]),
         ),
     );
+    const [musicId, setMusicId] = useState((post.music?.id as string) ?? '');
     const [musicName, setMusicName] = useState((post.music?.name as string) ?? '');
+    const [musicQuery, setMusicQuery] = useState('');
+    const [musicResults, setMusicResults] = useState<MusicTrackResult[]>([]);
+    const [musicSearching, setMusicSearching] = useState(false);
+    const [musicSearchError, setMusicSearchError] = useState<string | null>(null);
+    const [musicPlatform, setMusicPlatform] = useState<string | null>(null);
     const [locationName, setLocationName] = useState((post.location?.name as string) ?? '');
 
     const toggleTargetAccount = (accountId: number) => {
@@ -342,6 +351,66 @@ export default function PostEdit({
 
     const targetEntries = Object.entries(targetRows);
     const [activeTab, setActiveTab] = useState('editor');
+
+    // Step 1.8.4 — the music search field only makes sense (and only has a real vendor lookup,
+    // per SearchMusicAction/UploadPostMusicProvider) for Instagram/TikTok targets, so it's shown
+    // only when at least one currently selected target account is on one of those platforms.
+    const musicPlatforms = Array.from(
+        new Set(
+            targetEntries
+                .map(([accountIdStr]) => targetAccounts.find((a) => a.id === Number(accountIdStr))?.platform)
+                .filter((platform): platform is string => platform === 'instagram' || platform === 'tiktok'),
+        ),
+    );
+    const activeMusicPlatform = musicPlatform && musicPlatforms.includes(musicPlatform) ? musicPlatform : musicPlatforms[0] ?? null;
+
+    const handleMusicSearch = async () => {
+        if (!activeMusicPlatform || musicQuery.trim() === '') {
+            return;
+        }
+
+        setMusicSearching(true);
+        setMusicSearchError(null);
+
+        try {
+            const response = await fetch(
+                musicSearchRoute.url(post.id, { query: { query: musicQuery, platform: activeMusicPlatform } }),
+                { headers: { Accept: 'application/json' } },
+            );
+            const data = await response.json();
+
+            if (!response.ok) {
+                setMusicSearchError('Unable to search music right now.');
+                setMusicResults([]);
+                return;
+            }
+
+            if (data.error) {
+                setMusicSearchError(data.error);
+                setMusicResults([]);
+                return;
+            }
+
+            setMusicResults(data.tracks ?? []);
+        } catch {
+            setMusicSearchError('Unable to search music right now.');
+            setMusicResults([]);
+        } finally {
+            setMusicSearching(false);
+        }
+    };
+
+    const selectMusicTrack = (track: MusicTrackResult) => {
+        setMusicId(track.id);
+        setMusicName(track.name);
+        setMusicResults([]);
+        setMusicQuery('');
+    };
+
+    const clearMusicTrack = () => {
+        setMusicId('');
+        setMusicName('');
+    };
 
     // Live preview targets: the accounts currently selected in the form (or, read-only, the
     // post's saved targets), each paired with its platform/handle so `SocialPostPreview` can
@@ -652,20 +721,92 @@ export default function PostEdit({
 
                                 <div className="grid gap-2 sm:grid-cols-2">
                                     <div className="grid gap-1">
-                                        <Label htmlFor="music_name">
-                                            Music{' '}
-                                            <Badge variant="outline" className="ml-1 align-middle">
-                                                <Lock className="size-3" />
-                                                Not available yet
-                                            </Badge>
-                                        </Label>
-                                        <Input
-                                            id="music_name"
-                                            name="music[name]"
-                                            value={musicName}
-                                            onChange={(e) => setMusicName(e.target.value)}
-                                            placeholder="Track / audio name"
-                                        />
+                                        <Label htmlFor="music_search">Music</Label>
+                                        {musicPlatforms.length > 0 ? (
+                                            <div className="grid gap-2">
+                                                {musicPlatforms.length > 1 && (
+                                                    <div className="flex gap-1.5">
+                                                        {musicPlatforms.map((platform) => (
+                                                            <button
+                                                                key={platform}
+                                                                type="button"
+                                                                onClick={() => setMusicPlatform(platform)}
+                                                                className={cn(
+                                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                                                                    activeMusicPlatform === platform
+                                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                                        : 'border-border bg-muted/50 text-foreground',
+                                                                )}
+                                                            >
+                                                                {platform === 'instagram' ? 'Instagram' : 'TikTok'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        id="music_search"
+                                                        value={musicQuery}
+                                                        onChange={(e) => setMusicQuery(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                handleMusicSearch();
+                                                            }
+                                                        }}
+                                                        placeholder="Search a track / sound…"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={handleMusicSearch}
+                                                        disabled={musicSearching || musicQuery.trim() === ''}
+                                                    >
+                                                        <Search className="size-4" />
+                                                        Search
+                                                    </Button>
+                                                </div>
+                                                {musicSearchError && <p className="text-sm text-destructive">{musicSearchError}</p>}
+                                                {musicResults.length > 0 && (
+                                                    <ul className="grid gap-1 rounded-md border border-border p-1">
+                                                        {musicResults.map((track) => (
+                                                            <li key={track.id}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => selectMusicTrack(track)}
+                                                                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+                                                                >
+                                                                    <Music2 className="size-3.5 shrink-0 text-muted-foreground" />
+                                                                    <span className="min-w-0 flex-1 truncate">
+                                                                        {track.name}
+                                                                        {track.artist ? ` — ${track.artist}` : ''}
+                                                                    </span>
+                                                                </button>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                                {musicName ? (
+                                                    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                                                        <span className="flex min-w-0 items-center gap-1.5 truncate">
+                                                            <Music2 className="size-3.5 shrink-0 text-primary" />
+                                                            {musicName}
+                                                        </span>
+                                                        <Button type="button" variant="ghost" size="sm" onClick={clearMusicTrack}>
+                                                            Clear
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-muted-foreground">No track selected.</p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">
+                                                Select an Instagram or TikTok target account to search for music.
+                                            </p>
+                                        )}
+                                        <input type="hidden" name="music[id]" value={musicId} />
+                                        <input type="hidden" name="music[name]" value={musicName} />
                                     </div>
                                     <div className="grid gap-1">
                                         <Label htmlFor="location_name">Location</Label>

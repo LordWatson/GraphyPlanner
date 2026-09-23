@@ -130,6 +130,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+    Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
+        ->name('posts.music-search');
 
     // Step 6.1: client portal invitations (Owner/Strategist only, see ClientInvitationPolicy).
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
@@ -236,6 +238,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+    Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
+        ->name('posts.music-search');
 
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
         ->name('clients.invitations.store');

@@ -2,17 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\MusicProvider;
 use App\Enums\AssetSource;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Models\Asset;
+use App\Models\BrandBrain;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Support\Publishing\MusicTrack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 class PostEditorControllerTest extends TestCase
@@ -91,6 +96,83 @@ class PostEditorControllerTest extends TestCase
     }
 
     /**
+     * Step 1.8.4 — the editor's music search field calls PostController::musicSearch, which
+     * delegates to SearchMusicAction/MusicProvider and returns the matched tracks as JSON.
+     */
+    public function test_music_search_returns_tracks_from_the_music_provider_for_tiktok(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $track = new MusicTrack('track-1', 'Some Song', 'Some Artist', 'https://example.test/preview.mp3', Platform::TikTok);
+        $provider = $this->createMock(MusicProvider::class);
+        $provider->expects($this->once())
+            ->method('search')
+            ->with('lofi', Platform::TikTok)
+            ->willReturn(new Collection([$track]));
+        $this->app->instance(MusicProvider::class, $provider);
+
+        $response = $this->actingAs($owner)->getJson(route('posts.music-search', $post).'?query=lofi&platform=tiktok');
+
+        $response->assertOk();
+        $response->assertJson([
+            'tracks' => [
+                ['id' => 'track-1', 'name' => 'Some Song', 'artist' => 'Some Artist', 'preview_url' => 'https://example.test/preview.mp3'],
+            ],
+        ]);
+    }
+
+    /**
+     * Only Instagram/TikTok have any real vendor music lookup (Step 1.8.2) — any other platform
+     * is rejected before ever reaching MusicProvider/SearchMusicAction.
+     */
+    public function test_music_search_short_circuits_for_platforms_without_a_music_lookup(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $provider = $this->createMock(MusicProvider::class);
+        $provider->expects($this->never())->method('search');
+        $this->app->instance(MusicProvider::class, $provider);
+
+        $response = $this->actingAs($owner)->getJson(route('posts.music-search', $post).'?query=lofi&platform=facebook');
+
+        $response->assertOk();
+        $response->assertJson(['tracks' => []]);
+    }
+
+    /**
+     * When the MusicProvider can't produce a real result (no connected account, vendor
+     * rejection, etc.), `musicSearch` surfaces the reason as an `error` string instead of
+     * silently returning an empty, unexplained result.
+     */
+    public function test_music_search_surfaces_the_music_provider_unavailable_reason(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $provider = $this->createMock(MusicProvider::class);
+        $provider->method('search')->willThrowException(
+            new MusicProviderUnavailableException('Connect a TikTok account before searching for music.'),
+        );
+        $this->app->instance(MusicProvider::class, $provider);
+
+        $response = $this->actingAs($owner)->getJson(route('posts.music-search', $post).'?query=lofi&platform=tiktok');
+
+        $response->assertOk();
+        $response->assertJson([
+            'tracks' => [],
+            'error' => 'Connect a TikTok account before searching for music.',
+        ]);
+    }
+
+    /**
      * A `Role::ClientReviewer` (or any role without `update` on the post) can still open the
      * editor and receives the full post payload (caption, hashtags, targets, assets) even though
      * `can.update` is false — the frontend renders it read-only rather than hiding it.
@@ -130,7 +212,7 @@ class PostEditorControllerTest extends TestCase
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
-        \App\Models\BrandBrain::factory()->for($client)->create([
+        BrandBrain::factory()->for($client)->create([
             'hashtag_policy' => ['always_use' => ['#brandalways', 'shared'], 'never_use' => [], 'rotation_notes' => null],
         ]);
         Post::factory()->for($client)->create(['org_id' => $org->id, 'hashtags' => ['shared', 'pastpost']]);
