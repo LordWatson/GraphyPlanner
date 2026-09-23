@@ -19,6 +19,7 @@ class GetClientHealthSummaryAction
         $clients = Client::query()
             ->where('org_id', $orgId)
             ->withCount('posts')
+            ->with('socialAccounts')
             ->get();
 
         $rows = $clients->map(function (Client $client) {

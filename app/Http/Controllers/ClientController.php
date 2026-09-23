@@ -37,6 +37,7 @@ class ClientController extends Controller
 
         $clients = Client::query()
             ->where('org_id', $user->org_id)
+            ->with('socialAccounts')
             ->orderBy('name')
             ->get()
             ->map(fn (Client $client) => $this->transform($client, $user->can('viewBilling', $client)));

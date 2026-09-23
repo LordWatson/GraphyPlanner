@@ -14,3 +14,7 @@ Schedule::command('posts:send-upcoming-reminders')->dailyAt('08:00');
 // Step 1.5 fallback: catches any post stuck in `publishing` because the Upload-Post webhook
 // never arrived.
 Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes();
+
+// Step 1.6: re-checks every connected social account's token health so an expired token is
+// caught even if nothing else touches that account.
+Schedule::command('social-accounts:check-health')->hourly();

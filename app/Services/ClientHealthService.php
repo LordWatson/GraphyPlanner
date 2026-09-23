@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
+use App\Enums\ConnectionStatus;
 use App\Models\Client;
 
 /**
@@ -52,7 +53,23 @@ class ClientHealthService
             return $this->result(ClientHealth::Red, 'Active client has no billing setup (missing retainer amount and billing cycle).');
         }
 
+        if ($this->hasTokenExpiredAccount($client)) {
+            return $this->result(ClientHealth::Red, 'A connected social account has an expired/revoked token.');
+        }
+
         return null;
+    }
+
+    /**
+     * Step 1.6: a disconnected vendor token is a red flag on its own — the client can't publish
+     * to that account until someone reconnects it. Uses `loadMissing()` so callers that haven't
+     * eager-loaded `socialAccounts` (e.g. a single client detail page) still work correctly.
+     */
+    private function hasTokenExpiredAccount(Client $client): bool
+    {
+        return $client->loadMissing('socialAccounts')
+            ->socialAccounts
+            ->contains(fn ($account) => $account->connection_status === ConnectionStatus::TokenExpired);
     }
 
     /**

@@ -5,7 +5,9 @@ namespace Tests\Unit\Services;
 use App\Enums\BillingCycle;
 use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
+use App\Enums\ConnectionStatus;
 use App\Models\Client;
+use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\ClientHealthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,5 +119,36 @@ class ClientHealthServiceTest extends TestCase
 
         $this->assertSame(ClientHealth::Amber, $result['status']);
         $this->assertSame('Client billing setup is incomplete (retainer amount or billing cycle missing).', $result['reason']);
+    }
+
+    public function test_client_with_a_token_expired_social_account_is_red(): void
+    {
+        $client = Client::factory()->create($this->healthyClientState());
+
+        SocialAccount::factory()->create([
+            'org_id' => $client->org_id,
+            'client_id' => $client->id,
+            'connection_status' => ConnectionStatus::TokenExpired,
+        ]);
+
+        $result = $this->service()->compute($client);
+
+        $this->assertSame(ClientHealth::Red, $result['status']);
+        $this->assertSame('A connected social account has an expired/revoked token.', $result['reason']);
+    }
+
+    public function test_client_with_only_connected_social_accounts_is_unaffected(): void
+    {
+        $client = Client::factory()->create($this->healthyClientState());
+
+        SocialAccount::factory()->create([
+            'org_id' => $client->org_id,
+            'client_id' => $client->id,
+            'connection_status' => ConnectionStatus::Connected,
+        ]);
+
+        $result = $this->service()->compute($client);
+
+        $this->assertSame(ClientHealth::Green, $result['status']);
     }
 }
