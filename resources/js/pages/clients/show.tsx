@@ -32,6 +32,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -289,6 +297,18 @@ export default function ClientShow({
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>('upload');
     const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<number[]>([]);
     const [connectingAccountId, setConnectingAccountId] = useState<number | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteConfirmName, setDeleteConfirmName] = useState('');
+    const [deleting, setDeleting] = useState(false);
+
+    const handleDeleteClient = () => {
+        setDeleting(true);
+        router.delete(destroyClient.url(client.id), {
+            preserveScroll: true,
+            onFinish: () => setDeleting(false),
+            onError: () => setDeleting(false),
+        });
+    };
 
     const toggleTargetAccount = (id: number) => {
         setSelectedTargetAccounts((current) =>
@@ -436,19 +456,18 @@ export default function ClientShow({
                                     </Button>
                                 )}
                                 {can.delete && (
-                                    <Form {...destroyClient.form(client.id)}>
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                variant="destructive"
-                                                size="sm"
-                                                disabled={processing}
-                                            >
-                                                <Trash2 />
-                                                Delete
-                                            </Button>
-                                        )}
-                                    </Form>
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => {
+                                            setDeleteConfirmName('');
+                                            setDeleteDialogOpen(true);
+                                        }}
+                                    >
+                                        <Trash2 />
+                                        Delete
+                                    </Button>
                                 )}
                             </div>
                         </div>
@@ -483,6 +502,44 @@ export default function ClientShow({
                         )}
                     </div>
                 </div>
+
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete {client.name}?</DialogTitle>
+                            <DialogDescription>
+                                This action cannot be undone. This will permanently delete the client and all of its
+                                associated data. To confirm, type <strong>{client.name}</strong> below.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid gap-1">
+                            <Label htmlFor="delete-confirm-name">Client name</Label>
+                            <Input
+                                id="delete-confirm-name"
+                                value={deleteConfirmName}
+                                onChange={(event) => setDeleteConfirmName(event.target.value)}
+                                autoComplete="off"
+                                placeholder={client.name}
+                            />
+                        </div>
+
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                disabled={deleteConfirmName !== client.name || deleting}
+                                onClick={handleDeleteClient}
+                            >
+                                <Trash2 />
+                                Delete client
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <div
                     className={cn(
