@@ -325,6 +325,9 @@ export default function PostEdit({
     const [musicResults, setMusicResults] = useState<MusicTrackResult[]>([]);
     const [musicSearching, setMusicSearching] = useState(false);
     const [musicSearchError, setMusicSearchError] = useState<string | null>(null);
+    // Step 1.9.5 — a distinguishable error_code (e.g. "meta_not_connected") lets this render an
+    // actionable "Connect Instagram" link instead of bare error text.
+    const [musicSearchErrorCode, setMusicSearchErrorCode] = useState<string | null>(null);
     const [musicPlatform, setMusicPlatform] = useState<string | null>(null);
     const [locationName, setLocationName] = useState((post.location?.name as string) ?? '');
 
@@ -371,6 +374,7 @@ export default function PostEdit({
 
         setMusicSearching(true);
         setMusicSearchError(null);
+        setMusicSearchErrorCode(null);
 
         try {
             const response = await fetch(
@@ -387,6 +391,7 @@ export default function PostEdit({
 
             if (data.error) {
                 setMusicSearchError(data.error);
+                setMusicSearchErrorCode(data.error_code ?? null);
                 setMusicResults([]);
                 return;
             }
@@ -766,7 +771,29 @@ export default function PostEdit({
                                                         Search
                                                     </Button>
                                                 </div>
-                                                {musicSearchError && <p className="text-sm text-destructive">{musicSearchError}</p>}
+                                                {musicSearchError && (
+                                                    <p className="text-sm text-destructive">
+                                                        {musicSearchError}
+                                                        {musicSearchErrorCode === 'meta_not_connected' &&
+                                                            (() => {
+                                                                const instagramAccountId = targetEntries
+                                                                    .map(([accountIdStr]) => targetAccounts.find((a) => a.id === Number(accountIdStr)))
+                                                                    .find((a) => a?.platform === 'instagram')?.id;
+
+                                                                return instagramAccountId ? (
+                                                                    <>
+                                                                        {' '}
+                                                                        <a
+                                                                            href={`/clients/${post.client_id}/social-accounts/${instagramAccountId}/facebook/connect`}
+                                                                            className="underline"
+                                                                        >
+                                                                            Connect Instagram for music search
+                                                                        </a>
+                                                                    </>
+                                                                ) : null;
+                                                            })()}
+                                                    </p>
+                                                )}
                                                 {musicResults.length > 0 && (
                                                     <ul className="grid gap-1 rounded-md border border-border p-1">
                                                         {musicResults.map((track) => (

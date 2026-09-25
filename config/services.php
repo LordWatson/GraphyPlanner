@@ -44,4 +44,18 @@ return [
         'base_url' => env('UPLOAD_POST_BASE_URL', 'https://api.upload-post.com/api'),
     ],
 
+    // Meta Graph API direct integration (Step 1.9), used only for Instagram audio search
+    // (`GET /ig_audio`, spec https://developers.facebook.com/documentation/instagram-platform/
+    // content-publishing/audio-api) — Upload-Post has no Instagram sound-library endpoint
+    // (confirmed in Step 1.8.2). This is a separate Facebook App (Facebook Login for Business,
+    // `instagram_basic` + `instagram_content_publish`) from Upload-Post; the client secret is
+    // never logged, mirroring the `upload_post_key` handling convention.
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect_uri' => env('FACEBOOK_REDIRECT_URI'),
+        'graph_base_url' => env('FACEBOOK_GRAPH_BASE_URL', 'https://graph.facebook.com'),
+        'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v20.0'),
+    ],
+
 ];

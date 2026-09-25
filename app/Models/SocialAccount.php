@@ -29,6 +29,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $provider
  * @property string|null $external_profile_id
  * @property string|null $external_account_id
+ * @property string|null $meta_access_token
+ * @property Carbon|null $meta_access_token_expires_at
+ * @property string|null $meta_instagram_user_id
  * @property Carbon|null $connected_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -37,6 +40,7 @@ use Illuminate\Support\Carbon;
     'org_id', 'client_id', 'platform', 'handle', 'display_name', 'timezone',
     'language', 'country', 'default_location', 'posting_windows', 'persona_override',
     'connection_status', 'provider', 'external_profile_id', 'external_account_id', 'connected_at',
+    'meta_access_token', 'meta_access_token_expires_at', 'meta_instagram_user_id',
 ])]
 class SocialAccount extends Model
 {
@@ -53,6 +57,10 @@ class SocialAccount extends Model
             'connection_status' => ConnectionStatus::class,
             'posting_windows' => 'array',
             'connected_at' => 'datetime',
+            // Step 1.9.2: a Meta user access token must never be stored/logged in plaintext —
+            // Laravel's `encrypted` cast handles that transparently for both reads and writes.
+            'meta_access_token' => 'encrypted',
+            'meta_access_token_expires_at' => 'datetime',
         ];
     }
 

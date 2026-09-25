@@ -173,6 +173,37 @@ class PostEditorControllerTest extends TestCase
     }
 
     /**
+     * Step 1.9.5 — when MetaGraphMusicProvider throws the "not connected" error with the
+     * `meta_not_connected` code, musicSearch surfaces that distinguishable `error_code` so the
+     * editor UI can key off it to render an inline "Connect Instagram" link instead of bare text.
+     */
+    public function test_music_search_surfaces_a_distinguishable_error_code_when_meta_is_not_connected(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $provider = $this->createMock(MusicProvider::class);
+        $provider->method('search')->willThrowException(
+            new MusicProviderUnavailableException(
+                'Connect Instagram via Facebook Login before searching for music.',
+                errorCode: 'meta_not_connected',
+            ),
+        );
+        $this->app->instance(MusicProvider::class, $provider);
+
+        $response = $this->actingAs($owner)->getJson(route('posts.music-search', $post).'?query=lofi&platform=instagram');
+
+        $response->assertOk();
+        $response->assertJson([
+            'tracks' => [],
+            'error' => 'Connect Instagram via Facebook Login before searching for music.',
+            'error_code' => 'meta_not_connected',
+        ]);
+    }
+
+    /**
      * A `Role::ClientReviewer` (or any role without `update` on the post) can still open the
      * editor and receives the full post payload (caption, hashtags, targets, assets) even though
      * `can.update` is false — the frontend renders it read-only rather than hiding it.

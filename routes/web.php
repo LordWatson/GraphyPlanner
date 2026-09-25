@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
@@ -101,6 +102,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('social-accounts.destroy');
     Route::post('social-accounts/{socialAccount}/connect', [SocialAccountController::class, 'connect'])
         ->name('social-accounts.connect');
+
+    // Step 1.9.3: the additive Facebook Login connect flow that grants Meta Graph API access for
+    // Instagram audio search (Step 1.9.4) — separate from, and does not replace, the Upload-Post
+    // connect flow above. Kept in the authenticated browser tab (unlike the Upload-Post popup
+    // flow) since Facebook's own OAuth redirect returns here directly.
+    Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/connect', [FacebookInstagramConnectController::class, 'redirect'])
+        ->name('social-accounts.facebook.connect');
+    Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/callback', [FacebookInstagramConnectController::class, 'callback'])
+        ->name('social-accounts.facebook.callback');
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');

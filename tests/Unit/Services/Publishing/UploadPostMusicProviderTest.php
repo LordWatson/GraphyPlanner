@@ -10,6 +10,7 @@ use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Models\Organization;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostMusicProvider;
 use App\Support\Publishing\MusicTrack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,9 +26,12 @@ class UploadPostMusicProviderTest extends TestCase
         $this->assertInstanceOf(MusicProvider::class, new UploadPostMusicProvider);
     }
 
-    public function test_it_is_bound_as_the_default_music_provider(): void
+    public function test_it_is_bound_as_the_delegate_music_provider_behind_meta_graph_music_provider(): void
     {
-        $this->assertInstanceOf(UploadPostMusicProvider::class, app(MusicProvider::class));
+        // Step 1.9.4: the default MusicProvider binding is now MetaGraphMusicProvider, which
+        // wraps this class for every platform other than Instagram (see
+        // MetaGraphMusicProviderTest for that coverage).
+        $this->assertInstanceOf(MetaGraphMusicProvider::class, app(MusicProvider::class));
     }
 
     private function actingOrgWithConnectedTikTok(): SocialAccount

@@ -194,8 +194,14 @@ class PostController extends Controller
         } catch (MusicProviderUnavailableException $e) {
             // Surface the real reason (no connected account, vendor rejection, etc.) to the
             // editor instead of silently returning an unexplained empty result — see
-            // UploadPostMusicProvider for what raises this.
-            return response()->json(['tracks' => [], 'error' => $e->getMessage()]);
+            // UploadPostMusicProvider/MetaGraphMusicProvider for what raises this.
+            // `error_code` (Step 1.9.5) lets the frontend key off a specific reason (e.g.
+            // `meta_not_connected`) to show an actionable connect link instead of just text.
+            return response()->json([
+                'tracks' => [],
+                'error' => $e->getMessage(),
+                'error_code' => $e->errorCode(),
+            ]);
         }
 
         return response()->json([
