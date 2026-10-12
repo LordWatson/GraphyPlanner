@@ -57,4 +57,18 @@ class SocialAccountFactory extends Factory
             'connected_at' => now(),
         ]);
     }
+
+    /**
+     * Indicate the account has completed the additive Facebook Login connect flow (Step 1.9.3),
+     * granting the Meta Graph API access needed for Instagram audio search (Step 1.9.4).
+     */
+    public function metaConnected(): static
+    {
+        return $this->state(fn () => [
+            'platform' => Platform::Instagram,
+            'meta_access_token' => fake()->sha256(),
+            'meta_access_token_expires_at' => now()->addDays(60),
+            'meta_instagram_user_id' => (string) fake()->numberBetween(100000000000000, 999999999999999),
+        ]);
+    }
 }

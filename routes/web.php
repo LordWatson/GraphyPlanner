@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
@@ -102,6 +103,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('social-accounts/{socialAccount}/connect', [SocialAccountController::class, 'connect'])
         ->name('social-accounts.connect');
 
+    // Step 1.9.3: the additive Facebook Login connect flow that grants Meta Graph API access for
+    // Instagram audio search (Step 1.9.4) — separate from, and does not replace, the Upload-Post
+    // connect flow above. Kept in the authenticated browser tab (unlike the Upload-Post popup
+    // flow) since Facebook's own OAuth redirect returns here directly.
+    Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/connect', [FacebookInstagramConnectController::class, 'redirect'])
+        ->name('social-accounts.facebook.connect');
+    Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/callback', [FacebookInstagramConnectController::class, 'callback'])
+        ->name('social-accounts.facebook.callback');
+
+    // Static alternative to the dynamic callback above: Facebook Apps only allow a fixed,
+    // pre-registered list of OAuth redirect URIs, so when `FACEBOOK_REDIRECT_URI` is configured
+    // to a single static URL (e.g. in production), Facebook redirects here instead — the
+    // `SocialAccount` being connected is recovered from the `state` query parameter.
+    Route::get('auth/meta/callback', [FacebookInstagramConnectController::class, 'metaCallback'])
+        ->name('auth.meta.callback');
+
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
     Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])
@@ -130,6 +147,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+    Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
+        ->name('posts.music-search');
 
     // Step 6.1: client portal invitations (Owner/Strategist only, see ClientInvitationPolicy).
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
@@ -236,6 +255,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+    Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
+        ->name('posts.music-search');
 
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
         ->name('clients.invitations.store');

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\AssetStorage;
+use App\Contracts\MusicProvider;
 use App\Contracts\PublishAdapter;
 use App\Models\Asset;
 use App\Models\BrandBrain;
@@ -27,7 +28,9 @@ use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
 use App\Services\LocalAssetStorage;
+use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
+use App\Services\Publishing\UploadPostMusicProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +54,13 @@ class AppServiceProvider extends ServiceProvider
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule
         // endpoint, webhook sync, and health integration still land in Steps 1.3-1.6.
         $this->app->bind(PublishAdapter::class, UploadPostAdapter::class);
+
+        // MusicProvider contract (Step 1.8.1) bound to MetaGraphMusicProvider (Step 1.9.4), a
+        // combinator that calls Meta's Graph API directly for Instagram audio search and
+        // delegates every other platform (TikTok) unchanged to UploadPostMusicProvider
+        // (Step 1.8.2, still bound below as its own concrete class). No caller of
+        // App\Contracts\MusicProvider needs to change.
+        $this->app->bind(MusicProvider::class, MetaGraphMusicProvider::class);
     }
 
     /**
