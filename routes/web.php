@@ -112,6 +112,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/callback', [FacebookInstagramConnectController::class, 'callback'])
         ->name('social-accounts.facebook.callback');
 
+    // Static alternative to the dynamic callback above: Facebook Apps only allow a fixed,
+    // pre-registered list of OAuth redirect URIs, so when `FACEBOOK_REDIRECT_URI` is configured
+    // to a single static URL (e.g. in production), Facebook redirects here instead — the
+    // `SocialAccount` being connected is recovered from the `state` query parameter.
+    Route::get('auth/meta/callback', [FacebookInstagramConnectController::class, 'metaCallback'])
+        ->name('auth.meta.callback');
+
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
     Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])

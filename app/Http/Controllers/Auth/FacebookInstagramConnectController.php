@@ -60,6 +60,44 @@ class FacebookInstagramConnectController extends Controller
 
         abort_unless($socialAccount->client_id === $client->id, 404);
 
+        return $this->handleCallback($request, $client, $socialAccount, $action);
+    }
+
+    /**
+     * Handle Facebook's OAuth redirect when `services.facebook.redirect_uri` is configured to a
+     * single, static URL (e.g. `https://.../auth/meta/callback`) rather than the per-account
+     * dynamic one above — Facebook Apps only allow a fixed, pre-registered list of OAuth redirect
+     * URIs, so a static callback must exist at that exact path. The `SocialAccount` being
+     * connected is recovered from the `state` parameter the `redirect()` action above sent
+     * Facebook, instead of from the URL.
+     */
+    public function metaCallback(
+        Request $request,
+        ConnectMetaAudioAccessAction $action,
+    ): RedirectResponse {
+        $socialAccount = SocialAccount::find($request->query('state'));
+
+        if (! $socialAccount) {
+            Log::warning('Facebook Instagram connect static callback missing/invalid state', [
+                'state' => $request->query('state'),
+            ]);
+
+            return to_route('dashboard')->with('error', 'Instagram connection via Facebook failed.');
+        }
+
+        $client = $socialAccount->client;
+
+        $this->authorize('update', $socialAccount);
+
+        return $this->handleCallback($request, $client, $socialAccount, $action);
+    }
+
+    private function handleCallback(
+        Request $request,
+        Client $client,
+        SocialAccount $socialAccount,
+        ConnectMetaAudioAccessAction $action,
+    ): RedirectResponse {
         $code = $request->query('code');
 
         if (! $code) {

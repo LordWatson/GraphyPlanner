@@ -75,6 +75,45 @@ class FacebookInstagramConnectControllerTest extends TestCase
         $this->assertNotNull($account->meta_access_token_expires_at);
     }
 
+    public function test_static_meta_callback_resolves_the_account_from_state_and_persists_the_grant(): void
+    {
+        config(['services.facebook.client_id' => 'app-id', 'services.facebook.client_secret' => 'app-secret']);
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'platform' => Platform::Instagram,
+        ]);
+
+        Http::fake([
+            '*/oauth/access_token*grant_type=fb_exchange_token*' => Http::response([
+                'access_token' => 'long-lived-token',
+                'expires_in' => 5184000,
+            ], 200),
+            '*/oauth/access_token*' => Http::response([
+                'access_token' => 'short-lived-token',
+            ], 200),
+            '*/me/accounts*' => Http::response([
+                'data' => [['id' => 'page-1']],
+            ], 200),
+            '*/page-1*' => Http::response([
+                'instagram_business_account' => ['id' => '17841400000000001'],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($owner)->get(
+            route('auth.meta.callback').'?code=auth-code&state='.$account->id
+        );
+
+        $response->assertRedirect(route('clients.show', $client));
+
+        $account->refresh();
+        $this->assertSame('long-lived-token', $account->meta_access_token);
+        $this->assertSame('17841400000000001', $account->meta_instagram_user_id);
+    }
+
     public function test_a_designer_cannot_start_the_connect_flow(): void
     {
         $org = Organization::factory()->create();
