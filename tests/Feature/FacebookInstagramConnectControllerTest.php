@@ -114,6 +114,32 @@ class FacebookInstagramConnectControllerTest extends TestCase
         $this->assertSame('17841400000000001', $account->meta_instagram_user_id);
     }
 
+    public function test_callback_fails_gracefully_when_graph_base_url_is_misconfigured(): void
+    {
+        config([
+            'services.facebook.client_id' => 'app-id',
+            'services.facebook.client_secret' => 'app-secret',
+            'services.facebook.graph_base_url' => 'https://graph.facebook.co',
+        ]);
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'platform' => Platform::Instagram,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('social-accounts.facebook.callback', [$client, $account]).'?code=auth-code');
+
+        $response->assertRedirect(route('clients.show', $client));
+        $response->assertSessionHas('error');
+        $this->assertStringContainsString('facebook.com', session('error'));
+
+        $account->refresh();
+        $this->assertNull($account->meta_access_token);
+    }
+
     public function test_a_designer_cannot_start_the_connect_flow(): void
     {
         $org = Organization::factory()->create();

@@ -200,8 +200,18 @@ class FacebookInstagramConnectController extends Controller
 
     private function graphUrl(string $path): string
     {
-        return rtrim((string) config('services.facebook.graph_base_url', 'https://graph.facebook.com'), '/')
-            .'/'.$this->graphVersion().$path;
+        $base = rtrim((string) config('services.facebook.graph_base_url', 'https://graph.facebook.com'), '/');
+
+        $host = parse_url($base, PHP_URL_HOST);
+
+        if (! $host || ! str_ends_with($host, 'facebook.com')) {
+            throw new RuntimeException(
+                "Invalid FACEBOOK_GRAPH_BASE_URL configured: \"{$base}\" does not point to facebook.com. ".
+                'Check the services.facebook.graph_base_url config/env value for typos.'
+            );
+        }
+
+        return $base.'/'.$this->graphVersion().$path;
     }
 
     private function graphVersion(): string
