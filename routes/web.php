@@ -11,6 +11,7 @@ use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
@@ -89,10 +90,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoices.destroy');
     Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
         ->name('invoices.pdf.store');
+    Route::post('invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+        ->name('invoices.generate-pdf');
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
         ->name('invoices.send');
     Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
         ->name('invoices.mark-paid');
+    Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
+        ->name('invoices.finalize');
+
+    Route::post('invoices/{invoice}/items', [InvoiceItemController::class, 'store'])
+        ->name('invoices.items.store');
+    Route::put('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'update'])
+        ->name('invoice-items.update');
+    Route::delete('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'destroy'])
+        ->name('invoice-items.destroy');
 
     Route::post('clients/{client}/social-accounts', [SocialAccountController::class, 'store'])
         ->name('clients.social-accounts.store');
@@ -213,10 +225,21 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('invoices.destroy');
     Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
         ->name('invoices.pdf.store');
+    Route::post('invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+        ->name('invoices.generate-pdf');
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
         ->name('invoices.send');
     Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
         ->name('invoices.mark-paid');
+    Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
+        ->name('invoices.finalize');
+
+    Route::post('invoices/{invoice}/items', [InvoiceItemController::class, 'store'])
+        ->name('invoices.items.store');
+    Route::put('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'update'])
+        ->name('invoice-items.update');
+    Route::delete('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'destroy'])
+        ->name('invoice-items.destroy');
 
     Route::post('clients/{client}/social-accounts', [SocialAccountController::class, 'store'])
         ->name('clients.social-accounts.store');

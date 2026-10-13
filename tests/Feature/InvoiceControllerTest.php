@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -172,6 +173,47 @@ class InvoiceControllerTest extends TestCase
             ->where('invoice.id', $invoice->id)
             ->where('can.update', true)
             ->where('can.delete', true)
+        );
+    }
+
+    public function test_invoice_detail_page_exposes_items_and_subtotal_in_inertia_props(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        $item = InvoiceItem::factory()->for($invoice)->create(['is_billable' => true, 'price' => 100, 'quantity' => 2]);
+        InvoiceItem::factory()->for($invoice)->create(['is_billable' => false, 'price' => 999, 'quantity' => 1]);
+
+        $response = $this->actingAs($owner)->get(route('invoices.show', $invoice));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('invoices/show')
+            ->where('invoice.is_finalized', false)
+            ->where('invoice.items_subtotal', 200)
+            ->has('invoice.items', 2)
+            ->where('invoice.items.0.id', $item->id)
+            ->where('can.manage_items', true)
+            ->where('can.finalize', true)
+        );
+    }
+
+    public function test_manage_items_stays_true_once_an_invoice_is_finalized(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->finalized()->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+
+        $response = $this->actingAs($owner)->get(route('invoices.show', $invoice));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('invoices/show')
+            ->where('invoice.is_finalized', true)
+            ->where('can.manage_items', true)
+            ->where('can.finalize', false)
         );
     }
 
@@ -347,5 +389,141 @@ class InvoiceControllerTest extends TestCase
         ]);
 
         $response->assertForbidden();
+    }
+
+    public function test_owner_can_finalize_a_draft_invoice_with_items(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['retainer_amount' => 200]);
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        InvoiceItem::factory()->for($invoice)->create(['is_billable' => true, 'price' => 100, 'quantity' => 1]);
+
+        $response = $this->actingAs($owner)->post(route('invoices.finalize', $invoice));
+
+        $response->assertRedirect(route('invoices.show', $invoice));
+        $invoice->refresh();
+        $this->assertTrue($invoice->is_finalized);
+        $this->assertSame('300.00', $invoice->amount);
+        $this->assertSame('200.00', $invoice->retainer_amount_snapshot);
+    }
+
+    public function test_finalizing_an_invoice_with_no_items_is_rejected(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+
+        $response = $this->actingAs($owner)->post(route('invoices.finalize', $invoice));
+
+        $response->assertSessionHasErrors('invoice');
+        $this->assertFalse($invoice->fresh()->is_finalized);
+    }
+
+    public function test_designer_cannot_finalize_an_invoice(): void
+    {
+        $org = Organization::factory()->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        InvoiceItem::factory()->for($invoice)->create();
+
+        $response = $this->actingAs($designer)->post(route('invoices.finalize', $invoice));
+
+        $response->assertForbidden();
+        $this->assertFalse($invoice->fresh()->is_finalized);
+    }
+
+    public function test_items_can_still_be_added_once_an_invoice_is_finalized_and_amount_is_refreshed(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->finalized()->create([
+            'org_id' => $org->id,
+            'status' => InvoiceStatus::Draft,
+            'amount' => 100,
+            'retainer_amount_snapshot' => 100,
+        ]);
+
+        $response = $this->actingAs($owner)->post(route('invoices.items.store', $invoice), [
+            'description' => 'New item',
+            'is_billable' => true,
+            'price' => 50,
+            'quantity' => 1,
+        ]);
+
+        $response->assertRedirect(route('invoices.show', $invoice));
+        $this->assertDatabaseCount('invoice_items', 1);
+        $invoice->refresh();
+        $this->assertTrue($invoice->is_finalized);
+        $this->assertSame('150.00', $invoice->amount);
+    }
+
+    public function test_amount_cannot_be_changed_once_an_invoice_is_finalized(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->finalized()->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft, 'amount' => 300]);
+
+        $response = $this->actingAs($owner)->put(route('invoices.update', $invoice), [
+            'amount' => 999,
+            'issue_date' => $invoice->issue_date->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('amount');
+        $this->assertSame('300.00', $invoice->fresh()->amount);
+    }
+
+    public function test_owner_can_generate_a_branded_pdf_for_a_finalized_invoice(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->finalized()->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        InvoiceItem::factory()->for($invoice)->create(['is_billable' => true, 'price' => 100, 'quantity' => 1]);
+
+        $response = $this->actingAs($owner)->post(route('invoices.generate-pdf', $invoice));
+
+        $response->assertRedirect(route('invoices.show', $invoice));
+        $invoice->refresh();
+        $this->assertNotNull($invoice->pdf_path);
+        $this->assertSame('application/pdf', $invoice->pdf_mime_type);
+        Storage::disk('public')->assertExists($invoice->pdf_path);
+    }
+
+    public function test_generating_a_pdf_for_a_non_finalized_invoice_is_rejected(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+
+        $response = $this->actingAs($owner)->post(route('invoices.generate-pdf', $invoice));
+
+        $response->assertSessionHasErrors('invoice');
+        $this->assertNull($invoice->fresh()->pdf_path);
+    }
+
+    public function test_designer_cannot_generate_an_invoice_pdf(): void
+    {
+        Storage::fake('public');
+
+        $org = Organization::factory()->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->finalized()->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        InvoiceItem::factory()->for($invoice)->create();
+
+        $response = $this->actingAs($designer)->post(route('invoices.generate-pdf', $invoice));
+
+        $response->assertForbidden();
+        $this->assertNull($invoice->fresh()->pdf_path);
     }
 }

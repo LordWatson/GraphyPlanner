@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\Invoices\CreateInvoiceAction;
 use App\Actions\Invoices\DeleteInvoiceAction;
+use App\Actions\Invoices\FinalizeInvoiceAction;
+use App\Actions\Invoices\GenerateInvoicePdfAction;
 use App\Actions\Invoices\MarkInvoicePaidAction;
 use App\Actions\Invoices\SendInvoiceAction;
 use App\Actions\Invoices\UpdateInvoiceAction;
@@ -51,6 +53,9 @@ class InvoiceController extends Controller
                 'delete' => $user->can('delete', $invoice),
                 'send' => $invoice->status === InvoiceStatus::Draft && $user->can('send', $invoice),
                 'mark_paid' => $invoice->status === InvoiceStatus::Sent && $user->can('markPaid', $invoice),
+                'finalize' => $invoice->status === InvoiceStatus::Draft && ! $invoice->is_finalized && $user->can('finalize', $invoice),
+                'manage_items' => $invoice->status === InvoiceStatus::Draft && $user->can('update', $invoice),
+                'generate_pdf' => $invoice->is_finalized && $user->can('update', $invoice),
             ],
         ]);
     }
@@ -106,6 +111,18 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Generate a branded PDF for the finalized invoice, replacing any manually uploaded one.
+     */
+    public function generatePdf(Invoice $invoice, GenerateInvoicePdfAction $action): RedirectResponse
+    {
+        $this->authorize('update', $invoice);
+
+        $action($invoice);
+
+        return to_route('invoices.show', $invoice);
+    }
+
+    /**
      * Send the invoice to the client for billing.
      */
     public function send(Invoice $invoice, SendInvoiceAction $action): RedirectResponse
@@ -130,6 +147,18 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Finalize the invoice: lock in the computed total (items subtotal + retainer snapshot).
+     */
+    public function finalize(Invoice $invoice, FinalizeInvoiceAction $action): RedirectResponse
+    {
+        $this->authorize('finalize', $invoice);
+
+        $action($invoice);
+
+        return to_route('invoices.show', $invoice);
+    }
+
+    /**
      * Transform an invoice model into an array for the show/edit pages.
      *
      * @return array<string, mixed>
@@ -143,6 +172,8 @@ class InvoiceController extends Controller
             'status_label' => $invoice->status->label(),
             'amount' => (string) $invoice->amount,
             'currency' => $invoice->currency,
+            'is_finalized' => $invoice->is_finalized,
+            'retainer_amount_snapshot' => $invoice->retainer_amount_snapshot !== null ? (string) $invoice->retainer_amount_snapshot : null,
             'issue_date' => $invoice->issue_date->toDateString(),
             'due_date' => $invoice->due_date?->toDateString(),
             'description' => $invoice->description,
@@ -150,6 +181,16 @@ class InvoiceController extends Controller
             'paid_at' => $invoice->paid_at?->toIso8601String(),
             'pdf_url' => $invoice->pdf_url,
             'pdf_original_filename' => $invoice->pdf_original_filename,
+            'items' => $invoice->items->map(fn ($item) => [
+                'id' => $item->id,
+                'description' => $item->description,
+                'is_billable' => $item->is_billable,
+                'price' => $item->price !== null ? (string) $item->price : null,
+                'quantity' => $item->quantity,
+                'sort_order' => $item->sort_order,
+                'line_total' => $item->lineTotal(),
+            ]),
+            'items_subtotal' => $invoice->items->sum(fn ($item) => $item->lineTotal()),
         ];
     }
 }

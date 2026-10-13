@@ -15,6 +15,7 @@ type InvoiceData = {
     status_label: string;
     amount: string;
     currency: string;
+    is_finalized: boolean;
     issue_date: string;
     due_date: string | null;
     description: string | null;
@@ -115,6 +116,12 @@ export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData;
                             />
                         </div>
                     )}
+                    {invoice.is_finalized ? (
+                        <p className="text-xs text-muted-foreground">
+                            This invoice is finalized — generate its branded PDF from the invoice page. Manual upload
+                            below remains available as a one-off override.
+                        </p>
+                    ) : null}
                     <Form {...storePdf.form(invoice.id)} encType="multipart/form-data" resetOnSuccess className="grid gap-2">
                         {({ processing: uploadProcessing, errors: uploadErrors }) => (
                             <>
@@ -122,7 +129,7 @@ export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData;
                                 <Input id="pdf" name="pdf" type="file" accept="application/pdf" />
                                 <InputError message={uploadErrors.pdf} />
                                 <div>
-                                    <Button type="submit" size="sm" disabled={uploadProcessing}>
+                                    <Button type="submit" size="sm" variant="outline" disabled={uploadProcessing}>
                                         {invoice.pdf_url ? 'Replace file' : 'Upload file'}
                                     </Button>
                                 </div>

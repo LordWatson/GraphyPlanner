@@ -67,4 +67,15 @@ class InvoiceFactory extends Factory
             'paid_at' => fake()->dateTimeBetween('-1 week', 'now'),
         ]);
     }
+
+    /**
+     * Indicate that the invoice has been finalized (total locked in).
+     */
+    public function finalized(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_finalized' => true,
+            'retainer_amount_snapshot' => fake()->randomFloat(2, 0, 2000),
+        ]);
+    }
 }

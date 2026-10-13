@@ -62,6 +62,15 @@ class InvoicePolicy
     }
 
     /**
+     * Determine whether the user can finalize an invoice (lock in its total).
+     */
+    public function finalize(User $user, Invoice $invoice): bool
+    {
+        return $user->org_id === $invoice->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+    }
+
+    /**
      * Determine whether the user can delete an invoice.
      */
     public function delete(User $user, Invoice $invoice): bool
