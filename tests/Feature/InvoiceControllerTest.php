@@ -37,6 +37,68 @@ class InvoiceControllerTest extends TestCase
         ]);
     }
 
+    public function test_invoice_numbers_do_not_collide_across_organizations_with_the_same_invoice_count(): void
+    {
+        // Regression test: invoice_number generation previously counted the org's existing
+        // invoices (not the highest number actually used), and the column was globally unique —
+        // so two different orgs that both happened to have, say, 5 invoices each would both try to
+        // insert "INV-000006" and the second request would fail with a unique constraint violation.
+        $orgA = Organization::factory()->create();
+        $ownerA = User::factory()->for($orgA, 'organization')->role(Role::Owner)->create();
+        $clientA = Client::factory()->for($orgA, 'organization')->create();
+        for ($i = 1; $i <= 5; $i++) {
+            Invoice::factory()->for($clientA)->create(['org_id' => $orgA->id, 'invoice_number' => sprintf('INV-%06d', $i)]);
+        }
+
+        $orgB = Organization::factory()->create();
+        $ownerB = User::factory()->for($orgB, 'organization')->role(Role::Owner)->create();
+        $clientB = Client::factory()->for($orgB, 'organization')->create();
+        for ($i = 1; $i <= 5; $i++) {
+            Invoice::factory()->for($clientB)->create(['org_id' => $orgB->id, 'invoice_number' => sprintf('INV-%06d', $i)]);
+        }
+
+        $responseA = $this->actingAs($ownerA)->post(route('clients.invoices.store', $clientA), [
+            'amount' => 1000,
+            'issue_date' => now()->toDateString(),
+        ]);
+        $responseA->assertRedirect(route('clients.show', $clientA));
+
+        $responseB = $this->actingAs($ownerB)->post(route('clients.invoices.store', $clientB), [
+            'amount' => 1000,
+            'issue_date' => now()->toDateString(),
+        ]);
+        $responseB->assertRedirect(route('clients.show', $clientB));
+
+        $this->assertDatabaseHas('invoices', ['org_id' => $orgA->id, 'invoice_number' => 'INV-000006']);
+        $this->assertDatabaseHas('invoices', ['org_id' => $orgB->id, 'invoice_number' => 'INV-000006']);
+    }
+
+    public function test_invoice_number_is_not_reused_after_an_invoice_is_deleted(): void
+    {
+        // Regression test: generating the next number from a row count reused an already-used
+        // number once any invoice for the org was deleted.
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoices = collect(range(1, 3))->map(fn (int $i) => Invoice::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'invoice_number' => sprintf('INV-%06d', $i),
+        ]));
+        $invoices->first()->delete();
+
+        $response = $this->actingAs($owner)->post(route('clients.invoices.store', $client), [
+            'amount' => 1000,
+            'issue_date' => now()->toDateString(),
+        ]);
+
+        $response->assertRedirect(route('clients.show', $client));
+        $this->assertDatabaseHas('invoices', [
+            'org_id' => $org->id,
+            'invoice_number' => 'INV-000004',
+        ]);
+        $this->assertDatabaseCount('invoices', 3);
+    }
+
     public function test_designer_cannot_create_an_invoice(): void
     {
         $org = Organization::factory()->create();

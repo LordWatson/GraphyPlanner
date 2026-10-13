@@ -41,11 +41,23 @@ class CreateInvoiceAction
 
     /**
      * Generate the next sequential invoice number for the client's organization.
+     *
+     * Derived from the highest existing `invoice_number` for the org (not a row count), and the
+     * selecting query is locked (`lockForUpdate`) within the surrounding transaction so concurrent
+     * invoice creations for the same org can't compute the same "next" number. Using a row count
+     * previously caused duplicate numbers (and a unique constraint violation) once any invoice for
+     * the org was deleted, or when two orgs' counts happened to coincide under the old globally
+     * unique column.
      */
     private function nextInvoiceNumber(Client $client): string
     {
-        $count = Invoice::where('org_id', $client->org_id)->count();
+        $lastNumber = Invoice::where('org_id', $client->org_id)
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->value('invoice_number');
 
-        return sprintf('INV-%06d', $count + 1);
+        $nextSequence = $lastNumber ? ((int) substr($lastNumber, 4)) + 1 : 1;
+
+        return sprintf('INV-%06d', $nextSequence);
     }
 }
