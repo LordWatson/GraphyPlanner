@@ -66,6 +66,7 @@ import { show as showInvoice, send as sendInvoice, markPaid as markPaidInvoice }
 import { store as storeInvitation } from '@/routes/clients/invitations';
 import { destroy as destroyInvitation } from '@/routes/invitations';
 import aiClients from '@/routes/clients/ai';
+import dailyBriefs from '@/routes/clients/daily-briefs';
 
 type ClientData = {
     id: number;
@@ -358,6 +359,32 @@ export default function ClientShow({
 
         return true;
     });
+
+    // Step 2.5 — "Daily Briefs" tab. Same gating as the AI panel above.
+    const [briefsLoading, setBriefsLoading] = useState(false);
+    const [briefsError, setBriefsError] = useState<string | null>(null);
+    const [briefs, setBriefs] = useState<{ id: number; brief_date: string; trends: { title: string; summary: string }[]; ideas: { title: string; description: string }[] }[]>([]);
+
+    const fetchDailyBriefs = async () => {
+        setBriefsError(null);
+        setBriefsLoading(true);
+
+        try {
+            const res = await fetch(dailyBriefs.index.url(client.id), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(typeof data?.message === 'string' ? data.message : 'Unable to fetch daily briefs.');
+
+            setBriefs(Array.isArray(data?.briefs) ? data.briefs : []);
+        } catch (e) {
+            setBriefsError(e instanceof Error ? e.message : 'Unable to fetch daily briefs.');
+        } finally {
+            setBriefsLoading(false);
+        }
+    };
 
     const handleDeleteClient = () => {
         setDeleting(true);
@@ -671,6 +698,12 @@ export default function ClientShow({
                             <TabsTrigger value="ai">
                                 <Lightbulb />
                                 Trends & Ideas
+                            </TabsTrigger>
+                        )}
+                        {showAiPanel && (
+                            <TabsTrigger value="daily-briefs">
+                                <CalendarDays />
+                                Daily Briefs
                             </TabsTrigger>
                         )}
                     </TabsList>
@@ -1520,6 +1553,54 @@ export default function ClientShow({
                                 )}
                             </div>
                         </div>
+                    </TabsContent>
+                    )}
+
+                    {showAiPanel && (
+                    <TabsContent
+                        value="daily-briefs"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Daily Briefs" description="Nightly AI-generated trends and post ideas for this client" />
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button type="button" size="sm" onClick={fetchDailyBriefs} disabled={briefsLoading}>
+                                {briefsLoading ? 'Loading…' : 'Load briefs'}
+                            </Button>
+                            {briefsError && <span className="text-xs text-destructive">{briefsError}</span>}
+                        </div>
+
+                        {briefs.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No daily briefs yet. Click "Load briefs".</p>
+                        ) : (
+                            <div className="grid gap-3">
+                                {briefs.map((brief) => (
+                                    <div key={brief.id} className="rounded-md border border-border p-3">
+                                        <div className="mb-2 text-sm font-medium">{brief.brief_date}</div>
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="grid gap-2">
+                                                <h4 className="text-xs font-medium text-muted-foreground">Trends</h4>
+                                                {brief.trends.map((trend, i) => (
+                                                    <div key={i} className="rounded border border-border p-2">
+                                                        <div className="text-sm font-medium">{trend.title}</div>
+                                                        <p className="text-xs text-muted-foreground">{trend.summary}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <h4 className="text-xs font-medium text-muted-foreground">Ideas</h4>
+                                                {brief.ideas.map((idea, i) => (
+                                                    <div key={i} className="rounded border border-border p-2">
+                                                        <div className="text-sm font-medium">{idea.title}</div>
+                                                        <p className="text-xs text-muted-foreground">{idea.description}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </TabsContent>
                     )}
                 </Tabs>

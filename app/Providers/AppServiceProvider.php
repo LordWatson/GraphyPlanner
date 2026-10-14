@@ -30,6 +30,7 @@ use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
+use App\Services\AI\DeepSeekProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\LocalAssetStorage;
 use App\Services\Publishing\MetaGraphMusicProvider;
@@ -66,11 +67,20 @@ class AppServiceProvider extends ServiceProvider
         // App\Contracts\MusicProvider needs to change.
         $this->app->bind(MusicProvider::class, MetaGraphMusicProvider::class);
 
-        // AiProvider contract (Step 2.1) bound to NullAiProvider as a safe default
-        // that never calls an external service. Step 2.7 switches this binding to
-        // DeepSeekProvider (Step 2.2) when AI is enabled and configured; no caller
-        // of App\Contracts\AiProvider needs to change.
-        $this->app->bind(AiProvider::class, NullAiProvider::class);
+        // AiProvider contract (Step 2.1) resolves to DeepSeekProvider (Step 2.2) only when
+        // AI is enabled (config('ai.enabled'), env AI_ENABLED) AND a non-empty DEEPSEEK_API_KEY
+        // is configured; otherwise it safely falls back to NullAiProvider, which never calls an
+        // external service. No caller of App\Contracts\AiProvider needs to change.
+        $this->app->bind(AiProvider::class, function () {
+            $enabled = (bool) config('ai.enabled', false);
+            $apiKey = (string) config('ai.deepseek.api_key', '');
+
+            if ($enabled && $apiKey !== '') {
+                return $this->app->make(DeepSeekProvider::class);
+            }
+
+            return $this->app->make(NullAiProvider::class);
+        });
     }
 
     /**

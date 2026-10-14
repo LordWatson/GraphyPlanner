@@ -18,3 +18,7 @@ Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes();
 // Step 1.6: re-checks every connected social account's token health so an expired token is
 // caught even if nothing else touches that account.
 Schedule::command('social-accounts:check-health')->hourly();
+
+// Step 2.5: nightly AI "Daily Brief" per active client (trends + fresh post ideas), emailed to
+// Owners/Strategists — idempotent per client/day, see GenerateDailyBriefsAction.
+Schedule::command('ai:generate-daily-briefs')->dailyAt('06:00');

@@ -44,4 +44,33 @@ enum Platform: string
             self::LinkedIn => 3000,
         };
     }
+
+    /**
+     * Interim per-platform hashtag ceiling used by App\Services\AI\AiGuardrailService (Step 2.6)
+     * to flag AI caption suggestions that exceed a platform's commonly documented hashtag norms
+     * — enforced as a clear warning rather than a silent edit.
+     */
+    public function maxHashtags(): int
+    {
+        return match ($this) {
+            self::Instagram => 30,
+            self::TikTok => 30,
+            self::Facebook => 30,
+            self::LinkedIn => 5,
+        };
+    }
+
+    /**
+     * Whether this platform's caption policy is comfortable with links inline in the caption
+     * body. Used by App\Services\AI\AiGuardrailService (Step 2.6) to warn — not silently
+     * strip — when an AI suggestion includes a link on a platform that generally buries/penalizes
+     * in-caption links (TikTok, Instagram).
+     */
+    public function allowsLinksInCaption(): bool
+    {
+        return match ($this) {
+            self::Instagram, self::TikTok => false,
+            self::Facebook, self::LinkedIn => true,
+        };
+    }
 }

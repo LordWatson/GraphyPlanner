@@ -33,6 +33,10 @@ class DeepSeekProvider implements AiProvider
      */
     private const MAX_ATTEMPTS = 2;
 
+    public function __construct(
+        private readonly AiGuardrailService $guardrail = new AiGuardrailService(),
+    ) {}
+
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
         $client = $post->client;
@@ -155,7 +159,7 @@ class DeepSeekProvider implements AiProvider
     {
         $lines = [
             'Suggest 3 caption options for this post.',
-            'Current draft caption: '.($post->master_caption ?: '(none yet)'),
+            'Current draft caption: '.$this->guardrail->scrub($post->master_caption ?: '(none yet)'),
             'Target platforms: '.implode(', ', array_map(fn ($platform) => $platform->label(), $post->targetPlatforms())),
         ];
 

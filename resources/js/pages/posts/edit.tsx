@@ -362,6 +362,9 @@ export default function PostEdit({
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
     const [aiSuggestions, setAiSuggestions] = useState<AiCaptionSuggestionData[]>([]);
+    // Step 2.6 — per-suggestion platform policy warnings (e.g. link/hashtag rules), surfaced
+    // next to each card so a human can decide instead of the AI silently rewriting anything.
+    const [aiPolicyWarnings, setAiPolicyWarnings] = useState<string[][]>([]);
 
     const fetchAiSuggestions = async () => {
         setAiError(null);
@@ -379,6 +382,7 @@ export default function PostEdit({
             }
 
             setAiSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
+            setAiPolicyWarnings(Array.isArray(data?.policyWarnings) ? data.policyWarnings : []);
         } catch (e) {
             setAiError(e instanceof Error ? e.message : 'Unable to fetch AI suggestions.');
         } finally {
@@ -738,6 +742,13 @@ export default function PostEdit({
                                                     )}
                                                     {suggestion.firstComment && (
                                                         <p className="text-xs text-muted-foreground">First comment: {suggestion.firstComment}</p>
+                                                    )}
+                                                    {(aiPolicyWarnings[i] ?? []).length > 0 && (
+                                                        <ul className="grid gap-0.5">
+                                                            {aiPolicyWarnings[i].map((warning, wi) => (
+                                                                <li key={wi} className="text-xs text-amber-600 dark:text-amber-500">⚠ {warning}</li>
+                                                            ))}
+                                                        </ul>
                                                     )}
                                                     <div>
                                                         <Button type="button" size="sm" onClick={() => applyAiSuggestion(suggestion)}>

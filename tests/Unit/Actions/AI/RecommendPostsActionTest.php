@@ -6,6 +6,7 @@ use App\Actions\AI\RecommendPostsAction;
 use App\Contracts\AiProvider;
 use App\Enums\PostStatus;
 use App\Models\Client;
+use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,9 +28,9 @@ class RecommendPostsActionTest extends TestCase
             ->withArgs(fn (Client $c) => $c->is($client))
             ->andReturn($ideas);
 
-        $result = (new RecommendPostsAction($ai))($client);
+        $result = (new RecommendPostsAction($ai, new AiGuardrailService()))($client);
 
-        $this->assertSame($ideas, $result);
+        $this->assertEquals($ideas, $result);
     }
 
     public function test_persist_creates_a_draft_idea_post_from_the_chosen_idea(): void
@@ -45,7 +46,7 @@ class RecommendPostsActionTest extends TestCase
         $ai = Mockery::mock(AiProvider::class);
         $ai->shouldNotReceive('recommendPosts');
 
-        $post = (new RecommendPostsAction($ai))->persist($client, $idea);
+        $post = (new RecommendPostsAction($ai, new AiGuardrailService()))->persist($client, $idea);
 
         $this->assertDatabaseHas('posts', [
             'id' => $post->id,
@@ -64,7 +65,7 @@ class RecommendPostsActionTest extends TestCase
         $ai = Mockery::mock(AiProvider::class);
         $ai->shouldReceive('recommendPosts')->once()->andReturn($ideas);
 
-        (new RecommendPostsAction($ai))($client);
+        (new RecommendPostsAction($ai, new AiGuardrailService()))($client);
 
         $this->assertDatabaseCount('posts', 0);
     }

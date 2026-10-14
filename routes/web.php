@@ -9,6 +9,7 @@ use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
+use App\Http\Controllers\DailyBriefController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
@@ -171,6 +172,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.ai.ideas');
     Route::get('posts/{post}/ai/captions', [AiController::class, 'captions'])
         ->name('posts.ai.captions');
+
+    // Step 2.5: internal-only "Daily Briefs" tab listing the nightly DailyBrief rows for a
+    // client, same gating as the AI endpoints above.
+    Route::get('clients/{client}/daily-briefs', [DailyBriefController::class, 'index'])
+        ->name('clients.daily-briefs.index');
 
     // Step 6.1: client portal invitations (Owner/Strategist only, see ClientInvitationPolicy).
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])

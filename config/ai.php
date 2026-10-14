@@ -35,4 +35,39 @@ return [
         'max_tokens' => (int) env('DEEPSEEK_MAX_TOKENS', 1024),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Daily Briefs (Step 2.5)
+    |--------------------------------------------------------------------------
+    |
+    | App\Actions\AI\GenerateDailyBriefsAction runs nightly (see routes/console.php) and emails
+    | Owners/Strategists about the fresh brief. The quiet hours window below (in the app's local
+    | timezone, config('app.timezone')) is checked right before sending — the brief itself is
+    | always generated/stored on schedule, only the notification email is held back if it would
+    | land inside this window, to avoid waking anyone up over a non-urgent digest.
+    |
+    */
+    'daily_briefs' => [
+        'quiet_hours_start' => env('AI_DAILY_BRIEF_QUIET_HOURS_START', 21),
+        'quiet_hours_end' => env('AI_DAILY_BRIEF_QUIET_HOURS_END', 7),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Guardrails (Step 2.6)
+    |--------------------------------------------------------------------------
+    |
+    | App\Services\AI\AiGuardrailService reads this list — on top of each client's
+    | App\Models\BrandBrain::voice['do_nots']/hashtag_policy['never_use'] — to reject any
+    | AI-generated caption/idea/trend that mentions a prohibited topic before it's ever
+    | surfaced to a user. Comma-separated, case-insensitive substring matches.
+    |
+    */
+    'guardrails' => [
+        'prohibited_topics' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('AI_PROHIBITED_TOPICS', ''))
+        ))),
+    ],
+
 ];

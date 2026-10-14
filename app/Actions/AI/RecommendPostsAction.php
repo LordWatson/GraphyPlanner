@@ -6,6 +6,7 @@ use App\Contracts\AiProvider;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Post;
+use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class RecommendPostsAction
 {
     public function __construct(
         private readonly AiProvider $ai,
+        private readonly AiGuardrailService $guardrail,
     ) {}
 
     public function __invoke(Client $client): AiPostIdeas
@@ -29,7 +31,12 @@ class RecommendPostsAction
             'org_id' => $client->org_id,
         ]);
 
-        return $this->ai->recommendPosts($client);
+        $ideas = $this->ai->recommendPosts($client);
+
+        return $this->guardrail->filterPostIdeas($client->brandBrain, $ideas, [
+            'client_id' => $client->id,
+            'org_id' => $client->org_id,
+        ]);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Actions\AI;
 
 use App\Contracts\AiProvider;
 use App\Models\Post;
+use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class SuggestCaptionsForPostAction
 {
     public function __construct(
         private readonly AiProvider $ai,
+        private readonly AiGuardrailService $guardrail,
     ) {}
 
     public function __invoke(Post $post): AiCaptionSuggestions
@@ -29,7 +31,13 @@ class SuggestCaptionsForPostAction
             'org_id' => $post->org_id,
         ]);
 
-        return $this->ai->suggestCaptions($post);
+        $suggestions = $this->ai->suggestCaptions($post);
+
+        return $this->guardrail->filterCaptionSuggestions($post->client?->brandBrain, $suggestions, [
+            'post_id' => $post->id,
+            'client_id' => $post->client_id,
+            'org_id' => $post->org_id,
+        ]);
     }
 
     /**

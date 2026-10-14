@@ -4,6 +4,7 @@ namespace App\Actions\AI;
 
 use App\Contracts\AiProvider;
 use App\Models\Client;
+use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiTrends;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +23,7 @@ class DiscoverTrendsAction
 
     public function __construct(
         private readonly AiProvider $ai,
+        private readonly AiGuardrailService $guardrail,
     ) {}
 
     /**
@@ -38,7 +40,13 @@ class DiscoverTrendsAction
                 'platforms' => $platforms,
             ]);
 
-            return $this->ai->discoverTrends($client, $platforms);
+            $trends = $this->ai->discoverTrends($client, $platforms);
+
+            return $this->guardrail->filterTrends($client->brandBrain, $trends, [
+                'client_id' => $client->id,
+                'org_id' => $client->org_id,
+                'platforms' => $platforms,
+            ]);
         });
     }
 

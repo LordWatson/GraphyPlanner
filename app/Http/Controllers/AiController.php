@@ -9,6 +9,7 @@ use App\Enums\Platform;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Post;
+use App\Services\AI\AiGuardrailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -65,15 +66,24 @@ class AiController extends Controller
      * panel). Never writes anything to the post — applying a suggestion is a separate,
      * explicit, user-confirmed step entirely on the frontend/normal post-update route.
      */
-    public function captions(Request $request, Post $post, SuggestCaptionsForPostAction $action): JsonResponse
+    public function captions(Request $request, Post $post, SuggestCaptionsForPostAction $action, AiGuardrailService $guardrail): JsonResponse
     {
         abort_unless((bool) config('ai.enabled', false), 404);
         $this->authorize('view', $post);
         $this->authorizeAiUse($request, $post->org_id);
 
         $suggestions = $action($post);
+        $platforms = $post->targetPlatforms();
 
-        return response()->json(['suggestions' => $suggestions]);
+        $policyWarnings = collect($suggestions->suggestions)
+            ->map(fn ($suggestion) => collect($platforms)
+                ->flatMap(fn (Platform $platform) => $guardrail->platformWarnings($platform, $suggestion))
+                ->values()
+                ->all())
+            ->values()
+            ->all();
+
+        return response()->json(['suggestions' => $suggestions, 'policyWarnings' => $policyWarnings]);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace Tests\Unit\Contracts;
 use App\Contracts\AiProvider;
 use App\Models\Client;
 use App\Models\Post;
+use App\Services\AI\DeepSeekProvider;
 use App\Services\AI\NullAiProvider;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
@@ -47,5 +48,32 @@ class AiProviderTest extends TestCase
         $this->assertSame([], $provider->suggestCaptions(new Post())->suggestions);
         $this->assertSame([], $provider->recommendPosts(new Client())->ideas);
         $this->assertSame([], $provider->discoverTrends(new Client(), ['instagram'])->trends);
+    }
+
+    public function test_the_container_resolves_ai_provider_to_null_when_disabled_even_with_an_api_key(): void
+    {
+        config(['ai.enabled' => false, 'ai.deepseek.api_key' => 'some-key']);
+
+        $provider = $this->app->make(AiProvider::class);
+
+        $this->assertInstanceOf(NullAiProvider::class, $provider);
+    }
+
+    public function test_the_container_resolves_ai_provider_to_null_when_enabled_without_an_api_key(): void
+    {
+        config(['ai.enabled' => true, 'ai.deepseek.api_key' => '']);
+
+        $provider = $this->app->make(AiProvider::class);
+
+        $this->assertInstanceOf(NullAiProvider::class, $provider);
+    }
+
+    public function test_the_container_resolves_ai_provider_to_deep_seek_when_enabled_and_configured(): void
+    {
+        config(['ai.enabled' => true, 'ai.deepseek.api_key' => 'some-key']);
+
+        $provider = $this->app->make(AiProvider::class);
+
+        $this->assertInstanceOf(DeepSeekProvider::class, $provider);
     }
 }
