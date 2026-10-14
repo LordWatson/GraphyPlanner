@@ -17,6 +17,7 @@
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
     --radius-sm: calc(var(--radius) - 4px);
+    --radius-xl: calc(var(--radius) + 8px);
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -99,8 +100,8 @@
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.7 0.15 260);
     --chart-5: oklch(0.769 0.188 70.08);
-    --radius: 0.6rem;
-    --gradient-brand: linear-gradient(135deg, oklch(0.65 0.19 40) 0%, oklch(0.68 0.17 55) 50%, oklch(0.7 0.15 70) 100%);
+    --radius: 0.65rem;
+    --gradient-brand: linear-gradient(120deg, oklch(0.65 0.19 40) 0%, oklch(0.7 0.18 55) 35%, oklch(0.75 0.16 70) 65%, oklch(0.68 0.17 50) 100%);
     --sidebar: oklch(0.16 0.005 40);
     --sidebar-foreground: oklch(0.88 0.005 80);
     --sidebar-primary: oklch(0.65 0.19 40);
@@ -140,7 +141,7 @@
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    --gradient-brand: linear-gradient(135deg, oklch(0.7 0.18 45) 0%, oklch(0.68 0.17 55) 50%, oklch(0.7 0.15 70) 100%);
+    --gradient-brand: linear-gradient(120deg, oklch(0.7 0.18 45) 0%, oklch(0.74 0.17 60) 35%, oklch(0.76 0.15 72) 65%, oklch(0.68 0.17 50) 100%);
     --sidebar: oklch(0.14 0.005 40);
     --sidebar-foreground: oklch(0.88 0.005 80);
     --sidebar-primary: oklch(0.7 0.18 45);
@@ -164,12 +165,56 @@
 @layer utilities {
     .bg-gradient-brand {
         background-image: var(--gradient-brand);
+        background-size: 200% 200%;
     }
 
     .text-gradient-brand {
         background-image: var(--gradient-brand);
+        background-size: 200% 200%;
         background-clip: text;
         -webkit-background-clip: text;
         color: transparent;
+    }
+
+    .bg-gradient-brand-animated {
+        background-image: var(--gradient-brand);
+        background-size: 200% 200%;
+        animation: brand-shift 10s ease-in-out infinite;
+    }
+
+    .bg-noise {
+        position: relative;
+    }
+
+    .bg-noise::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .shadow-agency {
+        box-shadow:
+            0 1px 2px oklch(0.2 0.02 40 / 0.06),
+            0 12px 32px -12px oklch(0.65 0.19 40 / 0.25);
+    }
+
+    @keyframes brand-shift {
+        0%,
+        100% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .bg-gradient-brand-animated {
+            animation: none;
+        }
     }
 }

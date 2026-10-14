@@ -67,28 +67,33 @@ export default function CampaignShow({
                     </Link>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                <div className="bg-noise relative flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
                     <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <Clapperboard className="size-5" />
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex items-center gap-3">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
+                            <Clapperboard className="size-5" />
+                        </span>
+                        <div className="flex flex-col gap-1">
+                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
+                                Campaign
                             </span>
-                            <div className="flex flex-col gap-1">
-                                <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                                    <span className="text-gradient-brand">{campaign.name}</span>
-                                </h1>
-                                <p className="text-sm text-muted-foreground">Client: {client.name}</p>
-                            </div>
+                            <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">{campaign.name}</h1>
+                            <p className="text-sm text-primary-foreground/80">Client: {client.name}</p>
                         </div>
-                        <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'}>{campaign.status_label}</Badge>
                     </div>
+                    <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'} className="relative bg-white/90">
+                        {campaign.status_label}
+                    </Badge>
                 </div>
 
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
                     <Heading title="Campaign details" />
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="grid gap-1">
@@ -131,7 +136,7 @@ export default function CampaignShow({
                     </div>
                 </div>
 
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
+                <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
                     <Heading title="Posts" description="Posts attached to this campaign" />
                     {posts.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No posts attached to this campaign yet.</p>
@@ -141,7 +146,7 @@ export default function CampaignShow({
                                 <Link
                                     key={post.id}
                                     href={editPost(post.id)}
-                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm hover:bg-muted/40"
+                                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-muted/40"
                                 >
                                     <div className="flex flex-col">
                                         <span className="font-medium">{post.master_caption ?? 'Untitled post'}</span>

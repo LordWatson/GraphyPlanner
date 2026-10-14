@@ -601,20 +601,37 @@ export default function ClientShow({
         <>
             <Head title={client.name} />
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]" />
+                <div className="bg-noise relative flex flex-col gap-4 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
+                    />
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
                     <div className="relative flex flex-col gap-4">
                         <div className="flex flex-wrap items-start justify-between gap-4">
-                            <Heading title={client.name} description={client.legal_name ?? undefined} />
+                            <div className="flex flex-col gap-1">
+                                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
+                                    Client
+                                </span>
+                                <h1 className="font-serif text-3xl font-semibold tracking-tight italic sm:text-4xl">
+                                    {client.name}
+                                </h1>
+                                {client.legal_name && (
+                                    <p className="text-sm text-primary-foreground/80">{client.legal_name}</p>
+                                )}
+                            </div>
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" asChild>
+                                <Button variant="secondary" size="sm" asChild>
                                     <Link href={editBrandBrain(client.id)}>
                                         <NotebookPen />
                                         Brand brain
                                     </Link>
                                 </Button>
                                 {can.update && (
-                                    <Button variant="outline" size="sm" asChild>
+                                    <Button variant="secondary" size="sm" asChild>
                                         <Link href={edit(client.id)}>
                                             <Pencil />
                                             Edit
@@ -639,11 +656,13 @@ export default function ClientShow({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={statusVariant[client.status] ?? 'outline'}>{client.status}</Badge>
-                            <Badge variant={healthVariant[client.health] ?? 'outline'} title={client.health_reason}>
+                            <Badge variant={statusVariant[client.status] ?? 'outline'} className="bg-white/90">
+                                {client.status}
+                            </Badge>
+                            <Badge variant={healthVariant[client.health] ?? 'outline'} title={client.health_reason} className="bg-white/90">
                                 {client.health}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">{client.health_reason}</span>
+                            <span className="text-xs text-primary-foreground/80">{client.health_reason}</span>
                         </div>
 
                         {metaChips.length > 0 && (
@@ -651,9 +670,9 @@ export default function ClientShow({
                                 {metaChips.map(({ icon: Icon, label }, index) => (
                                     <span
                                         key={`${label}-${index}`}
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-foreground"
+                                        className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs"
                                     >
-                                        <Icon className="size-3.5 text-primary" />
+                                        <Icon className="size-3.5" />
                                         {label}
                                     </span>
                                 ))}
@@ -661,8 +680,8 @@ export default function ClientShow({
                         )}
 
                         {client.notes_internal && (
-                            <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
-                                <span className="text-xs font-medium text-muted-foreground">Internal notes</span>
+                            <div className="rounded-xl border border-white/20 bg-white/10 p-3">
+                                <span className="text-xs font-medium text-primary-foreground/80">Internal notes</span>
                                 <p className="mt-1 text-sm whitespace-pre-wrap">{client.notes_internal}</p>
                             </div>
                         )}
@@ -714,13 +733,12 @@ export default function ClientShow({
                             key={label}
                             onClick={() => setActiveTab(tab)}
                             aria-current={activeTab === tab}
-                            className={`relative flex min-w-[9.5rem] flex-1 flex-col gap-1.5 overflow-hidden rounded-xl border p-3 text-left shadow-sm transition-colors ${
-                                activeTab === tab ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'
+                            className={`group relative flex min-w-[9.5rem] flex-1 flex-col gap-1.5 overflow-hidden rounded-2xl border p-3 text-left shadow-sm transition-all ${
+                                activeTab === tab ? 'border-primary bg-primary/5 shadow-agency' : 'border-border bg-card hover:-translate-y-0.5 hover:border-primary/30'
                             }`}
                         >
-                            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
                             <div className="flex items-center gap-2 text-muted-foreground">
-                                <span className="flex size-7 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
+                                <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-brand text-white shadow-sm">
                                     <Icon className="size-3.5" />
                                 </span>
                                 <span className="truncate text-xs">{label}</span>
@@ -736,12 +754,11 @@ export default function ClientShow({
                                 <button
                                     type="button"
                                     aria-current={isSecondaryTabActive}
-                                    className={`relative flex min-w-[9.5rem] flex-1 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border p-3 text-center shadow-sm transition-colors ${
-                                        isSecondaryTabActive ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'
+                                    className={`relative flex min-w-[9.5rem] flex-1 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border p-3 text-center shadow-sm transition-all ${
+                                        isSecondaryTabActive ? 'border-primary bg-primary/5 shadow-agency' : 'border-border bg-card hover:-translate-y-0.5 hover:border-primary/30'
                                     }`}
                                 >
-                                    <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                                    <span className="flex size-7 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
+                                    <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-brand text-white shadow-sm">
                                         <MoreHorizontal className="size-3.5" />
                                     </span>
                                     <span className="text-xs font-medium">More stats</span>
@@ -775,7 +792,7 @@ export default function ClientShow({
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
+                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/60 p-1">
                         <TabsTrigger value="social-accounts">
                             <Share2 />
                             Social accounts

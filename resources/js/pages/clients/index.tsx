@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Building2, Plus } from 'lucide-react';
+import { ArrowUpRight, Building2, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { create, index, show } from '@/routes/clients';
@@ -38,21 +38,17 @@ export default function ClientsIndex({
         <>
             <Head title="Clients" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
+                <div className="flex flex-wrap items-end justify-between gap-4">
                     <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Client roster</span>
+                        <span className="text-[10px] font-medium tracking-widest text-primary uppercase">Roster</span>
+                        <h1 className="font-serif text-3xl font-semibold tracking-tight italic sm:text-4xl">
+                            Client roster
                         </h1>
                         <p className="max-w-xl text-sm text-muted-foreground">
-                            Every brand your team manages, with health and status at a glance.
+                            Every brand your team manages, with health and status at a glance — {clients.length}{' '}
+                            total.
                         </p>
                     </div>
-                </div>
-                <div className="flex items-center justify-end">
                     {can.create && (
                         <Button asChild>
                             <Link href={create()}>
@@ -64,7 +60,7 @@ export default function ClientsIndex({
                 </div>
 
                 {clients.length === 0 ? (
-                    <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card/50 p-8 text-center">
+                    <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
                         <Building2 className="size-6 text-muted-foreground" />
                         <p className="text-sm font-medium">No clients yet</p>
                         <p className="max-w-sm text-xs text-muted-foreground">
@@ -77,54 +73,46 @@ export default function ClientsIndex({
                         )}
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-lg border border-border bg-card">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                                    <th className="px-4 py-2 font-medium">Name</th>
-                                    <th className="px-4 py-2 font-medium">Industry</th>
-                                    <th className="px-4 py-2 font-medium">Language</th>
-                                    <th className="px-4 py-2 font-medium">Status</th>
-                                    <th className="px-4 py-2 font-medium">Health</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {clients.map((client) => (
-                                    <tr
-                                        key={client.id}
-                                        className="border-b border-border last:border-0 hover:bg-muted/50"
-                                    >
-                                        <td className="px-4 py-2">
-                                            <Link
-                                                href={show(client.id)}
-                                                className="font-medium hover:underline"
-                                            >
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {clients.map((client) => (
+                            <Link
+                                key={client.id}
+                                href={show(client.id)}
+                                className="group relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
+                            >
+                                <span
+                                    aria-hidden
+                                    className="bg-gradient-brand absolute inset-x-0 top-0 h-1 opacity-70 transition-opacity group-hover:opacity-100"
+                                />
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-noise flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-brand text-sm font-semibold text-primary-foreground">
+                                            {client.name.slice(0, 2).toUpperCase()}
+                                        </span>
+                                        <div className="flex flex-col">
+                                            <span className="font-serif text-lg font-semibold italic group-hover:text-primary">
                                                 {client.name}
-                                            </Link>
-                                        </td>
-                                        <td className="px-4 py-2 text-muted-foreground">
-                                            {client.industry ?? '—'}
-                                        </td>
-                                        <td className="px-4 py-2 text-muted-foreground">
-                                            {client.default_language ?? '—'}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <Badge variant={statusVariant[client.status] ?? 'outline'}>
-                                                {client.status}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <Badge
-                                                variant={healthVariant[client.health] ?? 'outline'}
-                                                title={client.health_reason}
-                                            >
-                                                {client.health}
-                                            </Badge>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {client.industry ?? 'No industry set'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <ArrowUpRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Badge variant={statusVariant[client.status] ?? 'outline'}>{client.status}</Badge>
+                                    <Badge variant={healthVariant[client.health] ?? 'outline'} title={client.health_reason}>
+                                        {client.health}
+                                    </Badge>
+                                    {client.default_language && (
+                                        <Badge variant="outline" className="text-[10px] uppercase">
+                                            {client.default_language}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </Link>
+                        ))}
                     </div>
                 )}
             </div>

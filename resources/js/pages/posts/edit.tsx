@@ -572,29 +572,35 @@ export default function PostEdit({
                     </Link>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                <div className="bg-noise relative flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
                     <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-col gap-1">
-                            <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                                <span className="text-gradient-brand">Post editor</span>
-                            </h1>
-                            <p className="max-w-xl text-sm text-muted-foreground">Client: {client.name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Badge variant={postStatusVariant[post.status] ?? 'outline'}>{post.status_label}</Badge>
-                            {post.campaign_name && (
-                                <span className="text-xs text-muted-foreground">{post.campaign_name}</span>
-                            )}
-                        </div>
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex flex-col gap-1">
+                        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
+                            Post editor
+                        </span>
+                        <h1 className="font-serif text-3xl font-semibold tracking-tight italic sm:text-4xl">
+                            {client.name}
+                        </h1>
+                        {post.campaign_name && (
+                            <p className="text-sm text-primary-foreground/80">{post.campaign_name}</p>
+                        )}
+                    </div>
+                    <div className="relative flex items-center gap-2">
+                        <Badge variant={postStatusVariant[post.status] ?? 'outline'} className="bg-white/90">
+                            {post.status_label}
+                        </Badge>
                     </div>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
+                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/60 p-1">
                         <TabsTrigger value="editor">
                             <Pencil />
                             Editor
