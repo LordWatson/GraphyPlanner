@@ -90,28 +90,30 @@ export default function InvoiceShow({
                     </Link>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                <div className="bg-noise relative overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
                     <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
                                 <Receipt className="size-5" />
                             </span>
                             <div className="flex flex-col gap-1">
-                                <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                                    <span className="text-gradient-brand">{invoice.invoice_number}</span>
-                                </h1>
-                                <p className="text-sm text-muted-foreground">Client: {client.name}</p>
+                                <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">{invoice.invoice_number}</h1>
+                                <p className="text-sm text-primary-foreground/80">Client: {client.name}</p>
                             </div>
                         </div>
-                        <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'}>{invoice.status_label}</Badge>
+                        <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'} className="border-white/30 bg-white/10 text-primary-foreground">{invoice.status_label}</Badge>
                     </div>
                 </div>
 
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
                     <Heading title="Invoice details" />
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="grid gap-1">
@@ -195,7 +197,7 @@ export default function InvoiceShow({
                     </div>
                 </div>
 
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
                     <Heading
                         title="Items"
                         description={
@@ -277,7 +279,7 @@ export default function InvoiceShow({
                                 ) : (
                                     <div
                                         key={item.id}
-                                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3"
+                                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                     >
                                         <div className="grid gap-0.5">
                                             <span className="text-sm font-medium">{item.description}</span>
@@ -385,7 +387,7 @@ export default function InvoiceShow({
                     </div>
                 </div>
 
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
+                <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
                     <Heading title="Invoice PDF" description="Uploaded by your organization" />
                     {can.generate_pdf && (
                         <Form {...generateInvoicePdf.form(invoice.id)}>

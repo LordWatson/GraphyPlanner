@@ -1,5 +1,4 @@
 import { Form, Head } from '@inertiajs/react';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +47,20 @@ export default function ClientEdit({
         <>
             <Head title={`Edit ${client.name}`} />
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4">
-                <Heading title={`Edit ${client.name}`} description="Update client details" />
+                <div className="bg-noise relative overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
+                    />
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex flex-col gap-1">
+                        <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">Edit {client.name}</h1>
+                        <p className="max-w-xl text-sm text-primary-foreground/80">Update client details</p>
+                    </div>
+                </div>
 
                 <Form
                     {...update.form(client.id)}
@@ -57,7 +69,7 @@ export default function ClientEdit({
                         owner_user_id: data.owner_user_id === 'none' ? '' : data.owner_user_id,
                     })}
                     options={{ preserveScroll: true }}
-                    className="space-y-6"
+                    className="grid gap-6 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
                 >
                     {({ processing, errors }) => (
                         <>

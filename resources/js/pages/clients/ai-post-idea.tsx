@@ -23,7 +23,7 @@ export default function AiPostIdeaShow({ client, idea }: { client: { id: number;
     return (
         <>
             <Head title={`${idea.title} — Post idea`} />
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
                 <Link
                     href={clientAiTabUrl(client.id)}
                     className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

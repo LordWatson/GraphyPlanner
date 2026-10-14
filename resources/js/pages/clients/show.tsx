@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -243,6 +242,20 @@ function getXsrfTokenFromCookie(): string {
     const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
 
     return match ? decodeURIComponent(match[1]) : '';
+}
+
+function TabHeading({ icon: Icon, title, description }: { icon: typeof Share2; title: string; description: string }) {
+    return (
+        <div className="relative flex items-center gap-3 overflow-hidden">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-brand text-white shadow-sm">
+                <Icon className="size-4" />
+            </span>
+            <div className="flex flex-col">
+                <h2 className="font-serif text-lg font-semibold tracking-tight italic">{title}</h2>
+                <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+        </div>
+    );
 }
 
 const assetSourceIcon: Record<string, typeof UploadCloud> = {
@@ -847,7 +860,7 @@ export default function ClientShow({
                         value="social-accounts"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Social accounts" description="Platforms this client posts to" />
+                        <TabHeading icon={Share2} title="Social accounts" description="Platforms this client posts to" />
 
                         <>
                             <>
@@ -855,7 +868,7 @@ export default function ClientShow({
                                     <Form
                                         {...storeSocialAccount.form(client.id)}
                                         resetOnSuccess
-                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                        className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                                     >
                                 {({ processing, errors }) => (
                                     <>
@@ -982,7 +995,7 @@ export default function ClientShow({
                         value="campaigns"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Campaigns" description="Marketing campaigns for this client" />
+                        <TabHeading icon={Clapperboard} title="Campaigns" description="Marketing campaigns for this client" />
 
                         <>
                             <>
@@ -1086,7 +1099,7 @@ export default function ClientShow({
                         value="posts"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Posts" description="Scheduled content across social accounts" />
+                        <TabHeading icon={Send} title="Posts" description="Scheduled content across social accounts" />
 
                         <>
                             <>
@@ -1255,7 +1268,7 @@ export default function ClientShow({
                         value="assets"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
+                        <TabHeading icon={FileImage} title="Assets" description="Uploads and Figma/URL links for this client" />
 
                         <>
                             <>
@@ -1379,7 +1392,7 @@ export default function ClientShow({
                         value="billing"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Billing history" description="Invoices raised for this client" />
+                        <TabHeading icon={Receipt} title="Billing history" description="Invoices raised for this client" />
 
                         <>
                         {can.createInvoice && (
@@ -1489,7 +1502,7 @@ export default function ClientShow({
                         value="invitations"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Client portal access" description="Invite a named contact at this client to their own login" />
+                        <TabHeading icon={UserPlus} title="Client portal access" description="Invite a named contact at this client to their own login" />
 
                         <>
                         {can.createInvitation && (
@@ -1580,7 +1593,7 @@ export default function ClientShow({
                         value="ai"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Trends & Ideas" description="AI-discovered trends and fresh post ideas for this client" />
+                        <TabHeading icon={TrendingUp} title="Trends & Ideas" description="AI-discovered trends and fresh post ideas for this client" />
 
                         <div className="flex flex-wrap items-center gap-2">
                             {platformOptions.map((platform) => {
@@ -1782,7 +1795,7 @@ export default function ClientShow({
                         value="daily-briefs"
                         className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <Heading title="Daily Briefs" description="Nightly AI-generated trends and post ideas for this client" />
+                        <TabHeading icon={CalendarDays} title="Daily Briefs" description="Nightly AI-generated trends and post ideas for this client" />
 
                         <div className="flex flex-wrap items-center gap-2">
                             <Button type="button" size="sm" onClick={fetchDailyBriefs} disabled={briefsLoading}>

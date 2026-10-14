@@ -295,16 +295,21 @@ export default function Calendar({ occurrences, orgTimezone, filters, filterOpti
         <>
             <Head title="Calendar" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                <div className="bg-noise relative overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
                     <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
                     />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Content calendar</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex flex-col gap-1">
+                        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
+                            Schedule
+                        </span>
+                        <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">Content calendar</h1>
+                        <p className="max-w-xl text-sm text-primary-foreground/80">
                             Every scheduled post's targets, filterable and viewable by month, week, day, or list.
                         </p>
                     </div>
@@ -404,7 +409,7 @@ export default function Calendar({ occurrences, orgTimezone, filters, filterOpti
                     </Select>
                 </div>
 
-                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
                     {view === 'month' && renderMonthView()}
                     {view === 'week' && renderWeekView()}
                     {view === 'day' && renderDayView()}
