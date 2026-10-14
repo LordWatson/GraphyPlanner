@@ -9,6 +9,7 @@ enum Role: string
     case Designer = 'designer';
     case ClientReviewer = 'client_reviewer';
     case Viewer = 'viewer';
+    case SuperAdmin = 'super_admin';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum Role: string
             self::Designer => 'Designer',
             self::ClientReviewer => 'Client reviewer',
             self::Viewer => 'Viewer',
+            self::SuperAdmin => 'Super admin',
         };
     }
 }

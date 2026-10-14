@@ -90,4 +90,9 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->role === $role;
     }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === Role::SuperAdmin;
+    }
 }
