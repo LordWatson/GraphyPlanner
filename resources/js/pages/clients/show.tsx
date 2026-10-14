@@ -14,6 +14,7 @@ import {
     Linkedin,
     Loader2,
     Mail,
+    MoreHorizontal,
     Music2,
     NotebookPen,
     Pencil,
@@ -50,9 +51,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index, destroy as destroyClient } from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
@@ -432,6 +432,15 @@ export default function ClientShow({
         }
     };
 
+    // Keeps the "Daily Briefs" stat card's count accurate without requiring the user to open
+    // the tab first.
+    useEffect(() => {
+        if (showAiPanel) {
+            fetchDailyBriefs();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showAiPanel]);
+
     const handleDeleteClient = () => {
         setDeleting(true);
         router.delete(destroyClient.url(client.id), {
@@ -532,11 +541,17 @@ export default function ClientShow({
         .filter((invoice) => invoice.status !== 'paid')
         .reduce((total, invoice) => total + Number(invoice.amount), 0);
 
-    const statCards = [
+    // The primary stats are always visible as a single row of cards; everything else (billing,
+    // portal access, AI insights) lives behind the "More stats" dropdown below so the header
+    // doesn't balloon into a long, messy multi-row grid as more features/cards are added.
+    const primaryStatCards = [
         { icon: Share2, label: 'Social accounts', value: socialAccounts.length, hint: 'Connected platforms', tab: 'social-accounts' },
         { icon: Clapperboard, label: 'Campaigns', value: campaigns.length, hint: 'Total campaigns', tab: 'campaigns' },
         { icon: Send, label: 'Posts', value: posts.length, hint: 'Scheduled & published', tab: 'posts' },
         { icon: FileImage, label: 'Assets', value: assets.length, hint: 'Uploads & links on file', tab: 'assets' },
+    ];
+
+    const secondaryStatCards = [
         ...(can.viewBilling
             ? [
                   {
@@ -560,7 +575,27 @@ export default function ClientShow({
                   },
               ]
             : []),
+        ...(showAiPanel
+            ? [
+                  {
+                      icon: Lightbulb,
+                      label: 'Trends & Ideas',
+                      value: trendItems.length + filteredIdeas.length,
+                      hint: `${trendItems.length} trend${trendItems.length === 1 ? '' : 's'}, ${filteredIdeas.length} idea${filteredIdeas.length === 1 ? '' : 's'}`,
+                      tab: 'ai',
+                  },
+                  {
+                      icon: CalendarDays,
+                      label: 'Daily Briefs',
+                      value: briefs.length,
+                      hint: 'Generated briefs on file',
+                      tab: 'daily-briefs',
+                  },
+              ]
+            : []),
     ];
+
+    const isSecondaryTabActive = secondaryStatCards.some((card) => card.tab === activeTab);
 
     return (
         <>
@@ -672,42 +707,71 @@ export default function ClientShow({
                     </DialogContent>
                 </Dialog>
 
-                <div
-                    className={cn(
-                        'grid gap-4 sm:grid-cols-2',
-                        statCards.length >= 6 ? 'lg:grid-cols-6' : statCards.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
-                    )}
-                >
-                    {statCards.map(({ icon: Icon, label, value, hint, tab, fullValue }) => (
+                <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
+                    {primaryStatCards.map(({ icon: Icon, label, value, hint, tab }) => (
                         <button
                             type="button"
                             key={label}
                             onClick={() => setActiveTab(tab)}
                             aria-current={activeTab === tab}
-                            className={`relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left shadow-sm transition-colors ${
+                            className={`relative flex min-w-[9.5rem] flex-1 flex-col gap-1.5 overflow-hidden rounded-xl border p-3 text-left shadow-sm transition-colors ${
                                 activeTab === tab ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'
                             }`}
                         >
                             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
                             <div className="flex items-center gap-2 text-muted-foreground">
-                                <span className="flex size-8 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
-                                    <Icon className="size-4" />
+                                <span className="flex size-7 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
+                                    <Icon className="size-3.5" />
                                 </span>
-                                <span className="text-xs">{label}</span>
+                                <span className="truncate text-xs">{label}</span>
                             </div>
-                            {fullValue ? (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="truncate text-3xl font-bold tabular-nums">{value}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom">{fullValue}</TooltipContent>
-                                </Tooltip>
-                            ) : (
-                                <span className="truncate text-3xl font-bold tabular-nums">{value}</span>
-                            )}
-                            <span className="text-xs text-muted-foreground">{hint}</span>
+                            <span className="truncate text-2xl font-bold tabular-nums">{value}</span>
+                            <span className="truncate text-xs text-muted-foreground">{hint}</span>
                         </button>
                     ))}
+
+                    {secondaryStatCards.length > 0 && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    aria-current={isSecondaryTabActive}
+                                    className={`relative flex min-w-[9.5rem] flex-1 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border p-3 text-center shadow-sm transition-colors ${
+                                        isSecondaryTabActive ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'
+                                    }`}
+                                >
+                                    <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
+                                    <span className="flex size-7 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
+                                        <MoreHorizontal className="size-3.5" />
+                                    </span>
+                                    <span className="text-xs font-medium">More stats</span>
+                                    <span className="truncate text-xs text-muted-foreground">
+                                        {secondaryStatCards.length} more card{secondaryStatCards.length === 1 ? '' : 's'}
+                                    </span>
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64">
+                                {secondaryStatCards.map(({ icon: Icon, label, value, hint, tab, fullValue }) => (
+                                    <DropdownMenuItem
+                                        key={label}
+                                        onSelect={() => setActiveTab(tab)}
+                                        className={`flex items-center gap-2.5 py-2 ${activeTab === tab ? 'bg-primary/5' : ''}`}
+                                    >
+                                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
+                                            <Icon className="size-3.5" />
+                                        </span>
+                                        <span className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate text-xs text-muted-foreground">{label}</span>
+                                            <span className="truncate text-xs">{hint}</span>
+                                        </span>
+                                        <span className="shrink-0 text-base font-bold tabular-nums" title={fullValue ?? undefined}>
+                                            {value}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
@@ -728,6 +792,10 @@ export default function ClientShow({
                             <FileImage />
                             Assets
                         </TabsTrigger>
+
+                        {(can.viewBilling || can.viewInvitations) && (
+                            <span aria-hidden className="mx-1 hidden h-6 w-px self-center bg-border sm:block" />
+                        )}
                         {can.viewBilling && (
                             <TabsTrigger value="billing">
                                 <Receipt />
@@ -739,6 +807,10 @@ export default function ClientShow({
                                 <UserPlus />
                                 Portal access
                             </TabsTrigger>
+                        )}
+
+                        {showAiPanel && (
+                            <span aria-hidden className="mx-1 hidden h-6 w-px self-center bg-border sm:block" />
                         )}
                         {showAiPanel && (
                             <TabsTrigger value="ai">
