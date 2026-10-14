@@ -365,6 +365,11 @@ export default function PostEdit({
     // Step 2.6 — per-suggestion platform policy warnings (e.g. link/hashtag rules), surfaced
     // next to each card so a human can decide instead of the AI silently rewriting anything.
     const [aiPolicyWarnings, setAiPolicyWarnings] = useState<string[][]>([]);
+    // Once a suggestion has been applied, the card list collapses to a small summary so it
+    // doesn't keep taking up space in the editor — the user can still expand it back if they
+    // want to compare/apply a different suggestion.
+    const [appliedSuggestionIndex, setAppliedSuggestionIndex] = useState<number | null>(null);
+    const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
 
     const fetchAiSuggestions = async () => {
         setAiError(null);
@@ -383,6 +388,8 @@ export default function PostEdit({
 
             setAiSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
             setAiPolicyWarnings(Array.isArray(data?.policyWarnings) ? data.policyWarnings : []);
+            setAppliedSuggestionIndex(null);
+            setSuggestionsExpanded(true);
         } catch (e) {
             setAiError(e instanceof Error ? e.message : 'Unable to fetch AI suggestions.');
         } finally {
@@ -390,13 +397,15 @@ export default function PostEdit({
         }
     };
 
-    const applyAiSuggestion = (suggestion: AiCaptionSuggestionData) => {
+    const applyAiSuggestion = (suggestion: AiCaptionSuggestionData, index: number) => {
         if (caption.trim() && !window.confirm('Replace the current caption with this AI suggestion?')) {
             return;
         }
 
         setCaption(suggestion.caption);
         setHashtags(suggestion.hashtags ?? []);
+        setAppliedSuggestionIndex(index);
+        setSuggestionsExpanded(false);
     };
 
     const toggleTargetAccount = (accountId: number) => {
@@ -726,37 +735,62 @@ export default function PostEdit({
                                     )}
                                     {showAiPanel && aiSuggestions.length > 0 && (
                                         <div className="mt-2 grid gap-2 rounded-md border border-border bg-muted/20 p-3">
-                                            <span className="text-xs font-medium text-muted-foreground">AI suggestions</span>
-                                            {aiSuggestions.map((suggestion, i) => (
-                                                <div key={i} className="grid gap-2 rounded-md border border-border bg-background p-3">
-                                                    <p className="text-sm whitespace-pre-wrap">{suggestion.caption}</p>
-                                                    {suggestion.hashtags.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {suggestion.hashtags.map((tag, ti) => (
-                                                                <Badge key={ti} variant="outline">#{tag}</Badge>
-                                                            ))}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    AI suggestions
+                                                    {appliedSuggestionIndex !== null && ' · applied ✓'}
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 px-2 text-xs"
+                                                    onClick={() => setSuggestionsExpanded((current) => !current)}
+                                                >
+                                                    {suggestionsExpanded ? 'Collapse' : 'Show suggestions'}
+                                                </Button>
+                                            </div>
+                                            {!suggestionsExpanded && appliedSuggestionIndex !== null && (
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    Using: {aiSuggestions[appliedSuggestionIndex]?.caption}
+                                                </p>
+                                            )}
+                                            {suggestionsExpanded &&
+                                                aiSuggestions.map((suggestion, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className={`grid gap-2 rounded-md border bg-background p-3 ${
+                                                            appliedSuggestionIndex === i ? 'border-primary' : 'border-border'
+                                                        }`}
+                                                    >
+                                                        <p className="text-sm whitespace-pre-wrap">{suggestion.caption}</p>
+                                                        {suggestion.hashtags.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {suggestion.hashtags.map((tag, ti) => (
+                                                                    <Badge key={ti} variant="outline">#{tag}</Badge>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {suggestion.altText && (
+                                                            <p className="text-xs text-muted-foreground">Alt text: {suggestion.altText}</p>
+                                                        )}
+                                                        {suggestion.firstComment && (
+                                                            <p className="text-xs text-muted-foreground">First comment: {suggestion.firstComment}</p>
+                                                        )}
+                                                        {(aiPolicyWarnings[i] ?? []).length > 0 && (
+                                                            <ul className="grid gap-0.5">
+                                                                {aiPolicyWarnings[i].map((warning, wi) => (
+                                                                    <li key={wi} className="text-xs text-amber-600 dark:text-amber-500">⚠ {warning}</li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                        <div>
+                                                            <Button type="button" size="sm" onClick={() => applyAiSuggestion(suggestion, i)}>
+                                                                {appliedSuggestionIndex === i ? 'Applied ✓' : 'Apply'}
+                                                            </Button>
                                                         </div>
-                                                    )}
-                                                    {suggestion.altText && (
-                                                        <p className="text-xs text-muted-foreground">Alt text: {suggestion.altText}</p>
-                                                    )}
-                                                    {suggestion.firstComment && (
-                                                        <p className="text-xs text-muted-foreground">First comment: {suggestion.firstComment}</p>
-                                                    )}
-                                                    {(aiPolicyWarnings[i] ?? []).length > 0 && (
-                                                        <ul className="grid gap-0.5">
-                                                            {aiPolicyWarnings[i].map((warning, wi) => (
-                                                                <li key={wi} className="text-xs text-amber-600 dark:text-amber-500">⚠ {warning}</li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
-                                                    <div>
-                                                        <Button type="button" size="sm" onClick={() => applyAiSuggestion(suggestion)}>
-                                                            Apply
-                                                        </Button>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ))}
                                         </div>
                                     )}
                                 </div>

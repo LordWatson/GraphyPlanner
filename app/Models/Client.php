@@ -131,6 +131,22 @@ class Client extends Model
     }
 
     /**
+     * @return HasMany<AiTrend, $this>
+     */
+    public function aiTrends(): HasMany
+    {
+        return $this->hasMany(AiTrend::class);
+    }
+
+    /**
+     * @return HasMany<AiPostIdea, $this>
+     */
+    public function aiPostIdeas(): HasMany
+    {
+        return $this->hasMany(AiPostIdea::class);
+    }
+
+    /**
      * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
      *
      * @return array{status: \App\Enums\ClientHealth, reason: string}

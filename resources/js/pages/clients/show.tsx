@@ -12,6 +12,7 @@ import {
     Lightbulb,
     Link2,
     Linkedin,
+    Loader2,
     Mail,
     Music2,
     NotebookPen,
@@ -20,6 +21,7 @@ import {
     Send,
     Share2,
     Trash2,
+    TrendingUp,
     UploadCloud,
     UserPlus,
     Wallet,
@@ -67,6 +69,8 @@ import { store as storeInvitation } from '@/routes/clients/invitations';
 import { destroy as destroyInvitation } from '@/routes/invitations';
 import aiClients from '@/routes/clients/ai';
 import dailyBriefs from '@/routes/clients/daily-briefs';
+import { show as showAiTrend } from '@/routes/ai-trends';
+import { show as showAiPostIdea } from '@/routes/ai-post-ideas';
 
 type ClientData = {
     id: number;
@@ -295,7 +299,14 @@ export default function ClientShow({
     posts: PostData[];
     targetAccounts: TargetAccountData[];
     invitations: InvitationData[];
-    ai?: { enabled: boolean; canUse: boolean; pillars: string[]; campaigns: { id: number; name: string }[] };
+    ai?: {
+        enabled: boolean;
+        canUse: boolean;
+        pillars: string[];
+        campaigns: { id: number; name: string }[];
+        trends: { id: number; title: string; summary: string | null; platforms: string[]; confidence: number }[];
+        ideas: { id: number; title: string; description: string | null; platforms: string[]; suggestedCaption: string | null; post_id: number | null }[];
+    };
 }) {
     const { currency } = usePage().props;
     const [activeTab, setActiveTab] = useState('social-accounts');
@@ -313,8 +324,13 @@ export default function ClientShow({
     const [aiPlatforms, setAiPlatforms] = useState<string[]>(['instagram']);
     const [aiPillarFilter, setAiPillarFilter] = useState<string>('');
     const [aiCampaignFilter, setAiCampaignFilter] = useState<string>('');
-    const [trendItems, setTrendItems] = useState<{ title: string; summary: string; platforms: string[]; confidence: number }[]>([]);
-    const [ideaItems, setIdeaItems] = useState<{ title: string; description: string; platforms: string[]; suggestedCaption: string | null }[]>([]);
+    const [aiTypeFilter, setAiTypeFilter] = useState<'all' | 'trend' | 'idea'>('all');
+    const [aiListPlatformFilter, setAiListPlatformFilter] = useState<string>('');
+    // Trends/ideas are now persisted server-side (see ClientController@show and AiController),
+    // so the list is seeded straight from the `ai` prop and survives a page refresh — Refresh
+    // just triggers a new AI call, which saves its results, then reloads this prop.
+    const trendItems = ai?.trends ?? [];
+    const ideaItems = ai?.ideas ?? [];
 
     const fetchTrendsAndIdeas = async () => {
         setAiError(null);
@@ -337,8 +353,9 @@ export default function ClientShow({
             if (!trendsRes.ok) throw new Error(typeof trendsData?.message === 'string' ? trendsData.message : 'Unable to fetch trends.');
             if (!ideasRes.ok) throw new Error(typeof ideasData?.message === 'string' ? ideasData.message : 'Unable to fetch ideas.');
 
-            setTrendItems(Array.isArray(trendsData?.trends) ? trendsData.trends : []);
-            setIdeaItems(Array.isArray(ideasData?.ideas) ? ideasData.ideas : []);
+            // The endpoints above already persisted the fresh trends/ideas server-side —
+            // reload the `ai` prop so the list (with real ids for the detail pages) reflects it.
+            router.reload({ only: ['ai'] });
         } catch (e) {
             setAiError(e instanceof Error ? e.message : 'Unable to fetch AI data.');
         } finally {
@@ -347,7 +364,7 @@ export default function ClientShow({
     };
 
     const filteredIdeas = ideaItems.filter((idea) => {
-        const text = `${idea.title} ${idea.description}`.toLowerCase();
+        const text = `${idea.title} ${idea.description ?? ''}`.toLowerCase();
 
         if (aiPillarFilter && !text.includes(aiPillarFilter.toLowerCase())) {
             return false;
@@ -359,6 +376,35 @@ export default function ClientShow({
 
         return true;
     });
+
+    // Merge trends and ideas into a single list, tagged with their type, so they can be
+    // shown together (newest first) in one paginated list instead of two side-by-side lists.
+    const AI_ITEMS_PER_PAGE = 5;
+    const combinedAiItems = [
+        ...trendItems.map((trend) => ({ type: 'trend' as const, item: trend })),
+        ...filteredIdeas.map((idea) => ({ type: 'idea' as const, item: idea })),
+    ].filter(({ type, item }) => {
+        if (aiTypeFilter !== 'all' && type !== aiTypeFilter) {
+            return false;
+        }
+
+        if (aiListPlatformFilter && !item.platforms.includes(aiListPlatformFilter)) {
+            return false;
+        }
+
+        return true;
+    });
+    const [aiPage, setAiPage] = useState(1);
+    const aiTotalPages = Math.max(1, Math.ceil(combinedAiItems.length / AI_ITEMS_PER_PAGE));
+    const aiCurrentPage = Math.min(aiPage, aiTotalPages);
+    const paginatedAiItems = combinedAiItems.slice(
+        (aiCurrentPage - 1) * AI_ITEMS_PER_PAGE,
+        aiCurrentPage * AI_ITEMS_PER_PAGE,
+    );
+
+    useEffect(() => {
+        setAiPage(1);
+    }, [trendItems.length, filteredIdeas.length, aiTypeFilter, aiListPlatformFilter]);
 
     // Step 2.5 — "Daily Briefs" tab. Same gating as the AI panel above.
     const [briefsLoading, setBriefsLoading] = useState(false);
@@ -1478,6 +1524,45 @@ export default function ClientShow({
 
                         <div className="flex flex-wrap gap-3">
                             <div className="grid gap-1">
+                                <Label>Filter by type</Label>
+                                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                                    {([
+                                        { value: 'all', label: 'All' },
+                                        { value: 'trend', label: 'Trends' },
+                                        { value: 'idea', label: 'Ideas' },
+                                    ] as const).map((option) => (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => setAiTypeFilter(option.value)}
+                                            className={`rounded-sm px-2.5 py-1 text-xs transition-colors ${
+                                                aiTypeFilter === option.value
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid gap-1">
+                                <Label htmlFor="ai-list-platform-filter">Filter by channel</Label>
+                                <Select value={aiListPlatformFilter || '__all'} onValueChange={(v) => setAiListPlatformFilter(v === '__all' ? '' : v)}>
+                                    <SelectTrigger id="ai-list-platform-filter" className="w-48">
+                                        <SelectValue placeholder="All channels" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__all">All channels</SelectItem>
+                                        {platformOptions.map((platform) => (
+                                            <SelectItem key={platform.value} value={platform.value}>
+                                                {platform.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-1">
                                 <Label htmlFor="ai-pillar-filter">Filter ideas by pillar</Label>
                                 <Select value={aiPillarFilter || '__all'} onValueChange={(v) => setAiPillarFilter(v === '__all' ? '' : v)}>
                                     <SelectTrigger id="ai-pillar-filter" className="w-48">
@@ -1511,47 +1596,94 @@ export default function ClientShow({
                             </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <h3 className="text-sm font-medium text-muted-foreground">Trends</h3>
-                                {trendItems.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No trends yet. Click Refresh.</p>
-                                ) : (
-                                    trendItems.map((trend, i) => (
-                                        <div key={i} className="rounded-md border border-border p-3">
-                                            <div className="font-medium">{trend.title}</div>
-                                            <p className="text-sm text-muted-foreground">{trend.summary}</p>
-                                            {trend.platforms.length > 0 && (
+                        <div className="relative grid gap-2">
+                            {aiLoading && (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-md bg-background/70 text-sm text-muted-foreground backdrop-blur-sm">
+                                    <Loader2 className="size-4 animate-spin" />
+                                    Loading trends &amp; ideas…
+                                </div>
+                            )}
+
+                            {combinedAiItems.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No trends or ideas saved yet, or none match the current filters.</p>
+                            ) : (
+                                paginatedAiItems.map(({ type, item }) =>
+                                    type === 'trend' ? (
+                                        <Link
+                                            key={`trend-${item.id}`}
+                                            href={showAiTrend(item.id)}
+                                            className="flex flex-col gap-1 rounded-md border border-border p-3 transition-colors hover:border-primary hover:bg-primary/5"
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="font-medium">{item.title}</div>
+                                                <Badge variant="outline" className="inline-flex items-center gap-1">
+                                                    <TrendingUp className="size-3" />
+                                                    Trend
+                                                </Badge>
+                                            </div>
+                                            <p className="line-clamp-2 text-sm text-muted-foreground">{item.summary}</p>
+                                            {item.platforms.length > 0 && (
                                                 <div className="mt-1 flex flex-wrap gap-1">
-                                                    {trend.platforms.map((p, pi) => (
+                                                    {item.platforms.map((p, pi) => (
                                                         <Badge key={pi} variant="outline">{p}</Badge>
                                                     ))}
                                                 </div>
                                             )}
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <div className="grid gap-2">
-                                <h3 className="text-sm font-medium text-muted-foreground">Ideas</h3>
-                                {filteredIdeas.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No ideas match the current filters.</p>
-                                ) : (
-                                    filteredIdeas.map((idea, i) => (
-                                        <div key={i} className="rounded-md border border-border p-3">
-                                            <div className="font-medium">{idea.title}</div>
-                                            <p className="text-sm text-muted-foreground">{idea.description}</p>
-                                            {idea.platforms.length > 0 && (
+                                        </Link>
+                                    ) : (
+                                        <Link
+                                            key={`idea-${item.id}`}
+                                            href={showAiPostIdea(item.id)}
+                                            className="flex flex-col gap-1 rounded-md border border-border p-3 transition-colors hover:border-primary hover:bg-primary/5"
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="font-medium">{item.title}</div>
+                                                <div className="flex items-center gap-2">
+                                                    {item.post_id && <Badge variant="success">Draft created</Badge>}
+                                                    <Badge variant="outline" className="inline-flex items-center gap-1">
+                                                        <Lightbulb className="size-3" />
+                                                        Idea
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <p className="line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
+                                            {item.platforms.length > 0 && (
                                                 <div className="mt-1 flex flex-wrap gap-1">
-                                                    {idea.platforms.map((p, pi) => (
+                                                    {item.platforms.map((p, pi) => (
                                                         <Badge key={pi} variant="outline">{p}</Badge>
                                                     ))}
                                                 </div>
                                             )}
-                                        </div>
-                                    ))
-                                )}
-                            </div>
+                                        </Link>
+                                    ),
+                                )
+                            )}
+
+                            {combinedAiItems.length > 0 && aiTotalPages > 1 && (
+                                <div className="flex items-center justify-between pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setAiPage((p) => Math.max(1, p - 1))}
+                                        disabled={aiCurrentPage <= 1}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground">
+                                        Page {aiCurrentPage} of {aiTotalPages}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setAiPage((p) => Math.min(aiTotalPages, p + 1))}
+                                        disabled={aiCurrentPage >= aiTotalPages}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </TabsContent>
                     )}

@@ -7,12 +7,18 @@ use App\Actions\AI\RecommendPostsAction;
 use App\Actions\AI\SuggestCaptionsForPostAction;
 use App\Enums\Platform;
 use App\Enums\Role;
+use App\Models\AiPostIdea;
+use App\Models\AiTrend;
 use App\Models\Client;
 use App\Models\Post;
 use App\Services\AI\AiGuardrailService;
+use App\Support\AI\AiPostIdea as AiPostIdeaDto;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Thin controller wiring the Step 2.3 AI Actions up to the editor's "Suggest with AI" panel
@@ -84,6 +90,80 @@ class AiController extends Controller
             ->all();
 
         return response()->json(['suggestions' => $suggestions, 'policyWarnings' => $policyWarnings]);
+    }
+
+    /**
+     * Detail page for a single persisted trend, giving the "Trends & Ideas" panel the same
+     * list → detail pattern used by the rest of the app instead of a dense inline card.
+     */
+    public function showTrend(Request $request, AiTrend $aiTrend): Response
+    {
+        abort_unless((bool) config('ai.enabled', false), 404);
+        $this->authorize('view', $aiTrend->client);
+        $this->authorizeAiUse($request, $aiTrend->org_id);
+
+        return Inertia::render('clients/ai-trend', [
+            'client' => ['id' => $aiTrend->client->id, 'name' => $aiTrend->client->name],
+            'trend' => [
+                'id' => $aiTrend->id,
+                'title' => $aiTrend->title,
+                'summary' => $aiTrend->summary,
+                'platforms' => $aiTrend->platforms ?? [],
+                'confidence' => $aiTrend->confidence,
+                'created_at' => $aiTrend->created_at?->toDateTimeString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Detail page for a single persisted idea, with a "Turn into draft post" action
+     * (`RecommendPostsAction::persist()`) only ever triggered by this explicit, confirmed click.
+     */
+    public function showIdea(Request $request, AiPostIdea $aiPostIdea): Response
+    {
+        abort_unless((bool) config('ai.enabled', false), 404);
+        $this->authorize('view', $aiPostIdea->client);
+        $this->authorizeAiUse($request, $aiPostIdea->org_id);
+
+        return Inertia::render('clients/ai-post-idea', [
+            'client' => ['id' => $aiPostIdea->client->id, 'name' => $aiPostIdea->client->name],
+            'idea' => [
+                'id' => $aiPostIdea->id,
+                'title' => $aiPostIdea->title,
+                'description' => $aiPostIdea->description,
+                'platforms' => $aiPostIdea->platforms ?? [],
+                'suggestedCaption' => $aiPostIdea->suggested_caption,
+                'suggestedPostAt' => $aiPostIdea->suggested_post_at,
+                'post_id' => $aiPostIdea->post_id,
+                'created_at' => $aiPostIdea->created_at?->toDateTimeString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Turns a single persisted idea into a real draft Post, only when explicitly requested from
+     * its detail page — mirrors `RecommendPostsAction::persist()`'s "never automatic" rule.
+     */
+    public function persistIdea(Request $request, AiPostIdea $aiPostIdea, RecommendPostsAction $action): RedirectResponse
+    {
+        abort_unless((bool) config('ai.enabled', false), 404);
+        $this->authorize('view', $aiPostIdea->client);
+        $this->authorizeAiUse($request, $aiPostIdea->org_id);
+
+        if ($aiPostIdea->post_id === null) {
+            $dto = new AiPostIdeaDto(
+                title: $aiPostIdea->title,
+                description: (string) $aiPostIdea->description,
+                platforms: $aiPostIdea->platforms ?? [],
+                suggestedCaption: $aiPostIdea->suggested_caption,
+                suggestedPostAt: $aiPostIdea->suggested_post_at,
+            );
+
+            $action->persist($aiPostIdea->client, $dto);
+            $aiPostIdea->refresh();
+        }
+
+        return to_route('posts.edit', $aiPostIdea->post_id);
     }
 
     /**

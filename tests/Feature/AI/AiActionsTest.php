@@ -16,6 +16,7 @@ use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
@@ -53,6 +54,49 @@ class AiActionsTest extends TestCase
 
         $this->assertCount(1, $trends->trends);
         $this->assertSame('Trend', $trends->trends[0]->title);
+
+        // Trends survive a page refresh: they're persisted (keyed on client_id+title) so the
+        // "Trends & Ideas" panel isn't empty until Refresh is clicked again.
+        $this->assertDatabaseHas('ai_trends', [
+            'client_id' => $client->id,
+            'title' => 'Trend',
+            'summary' => 'Summary',
+        ]);
+    }
+
+    public function test_discover_trends_action_discards_a_stale_or_incompatible_cached_value(): void
+    {
+        $client = Client::factory()->create();
+
+        $this->app->instance(AiProvider::class, new class implements AiProvider
+        {
+            public function suggestCaptions(Post $post): AiCaptionSuggestions
+            {
+                return new AiCaptionSuggestions();
+            }
+
+            public function recommendPosts(Client $client): AiPostIdeas
+            {
+                return new AiPostIdeas();
+            }
+
+            public function discoverTrends(Client $client, array $platforms): AiTrends
+            {
+                return new AiTrends([new AiTrend(title: 'Fresh', summary: 'Summary', platforms: $platforms, confidence: 0.9)]);
+            }
+        });
+
+        // Simulate a stale/incompatible cache entry (e.g. one unserialized as
+        // __PHP_Incomplete_Class after the AiTrends DTO changed shape) by seeding the
+        // exact cache key the action will look up with a value that isn't an AiTrends.
+        $sorted = ['instagram'];
+        Cache::put(sprintf('ai:trends:%d:%s', $client->id, implode(',', $sorted)), 'not-a-valid-trends-object', 3600);
+
+        $trends = $this->app->make(DiscoverTrendsAction::class)($client, ['instagram']);
+
+        $this->assertInstanceOf(AiTrends::class, $trends);
+        $this->assertCount(1, $trends->trends);
+        $this->assertSame('Fresh', $trends->trends[0]->title);
     }
 
     public function test_recommend_posts_action_can_persist_a_chosen_idea_as_a_draft_post(): void
@@ -80,6 +124,13 @@ class AiActionsTest extends TestCase
         $action = $this->app->make(RecommendPostsAction::class);
         $ideas = $action($client);
 
+        // Ideas survive a page refresh too, the same way trends do.
+        $this->assertDatabaseHas('ai_post_ideas', [
+            'client_id' => $client->id,
+            'title' => 'Idea',
+            'description' => 'Desc',
+        ]);
+
         $post = $action->persist($client, $ideas->ideas[0]);
 
         $this->assertDatabaseHas('posts', [
@@ -87,6 +138,13 @@ class AiActionsTest extends TestCase
             'client_id' => $client->id,
             'status' => PostStatus::Idea->value,
             'master_caption' => 'Caption',
+        ]);
+
+        // Turning the idea into a draft post links the two rows together.
+        $this->assertDatabaseHas('ai_post_ideas', [
+            'client_id' => $client->id,
+            'title' => 'Idea',
+            'post_id' => $post->id,
         ]);
     }
 

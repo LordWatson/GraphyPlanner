@@ -173,6 +173,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('posts/{post}/ai/captions', [AiController::class, 'captions'])
         ->name('posts.ai.captions');
 
+    // Trends & Ideas now persist (Step 2.4 follow-up) so each discovered trend/idea gets its
+    // own detail page, the same list → detail pattern as the rest of the app.
+    Route::get('ai-trends/{aiTrend}', [AiController::class, 'showTrend'])
+        ->name('ai-trends.show');
+    Route::get('ai-post-ideas/{aiPostIdea}', [AiController::class, 'showIdea'])
+        ->name('ai-post-ideas.show');
+    Route::post('ai-post-ideas/{aiPostIdea}/persist', [AiController::class, 'persistIdea'])
+        ->name('ai-post-ideas.persist');
+
     // Step 2.5: internal-only "Daily Briefs" tab listing the nightly DailyBrief rows for a
     // client, same gating as the AI endpoints above.
     Route::get('clients/{client}/daily-briefs', [DailyBriefController::class, 'index'])

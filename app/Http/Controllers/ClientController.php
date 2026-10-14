@@ -91,6 +91,7 @@ class ClientController extends Controller
         $canViewAssets = $user->can('viewAny', [Asset::class, $client]);
         $canViewPosts = $user->can('viewAny', [Post::class, $client]);
         $canViewInvitations = $user->can('viewAny', [ClientInvitation::class, $client]);
+        $canUseAi = (bool) config('ai.enabled', false) && in_array($user->role, [Role::Owner, Role::Strategist], true);
 
         $campaigns = $canViewCampaigns
             ? $client->campaigns()->latest()->get()
@@ -162,6 +163,27 @@ class ClientController extends Controller
                     'id' => $campaign->id,
                     'name' => $campaign->name,
                 ])->values(),
+                // Persisted trends/ideas (list → detail pattern) so the "Trends & Ideas" tab
+                // isn't empty on every page load — only Refresh triggers a new AI call.
+                'trends' => $canUseAi
+                    ? $client->aiTrends()->latest()->get()->map(fn ($trend) => [
+                        'id' => $trend->id,
+                        'title' => $trend->title,
+                        'summary' => $trend->summary,
+                        'platforms' => $trend->platforms ?? [],
+                        'confidence' => $trend->confidence,
+                    ])->values()
+                    : [],
+                'ideas' => $canUseAi
+                    ? $client->aiPostIdeas()->latest()->get()->map(fn ($idea) => [
+                        'id' => $idea->id,
+                        'title' => $idea->title,
+                        'description' => $idea->description,
+                        'platforms' => $idea->platforms ?? [],
+                        'suggestedCaption' => $idea->suggested_caption,
+                        'post_id' => $idea->post_id,
+                    ])->values()
+                    : [],
             ],
         ]);
     }

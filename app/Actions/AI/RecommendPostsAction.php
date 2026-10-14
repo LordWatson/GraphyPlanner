@@ -4,6 +4,7 @@ namespace App\Actions\AI;
 
 use App\Contracts\AiProvider;
 use App\Enums\PostStatus;
+use App\Models\AiPostIdea as PersistedAiPostIdea;
 use App\Models\Client;
 use App\Models\Post;
 use App\Services\AI\AiGuardrailService;
@@ -33,10 +34,40 @@ class RecommendPostsAction
 
         $ideas = $this->ai->recommendPosts($client);
 
-        return $this->guardrail->filterPostIdeas($client->brandBrain, $ideas, [
+        $filtered = $this->guardrail->filterPostIdeas($client->brandBrain, $ideas, [
             'client_id' => $client->id,
             'org_id' => $client->org_id,
         ]);
+
+        $this->persistIdeas($client, $filtered);
+
+        return $filtered;
+    }
+
+    /**
+     * Upserts the recommended ideas (keyed on client_id+title) so the Trends & Ideas panel
+     * survives a page refresh instead of only existing in the request-scoped DTO.
+     */
+    private function persistIdeas(Client $client, AiPostIdeas $ideas): void
+    {
+        if ($ideas->ideas === []) {
+            return;
+        }
+
+        DB::transaction(function () use ($client, $ideas) {
+            foreach ($ideas->ideas as $idea) {
+                PersistedAiPostIdea::query()->updateOrCreate(
+                    ['client_id' => $client->id, 'title' => $idea->title],
+                    [
+                        'org_id' => $client->org_id,
+                        'description' => $idea->description,
+                        'platforms' => $idea->platforms,
+                        'suggested_caption' => $idea->suggestedCaption,
+                        'suggested_post_at' => $idea->suggestedPostAt,
+                    ],
+                );
+            }
+        });
     }
 
     /**
@@ -53,6 +84,11 @@ class RecommendPostsAction
                 'status' => PostStatus::Idea,
                 'master_caption' => $idea->suggestedCaption,
             ]);
+
+            PersistedAiPostIdea::query()
+                ->where('client_id', $client->id)
+                ->where('title', $idea->title)
+                ->update(['post_id' => $post->id]);
 
             Log::info('AI post idea persisted as draft post', [
                 'client_id' => $client->id,
