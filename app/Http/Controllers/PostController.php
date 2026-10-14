@@ -12,6 +12,7 @@ use App\Actions\Posts\UpdatePostAction;
 use App\Actions\Publishing\SearchMusicAction;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
@@ -104,6 +105,10 @@ class PostController extends Controller
                 'id' => $mentionable->id,
                 'name' => $mentionable->name,
             ])->values(),
+            'ai' => [
+                'enabled' => (bool) config('ai.enabled', false),
+                'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
+            ],
         ]);
     }
 

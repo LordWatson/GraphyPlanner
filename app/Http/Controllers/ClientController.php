@@ -7,6 +7,7 @@ use App\Actions\Clients\UpdateClientAction;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Enums\InvoiceStatus;
+use App\Enums\Role;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Asset;
@@ -153,6 +154,15 @@ class ClientController extends Controller
                     ->get()
                     ->map(fn (ClientInvitation $invitation) => $this->transformInvitation($invitation, $user))
                 : [],
+            'ai' => [
+                'enabled' => (bool) config('ai.enabled', false),
+                'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
+                'pillars' => $client->brandBrain?->content_pillars ?? [],
+                'campaigns' => $campaigns->map(fn (Campaign $campaign) => [
+                    'id' => $campaign->id,
+                    'name' => $campaign->name,
+                ])->values(),
+            ],
         ]);
     }
 

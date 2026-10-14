@@ -4,6 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Global AI feature flag (Step 2.4)
+    |--------------------------------------------------------------------------
+    |
+    | Checked by App\Http\Controllers\AiController and the editor/dashboard UI props before
+    | exposing any AI endpoints or panels. The per-org enable switch and the logic that
+    | actually swaps AppServiceProvider's AiProvider::class binding to DeepSeekProvider are
+    | still Step 2.7's job — until then this only gates the UI/controller surface added here,
+    | while the Actions themselves keep resolving the safe NullAiProvider.
+    |
+    */
+    'enabled' => env('AI_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | DeepSeek (Phase 2 AI provider, Step 2.2)
     |--------------------------------------------------------------------------
     |

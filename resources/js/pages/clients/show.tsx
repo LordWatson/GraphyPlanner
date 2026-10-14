@@ -9,6 +9,7 @@ import {
     Globe,
     Instagram,
     Languages,
+    Lightbulb,
     Link2,
     Linkedin,
     Mail,
@@ -64,6 +65,7 @@ import { store as storeInvoice } from '@/routes/clients/invoices';
 import { show as showInvoice, send as sendInvoice, markPaid as markPaidInvoice } from '@/routes/invoices';
 import { store as storeInvitation } from '@/routes/clients/invitations';
 import { destroy as destroyInvitation } from '@/routes/invitations';
+import aiClients from '@/routes/clients/ai';
 
 type ClientData = {
     id: number;
@@ -269,6 +271,7 @@ export default function ClientShow({
     targetAccounts,
     timezones,
     invitations,
+    ai,
 }: {
     client: ClientData;
     can: {
@@ -291,6 +294,7 @@ export default function ClientShow({
     posts: PostData[];
     targetAccounts: TargetAccountData[];
     invitations: InvitationData[];
+    ai?: { enabled: boolean; canUse: boolean; pillars: string[]; campaigns: { id: number; name: string }[] };
 }) {
     const { currency } = usePage().props;
     const [activeTab, setActiveTab] = useState('social-accounts');
@@ -300,6 +304,60 @@ export default function ClientShow({
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteConfirmName, setDeleteConfirmName] = useState('');
     const [deleting, setDeleting] = useState(false);
+
+    // Step 2.4 — "Trends & Ideas" panel. Owner/Strategist only, gated behind config('ai.enabled').
+    const showAiPanel = Boolean(ai?.enabled && ai?.canUse);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [aiPlatforms, setAiPlatforms] = useState<string[]>(['instagram']);
+    const [aiPillarFilter, setAiPillarFilter] = useState<string>('');
+    const [aiCampaignFilter, setAiCampaignFilter] = useState<string>('');
+    const [trendItems, setTrendItems] = useState<{ title: string; summary: string; platforms: string[]; confidence: number }[]>([]);
+    const [ideaItems, setIdeaItems] = useState<{ title: string; description: string; platforms: string[]; suggestedCaption: string | null }[]>([]);
+
+    const fetchTrendsAndIdeas = async () => {
+        setAiError(null);
+        setAiLoading(true);
+
+        try {
+            const [trendsRes, ideasRes] = await Promise.all([
+                fetch(aiClients.trends.url(client.id, { query: { platforms: aiPlatforms } }), {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                }),
+                fetch(aiClients.ideas.url(client.id), {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                }),
+            ]);
+            const trendsData = await trendsRes.json();
+            const ideasData = await ideasRes.json();
+
+            if (!trendsRes.ok) throw new Error(typeof trendsData?.message === 'string' ? trendsData.message : 'Unable to fetch trends.');
+            if (!ideasRes.ok) throw new Error(typeof ideasData?.message === 'string' ? ideasData.message : 'Unable to fetch ideas.');
+
+            setTrendItems(Array.isArray(trendsData?.trends) ? trendsData.trends : []);
+            setIdeaItems(Array.isArray(ideasData?.ideas) ? ideasData.ideas : []);
+        } catch (e) {
+            setAiError(e instanceof Error ? e.message : 'Unable to fetch AI data.');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const filteredIdeas = ideaItems.filter((idea) => {
+        const text = `${idea.title} ${idea.description}`.toLowerCase();
+
+        if (aiPillarFilter && !text.includes(aiPillarFilter.toLowerCase())) {
+            return false;
+        }
+
+        if (aiCampaignFilter && !text.includes(aiCampaignFilter.toLowerCase())) {
+            return false;
+        }
+
+        return true;
+    });
 
     const handleDeleteClient = () => {
         setDeleting(true);
@@ -607,6 +665,12 @@ export default function ClientShow({
                             <TabsTrigger value="invitations">
                                 <UserPlus />
                                 Portal access
+                            </TabsTrigger>
+                        )}
+                        {showAiPanel && (
+                            <TabsTrigger value="ai">
+                                <Lightbulb />
+                                Trends & Ideas
                             </TabsTrigger>
                         )}
                     </TabsList>
@@ -1340,6 +1404,122 @@ export default function ClientShow({
                             </div>
                         )}
                         </>
+                    </TabsContent>
+                    )}
+
+                    {showAiPanel && (
+                    <TabsContent
+                        value="ai"
+                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    >
+                        <Heading title="Trends & Ideas" description="AI-discovered trends and fresh post ideas for this client" />
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {platformOptions.map((platform) => {
+                                const selected = aiPlatforms.includes(platform.value);
+                                const PlatformIcon = platformIcon[platform.value] ?? Share2;
+
+                                return (
+                                    <button
+                                        key={platform.value}
+                                        type="button"
+                                        onClick={() =>
+                                            setAiPlatforms((current) =>
+                                                selected ? current.filter((v) => v !== platform.value) : [...current, platform.value],
+                                            )
+                                        }
+                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                            selected ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted/50 text-foreground'
+                                        }`}
+                                    >
+                                        <PlatformIcon className="size-3.5" />
+                                        {platform.label}
+                                    </button>
+                                );
+                            })}
+                            <Button type="button" size="sm" onClick={fetchTrendsAndIdeas} disabled={aiLoading}>
+                                {aiLoading ? 'Loading…' : 'Refresh'}
+                            </Button>
+                            {aiError && <span className="text-xs text-destructive">{aiError}</span>}
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                            <div className="grid gap-1">
+                                <Label htmlFor="ai-pillar-filter">Filter ideas by pillar</Label>
+                                <Select value={aiPillarFilter || '__all'} onValueChange={(v) => setAiPillarFilter(v === '__all' ? '' : v)}>
+                                    <SelectTrigger id="ai-pillar-filter" className="w-48">
+                                        <SelectValue placeholder="All pillars" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__all">All pillars</SelectItem>
+                                        {(ai?.pillars ?? []).map((pillar) => (
+                                            <SelectItem key={pillar} value={pillar}>
+                                                {pillar}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-1">
+                                <Label htmlFor="ai-campaign-filter">Filter ideas by campaign</Label>
+                                <Select value={aiCampaignFilter || '__all'} onValueChange={(v) => setAiCampaignFilter(v === '__all' ? '' : v)}>
+                                    <SelectTrigger id="ai-campaign-filter" className="w-48">
+                                        <SelectValue placeholder="All campaigns" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__all">All campaigns</SelectItem>
+                                        {(ai?.campaigns ?? []).map((campaign) => (
+                                            <SelectItem key={campaign.id} value={campaign.name}>
+                                                {campaign.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-2">
+                                <h3 className="text-sm font-medium text-muted-foreground">Trends</h3>
+                                {trendItems.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No trends yet. Click Refresh.</p>
+                                ) : (
+                                    trendItems.map((trend, i) => (
+                                        <div key={i} className="rounded-md border border-border p-3">
+                                            <div className="font-medium">{trend.title}</div>
+                                            <p className="text-sm text-muted-foreground">{trend.summary}</p>
+                                            {trend.platforms.length > 0 && (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    {trend.platforms.map((p, pi) => (
+                                                        <Badge key={pi} variant="outline">{p}</Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="grid gap-2">
+                                <h3 className="text-sm font-medium text-muted-foreground">Ideas</h3>
+                                {filteredIdeas.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No ideas match the current filters.</p>
+                                ) : (
+                                    filteredIdeas.map((idea, i) => (
+                                        <div key={i} className="rounded-md border border-border p-3">
+                                            <div className="font-medium">{idea.title}</div>
+                                            <p className="text-sm text-muted-foreground">{idea.description}</p>
+                                            {idea.platforms.length > 0 && (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    {idea.platforms.map((p, pi) => (
+                                                        <Badge key={pi} variant="outline">{p}</Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </TabsContent>
                     )}
                 </Tabs>

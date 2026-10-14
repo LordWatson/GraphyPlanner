@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AiController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
@@ -161,6 +162,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.activity-logs.resend-review-email');
     Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
         ->name('posts.music-search');
+
+    // Step 2.4: AI-assisted trends/ideas (client dashboard) and caption suggestions (post
+    // editor) — see AiController, gated behind config('ai.enabled') and Owner/Strategist.
+    Route::get('clients/{client}/ai/trends', [AiController::class, 'trends'])
+        ->name('clients.ai.trends');
+    Route::get('clients/{client}/ai/ideas', [AiController::class, 'ideas'])
+        ->name('clients.ai.ideas');
+    Route::get('posts/{post}/ai/captions', [AiController::class, 'captions'])
+        ->name('posts.ai.captions');
 
     // Step 6.1: client portal invitations (Owner/Strategist only, see ClientInvitationPolicy).
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])

@@ -41,9 +41,12 @@ import { store as storeAsset } from '@/routes/clients/assets';
 import { show as showClient } from '@/routes/clients';
 import { musicSearch as musicSearchRoute, update as updatePost, transition as transitionPost } from '@/routes/posts';
 import postActivityLogs from '@/routes/posts/activity-logs';
+import aiPosts from '@/routes/posts/ai';
 import { store as storeComment } from '@/routes/posts/comments';
 
 type MusicTrackResult = { id: string; name: string; artist: string | null };
+
+type AiCaptionSuggestionData = { caption: string; hashtags: string[]; altText: string | null; firstComment: string | null };
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
 
@@ -310,6 +313,7 @@ export default function PostEdit({
     can,
     hashtagSuggestions,
     mentionableUsers,
+    ai,
 }: {
     post: PostData;
     client: { id: number; name: string };
@@ -319,6 +323,7 @@ export default function PostEdit({
     can: { update: boolean; comment: boolean; resend_review_email: boolean; create_asset: boolean };
     hashtagSuggestions: string[];
     mentionableUsers: MentionableUser[];
+    ai?: { enabled: boolean; canUse: boolean };
 }) {
     const [caption, setCaption] = useState(post.master_caption ?? '');
     // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
@@ -349,6 +354,46 @@ export default function PostEdit({
     const [musicSearchErrorCode, setMusicSearchErrorCode] = useState<string | null>(null);
     const [musicPlatform, setMusicPlatform] = useState<string | null>(null);
     const [locationName, setLocationName] = useState((post.location?.name as string) ?? '');
+
+    // Step 2.4 — "Suggest with AI" caption panel. Never overwrites the caption/hashtags fields
+    // without an explicit "Apply" click, and the result still has to go through the normal Save
+    // action below before anything is actually persisted.
+    const showAiPanel = Boolean(ai?.enabled && ai?.canUse);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [aiSuggestions, setAiSuggestions] = useState<AiCaptionSuggestionData[]>([]);
+
+    const fetchAiSuggestions = async () => {
+        setAiError(null);
+        setAiLoading(true);
+
+        try {
+            const response = await fetch(aiPosts.captions.url(post.id), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(typeof data?.message === 'string' ? data.message : 'Unable to fetch AI suggestions.');
+            }
+
+            setAiSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
+        } catch (e) {
+            setAiError(e instanceof Error ? e.message : 'Unable to fetch AI suggestions.');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const applyAiSuggestion = (suggestion: AiCaptionSuggestionData) => {
+        if (caption.trim() && !window.confirm('Replace the current caption with this AI suggestion?')) {
+            return;
+        }
+
+        setCaption(suggestion.caption);
+        setHashtags(suggestion.hashtags ?? []);
+    };
 
     const toggleTargetAccount = (accountId: number) => {
         setTargetRows((current) => {
@@ -655,7 +700,14 @@ export default function PostEdit({
                         {({ processing, errors }) => (
                             <>
                                 <div className="grid gap-1">
-                                    <Label htmlFor="master_caption">Master caption</Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label htmlFor="master_caption">Master caption</Label>
+                                        {showAiPanel && (
+                                            <Button type="button" size="sm" variant="secondary" onClick={fetchAiSuggestions} disabled={aiLoading}>
+                                                {aiLoading ? 'Suggesting…' : 'Suggest with AI'}
+                                            </Button>
+                                        )}
+                                    </div>
                                     <textarea
                                         id="master_caption"
                                         name="master_caption"
@@ -665,6 +717,37 @@ export default function PostEdit({
                                         className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                                     />
                                     <InputError message={errors.master_caption} />
+                                    {showAiPanel && aiError && (
+                                        <p className="text-xs text-destructive">{aiError}</p>
+                                    )}
+                                    {showAiPanel && aiSuggestions.length > 0 && (
+                                        <div className="mt-2 grid gap-2 rounded-md border border-border bg-muted/20 p-3">
+                                            <span className="text-xs font-medium text-muted-foreground">AI suggestions</span>
+                                            {aiSuggestions.map((suggestion, i) => (
+                                                <div key={i} className="grid gap-2 rounded-md border border-border bg-background p-3">
+                                                    <p className="text-sm whitespace-pre-wrap">{suggestion.caption}</p>
+                                                    {suggestion.hashtags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {suggestion.hashtags.map((tag, ti) => (
+                                                                <Badge key={ti} variant="outline">#{tag}</Badge>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {suggestion.altText && (
+                                                        <p className="text-xs text-muted-foreground">Alt text: {suggestion.altText}</p>
+                                                    )}
+                                                    {suggestion.firstComment && (
+                                                        <p className="text-xs text-muted-foreground">First comment: {suggestion.firstComment}</p>
+                                                    )}
+                                                    <div>
+                                                        <Button type="button" size="sm" onClick={() => applyAiSuggestion(suggestion)}>
+                                                            Apply
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Message to client — commented out for now, may be re-added later.
