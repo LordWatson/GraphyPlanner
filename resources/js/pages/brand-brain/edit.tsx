@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import { BrainCircuit } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -48,23 +49,31 @@ export default function BrandBrainEdit({
         <>
             <Head title={`Brand brain — ${client.name}`} />
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                <div className="bg-noise relative flex flex-wrap items-center gap-3 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
                     <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
                     />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Brand brain</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
-                            Voice, audience, and creative rules for {client.name}.
-                        </p>
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex items-center gap-3">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
+                            <BrainCircuit className="size-5" />
+                        </span>
+                        <div className="flex flex-col gap-1">
+                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
+                                Brand brain
+                            </span>
+                            <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">{client.name}</h1>
+                            <p className="text-sm text-primary-foreground/80">Voice, audience, and creative rules for this client.</p>
+                        </div>
                     </div>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList>
+                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/60 p-1">
                         <TabsTrigger value="voice">Voice</TabsTrigger>
                         <TabsTrigger value="audience">Audience</TabsTrigger>
                         <TabsTrigger value="offer">Offer</TabsTrigger>

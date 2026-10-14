@@ -57,18 +57,28 @@ export default function StaffIndex({ members, invitations, roles, can }: StaffIn
         <>
             <Head title="Staff" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
+                <div className="bg-noise relative flex flex-wrap items-center gap-3 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
                     <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
+                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
                     />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Your team</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
-                            Everyone with access to your organization, and anyone still waiting on an invite.
-                        </p>
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
+                    />
+                    <div className="relative flex items-center gap-3">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
+                            <UsersRound className="size-5" />
+                        </span>
+                        <div className="flex flex-col gap-1">
+                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
+                                Team
+                            </span>
+                            <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">Your team</h1>
+                            <p className="text-sm text-primary-foreground/80">
+                                Everyone with access to your organization, and anyone still waiting on an invite.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -76,7 +86,7 @@ export default function StaffIndex({ members, invitations, roles, can }: StaffIn
                     <Form
                         {...StaffInvitationController.store.form()}
                         resetOnSuccess
-                        className="grid grid-cols-2 gap-3 rounded-lg border border-dashed border-border bg-card/50 p-4 sm:grid-cols-4"
+                        className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                     >
                         {({ processing, errors }) => (
                             <>
@@ -118,43 +128,32 @@ export default function StaffIndex({ members, invitations, roles, can }: StaffIn
                     <h2 className="text-sm font-medium text-muted-foreground">Members</h2>
 
                     {members.length === 0 ? (
-                        <div className="flex min-h-[20vh] flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card/50 p-8 text-center">
+                        <div className="flex min-h-[20vh] flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
                             <UsersRound className="size-6 text-muted-foreground" />
                             <p className="text-sm font-medium">No staff yet</p>
                         </div>
                     ) : (
-                        <div className="overflow-hidden rounded-lg border border-border bg-card">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                                        <th className="px-4 py-2 font-medium">Name</th>
-                                        <th className="px-4 py-2 font-medium">Email</th>
-                                        <th className="px-4 py-2 font-medium">Role</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {members.map((member) => (
-                                        <tr
-                                            key={member.id}
-                                            className="border-b border-border last:border-0 hover:bg-muted/50"
-                                        >
-                                            <td className="px-4 py-2">
-                                                <Link href={show(member.id)} className="font-medium hover:underline">
-                                                    {member.name}
-                                                </Link>
-                                            </td>
-                                            <td className="px-4 py-2 text-muted-foreground">{member.email}</td>
-                                            <td className="px-4 py-2">
-                                                {member.role && (
-                                                    <Badge variant={roleVariant[member.role] ?? 'outline'}>
-                                                        {member.role_label}
-                                                    </Badge>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {members.map((member) => (
+                                <Link
+                                    key={member.id}
+                                    href={show(member.id)}
+                                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
+                                >
+                                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-brand text-sm font-semibold text-white shadow-sm">
+                                        {member.name.charAt(0).toUpperCase()}
+                                    </span>
+                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                        <span className="truncate font-serif text-sm font-semibold italic">{member.name}</span>
+                                        <span className="truncate text-xs text-muted-foreground">{member.email}</span>
+                                    </div>
+                                    {member.role && (
+                                        <Badge variant={roleVariant[member.role] ?? 'outline'} className="shrink-0">
+                                            {member.role_label}
+                                        </Badge>
+                                    )}
+                                </Link>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -167,7 +166,7 @@ export default function StaffIndex({ members, invitations, roles, can }: StaffIn
                             {pendingInvitations.map((invitation) => (
                                 <div
                                     key={invitation.id}
-                                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                 >
                                     <div className="flex items-center gap-3">
                                         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -208,7 +207,7 @@ export default function StaffIndex({ members, invitations, roles, can }: StaffIn
                             {otherInvitations.map((invitation) => (
                                 <div
                                     key={invitation.id}
-                                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="flex flex-col gap-1">

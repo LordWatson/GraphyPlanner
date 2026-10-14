@@ -845,7 +845,7 @@ export default function ClientShow({
 
                     <TabsContent
                         value="social-accounts"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Social accounts" description="Platforms this client posts to" />
 
@@ -920,7 +920,7 @@ export default function ClientShow({
                                             return (
                                                 <div
                                                     key={account.id}
-                                                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                                 >
                                                     <div className="flex min-w-0 items-center gap-3">
                                                         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -980,7 +980,7 @@ export default function ClientShow({
 
                     <TabsContent
                         value="campaigns"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Campaigns" description="Marketing campaigns for this client" />
 
@@ -990,7 +990,7 @@ export default function ClientShow({
                                     <Form
                                         {...storeCampaign.form(client.id)}
                                         resetOnSuccess
-                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                        className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                                     >
                                         {({ processing, errors }) => (
                                             <>
@@ -1036,7 +1036,7 @@ export default function ClientShow({
                                         {campaigns.map((campaign) => (
                                             <div
                                                 key={campaign.id}
-                                                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                             >
                                                 <Link
                                                     href={showCampaign(campaign.id)}
@@ -1084,7 +1084,7 @@ export default function ClientShow({
 
                     <TabsContent
                         value="posts"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Posts" description="Scheduled content across social accounts" />
 
@@ -1095,7 +1095,7 @@ export default function ClientShow({
                                         {...storePost.form(client.id)}
                                         resetOnSuccess
                                         onSuccess={() => setSelectedTargetAccounts([])}
-                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                        className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                                     >
                                         {({ processing, errors }) => (
                                             <>
@@ -1207,7 +1207,7 @@ export default function ClientShow({
                                                         router.visit(editPost(post.id).url);
                                                     }
                                                 }}
-                                                className="flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3 transition-colors hover:border-primary/50 hover:bg-muted/40"
+                                                className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                             >
                                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
@@ -1253,7 +1253,7 @@ export default function ClientShow({
 
                     <TabsContent
                         value="assets"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Assets" description="Uploads and Figma/URL links for this client" />
 
@@ -1263,7 +1263,7 @@ export default function ClientShow({
                                     <Form
                                         {...storeAsset.form(client.id)}
                                         resetOnSuccess
-                                        className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                        className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                                         encType="multipart/form-data"
                                     >
                                         {({ processing, errors }) => (
@@ -1332,7 +1332,7 @@ export default function ClientShow({
                                             return (
                                             <div
                                                 key={asset.id}
-                                                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -1377,7 +1377,7 @@ export default function ClientShow({
                     {can.viewBilling && (
                     <TabsContent
                         value="billing"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Billing history" description="Invoices raised for this client" />
 
@@ -1386,7 +1386,7 @@ export default function ClientShow({
                             <Form
                                 {...storeInvoice.form(client.id)}
                                 resetOnSuccess
-                                className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                             >
                                 {({ processing, errors }) => (
                                     <>
@@ -1427,7 +1427,7 @@ export default function ClientShow({
                                 {invoices.map((invoice) => (
                                     <div
                                         key={invoice.id}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                     >
                                         <div className="flex items-center gap-3">
                                             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -1487,7 +1487,7 @@ export default function ClientShow({
                     {can.viewInvitations && (
                     <TabsContent
                         value="invitations"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Client portal access" description="Invite a named contact at this client to their own login" />
 
@@ -1496,7 +1496,7 @@ export default function ClientShow({
                             <Form
                                 {...storeInvitation.form(client.id)}
                                 resetOnSuccess
-                                className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-4"
+                                className="grid grid-cols-2 gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-4 shadow-sm sm:grid-cols-4"
                             >
                                 {({ processing, errors }) => (
                                     <>
@@ -1523,7 +1523,7 @@ export default function ClientShow({
                                 {invitations.map((invitation) => (
                                     <div
                                         key={invitation.id}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3"
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                     >
                                         <div className="flex items-center gap-3">
                                             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -1578,7 +1578,7 @@ export default function ClientShow({
                     {showAiPanel && (
                     <TabsContent
                         value="ai"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Trends & Ideas" description="AI-discovered trends and fresh post ideas for this client" />
 
@@ -1701,7 +1701,7 @@ export default function ClientShow({
                                         <Link
                                             key={`trend-${item.id}`}
                                             href={showAiTrend(item.id)}
-                                            className="flex flex-col gap-1 rounded-md border border-border p-3 transition-colors hover:border-primary hover:bg-primary/5"
+                                            className="flex flex-col gap-1 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                         >
                                             <div className="flex items-center justify-between gap-2">
                                                 <div className="font-medium">{item.title}</div>
@@ -1723,7 +1723,7 @@ export default function ClientShow({
                                         <Link
                                             key={`idea-${item.id}`}
                                             href={showAiPostIdea(item.id)}
-                                            className="flex flex-col gap-1 rounded-md border border-border p-3 transition-colors hover:border-primary hover:bg-primary/5"
+                                            className="flex flex-col gap-1 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
                                         >
                                             <div className="flex items-center justify-between gap-2">
                                                 <div className="font-medium">{item.title}</div>
@@ -1780,7 +1780,7 @@ export default function ClientShow({
                     {showAiPanel && (
                     <TabsContent
                         value="daily-briefs"
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                        className="grid gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                     >
                         <Heading title="Daily Briefs" description="Nightly AI-generated trends and post ideas for this client" />
 
@@ -1796,13 +1796,13 @@ export default function ClientShow({
                         ) : (
                             <div className="grid gap-3">
                                 {briefs.map((brief) => (
-                                    <div key={brief.id} className="rounded-md border border-border p-3">
-                                        <div className="mb-2 text-sm font-medium">{brief.brief_date}</div>
+                                    <div key={brief.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                                        <div className="mb-2 font-serif text-sm font-semibold italic">{brief.brief_date}</div>
                                         <div className="grid gap-3 md:grid-cols-2">
                                             <div className="grid gap-2">
                                                 <h4 className="text-xs font-medium text-muted-foreground">Trends</h4>
                                                 {brief.trends.map((trend, i) => (
-                                                    <div key={i} className="rounded border border-border p-2">
+                                                    <div key={i} className="rounded-xl border border-border bg-muted/20 p-2 shadow-sm">
                                                         <div className="text-sm font-medium">{trend.title}</div>
                                                         <p className="text-xs text-muted-foreground">{trend.summary}</p>
                                                     </div>
@@ -1811,7 +1811,7 @@ export default function ClientShow({
                                             <div className="grid gap-2">
                                                 <h4 className="text-xs font-medium text-muted-foreground">Ideas</h4>
                                                 {brief.ideas.map((idea, i) => (
-                                                    <div key={i} className="rounded border border-border p-2">
+                                                    <div key={i} className="rounded-xl border border-border bg-muted/20 p-2 shadow-sm">
                                                         <div className="text-sm font-medium">{idea.title}</div>
                                                         <p className="text-xs text-muted-foreground">{idea.description}</p>
                                                     </div>
