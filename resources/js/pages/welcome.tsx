@@ -3,7 +3,7 @@ import { CalendarClock, LayoutGrid, ShieldCheck } from 'lucide-react';
 
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
-import { dashboard, login, register } from '@/routes';
+import { about, dashboard, login, register } from '@/routes';
 
 const features = [
     {
@@ -46,6 +46,9 @@ export default function Welcome() {
                         <span className="text-lg font-semibold">Graphy</span>
                     </div>
                     <nav className="flex items-center gap-2">
+                        <Button variant="ghost" asChild>
+                            <Link href={about()}>About</Link>
+                        </Button>
                         {auth.user ? (
                             <Button asChild>
                                 <Link href={dashboard()}>Dashboard</Link>
@@ -105,8 +108,11 @@ export default function Welcome() {
                     </div>
                 </main>
 
-                <footer className="mx-auto w-full max-w-5xl px-6 py-6 text-center text-xs text-muted-foreground">
-                    &copy; {new Date().getFullYear()} Graphy. All rights reserved.
+                <footer className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 px-6 py-6 text-center text-xs text-muted-foreground">
+                    <Link href={about()} className="font-medium text-foreground hover:text-primary">
+                        Learn more about Graphy
+                    </Link>
+                    <span>&copy; {new Date().getFullYear()} Graphy. All rights reserved.</span>
                 </footer>
             </div>
         </>

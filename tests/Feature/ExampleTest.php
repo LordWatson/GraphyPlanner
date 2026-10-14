@@ -15,4 +15,11 @@ class ExampleTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_about_page_returns_a_successful_response()
+    {
+        $response = $this->get(route('about'));
+
+        $response->assertOk();
+    }
 }
