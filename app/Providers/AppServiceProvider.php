@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
 use App\Contracts\MusicProvider;
 use App\Contracts\PublishAdapter;
@@ -29,6 +30,7 @@ use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
+use App\Services\AI\NullAiProvider;
 use App\Services\LocalAssetStorage;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
@@ -63,6 +65,12 @@ class AppServiceProvider extends ServiceProvider
         // (Step 1.8.2, still bound below as its own concrete class). No caller of
         // App\Contracts\MusicProvider needs to change.
         $this->app->bind(MusicProvider::class, MetaGraphMusicProvider::class);
+
+        // AiProvider contract (Step 2.1) bound to NullAiProvider as a safe default
+        // that never calls an external service. Step 2.7 switches this binding to
+        // DeepSeekProvider (Step 2.2) when AI is enabled and configured; no caller
+        // of App\Contracts\AiProvider needs to change.
+        $this->app->bind(AiProvider::class, NullAiProvider::class);
     }
 
     /**
