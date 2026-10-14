@@ -12,6 +12,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
+use App\Http\Controllers\AiController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
@@ -146,6 +147,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.assets.store');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])
         ->name('assets.destroy');
+
+    // AI (Step 2.3): thin endpoints delegating to Actions, gated by feature flag in controller
+    Route::get('clients/{client}/ai/trends', [AiController::class, 'trends'])
+        ->name('clients.ai.trends');
+    Route::get('clients/{client}/ai/ideas', [AiController::class, 'ideas'])
+        ->name('clients.ai.ideas');
+    Route::get('posts/{post}/ai/captions', [AiController::class, 'captions'])
+        ->name('posts.ai.captions');
 
     Route::post('clients/{client}/posts', [PostController::class, 'store'])
         ->name('clients.posts.store');
