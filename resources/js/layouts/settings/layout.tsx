@@ -1,8 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
-import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { Page, PageHeader } from '@/components/page';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
@@ -46,47 +44,54 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             : sidebarNavItems;
 
     return (
-        <div className="px-4 py-6">
-            <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
+        <Page>
+            <PageHeader
+                eyebrow="Settings"
+                title={
+                    <>
+                        Your <em>account</em>
+                    </>
+                }
+                description="Profile, security, appearance and — for owners — the organisation itself."
             />
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
+            <div className="flex flex-col gap-8 lg:flex-row lg:gap-14">
+                <aside className="w-full shrink-0 lg:sticky lg:top-20 lg:w-52 lg:self-start">
                     <nav
-                        className="flex flex-col space-y-1 space-x-0"
+                        className="flex gap-1 overflow-x-auto lg:flex-col lg:gap-0.5"
                         aria-label="Settings"
                     >
-                        {navItems.map((item, index) => (
-                            <Button
-                                key={`${toUrl(item.href)}-${index}`}
-                                size="sm"
-                                variant="ghost"
-                                asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
-                                })}
-                            >
-                                <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
+                        {navItems.map((item, index) => {
+                            const active = isCurrentOrParentUrl(item.href);
+
+                            return (
+                                <Link
+                                    key={`${toUrl(item.href)}-${index}`}
+                                    href={item.href}
+                                    aria-current={active ? 'page' : undefined}
+                                    className={cn(
+                                        'flex shrink-0 items-center gap-3 rounded-full px-3.5 py-2 text-sm transition-colors lg:rounded-lg',
+                                        active
+                                            ? 'bg-card text-foreground ring-border font-medium shadow-[inset_2px_0_0_var(--primary)] ring-1'
+                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                                     )}
+                                >
+                                    <span className="text-muted-foreground hidden font-mono text-[11px] tabular-nums lg:inline">
+                                        {String(index + 1).padStart(2, '0')}
+                                    </span>
                                     {item.title}
                                 </Link>
-                            </Button>
-                        ))}
+                            );
+                        })}
                     </nav>
                 </aside>
 
-                <Separator className="my-6 lg:hidden" />
-
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
+                <div className="min-w-0 flex-1 md:max-w-2xl">
+                    <section className="animate-rise flex max-w-xl flex-col gap-12">
                         {children}
                     </section>
                 </div>
             </div>
-        </div>
+        </Page>
     );
 }

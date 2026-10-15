@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
+import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -22,6 +23,8 @@ void createInertiaApp({
                 return null;
             case name.startsWith('staff-invite/'):
                 return null;
+            case name.startsWith('portal/'):
+                return ClientPortalLayout;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):
@@ -40,7 +43,7 @@ void createInertiaApp({
         );
     },
     progress: {
-        color: '#4B5563',
+        color: '#e8551f',
     },
 });
 

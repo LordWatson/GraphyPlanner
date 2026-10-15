@@ -3,18 +3,26 @@ import { NotificationBell } from '@/components/notification-bell';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
+const dateStamp = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+});
+
 export function AppSidebarHeader({
     breadcrumbs = [],
 }: {
     breadcrumbs?: BreadcrumbItemType[];
 }) {
     return (
-        <header className="border-sidebar-border/50 bg-sidebar text-sidebar-foreground flex h-16 shrink-0 items-center gap-2 border-b px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4">
-            <div className="flex items-center gap-2 [&_[data-slot=breadcrumb-list]]:text-sidebar-foreground/60 [&_[data-slot=breadcrumb-page]]:text-sidebar-foreground [&_[data-slot=breadcrumb-link]:hover]:text-sidebar-foreground">
-                <SidebarTrigger className="-ml-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
-                <Breadcrumbs breadcrumbs={breadcrumbs} />
-            </div>
-            <div className="ml-auto">
+        <header className="border-border/70 bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md md:rounded-t-[1.25rem] md:px-6">
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground -ml-1.5 rounded-full" />
+            <span aria-hidden className="bg-border h-4 w-px" />
+            <Breadcrumbs breadcrumbs={breadcrumbs} />
+            <div className="ml-auto flex items-center gap-3">
+                <span className="eyebrow text-muted-foreground hidden sm:inline">
+                    {dateStamp.format(new Date())}
+                </span>
                 <NotificationBell />
             </div>
         </header>

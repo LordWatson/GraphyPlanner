@@ -9,21 +9,30 @@ import {
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
-export function NavMain({ items }: { items: NavItem[] }) {
-    const { isCurrentUrl } = useCurrentUrl();
+export function NavMain({
+    items,
+    label = 'Studio',
+}: {
+    items: NavItem[];
+    label?: string;
+}) {
+    const { isCurrentOrParentUrl } = useCurrentUrl();
 
     return (
-        <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel className="text-[10px] font-semibold tracking-widest uppercase">
-                Platform
+        <SidebarGroup className="px-3 py-2">
+            <SidebarGroupLabel className="eyebrow text-sidebar-foreground/45 h-7 px-2">
+                {label}
             </SidebarGroupLabel>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
                 {items.map((item) => (
                     <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
                             asChild
-                            isActive={isCurrentUrl(item.href)}
+                            isActive={
+                                item.isActive ?? isCurrentOrParentUrl(item.href)
+                            }
                             tooltip={{ children: item.title }}
+                            className="text-sidebar-foreground/75"
                         >
                             <Link href={item.href} prefetch>
                                 {item.icon && <item.icon />}

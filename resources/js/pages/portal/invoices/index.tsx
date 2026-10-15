@@ -1,8 +1,8 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { ArrowUpRight, Receipt } from 'lucide-react';
 
-import Heading from '@/components/heading';
+import { EmptyState, Page, PageHeader, Stat } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
 import { formatCurrency } from '@/lib/currency';
 import { show as portalInvoicesShow } from '@/routes/portal/invoices';
 
@@ -19,47 +19,142 @@ type InvoiceRow = {
 };
 
 /**
- * Step 6.6 — the client portal's read-only invoices list: every invoice for this client, with
- * unpaid ones clearly flagged. No create/edit/send/mark-paid actions are exposed here.
+ * Step 6.6 — the client portal's read-only invoices: an outstanding/paid summary and a ledger,
+ * with unpaid invoices clearly flagged. No create/edit/send/mark-paid actions are exposed here.
  */
-export default function PortalInvoicesIndex({ invoices }: { invoices: InvoiceRow[] }) {
-    const { currency } = usePage().props;
+export default function PortalInvoicesIndex({
+    invoices,
+}: {
+    invoices: InvoiceRow[];
+}) {
+    const { currency } = usePage<{ currency: string }>().props;
+
+    const outstanding = invoices
+        .filter((invoice) => invoice.is_unpaid)
+        .reduce((sum, invoice) => sum + Number(invoice.amount), 0);
+    const paid = invoices
+        .filter((invoice) => !invoice.is_unpaid)
+        .reduce((sum, invoice) => sum + Number(invoice.amount), 0);
+    const unpaidCount = invoices.filter((invoice) => invoice.is_unpaid).length;
 
     return (
-        <ClientPortalLayout title="Invoices">
-            <Heading title="Invoices" description="Your billing history for this account." />
+        <>
+            <Head title="Invoices — Client portal" />
+            <Page>
+                <PageHeader
+                    eyebrow="Billing"
+                    title={
+                        <>
+                            Your <em>invoices</em>
+                        </>
+                    }
+                    description="Your billing history with the studio. Open any invoice to view or download the PDF."
+                />
 
-            <div className="mt-6 flex flex-col gap-2">
-                {invoices.length > 0 ? (
-                    invoices.map((invoice) => (
-                        <Link
-                            key={invoice.id}
-                            href={portalInvoicesShow(invoice.id)}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm hover:bg-muted/50"
-                        >
-                            <div className="flex flex-col">
-                                <span className="font-medium">{invoice.invoice_number}</span>
-                                <span className="text-xs text-muted-foreground">
-                                    Issued {invoice.issue_date}
-                                    {invoice.due_date ? ` · Due ${invoice.due_date}` : ''}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">
-                                    {formatCurrency(invoice.amount, currency)}
-                                </span>
-                                <Badge variant={invoice.is_unpaid ? 'warning' : 'success'} className="whitespace-nowrap text-[10px]">
-                                    {invoice.is_unpaid ? 'Unpaid' : invoice.status_label}
-                                </Badge>
-                            </div>
-                        </Link>
-                    ))
+                {invoices.length === 0 ? (
+                    <EmptyState
+                        icon={Receipt}
+                        title="No invoices yet."
+                        description="Invoices from the studio will appear here as soon as they're issued."
+                    />
                 ) : (
-                    <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                        No invoices to show here yet.
-                    </div>
+                    <>
+                        <div className="animate-rise grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <Stat
+                                tone={unpaidCount > 0 ? 'ink' : 'paper'}
+                                label="Outstanding"
+                                value={formatCurrency(outstanding, currency)}
+                                hint={
+                                    unpaidCount > 0
+                                        ? `${unpaidCount} unpaid invoice${unpaidCount === 1 ? '' : 's'}`
+                                        : 'Nothing to pay — thank you'
+                                }
+                                className="[&_.font-serif]:text-4xl"
+                            />
+                            <Stat
+                                label="Paid to date"
+                                value={formatCurrency(paid, currency)}
+                                className="[&_.font-serif]:text-4xl"
+                            />
+                            <Stat
+                                label="Invoices"
+                                value={invoices.length}
+                                className="[&_.font-serif]:text-4xl"
+                            />
+                        </div>
+
+                        <section className="animate-rise border-border bg-card overflow-hidden rounded-2xl border">
+                            <div className="eyebrow border-border text-muted-foreground hidden grid-cols-[minmax(0,1.3fr)_1fr_1fr_8rem_6rem_1.5rem] items-center gap-4 border-b px-5 py-3 md:grid">
+                                <span>Invoice</span>
+                                <span>Issued</span>
+                                <span>Due</span>
+                                <span className="text-right">Amount</span>
+                                <span>Status</span>
+                                <span />
+                            </div>
+                            <ul className="divide-border/70 divide-y">
+                                {invoices.map((invoice) => (
+                                    <li key={invoice.id}>
+                                        <Link
+                                            href={portalInvoicesShow(
+                                                invoice.id,
+                                            )}
+                                            className="group hover:bg-muted/50 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-4 transition-colors md:grid-cols-[minmax(0,1.3fr)_1fr_1fr_8rem_6rem_1.5rem]"
+                                        >
+                                            <span className="group-hover:text-primary truncate font-mono text-sm font-medium">
+                                                {invoice.invoice_number}
+                                            </span>
+                                            <span className="text-right font-mono text-sm tabular-nums md:hidden">
+                                                {formatCurrency(
+                                                    invoice.amount,
+                                                    currency,
+                                                )}
+                                            </span>
+                                            <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                                                <span className="md:hidden">
+                                                    Issued{' '}
+                                                </span>
+                                                {invoice.issue_date}
+                                            </span>
+                                            <span className="text-muted-foreground hidden font-mono text-xs tabular-nums md:inline">
+                                                {invoice.due_date ?? '—'}
+                                            </span>
+                                            <span className="hidden text-right font-mono text-sm tabular-nums md:inline">
+                                                {formatCurrency(
+                                                    invoice.amount,
+                                                    currency,
+                                                )}
+                                            </span>
+                                            <span className="justify-self-end md:justify-self-start">
+                                                <Badge
+                                                    variant={
+                                                        invoice.is_unpaid
+                                                            ? 'warning'
+                                                            : 'success'
+                                                    }
+                                                >
+                                                    <span
+                                                        aria-hidden
+                                                        className={
+                                                            invoice.is_unpaid
+                                                                ? 'bg-warning size-1.5 rounded-full'
+                                                                : 'bg-success size-1.5 rounded-full'
+                                                        }
+                                                    />
+                                                    {invoice.is_unpaid
+                                                        ? 'Unpaid'
+                                                        : invoice.status_label}
+                                                </Badge>
+                                            </span>
+                                            <ArrowUpRight className="text-muted-foreground group-hover:text-primary hidden size-4 justify-self-end transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:block" />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    </>
                 )}
-            </div>
-        </ClientPortalLayout>
+            </Page>
+        </>
     );
 }

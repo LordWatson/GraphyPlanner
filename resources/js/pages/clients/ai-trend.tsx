@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
+import { Page, PageHeader, Panel } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { show as showClient } from '@/routes/clients';
 
@@ -14,67 +15,77 @@ type TrendData = {
     created_at: string | null;
 };
 
-export default function AiTrendShow({ client, trend }: { client: { id: number; name: string }; trend: TrendData }) {
+export default function AiTrendShow({
+    client,
+    trend,
+}: {
+    client: { id: number; name: string };
+    trend: TrendData;
+}) {
+    const confidence = Math.round(
+        Math.min(1, Math.max(0, trend.confidence)) * 100,
+    );
+
     return (
         <>
             <Head title={`${trend.title} — Trend`} />
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
+            <Page width="narrow">
                 <Link
                     href={clientAiTabUrl(client.id)}
-                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
                 >
                     <ArrowLeft className="size-4" />
                     Back to {client.name}
                 </Link>
 
-                <div className="bg-noise relative flex flex-col gap-4 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
-                    />
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
-                    />
-                    <div className="relative flex items-start justify-between gap-3">
-                        <div className="flex flex-col gap-1">
-                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
-                                AI trend
+                <PageHeader
+                    eyebrow={`AI trend — ${client.name}${trend.created_at ? ` · ${trend.created_at}` : ''}`}
+                    title={trend.title}
+                    meta={trend.platforms.map((platform, i) => (
+                        <Badge key={i} variant="outline" className="capitalize">
+                            {platform}
+                        </Badge>
+                    ))}
+                />
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_15rem]">
+                    <Panel
+                        eyebrow="Summary"
+                        icon={Sparkles}
+                        title="What's happening"
+                    >
+                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                            {trend.summary || (
+                                <span className="text-muted-foreground">
+                                    No summary provided.
+                                </span>
+                            )}
+                        </p>
+                    </Panel>
+                    <div className="bg-ink text-ink-foreground flex flex-col justify-between gap-6 rounded-2xl p-5">
+                        <span className="eyebrow opacity-70">Confidence</span>
+                        <div className="flex flex-col gap-3">
+                            <span className="font-serif text-6xl leading-none tabular-nums">
+                                {confidence}
+                                <span className="text-primary text-3xl">%</span>
                             </span>
-                            <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">{trend.title}</h1>
-                            <p className="text-sm text-primary-foreground/80">
-                                For {client.name}{trend.created_at ? ` · discovered ${trend.created_at}` : ''}
-                            </p>
-                        </div>
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
-                            <Sparkles className="size-5" />
-                        </span>
-                    </div>
-
-                    <p className="relative text-sm whitespace-pre-wrap">
-                        {trend.summary || <span className="text-primary-foreground/70">No summary provided.</span>}
-                    </p>
-
-                    {trend.platforms.length > 0 && (
-                        <div className="relative flex flex-wrap gap-1.5">
-                            {trend.platforms.map((platform, i) => (
-                                <Badge key={i} variant="outline" className="border-white/30 bg-white/10 text-primary-foreground">{platform}</Badge>
-                            ))}
-                        </div>
-                    )}
-
-                    <div className="relative flex items-center gap-2 text-xs text-primary-foreground/80">
-                        Confidence:
-                        <div className="h-1.5 w-32 overflow-hidden rounded-full bg-white/20">
                             <div
-                                className="h-full rounded-full bg-white"
-                                style={{ width: `${Math.round(Math.min(1, Math.max(0, trend.confidence)) * 100)}%` }}
-                            />
+                                className="bg-ink-foreground/15 h-1.5 w-full overflow-hidden rounded-full"
+                                role="meter"
+                                aria-valuenow={confidence}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-label="Confidence"
+                            >
+                                <div
+                                    className="bg-primary h-full rounded-full"
+                                    style={{ width: `${confidence}%` }}
+                                />
+                            </div>
                         </div>
-                        {Math.round(trend.confidence * 100)}%
                     </div>
                 </div>
-            </div>
+            </Page>
         </>
     );
 }

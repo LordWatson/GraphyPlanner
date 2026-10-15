@@ -83,7 +83,9 @@ export function HashtagInput({
 
         if (e.key === 'ArrowDown' && showDropdown) {
             e.preventDefault();
-            setHighlighted((current) => Math.min(current + 1, matches.length - 1));
+            setHighlighted((current) =>
+                Math.min(current + 1, matches.length - 1),
+            );
             return;
         }
 
@@ -93,14 +95,18 @@ export function HashtagInput({
             return;
         }
 
-        if (e.key === 'Backspace' && inputValue.length === 0 && value.length > 0) {
+        if (
+            e.key === 'Backspace' &&
+            inputValue.length === 0 &&
+            value.length > 0
+        ) {
             removeTag(value[value.length - 1]);
         }
     };
 
     return (
         <div className="relative">
-            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1.5 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+            <div className="border-input focus-within:border-ring focus-within:ring-ring/50 dark:bg-input/30 flex flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5 focus-within:ring-[3px]">
                 {value.map((tag) => (
                     <Badge key={tag} variant="secondary" className="gap-1 pr-1">
                         <Hash className="size-3" />
@@ -108,7 +114,7 @@ export function HashtagInput({
                         <button
                             type="button"
                             onClick={() => removeTag(tag)}
-                            className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                            className="hover:bg-muted-foreground/20 rounded-full p-0.5"
                             aria-label={`Remove #${tag}`}
                         >
                             <X className="size-3" />
@@ -134,7 +140,7 @@ export function HashtagInput({
             </div>
 
             {showDropdown && (
-                <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-popover p-1 text-sm shadow-md">
+                <ul className="border-border bg-popover absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border p-1 text-sm shadow-md">
                     {matches.map((tag, index) => (
                         <li key={tag}>
                             <button
@@ -143,10 +149,12 @@ export function HashtagInput({
                                 onClick={() => addTag(tag)}
                                 className={cn(
                                     'flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-left',
-                                    index === highlighted ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
+                                    index === highlighted
+                                        ? 'bg-accent text-accent-foreground'
+                                        : 'hover:bg-accent/60',
                                 )}
                             >
-                                <Hash className="size-3.5 text-muted-foreground" />
+                                <Hash className="text-muted-foreground size-3.5" />
                                 {tag}
                             </button>
                         </li>

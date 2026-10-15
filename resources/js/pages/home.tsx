@@ -1,9 +1,18 @@
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, Clock, ImageOff, WifiOff } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import type { LucideIcon } from 'lucide-react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    Clock,
+    ImageOff,
+    WifiOff,
+} from 'lucide-react';
+import { EmptyState, Page, PageHeader } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 import { needsAttention } from '@/routes';
-import { edit as editPost } from '@/routes/posts';
 import { show as showClient } from '@/routes/clients';
+import { edit as editPost } from '@/routes/posts';
+import { cn } from '@/lib/utils';
 
 type PostRow = {
     post_id: number;
@@ -39,154 +48,204 @@ type HomeProps = {
     items: NeedsAttentionItems;
 };
 
-function PostRowItem({ row }: { row: PostRow }) {
-    return (
-        <Link
-            href={editPost(row.post_id)}
-            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
-        >
-            <div className="flex flex-col">
-                <span className="font-medium">{row.client_name ?? 'Unknown client'}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                    {row.platform ?? 'No platform'}
-                    {row.handle ? ` · ${row.handle}` : ''}
-                    {row.master_caption ? ` · ${row.master_caption}` : ''}
-                </span>
-            </div>
-            <Badge variant="outline" className="whitespace-nowrap text-[10px]">
-                {row.status_label}
-            </Badge>
-        </Link>
-    );
-}
-
-function Section({
+function Lane({
+    index,
     icon: Icon,
     title,
     description,
-    rows,
+    count,
+    accentClassName,
     emptyLabel,
+    children,
 }: {
-    icon: typeof AlertTriangle;
+    index: string;
+    icon: LucideIcon;
     title: string;
     description: string;
-    rows: PostRow[];
+    count: number;
+    accentClassName: string;
     emptyLabel: string;
+    children: React.ReactNode;
 }) {
     return (
-        <div className="relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-agency">
-            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-            <div className="flex items-center gap-2">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-brand text-white shadow-sm">
-                    <Icon className="size-4" />
+        <section className="border-border bg-card flex flex-col overflow-hidden rounded-2xl border">
+            <header className="border-border/70 flex items-start justify-between gap-4 border-b px-5 pt-4 pb-4">
+                <div className="flex items-start gap-3">
+                    <span
+                        className={cn(
+                            'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg',
+                            accentClassName,
+                        )}
+                    >
+                        <Icon className="size-4" />
+                    </span>
+                    <div className="flex flex-col gap-0.5">
+                        <span className="eyebrow text-muted-foreground">
+                            {index}
+                        </span>
+                        <h2 className="text-[15px] font-semibold">{title}</h2>
+                        <p className="text-muted-foreground text-[13px]">
+                            {description}
+                        </p>
+                    </div>
+                </div>
+                <span
+                    className={cn(
+                        'font-serif text-5xl leading-none tabular-nums',
+                        count === 0 && 'text-muted-foreground/40',
+                    )}
+                >
+                    {count}
                 </span>
-                <div className="flex flex-col">
-                    <h2 className="font-serif text-sm font-semibold italic">{title}</h2>
-                    <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
-            </div>
-            {rows.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                    {rows.map((row) => (
-                        <PostRowItem key={row.post_id} row={row} />
-                    ))}
-                </div>
+            </header>
+            {count > 0 ? (
+                <ul className="flex flex-col p-2">{children}</ul>
             ) : (
-                <p className="py-6 text-center text-xs text-muted-foreground">{emptyLabel}</p>
+                <EmptyState
+                    compact
+                    icon={CheckCircle2}
+                    title="Clear."
+                    description={emptyLabel}
+                    className="m-3 border-0"
+                />
             )}
-        </div>
+        </section>
+    );
+}
+
+function PostRowItem({ row }: { row: PostRow }) {
+    return (
+        <li>
+            <Link
+                href={editPost(row.post_id)}
+                className="group hover:bg-muted/70 flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors"
+            >
+                <span className="flex min-w-0 flex-col">
+                    <span className="group-hover:text-primary truncate text-sm font-medium">
+                        {row.client_name ?? 'Unknown client'}
+                    </span>
+                    <span className="text-muted-foreground truncate text-xs">
+                        <span className="capitalize">
+                            {row.platform ?? 'No platform'}
+                        </span>
+                        {row.handle ? ` · ${row.handle}` : ''}
+                        {row.master_caption ? ` · ${row.master_caption}` : ''}
+                    </span>
+                </span>
+                <StatusPill
+                    kind="post"
+                    value={row.status}
+                    label={row.status_label}
+                />
+            </Link>
+        </li>
     );
 }
 
 export default function Home({ items }: HomeProps) {
+    const total =
+        items.failedPublishes.length +
+        items.waitingApprovals.length +
+        items.missingMedia.length +
+        items.disconnectedAccounts.length;
+
     return (
         <>
-            <Head title="Home" />
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="bg-noise relative flex flex-wrap items-center gap-3 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
-                    />
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
-                    />
-                    <div className="relative flex items-center gap-3">
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
-                            <AlertTriangle className="size-5" />
-                        </span>
-                        <div className="flex flex-col gap-1">
-                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
-                                Priority queue
-                            </span>
-                            <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">Needs attention</h1>
-                            <p className="text-sm text-primary-foreground/80">
-                                Everything blocking a post or account from moving forward, in one place.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+            <Head title="Needs attention" />
+            <Page>
+                <PageHeader
+                    eyebrow="Triage"
+                    title={
+                        total > 0 ? (
+                            <>
+                                <em>{total}</em> thing{total === 1 ? '' : 's'}{' '}
+                                need you.
+                            </>
+                        ) : (
+                            <>
+                                Nothing is <em>blocked</em>.
+                            </>
+                        )
+                    }
+                    description="Everything stopping a post or account from moving forward, sorted by what to fix first."
+                />
 
-                <div className="grid gap-4 md:grid-cols-2">
-                    <Section
+                <div className="animate-rise grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Lane
+                        index="01 — Publishing"
                         icon={AlertTriangle}
                         title="Failed publishes"
-                        description="Posts that failed to publish"
-                        rows={items.failedPublishes}
+                        description="Posts the platform rejected"
+                        count={items.failedPublishes.length}
+                        accentClassName="bg-destructive/10 text-destructive"
                         emptyLabel="No failed publishes."
-                    />
-                    <Section
+                    >
+                        {items.failedPublishes.map((row) => (
+                            <PostRowItem key={row.post_id} row={row} />
+                        ))}
+                    </Lane>
+                    <Lane
+                        index="02 — Accounts"
+                        icon={WifiOff}
+                        title="Disconnected accounts"
+                        description="Social accounts needing reconnection"
+                        count={items.disconnectedAccounts.length}
+                        accentClassName="bg-warning/12 text-warning"
+                        emptyLabel="All accounts are connected."
+                    >
+                        {items.disconnectedAccounts.map((account) => (
+                            <li key={account.account_id}>
+                                <Link
+                                    href={showClient(account.client_id)}
+                                    className="group hover:bg-muted/70 flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors"
+                                >
+                                    <span className="flex min-w-0 flex-col">
+                                        <span className="group-hover:text-primary truncate text-sm font-medium">
+                                            {account.client_name ??
+                                                'Unknown client'}
+                                        </span>
+                                        <span className="text-muted-foreground truncate text-xs">
+                                            {account.platform_label} ·{' '}
+                                            {account.handle}
+                                        </span>
+                                    </span>
+                                    <StatusPill
+                                        kind="connection"
+                                        value={account.connection_status}
+                                        label={account.connection_status_label}
+                                    />
+                                </Link>
+                            </li>
+                        ))}
+                    </Lane>
+                    <Lane
+                        index="03 — Approvals"
                         icon={Clock}
-                        title="Waiting on approval"
-                        description="Posts waiting on client review"
-                        rows={items.waitingApprovals}
+                        title="Waiting on the client"
+                        description="Posts sitting in client review"
+                        count={items.waitingApprovals.length}
+                        accentClassName="bg-info/10 text-info"
                         emptyLabel="Nothing waiting on a client."
-                    />
-                    <Section
+                    >
+                        {items.waitingApprovals.map((row) => (
+                            <PostRowItem key={row.post_id} row={row} />
+                        ))}
+                    </Lane>
+                    <Lane
+                        index="04 — Assets"
                         icon={ImageOff}
                         title="Missing media"
                         description="Posts that still need media attached"
-                        rows={items.missingMedia}
+                        count={items.missingMedia.length}
+                        accentClassName="bg-muted text-foreground/60"
                         emptyLabel="Every active post has its required media."
-                    />
-                    <div className="relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-agency">
-                        <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                        <div className="flex items-center gap-2">
-                            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-brand text-white shadow-sm">
-                                <WifiOff className="size-4" />
-                            </span>
-                            <div className="flex flex-col">
-                                <h2 className="font-serif text-sm font-semibold italic">Disconnected accounts</h2>
-                                <p className="text-xs text-muted-foreground">Social accounts needing reconnection</p>
-                            </div>
-                        </div>
-                        {items.disconnectedAccounts.length > 0 ? (
-                            <div className="flex flex-col gap-2">
-                                {items.disconnectedAccounts.map((account) => (
-                                    <Link
-                                        key={account.account_id}
-                                        href={showClient(account.client_id)}
-                                        className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-agency"
-                                    >
-                                        <div className="flex flex-col">
-                                            <span className="font-medium">{account.client_name ?? 'Unknown client'}</span>
-                                            <span className="truncate text-xs text-muted-foreground">
-                                                {account.platform_label} · {account.handle}
-                                            </span>
-                                        </div>
-                                        <Badge variant="outline" className="whitespace-nowrap text-[10px]">
-                                            {account.connection_status_label}
-                                        </Badge>
-                                    </Link>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="py-6 text-center text-xs text-muted-foreground">All accounts are connected.</p>
-                        )}
-                    </div>
+                    >
+                        {items.missingMedia.map((row) => (
+                            <PostRowItem key={row.post_id} row={row} />
+                        ))}
+                    </Lane>
                 </div>
-            </div>
+            </Page>
         </>
     );
 }

@@ -16,6 +16,32 @@ enum PostStatus: string
     case Failed = 'failed';
     case Archived = 'archived';
 
+    /**
+     * Statuses a client portal contact (`Role::ClientReviewer`) may ever see. Pre-review internal
+     * stages (idea, draft, internal review) never reach the portal — every portal surface (posts,
+     * campaigns, calendar, post detail) filters through this one list.
+     *
+     * @return list<self>
+     */
+    public static function clientVisible(): array
+    {
+        return [
+            self::WaitingClient,
+            self::ChangesRequested,
+            self::Approved,
+            self::Scheduled,
+            self::Publishing,
+            self::Published,
+            self::Failed,
+            self::Archived,
+        ];
+    }
+
+    public function isClientVisible(): bool
+    {
+        return in_array($this, self::clientVisible(), true);
+    }
+
     public function label(): string
     {
         return match ($this) {

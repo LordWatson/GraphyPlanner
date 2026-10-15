@@ -1,17 +1,19 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
+    ArrowRight,
     BarChart3,
     CalendarClock,
     FileCheck2,
-    Layers,
     LayoutGrid,
     PlugZap,
     Receipt,
     ShieldCheck,
     Sparkles,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-import AppLogoIcon from '@/components/app-logo-icon';
+import { BrandMark } from '@/components/brand-mark';
+import { BrandPoster } from '@/components/brand-poster';
 import { Button } from '@/components/ui/button';
 import { about, dashboard, home, login, register } from '@/routes';
 
@@ -70,24 +72,45 @@ const workflow = [
     {
         step: '01',
         title: 'Bring your clients in',
-        description: 'Add clients, define their brand voice, and connect their social accounts.',
+        description:
+            'Add clients, define their brand voice, and connect their social accounts.',
     },
     {
         step: '02',
         title: 'Plan the work',
-        description: 'Build campaigns, draft posts, and let AI suggest ideas and captions that fit the brand.',
+        description:
+            'Build campaigns, draft posts, and let AI suggest ideas and captions that fit the brand.',
     },
     {
         step: '03',
         title: 'Review & approve',
-        description: 'Your team reviews internally, then clients approve or request changes from their own portal.',
+        description:
+            'Your team reviews internally, then clients approve or request changes from their own portal.',
     },
     {
         step: '04',
         title: 'Publish & track',
-        description: 'Approved posts go live on schedule, and every status is tracked back to a single source of truth.',
+        description:
+            'Approved posts go live on schedule, and every status is tracked back to a single source of truth.',
     },
 ];
+
+function SectionTitle({
+    eyebrow,
+    title,
+}: {
+    eyebrow: string;
+    title: ReactNode;
+}) {
+    return (
+        <div className="flex flex-col gap-3">
+            <span className="eyebrow text-muted-foreground">{eyebrow}</span>
+            <h2 className="[&_em]:text-primary max-w-3xl font-serif text-4xl leading-[0.95] tracking-[-0.02em] lg:text-5xl [&_em]:italic">
+                {title}
+            </h2>
+        </div>
+    );
+}
 
 export default function About() {
     const { auth } = usePage().props;
@@ -95,30 +118,30 @@ export default function About() {
     return (
         <>
             <Head title="About" />
-            <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
+            <div className="bg-background text-foreground relative flex min-h-screen flex-col overflow-hidden">
                 <div
                     aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-gradient-brand opacity-[0.12] blur-3xl"
+                    className="bg-grid text-foreground pointer-events-none absolute inset-x-0 top-0 h-[560px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]"
                 />
 
-                <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6">
-                    <Link href={home()} className="flex items-center gap-2">
-                        <span className="flex size-9 items-center justify-center rounded-lg bg-gradient-brand shadow-lg shadow-primary/20">
-                            <AppLogoIcon className="size-5 fill-current text-white" />
-                        </span>
-                        <span className="text-lg font-semibold">Graphy</span>
+                <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+                    <Link href={home()} aria-label="Graphy home">
+                        <BrandMark size="sm" wordmark />
                     </Link>
-                    <nav className="flex items-center gap-2">
+                    <nav className="flex items-center gap-1.5">
                         {auth.user ? (
                             <Button asChild>
-                                <Link href={dashboard()}>Dashboard</Link>
+                                <Link href={dashboard()}>
+                                    Open studio
+                                    <ArrowRight />
+                                </Link>
                             </Button>
                         ) : (
                             <>
                                 <Button variant="ghost" asChild>
                                     <Link href={login()}>Log in</Link>
                                 </Button>
-                                <Button asChild>
+                                <Button variant="secondary" asChild>
                                     <Link href={register()}>Get started</Link>
                                 </Button>
                             </>
@@ -126,116 +149,135 @@ export default function About() {
                     </nav>
                 </header>
 
-                <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-20 px-6 py-12 lg:py-20">
-                    <div className="flex flex-col items-center gap-6 text-center">
-                        <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                <main className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col gap-28 px-6 pt-14 pb-24 lg:pt-24">
+                    <section className="animate-rise flex flex-col gap-8">
+                        <span className="eyebrow text-muted-foreground flex items-center gap-2">
+                            <span
+                                aria-hidden
+                                className="bg-primary size-1.5 rounded-[2px]"
+                            />
                             About Graphy
                         </span>
-                        <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-balance lg:text-5xl">
-                            The <span className="text-gradient-brand">agency OS</span> for running
-                            social content, end to end.
+                        <h1 className="max-w-4xl font-serif text-[clamp(3rem,7.5vw,6.25rem)] leading-[0.9] tracking-[-0.03em]">
+                            The <em className="text-primary">studio OS</em> for
+                            running social content, end to end.
                         </h1>
-                        <p className="max-w-2xl text-sm text-muted-foreground lg:text-base">
-                            Graphy brings clients, brands, campaigns, approvals, AI assistance, and
-                            publishing together in one dependable workspace — built for design &amp;
-                            marketing agencies that juggle dozens of clients at once.
+                        <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed text-pretty">
+                            Graphy brings clients, brands, campaigns, approvals,
+                            AI assistance, and publishing together in one
+                            dependable workspace — built for design &amp;
+                            marketing agencies that juggle dozens of clients at
+                            once.
                         </p>
-                        {!auth.user && (
-                            <div className="flex items-center gap-3">
-                                <Button size="lg" className="shadow-lg shadow-primary/25" asChild>
-                                    <Link href={register()}>Get started</Link>
-                                </Button>
-                                <Button size="lg" variant="outline" asChild>
-                                    <Link href={about()}>See what&apos;s inside</Link>
-                                </Button>
-                            </div>
-                        )}
-                    </div>
+                    </section>
 
-                    <section className="flex flex-col gap-8">
-                        <div className="flex flex-col items-center gap-2 text-center">
-                            <span className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
-                                Everything you need
-                            </span>
-                            <h2 className="text-2xl font-serif font-semibold tracking-tight">
-                                One workspace, every part of the job.
-                            </h2>
-                        </div>
-                        <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {pillars.map(({ icon: Icon, title, description }) => (
-                                <div
-                                    key={title}
-                                    className="flex flex-col items-start gap-3 rounded-xl border border-border bg-card p-6 text-left shadow-lg shadow-black/[0.03] transition-shadow hover:shadow-primary/10"
-                                >
-                                    <span className="flex size-9 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
-                                        <Icon className="size-4" />
-                                    </span>
-                                    <h3 className="text-sm font-semibold">{title}</h3>
-                                    <p className="text-xs text-muted-foreground">{description}</p>
-                                </div>
-                            ))}
+                    <section className="flex flex-col gap-10">
+                        <SectionTitle
+                            eyebrow="Everything you need"
+                            title={
+                                <>
+                                    One workspace, <em>every part</em> of the
+                                    job.
+                                </>
+                            }
+                        />
+                        <div className="border-border bg-border grid w-full grid-cols-1 gap-px overflow-hidden rounded-2xl border sm:grid-cols-2 lg:grid-cols-4">
+                            {pillars.map(
+                                ({ icon: Icon, title, description }) => (
+                                    <div
+                                        key={title}
+                                        className="bg-card hover:bg-muted/40 flex flex-col items-start gap-3 p-6 transition-colors"
+                                    >
+                                        <Icon className="text-primary size-5" />
+                                        <h3 className="text-[15px] font-semibold">
+                                            {title}
+                                        </h3>
+                                        <p className="text-muted-foreground text-[13px] leading-relaxed">
+                                            {description}
+                                        </p>
+                                    </div>
+                                ),
+                            )}
                         </div>
                     </section>
 
-                    <section className="flex flex-col gap-8">
-                        <div className="flex flex-col items-center gap-2 text-center">
-                            <span className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
-                                How it works
-                            </span>
-                            <h2 className="text-2xl font-serif font-semibold tracking-tight">
-                                From brief to published, without the chaos.
-                            </h2>
-                        </div>
-                        <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <section className="flex flex-col gap-10">
+                        <SectionTitle
+                            eyebrow="How it works"
+                            title={
+                                <>
+                                    From brief to published,{' '}
+                                    <em>without the chaos</em>.
+                                </>
+                            }
+                        />
+                        <ol className="grid w-full grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
                             {workflow.map(({ step, title, description }) => (
-                                <div
+                                <li
                                     key={step}
-                                    className="flex flex-col gap-3 rounded-xl border border-border bg-card p-6 text-left"
+                                    className="border-foreground flex flex-col gap-3 border-t pt-5"
                                 >
-                                    <span className="font-serif text-2xl font-semibold text-primary">
+                                    <span className="text-primary font-mono text-xs">
                                         {step}
                                     </span>
-                                    <h3 className="text-sm font-semibold">{title}</h3>
-                                    <p className="text-xs text-muted-foreground">{description}</p>
-                                </div>
+                                    <h3 className="font-serif text-3xl leading-tight">
+                                        {title}
+                                    </h3>
+                                    <p className="text-muted-foreground text-sm leading-relaxed">
+                                        {description}
+                                    </p>
+                                </li>
                             ))}
-                        </div>
+                        </ol>
                     </section>
 
-                    <section className="flex flex-col items-center gap-6 rounded-2xl border border-border bg-gradient-brand p-10 text-center shadow-lg shadow-primary/10 lg:p-16">
-                        <span className="flex size-10 items-center justify-center rounded-full bg-background/90 text-primary shadow-sm">
-                            <Layers className="size-5" />
-                        </span>
-                        <h2 className="max-w-xl text-2xl font-serif font-semibold tracking-tight text-balance text-background lg:text-3xl">
-                            Ready to stop chasing approvals in Slack threads?
-                        </h2>
-                        <p className="max-w-md text-sm text-background/80">
-                            Bring your clients, content, and approvals into one dependable home.
-                        </p>
-                        {!auth.user ? (
-                            <div className="flex items-center gap-3">
-                                <Button size="lg" variant="secondary" className="shadow-lg" asChild>
-                                    <Link href={register()}>Get started</Link>
+                    <section className="bg-ink text-ink-foreground relative flex flex-col gap-8 overflow-hidden rounded-[1.75rem] p-10 lg:flex-row lg:items-end lg:justify-between lg:p-14">
+                        <BrandPoster className="pointer-events-none absolute -top-10 -right-10 w-64 opacity-20 lg:w-80" />
+                        <div className="relative flex max-w-xl flex-col gap-4">
+                            <h2 className="font-serif text-4xl leading-[0.95] tracking-[-0.02em] text-balance lg:text-6xl">
+                                Stop chasing approvals in{' '}
+                                <em className="text-primary">Slack threads</em>.
+                            </h2>
+                            <p className="text-ink-foreground/70 max-w-md text-[15px]">
+                                Bring your clients, content, and approvals into
+                                one dependable home.
+                            </p>
+                        </div>
+                        <div className="relative flex flex-wrap items-center gap-3">
+                            {!auth.user ? (
+                                <>
+                                    <Button size="lg" asChild>
+                                        <Link href={register()}>
+                                            Get started
+                                            <ArrowRight />
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        size="lg"
+                                        variant="outline"
+                                        className="border-ink-foreground/25 text-ink-foreground hover:bg-ink-foreground/10 hover:text-ink-foreground bg-transparent"
+                                        asChild
+                                    >
+                                        <Link href={login()}>Log in</Link>
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button size="lg" asChild>
+                                    <Link href={dashboard()}>
+                                        Open studio
+                                        <ArrowRight />
+                                    </Link>
                                 </Button>
-                                <Button
-                                    size="lg"
-                                    variant="outline"
-                                    className="border-background/40 bg-transparent text-background hover:bg-background/10 hover:text-background"
-                                    asChild
-                                >
-                                    <Link href={login()}>Log in</Link>
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button size="lg" variant="secondary" className="shadow-lg" asChild>
-                                <Link href={dashboard()}>Go to dashboard</Link>
-                            </Button>
-                        )}
+                            )}
+                        </div>
                     </section>
                 </main>
 
-                <footer className="mx-auto w-full max-w-5xl px-6 py-6 text-center text-xs text-muted-foreground">
-                    &copy; {new Date().getFullYear()} Graphy. All rights reserved.
+                <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-6xl justify-between px-6 py-6">
+                    <span>© {new Date().getFullYear()} Graphy</span>
+                    <Link href={about()} className="hover:text-foreground">
+                        About
+                    </Link>
                 </footer>
             </div>
         </>

@@ -1,10 +1,11 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Lightbulb } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarClock, Lightbulb } from 'lucide-react';
+import { Page, PageHeader, Panel } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import aiPostIdeas from '@/routes/ai-post-ideas';
 import { show as showClient } from '@/routes/clients';
 import { edit as editPost } from '@/routes/posts';
-import aiPostIdeas from '@/routes/ai-post-ideas';
 
 const clientAiTabUrl = (clientId: number) => `${showClient(clientId).url}#ai`;
 
@@ -19,85 +20,84 @@ type IdeaData = {
     created_at: string | null;
 };
 
-export default function AiPostIdeaShow({ client, idea }: { client: { id: number; name: string }; idea: IdeaData }) {
+export default function AiPostIdeaShow({
+    client,
+    idea,
+}: {
+    client: { id: number; name: string };
+    idea: IdeaData;
+}) {
     return (
         <>
             <Head title={`${idea.title} — Post idea`} />
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
+            <Page width="narrow">
                 <Link
                     href={clientAiTabUrl(client.id)}
-                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
                 >
                     <ArrowLeft className="size-4" />
                     Back to {client.name}
                 </Link>
 
-                <div className="bg-noise relative flex flex-col gap-4 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
-                    />
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
-                    />
-                    <div className="relative flex items-start justify-between gap-3">
-                        <div className="flex flex-col gap-1">
-                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
-                                Post idea
-                            </span>
-                            <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">{idea.title}</h1>
-                            <p className="text-sm text-primary-foreground/80">
-                                For {client.name}{idea.created_at ? ` · suggested ${idea.created_at}` : ''}
-                            </p>
-                        </div>
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-primary-foreground">
-                            <Lightbulb className="size-5" />
-                        </span>
-                    </div>
-
-                    <p className="relative text-sm whitespace-pre-wrap">
-                        {idea.description || <span className="text-primary-foreground/70">No description provided.</span>}
-                    </p>
-
-                    {idea.platforms.length > 0 && (
-                        <div className="relative flex flex-wrap gap-1.5">
-                            {idea.platforms.map((platform, i) => (
-                                <Badge key={i} variant="outline" className="border-white/30 bg-white/10 text-primary-foreground">{platform}</Badge>
-                            ))}
-                        </div>
-                    )}
-
-                    {idea.suggestedCaption && (
-                        <div className="relative grid gap-1">
-                            <span className="text-xs font-medium text-primary-foreground/80">Suggested caption</span>
-                            <p className="rounded-xl border border-white/20 bg-white/10 p-3 text-sm whitespace-pre-wrap">
-                                {idea.suggestedCaption}
-                            </p>
-                        </div>
-                    )}
-
-                    {idea.suggestedPostAt && (
-                        <p className="relative text-xs text-primary-foreground/80">Suggested posting time: {idea.suggestedPostAt}</p>
-                    )}
-
-                    <div className="relative">
-                        {idea.post_id ? (
-                            <Button asChild size="sm" variant="secondary">
-                                <Link href={editPost(idea.post_id)}>Open draft post</Link>
+                <PageHeader
+                    eyebrow={`Post idea — ${client.name}${idea.created_at ? ` · ${idea.created_at}` : ''}`}
+                    title={idea.title}
+                    meta={idea.platforms.map((platform, i) => (
+                        <Badge key={i} variant="outline" className="capitalize">
+                            {platform}
+                        </Badge>
+                    ))}
+                    actions={
+                        idea.post_id ? (
+                            <Button asChild>
+                                <Link href={editPost(idea.post_id)}>
+                                    Open draft post
+                                    <ArrowRight />
+                                </Link>
                             </Button>
                         ) : (
                             <Form {...aiPostIdeas.persist.form(idea.id)}>
                                 {({ processing }) => (
-                                    <Button type="submit" size="sm" disabled={processing}>
-                                        {processing ? 'Creating draft…' : 'Turn into draft post'}
+                                    <Button type="submit" disabled={processing}>
+                                        {processing
+                                            ? 'Creating draft…'
+                                            : 'Turn into draft post'}
                                     </Button>
                                 )}
                             </Form>
+                        )
+                    }
+                />
+
+                <Panel eyebrow="The idea" icon={Lightbulb} title="Concept">
+                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                        {idea.description || (
+                            <span className="text-muted-foreground">
+                                No description provided.
+                            </span>
                         )}
-                    </div>
-                </div>
-            </div>
+                    </p>
+                </Panel>
+
+                {(idea.suggestedCaption || idea.suggestedPostAt) && (
+                    <Panel eyebrow="Draft copy" title="Suggested caption">
+                        <div className="flex flex-col gap-4">
+                            {idea.suggestedCaption && (
+                                <p className="border-primary border-l-2 pl-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                                    {idea.suggestedCaption}
+                                </p>
+                            )}
+                            {idea.suggestedPostAt && (
+                                <p className="text-muted-foreground inline-flex items-center gap-1.5 font-mono text-xs">
+                                    <CalendarClock className="size-3.5" />
+                                    Suggested posting time:{' '}
+                                    {idea.suggestedPostAt}
+                                </p>
+                            )}
+                        </div>
+                    </Panel>
+                )}
+            </Page>
         </>
     );
 }

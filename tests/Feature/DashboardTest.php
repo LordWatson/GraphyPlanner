@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Enums\ConnectionStatus;
 use App\Enums\InvoiceStatus;
@@ -149,42 +150,19 @@ class DashboardTest extends TestCase
         );
     }
 
-    public function test_client_reviewer_only_sees_their_own_clients_upcoming_posts()
+    /**
+     * Client portal contacts never see the internal staff dashboard (its links and org-wide
+     * stats are staff-only) — they are sent to their own portal home instead.
+     */
+    public function test_client_reviewer_is_redirected_from_the_internal_dashboard_to_the_portal()
     {
         $reviewer = User::factory()->role(Role::ClientReviewer)->create();
-        $ownClient = Client::factory()->create(['org_id' => $reviewer->org_id]);
-        $reviewer->forceFill(['client_id' => $ownClient->id])->save();
-        $otherClient = Client::factory()->create(['org_id' => $reviewer->org_id]);
+        $client = Client::factory()->create(['org_id' => $reviewer->org_id]);
+        $reviewer->forceFill(['client_id' => $client->id])->save();
 
-        $ownAccount = SocialAccount::factory()->for($ownClient)->create(['org_id' => $reviewer->org_id, 'timezone' => 'UTC']);
-        $otherAccount = SocialAccount::factory()->for($otherClient)->create(['org_id' => $reviewer->org_id, 'timezone' => 'UTC']);
-
-        $ownPost = Post::factory()->for($ownClient)->create(['org_id' => $reviewer->org_id]);
-        $ownPost->targets()->create([
-            'social_account_id' => $ownAccount->id,
-            'scheduled_local_date' => now()->addDay()->toDateString(),
-            'scheduled_local_time' => '09:00',
-            'scheduled_at_utc' => now()->addDay(),
-        ]);
-
-        $otherPost = Post::factory()->for($otherClient)->create(['org_id' => $reviewer->org_id]);
-        $otherPost->targets()->create([
-            'social_account_id' => $otherAccount->id,
-            'scheduled_local_date' => now()->addDay()->toDateString(),
-            'scheduled_local_time' => '09:00',
-            'scheduled_at_utc' => now()->addDay(),
-        ]);
-
-        $this->actingAs($reviewer);
-
-        $response = $this->get(route('dashboard'));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->has('upcomingPosts', 1)
-            ->where('upcomingPosts.0.post_id', $ownPost->id)
-            ->where('summary.scheduledPosts', 1)
-        );
+        $this->actingAs($reviewer)
+            ->get(route('dashboard'))
+            ->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_dashboard_shows_needs_attention_items_and_summary_count()
@@ -226,7 +204,7 @@ class DashboardTest extends TestCase
             'status' => ClientStatus::Active,
             'owner_user_id' => $user->id,
             'retainer_amount' => 1000,
-            'billing_cycle' => \App\Enums\BillingCycle::Monthly,
+            'billing_cycle' => BillingCycle::Monthly,
             'start_date' => now(),
         ]);
 

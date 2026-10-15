@@ -1,10 +1,21 @@
-import { Link } from '@inertiajs/react';
-import { CalendarClock, Clock, MessageSquareWarning } from 'lucide-react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import {
+    ArrowRight,
+    CalendarDays,
+    CheckCircle2,
+    MessageSquareWarning,
+} from 'lucide-react';
 
-import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
-import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
-import { show as showPortalPost } from '@/routes/portal/posts';
+import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import { PlatformIcon } from '@/components/platform-icon';
+import { PortalPostRow } from '@/components/portal-post-row';
+import { Button } from '@/components/ui/button';
+import { calendar as portalCalendar } from '@/routes/portal';
+import {
+    index as portalPostsIndex,
+    show as portalPostsShow,
+} from '@/routes/portal/posts';
+import type { Auth } from '@/types';
 
 type PostRow = {
     post_id: number;
@@ -33,122 +44,254 @@ type DashboardItems = {
     upcomingPosts: UpcomingPostRow[];
 };
 
-function PostRowItem({ row }: { row: PostRow }) {
-    return (
-        <Link
-            href={showPortalPost(row.post_id)}
-            className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-muted/50"
-        >
-            <div className="flex flex-col">
-                <span className="font-medium">{row.master_caption ?? 'Untitled post'}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                    {row.platform ?? 'No platform'}
-                    {row.handle ? ` · ${row.handle}` : ''}
-                </span>
-            </div>
-            <Badge variant="outline" className="whitespace-nowrap text-[10px]">
-                {row.status_label}
-            </Badge>
-        </Link>
-    );
+const dayFormatter = new Intl.DateTimeFormat('en-US', { day: '2-digit' });
+const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+
+function parseDate(date: string): Date {
+    const [y, m, d] = date.split('-').map(Number);
+
+    return new Date(y, m - 1, d);
 }
 
-function Section({
-    icon: Icon,
-    title,
-    description,
-    rows,
-    emptyLabel,
+function toRow(row: PostRow) {
+    return {
+        id: row.post_id,
+        status: row.status,
+        status_label: row.status_label,
+        master_caption: row.master_caption,
+        platform: row.platform,
+        handle: row.handle,
+    };
+}
+
+/**
+ * Step 6.4 — the client portal's landing page. Built around the one job a client logs in for —
+ * approving work — so outstanding approvals lead as an ink "action" block, with what's going out
+ * next and what's back with the studio alongside.
+ */
+export default function PortalDashboard({
+    client,
+    items,
 }: {
-    icon: typeof Clock;
-    title: string;
-    description: string;
-    rows: PostRow[];
-    emptyLabel: string;
+    client: { name: string };
+    items: DashboardItems;
 }) {
-    return (
-        <div className="relative flex flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-            <div className="flex items-center gap-2">
-                <span className="flex size-8 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
-                    <Icon className="size-4" />
-                </span>
-                <div className="flex flex-col">
-                    <h2 className="text-sm font-semibold">{title}</h2>
-                    <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
-            </div>
-            {rows.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                    {rows.map((row) => (
-                        <PostRowItem key={row.post_id} row={row} />
-                    ))}
-                </div>
-            ) : (
-                <p className="py-6 text-center text-xs text-muted-foreground">{emptyLabel}</p>
-            )}
-        </div>
-    );
-}
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const firstName = auth.user.name.split(' ')[0];
+    const waiting = items.waitingApprovals;
+    const next = waiting[0];
 
-export default function PortalDashboard({ client, items }: { client: { name: string }; items: DashboardItems }) {
     return (
-        <ClientPortalLayout title="Dashboard">
-            <Heading title={`Welcome, ${client.name}`} description="Here's what's happening with your content." />
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <Section
-                    icon={Clock}
-                    title="Waiting on your approval"
-                    description="Posts ready for your review"
-                    rows={items.waitingApprovals}
-                    emptyLabel="Nothing waiting on your approval."
-                />
-                <Section
-                    icon={MessageSquareWarning}
-                    title="Changes requested"
-                    description="Posts you've asked to be revised"
-                    rows={items.changesRequested}
-                    emptyLabel="No changes currently requested."
+        <>
+            <Head title={`${client.name} — Client portal`} />
+            <Page>
+                <PageHeader
+                    eyebrow={`Client portal — ${client.name}`}
+                    title={
+                        <>
+                            Welcome back, <em>{firstName}</em>.
+                        </>
+                    }
+                    description={
+                        waiting.length > 0
+                            ? `${waiting.length} post${waiting.length === 1 ? ' is' : 's are'} waiting on your sign-off. Everything else is moving along.`
+                            : "You're all caught up — there's nothing waiting on your sign-off right now."
+                    }
+                    actions={
+                        <Button variant="outline" asChild>
+                            <Link href={portalCalendar()}>
+                                <CalendarDays />
+                                Calendar
+                            </Link>
+                        </Button>
+                    }
                 />
 
-                <div className="relative flex flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-2">
-                    <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                    <div className="flex items-center gap-2">
-                        <span className="flex size-8 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
-                            <CalendarClock className="size-4" />
-                        </span>
-                        <div className="flex flex-col">
-                            <h2 className="text-sm font-semibold">Upcoming scheduled posts</h2>
-                            <p className="text-xs text-muted-foreground">What's going out next for your brand</p>
-                        </div>
-                    </div>
-                    {items.upcomingPosts.length > 0 ? (
-                        <div className="flex flex-col gap-2">
-                            {items.upcomingPosts.map((row) => (
+                <div className="animate-rise grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
+                    {waiting.length > 0 ? (
+                        <section className="bg-ink text-ink-foreground flex flex-col overflow-hidden rounded-2xl">
+                            <div className="flex flex-wrap items-end justify-between gap-6 p-6 sm:p-7">
+                                <div className="flex flex-col gap-3">
+                                    <span className="eyebrow text-ink-foreground/60">
+                                        Needs your approval
+                                    </span>
+                                    <span className="font-serif text-7xl leading-[0.85] tabular-nums">
+                                        {waiting.length}
+                                    </span>
+                                    <span className="text-ink-foreground/70 text-sm">
+                                        {waiting.length === 1
+                                            ? 'post is ready for your review'
+                                            : 'posts are ready for your review'}
+                                    </span>
+                                </div>
+                                {next && (
+                                    <Button size="lg" asChild>
+                                        <Link
+                                            href={portalPostsShow(next.post_id)}
+                                        >
+                                            Start reviewing
+                                            <ArrowRight />
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
+                            <ul className="divide-ink-foreground/10 border-ink-foreground/10 divide-y border-t">
+                                {waiting.slice(0, 4).map((row) => (
+                                    <li key={row.post_id}>
+                                        <Link
+                                            href={portalPostsShow(row.post_id)}
+                                            className="group hover:bg-ink-foreground/5 flex items-center gap-3.5 px-6 py-3.5 transition-colors sm:px-7"
+                                        >
+                                            <PlatformIcon
+                                                platform={row.platform}
+                                                className="border-ink-foreground/15 bg-ink-foreground/5 text-ink-foreground/80"
+                                            />
+                                            <span className="flex min-w-0 flex-1 flex-col">
+                                                <span className="truncate text-sm font-medium">
+                                                    {row.master_caption ||
+                                                        'Untitled post'}
+                                                </span>
+                                                <span className="text-ink-foreground/55 truncate text-xs capitalize">
+                                                    {row.platform ??
+                                                        'No platform yet'}
+                                                    {row.handle
+                                                        ? ` · ${row.handle}`
+                                                        : ''}
+                                                </span>
+                                            </span>
+                                            <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+                                                Review
+                                                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                                            </span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                            {waiting.length > 4 && (
                                 <Link
-                                    key={row.target_id}
-                                    href={showPortalPost(row.post_id)}
-                                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-muted/50"
+                                    href={portalPostsIndex({
+                                        query: { status: 'waiting_client' },
+                                    })}
+                                    className="eyebrow border-ink-foreground/10 text-ink-foreground/60 hover:text-ink-foreground border-t px-6 py-3 sm:px-7"
                                 >
-                                    <div className="flex flex-col">
-                                        <span className="font-medium">{row.master_caption ?? 'Untitled post'}</span>
-                                        <span className="truncate text-xs text-muted-foreground">
-                                            {row.platform ?? 'No platform'}
-                                            {row.handle ? ` · ${row.handle}` : ''}
-                                        </span>
-                                    </div>
-                                    <Badge variant="outline" className="whitespace-nowrap text-[10px]">
-                                        {row.date} · {row.time}
-                                    </Badge>
+                                    +{waiting.length - 4} more waiting →
                                 </Link>
+                            )}
+                        </section>
+                    ) : (
+                        <EmptyState
+                            icon={CheckCircle2}
+                            title="All caught up."
+                            description="Nothing needs your sign-off. We'll let you know the moment something's ready."
+                            className="min-h-0 py-12"
+                            action={
+                                <Button variant="outline" asChild>
+                                    <Link href={portalPostsIndex()}>
+                                        Browse your posts
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    )}
+
+                    <Panel
+                        eyebrow="Next 14 days"
+                        title="Going out"
+                        actions={
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={portalCalendar()}>
+                                    Calendar
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        }
+                        bodyClassName="p-2"
+                    >
+                        {items.upcomingPosts.length > 0 ? (
+                            <ul className="flex flex-col">
+                                {items.upcomingPosts.map((row) => {
+                                    const date = parseDate(row.date);
+
+                                    return (
+                                        <li key={row.target_id}>
+                                            <Link
+                                                href={portalPostsShow(
+                                                    row.post_id,
+                                                )}
+                                                className="group hover:bg-muted/60 flex items-center gap-4 rounded-xl px-3 py-2.5 transition-colors"
+                                            >
+                                                <span className="border-border flex w-11 shrink-0 flex-col items-center border-r pr-4">
+                                                    <span className="font-serif text-2xl leading-none tabular-nums">
+                                                        {dayFormatter.format(
+                                                            date,
+                                                        )}
+                                                    </span>
+                                                    <span className="eyebrow text-muted-foreground text-[9.5px]">
+                                                        {weekdayFormatter.format(
+                                                            date,
+                                                        )}
+                                                    </span>
+                                                </span>
+                                                <span className="flex min-w-0 flex-1 flex-col">
+                                                    <span className="group-hover:text-primary truncate text-sm font-medium">
+                                                        {row.master_caption ||
+                                                            'Untitled post'}
+                                                    </span>
+                                                    <span className="text-muted-foreground truncate text-xs capitalize">
+                                                        {row.platform}
+                                                        {row.handle
+                                                            ? ` · ${row.handle}`
+                                                            : ''}{' '}
+                                                        ·{' '}
+                                                        {monthFormatter.format(
+                                                            date,
+                                                        )}
+                                                    </span>
+                                                </span>
+                                                <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                                                    {row.time}
+                                                </span>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                compact
+                                icon={CalendarDays}
+                                title="A quiet fortnight."
+                                description="Nothing is scheduled to go out in the next two weeks."
+                                className="m-3 border-0"
+                            />
+                        )}
+                    </Panel>
+                </div>
+
+                <Panel
+                    eyebrow="With the studio"
+                    title="Changes you've requested"
+                    description="Posts you've sent back for revision — they'll return here for your approval."
+                    icon={MessageSquareWarning}
+                    bodyClassName="p-2"
+                >
+                    {items.changesRequested.length > 0 ? (
+                        <div className="flex flex-col">
+                            {items.changesRequested.map((row) => (
+                                <PortalPostRow
+                                    key={row.post_id}
+                                    post={toRow(row)}
+                                />
                             ))}
                         </div>
                     ) : (
-                        <p className="py-6 text-center text-xs text-muted-foreground">No scheduled posts in the next two weeks.</p>
+                        <p className="text-muted-foreground px-3 py-6 text-center text-[13px]">
+                            Nothing is back with the studio right now.
+                        </p>
                     )}
-                </div>
-            </div>
-        </ClientPortalLayout>
+                </Panel>
+            </Page>
+        </>
     );
 }

@@ -4,9 +4,19 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { index as indexClients } from '@/routes/clients';
-import { show as showCampaign, update as updateCampaign } from '@/routes/campaigns';
+import {
+    show as showCampaign,
+    update as updateCampaign,
+} from '@/routes/campaigns';
+import { PageHeader } from '@/components/page';
 
 type CampaignData = {
     id: number;
@@ -33,52 +43,61 @@ export default function CampaignEdit({
     return (
         <>
             <Head title={`Edit ${campaign.name} — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <div className="flex flex-col gap-4">
                     <Link
                         href={showCampaign(campaign.id)}
-                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
                     >
                         <ArrowLeft className="size-4" />
                         Back to {campaign.name}
                     </Link>
                 </div>
 
-                <div className="bg-noise relative overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
-                    />
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
-                    />
-                    <div className="relative flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">Edit campaign</h1>
-                        <p className="max-w-xl text-sm text-primary-foreground/80">
+                <PageHeader
+                    title="Edit campaign"
+                    description={
+                        <>
                             {campaign.name} — {client.name}
-                        </p>
-                    </div>
-                </div>
+                        </>
+                    }
+                />
 
-                <Form {...updateCampaign.form(campaign.id)} className="grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <Form
+                    {...updateCampaign.form(campaign.id)}
+                    className="border-border bg-card grid gap-4 rounded-2xl border p-4 shadow-sm"
+                >
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-1">
                                 <Label htmlFor="name">Name</Label>
-                                <Input id="name" name="name" defaultValue={campaign.name} required />
+                                <Input
+                                    id="name"
+                                    name="name"
+                                    defaultValue={campaign.name}
+                                    required
+                                />
                                 <InputError message={errors.name} />
                             </div>
-                            <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <div className="grid gap-1">
                                     <Label htmlFor="status">Status</Label>
-                                    <Select name="status" defaultValue={campaign.status}>
-                                        <SelectTrigger id="status" className="w-full">
+                                    <Select
+                                        name="status"
+                                        defaultValue={campaign.status}
+                                    >
+                                        <SelectTrigger
+                                            id="status"
+                                            className="w-full"
+                                        >
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {statuses.map((status) => (
-                                                <SelectItem key={status.value} value={status.value}>
+                                                <SelectItem
+                                                    key={status.value}
+                                                    value={status.value}
+                                                >
                                                     {status.label}
                                                 </SelectItem>
                                             ))}
@@ -87,13 +106,25 @@ export default function CampaignEdit({
                                     <InputError message={errors.status} />
                                 </div>
                                 <div className="grid gap-1">
-                                    <Label htmlFor="start_date">Start date</Label>
-                                    <Input id="start_date" name="start_date" type="date" defaultValue={campaign.start_date ?? ''} />
+                                    <Label htmlFor="start_date">
+                                        Start date
+                                    </Label>
+                                    <Input
+                                        id="start_date"
+                                        name="start_date"
+                                        type="date"
+                                        defaultValue={campaign.start_date ?? ''}
+                                    />
                                     <InputError message={errors.start_date} />
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor="end_date">End date</Label>
-                                    <Input id="end_date" name="end_date" type="date" defaultValue={campaign.end_date ?? ''} />
+                                    <Input
+                                        id="end_date"
+                                        name="end_date"
+                                        type="date"
+                                        defaultValue={campaign.end_date ?? ''}
+                                    />
                                     <InputError message={errors.end_date} />
                                 </div>
                             </div>
@@ -104,7 +135,7 @@ export default function CampaignEdit({
                                     name="goal"
                                     rows={4}
                                     defaultValue={campaign.goal ?? ''}
-                                    className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
                                 />
                                 <InputError message={errors.goal} />
                             </div>
@@ -115,7 +146,7 @@ export default function CampaignEdit({
                                     name="notes"
                                     rows={4}
                                     defaultValue={campaign.notes ?? ''}
-                                    className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
                                 />
                                 <InputError message={errors.notes} />
                             </div>
@@ -133,5 +164,8 @@ export default function CampaignEdit({
 }
 
 CampaignEdit.layout = {
-    breadcrumbs: [{ title: 'Clients', href: indexClients() }, { title: 'Edit campaign', href: indexClients() }],
+    breadcrumbs: [
+        { title: 'Clients', href: indexClients() },
+        { title: 'Edit campaign', href: indexClients() },
+    ],
 };

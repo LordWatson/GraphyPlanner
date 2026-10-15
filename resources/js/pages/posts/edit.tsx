@@ -27,26 +27,50 @@ import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import Heading from '@/components/heading';
 import { HashtagInput } from '@/components/hashtag-input';
 import InputError from '@/components/input-error';
-import { MentionTextarea, renderCommentBody, type MentionableUser } from '@/components/mention-textarea';
+import {
+    MentionTextarea,
+    renderCommentBody,
+    type MentionableUser,
+} from '@/components/mention-textarea';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { show as showClient } from '@/routes/clients';
-import { musicSearch as musicSearchRoute, update as updatePost, transition as transitionPost } from '@/routes/posts';
+import {
+    musicSearch as musicSearchRoute,
+    update as updatePost,
+    transition as transitionPost,
+} from '@/routes/posts';
 import postActivityLogs from '@/routes/posts/activity-logs';
 import aiPosts from '@/routes/posts/ai';
 import { store as storeComment } from '@/routes/posts/comments';
+import { PageHeader } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 
 type MusicTrackResult = { id: string; name: string; artist: string | null };
 
-type AiCaptionSuggestionData = { caption: string; hashtags: string[]; altText: string | null; firstComment: string | null };
+type AiCaptionSuggestionData = {
+    caption: string;
+    hashtags: string[];
+    altText: string | null;
+    firstComment: string | null;
+};
 
 type ChecklistItem = { key: string; label: string; passed: boolean };
 
@@ -107,7 +131,12 @@ type PostData = {
     music: Record<string, unknown> | null;
     location: Record<string, unknown> | null;
     checklist: { items: ChecklistItem[]; passed: boolean };
-    assets: { id: number; url: string | null; original_filename: string | null; type: string | null }[];
+    assets: {
+        id: number;
+        url: string | null;
+        original_filename: string | null;
+        type: string | null;
+    }[];
     targets: TargetData[];
     activity_logs: ActivityLogData[];
     approvals: ApprovalData[];
@@ -133,20 +162,6 @@ const platformIcon: Record<string, typeof Instagram> = {
     tiktok: Music2,
     facebook: Facebook,
     linkedin: Linkedin,
-};
-
-const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline' | 'destructive'> = {
-    idea: 'outline',
-    draft: 'secondary',
-    internal_review: 'warning',
-    waiting_client: 'warning',
-    changes_requested: 'destructive',
-    approved: 'success',
-    scheduled: 'success',
-    publishing: 'warning',
-    published: 'success',
-    failed: 'destructive',
-    archived: 'outline',
 };
 
 /**
@@ -181,34 +196,48 @@ function CommentEntry({ comment }: { comment: CommentData }) {
         <Collapsible
             open={open}
             onOpenChange={setOpen}
-            className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/30"
+            className="border-border bg-card hover:border-primary/30 overflow-hidden rounded-lg border transition-colors"
         >
             <CollapsibleTrigger asChild>
-                <button type="button" className="flex w-full items-start gap-3 p-3.5 text-left text-sm hover:bg-muted/30">
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <User className="size-4 text-muted-foreground" />
+                <button
+                    type="button"
+                    className="hover:bg-muted/30 flex w-full items-start gap-3 p-3.5 text-left text-sm"
+                >
+                    <span className="bg-muted mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full">
+                        <User className="text-muted-foreground size-4" />
                     </span>
                     <div className="grid min-w-0 flex-1 gap-1.5">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{comment.user_name ?? 'Unknown'}</span>
-                            {comment.internal_only && <Badge variant="secondary">Internal</Badge>}
-                            <span className="text-xs text-muted-foreground">{comment.created_at}</span>
+                            <span className="font-medium">
+                                {comment.user_name ?? 'Unknown'}
+                            </span>
+                            {comment.internal_only && (
+                                <Badge variant="secondary">Internal</Badge>
+                            )}
+                            <span className="text-muted-foreground text-xs">
+                                {comment.created_at}
+                            </span>
                         </div>
                         {!open && (
-                            <span className="min-w-0 truncate text-xs text-muted-foreground">
+                            <span className="text-muted-foreground min-w-0 truncate text-xs">
                                 <MessageSquareQuote className="mr-1 inline size-3.5" />
                                 {preview}
                                 {isTruncated ? '…' : ''}
                             </span>
                         )}
                     </div>
-                    <ChevronDown className={cn('mt-1 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                    <ChevronDown
+                        className={cn(
+                            'text-muted-foreground mt-1 size-4 shrink-0 transition-transform',
+                            open && 'rotate-180',
+                        )}
+                    />
                 </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-t border-border/60 bg-muted/10 py-3 pr-3.5 pl-[3.25rem] text-sm">
+            <CollapsibleContent className="border-border/60 bg-muted/10 border-t py-3 pr-3.5 pl-[3.25rem] text-sm">
                 <div className="flex items-start gap-2">
-                    <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                    <MessageSquareQuote className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                    <p className="text-muted-foreground min-w-0 flex-1 overflow-hidden leading-relaxed break-words whitespace-pre-wrap">
                         {renderCommentBody(comment.body)}
                     </p>
                 </div>
@@ -217,7 +246,15 @@ function CommentEntry({ comment }: { comment: CommentData }) {
     );
 }
 
-function ActivityLogEntry({ log, postId, canResend }: { log: ActivityLogData; postId: number; canResend: boolean }) {
+function ActivityLogEntry({
+    log,
+    postId,
+    canResend,
+}: {
+    log: ActivityLogData;
+    postId: number;
+    canResend: boolean;
+}) {
     const [open, setOpen] = useState(false);
     const hasNote = Boolean(log.note && log.note.trim().length > 0);
     const hasReviewUrl = Boolean(log.review_url);
@@ -231,7 +268,7 @@ function ActivityLogEntry({ log, postId, canResend }: { log: ActivityLogData; po
         <Collapsible
             open={open}
             onOpenChange={setOpen}
-            className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/30"
+            className="border-border bg-card hover:border-primary/30 overflow-hidden rounded-lg border transition-colors"
         >
             <CollapsibleTrigger asChild>
                 <button
@@ -242,23 +279,33 @@ function ActivityLogEntry({ log, postId, canResend }: { log: ActivityLogData; po
                         hasDetails ? 'hover:bg-muted/30' : 'cursor-default',
                     )}
                 >
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <History className="size-4 text-muted-foreground" />
+                    <span className="bg-muted mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full">
+                        <History className="text-muted-foreground size-4" />
                     </span>
                     <div className="grid min-w-0 flex-1 gap-1.5">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{log.user_name ?? 'System'}</span>
-                            <span className="flex items-center gap-1.5">
-                                <Badge variant={postStatusVariant[log.from_status ?? ''] ?? 'outline'}>
-                                    {formatStatusLabel(log.from_status)}
-                                </Badge>
-                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                                <Badge variant={postStatusVariant[log.to_status] ?? 'outline'}>{formatStatusLabel(log.to_status)}</Badge>
+                            <span className="font-medium">
+                                {log.user_name ?? 'System'}
                             </span>
-                            <span className="text-xs text-muted-foreground">{log.created_at}</span>
+                            <span className="flex items-center gap-1.5">
+                                <StatusPill
+                                    kind="post"
+                                    value={log.from_status ?? ''}
+                                    label={formatStatusLabel(log.from_status)}
+                                />
+                                <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
+                                <StatusPill
+                                    kind="post"
+                                    value={log.to_status}
+                                    label={formatStatusLabel(log.to_status)}
+                                />
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                                {log.created_at}
+                            </span>
                         </div>
                         {hasNote && !open && (
-                            <span className="min-w-0 truncate text-xs text-muted-foreground">
+                            <span className="text-muted-foreground min-w-0 truncate text-xs">
                                 <MessageSquareQuote className="mr-1 inline size-3.5" />
                                 {preview}
                                 {isTruncated ? '…' : ''}
@@ -266,30 +313,52 @@ function ActivityLogEntry({ log, postId, canResend }: { log: ActivityLogData; po
                         )}
                     </div>
                     {hasDetails && (
-                        <ChevronDown className={cn('mt-1 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                        <ChevronDown
+                            className={cn(
+                                'text-muted-foreground mt-1 size-4 shrink-0 transition-transform',
+                                open && 'rotate-180',
+                            )}
+                        />
                     )}
                 </button>
             </CollapsibleTrigger>
             {hasDetails && (
-                <CollapsibleContent className="border-t border-border/60 bg-muted/10 py-3 pr-3.5 pl-[3.25rem] text-sm">
+                <CollapsibleContent className="border-border/60 bg-muted/10 border-t py-3 pr-3.5 pl-[3.25rem] text-sm">
                     <div className="grid gap-3">
                         {hasNote && (
                             <div className="flex items-start gap-2">
-                                <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                                <p className="min-w-0 flex-1 overflow-hidden break-words whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                                <MessageSquareQuote className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                                <p className="text-muted-foreground min-w-0 flex-1 overflow-hidden leading-relaxed break-words whitespace-pre-wrap">
                                     {log.note}
                                 </p>
                             </div>
                         )}
                         {hasReviewUrl && (
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
-                                    Review link: <a href={log.review_url as string} className="underline" target="_blank" rel="noreferrer">{log.review_url}</a>
+                                <span className="text-muted-foreground min-w-0 flex-1 text-xs break-all">
+                                    Review link:{' '}
+                                    <a
+                                        href={log.review_url as string}
+                                        className="underline"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {log.review_url}
+                                    </a>
                                 </span>
                                 {canResend && (
-                                    <Form {...postActivityLogs.resendReviewEmail.form([postId, log.id])}>
+                                    <Form
+                                        {...postActivityLogs.resendReviewEmail.form(
+                                            [postId, log.id],
+                                        )}
+                                    >
                                         {({ processing }) => (
-                                            <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={processing}
+                                            >
                                                 Resend email
                                             </Button>
                                         )}
@@ -320,7 +389,12 @@ export default function PostEdit({
     targetAccounts: TargetAccountData[];
     availableAssets: AvailableAssetData[];
     allowedTransitions: { value: string; label: string }[];
-    can: { update: boolean; comment: boolean; resend_review_email: boolean; create_asset: boolean };
+    can: {
+        update: boolean;
+        comment: boolean;
+        resend_review_email: boolean;
+        create_asset: boolean;
+    };
     hashtagSuggestions: string[];
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
@@ -328,32 +402,47 @@ export default function PostEdit({
     const [caption, setCaption] = useState(post.master_caption ?? '');
     // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
     const [hashtags, setHashtags] = useState<string[]>(post.hashtags ?? []);
-    const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>(post.assets.map((asset) => asset.id));
+    const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>(
+        post.assets.map((asset) => asset.id),
+    );
     // Assets uploaded inline from this editor (via the "Upload asset" widget below) are merged
     // into the picker list on the fly, without a full page reload, so the rest of the in-progress
     // form (caption, hashtags, schedule rows, etc.) isn't lost.
     const [assets, setAssets] = useState<AvailableAssetData[]>(availableAssets);
     const [isUploadingAsset, setIsUploadingAsset] = useState(false);
     const assetFileInputRef = useRef<HTMLInputElement>(null);
-    const [targetRows, setTargetRows] = useState<Record<number, { date: string; time: string }>>(
+    const [targetRows, setTargetRows] = useState<
+        Record<number, { date: string; time: string }>
+    >(
         Object.fromEntries(
             post.targets.map((target) => [
                 target.social_account_id,
-                { date: target.scheduled_local_date ?? '', time: target.scheduled_local_time ?? '' },
+                {
+                    date: target.scheduled_local_date ?? '',
+                    time: target.scheduled_local_time ?? '',
+                },
             ]),
         ),
     );
     const [musicId, setMusicId] = useState((post.music?.id as string) ?? '');
-    const [musicName, setMusicName] = useState((post.music?.name as string) ?? '');
+    const [musicName, setMusicName] = useState(
+        (post.music?.name as string) ?? '',
+    );
     const [musicQuery, setMusicQuery] = useState('');
     const [musicResults, setMusicResults] = useState<MusicTrackResult[]>([]);
     const [musicSearching, setMusicSearching] = useState(false);
-    const [musicSearchError, setMusicSearchError] = useState<string | null>(null);
+    const [musicSearchError, setMusicSearchError] = useState<string | null>(
+        null,
+    );
     // Step 1.9.5 — a distinguishable error_code (e.g. "meta_not_connected") lets this render an
     // actionable "Connect Instagram" link instead of bare error text.
-    const [musicSearchErrorCode, setMusicSearchErrorCode] = useState<string | null>(null);
+    const [musicSearchErrorCode, setMusicSearchErrorCode] = useState<
+        string | null
+    >(null);
     const [musicPlatform, setMusicPlatform] = useState<string | null>(null);
-    const [locationName, setLocationName] = useState((post.location?.name as string) ?? '');
+    const [locationName, setLocationName] = useState(
+        (post.location?.name as string) ?? '',
+    );
 
     // Step 2.4 — "Suggest with AI" caption panel. Never overwrites the caption/hashtags fields
     // without an explicit "Apply" click, and the result still has to go through the normal Save
@@ -361,14 +450,18 @@ export default function PostEdit({
     const showAiPanel = Boolean(ai?.enabled && ai?.canUse);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
-    const [aiSuggestions, setAiSuggestions] = useState<AiCaptionSuggestionData[]>([]);
+    const [aiSuggestions, setAiSuggestions] = useState<
+        AiCaptionSuggestionData[]
+    >([]);
     // Step 2.6 — per-suggestion platform policy warnings (e.g. link/hashtag rules), surfaced
     // next to each card so a human can decide instead of the AI silently rewriting anything.
     const [aiPolicyWarnings, setAiPolicyWarnings] = useState<string[][]>([]);
     // Once a suggestion has been applied, the card list collapses to a small summary so it
     // doesn't keep taking up space in the editor — the user can still expand it back if they
     // want to compare/apply a different suggestion.
-    const [appliedSuggestionIndex, setAppliedSuggestionIndex] = useState<number | null>(null);
+    const [appliedSuggestionIndex, setAppliedSuggestionIndex] = useState<
+        number | null
+    >(null);
     const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
 
     const fetchAiSuggestions = async () => {
@@ -378,27 +471,50 @@ export default function PostEdit({
         try {
             const response = await fetch(aiPosts.captions.url(post.id), {
                 credentials: 'same-origin',
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             });
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(typeof data?.message === 'string' ? data.message : 'Unable to fetch AI suggestions.');
+                throw new Error(
+                    typeof data?.message === 'string'
+                        ? data.message
+                        : 'Unable to fetch AI suggestions.',
+                );
             }
 
-            setAiSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
-            setAiPolicyWarnings(Array.isArray(data?.policyWarnings) ? data.policyWarnings : []);
+            setAiSuggestions(
+                Array.isArray(data?.suggestions) ? data.suggestions : [],
+            );
+            setAiPolicyWarnings(
+                Array.isArray(data?.policyWarnings) ? data.policyWarnings : [],
+            );
             setAppliedSuggestionIndex(null);
             setSuggestionsExpanded(true);
         } catch (e) {
-            setAiError(e instanceof Error ? e.message : 'Unable to fetch AI suggestions.');
+            setAiError(
+                e instanceof Error
+                    ? e.message
+                    : 'Unable to fetch AI suggestions.',
+            );
         } finally {
             setAiLoading(false);
         }
     };
 
-    const applyAiSuggestion = (suggestion: AiCaptionSuggestionData, index: number) => {
-        if (caption.trim() && !window.confirm('Replace the current caption with this AI suggestion?')) {
+    const applyAiSuggestion = (
+        suggestion: AiCaptionSuggestionData,
+        index: number,
+    ) => {
+        if (
+            caption.trim() &&
+            !window.confirm(
+                'Replace the current caption with this AI suggestion?',
+            )
+        ) {
             return;
         }
 
@@ -423,7 +539,9 @@ export default function PostEdit({
 
     const toggleAsset = (assetId: number) => {
         setSelectedAssetIds((current) =>
-            current.includes(assetId) ? current.filter((id) => id !== assetId) : [...current, assetId],
+            current.includes(assetId)
+                ? current.filter((id) => id !== assetId)
+                : [...current, assetId],
         );
     };
 
@@ -456,7 +574,10 @@ export default function PostEdit({
             const data = await response.json();
 
             if (!response.ok || !data.asset) {
-                const message = typeof data?.message === 'string' ? data.message : 'Unable to upload the asset.';
+                const message =
+                    typeof data?.message === 'string'
+                        ? data.message
+                        : 'Unable to upload the asset.';
                 toast.error(message);
                 return;
             }
@@ -475,7 +596,9 @@ export default function PostEdit({
         }
     };
 
-    const selectedAssets = assets.filter((asset) => selectedAssetIds.includes(asset.id));
+    const selectedAssets = assets.filter((asset) =>
+        selectedAssetIds.includes(asset.id),
+    );
 
     const targetEntries = Object.entries(targetRows);
     const [activeTab, setActiveTab] = useState('editor');
@@ -486,11 +609,22 @@ export default function PostEdit({
     const musicPlatforms = Array.from(
         new Set(
             targetEntries
-                .map(([accountIdStr]) => targetAccounts.find((a) => a.id === Number(accountIdStr))?.platform)
-                .filter((platform): platform is string => platform === 'instagram' || platform === 'tiktok'),
+                .map(
+                    ([accountIdStr]) =>
+                        targetAccounts.find(
+                            (a) => a.id === Number(accountIdStr),
+                        )?.platform,
+                )
+                .filter(
+                    (platform): platform is string =>
+                        platform === 'instagram' || platform === 'tiktok',
+                ),
         ),
     );
-    const activeMusicPlatform = musicPlatform && musicPlatforms.includes(musicPlatform) ? musicPlatform : musicPlatforms[0] ?? null;
+    const activeMusicPlatform =
+        musicPlatform && musicPlatforms.includes(musicPlatform)
+            ? musicPlatform
+            : (musicPlatforms[0] ?? null);
 
     const handleMusicSearch = async () => {
         if (!activeMusicPlatform || musicQuery.trim() === '') {
@@ -503,7 +637,9 @@ export default function PostEdit({
 
         try {
             const response = await fetch(
-                musicSearchRoute.url(post.id, { query: { query: musicQuery, platform: activeMusicPlatform } }),
+                musicSearchRoute.url(post.id, {
+                    query: { query: musicQuery, platform: activeMusicPlatform },
+                }),
                 { headers: { Accept: 'application/json' } },
             );
             const data = await response.json();
@@ -548,59 +684,67 @@ export default function PostEdit({
     // rows) since the preview only needs platform/handle, not date/time.
     const previewTargets = can.update
         ? targetEntries
-              .map(([accountIdStr]) => targetAccounts.find((a) => a.id === Number(accountIdStr)))
+              .map(([accountIdStr]) =>
+                  targetAccounts.find((a) => a.id === Number(accountIdStr)),
+              )
               .filter((a): a is TargetAccountData => Boolean(a))
-              .map((a) => ({ id: a.id, platform: a.platform, handle: a.handle }))
-        : post.targets.map((t) => ({ id: t.social_account_id, platform: t.platform ?? '', handle: t.handle ?? '' }));
+              .map((a) => ({
+                  id: a.id,
+                  platform: a.platform,
+                  handle: a.handle,
+              }))
+        : post.targets.map((t) => ({
+              id: t.social_account_id,
+              platform: t.platform ?? '',
+              handle: t.handle ?? '',
+          }));
 
-    const [previewTargetId, setPreviewTargetId] = useState<number | string | null>(previewTargets[0]?.id ?? null);
-    const activePreviewTarget = previewTargets.find((t) => t.id === previewTargetId) ?? previewTargets[0] ?? null;
+    const [previewTargetId, setPreviewTargetId] = useState<
+        number | string | null
+    >(previewTargets[0]?.id ?? null);
+    const activePreviewTarget =
+        previewTargets.find((t) => t.id === previewTargetId) ??
+        previewTargets[0] ??
+        null;
     const previewAssets = can.update ? selectedAssets : post.assets;
     const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
 
     return (
         <>
             <Head title={`Edit post — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <div className="flex flex-col gap-4">
                     <Link
                         href={showClient(client.id)}
-                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
                     >
                         <ArrowLeft className="size-4" />
                         Back to {client.name}
                     </Link>
                 </div>
 
-                <div className="bg-noise relative flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
-                    />
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
-                    />
-                    <div className="relative flex flex-col gap-1">
-                        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium tracking-widest uppercase">
-                            Post editor
-                        </span>
-                        <h1 className="font-serif text-3xl font-semibold tracking-tight italic sm:text-4xl">
-                            {client.name}
-                        </h1>
-                        {post.campaign_name && (
-                            <p className="text-sm text-primary-foreground/80">{post.campaign_name}</p>
-                        )}
-                    </div>
-                    <div className="relative flex items-center gap-2">
-                        <Badge variant={postStatusVariant[post.status] ?? 'outline'} className="bg-white/90">
-                            {post.status_label}
-                        </Badge>
-                    </div>
-                </div>
+                <PageHeader
+                    eyebrow={
+                        post.campaign_name
+                            ? `Post editor — ${post.campaign_name}`
+                            : 'Post editor'
+                    }
+                    title={client.name}
+                    meta={
+                        <StatusPill
+                            kind="post"
+                            value={post.status}
+                            label={post.status_label}
+                        />
+                    }
+                />
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/60 p-1">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="gap-4"
+                >
+                    <TabsList className="bg-muted/60 h-auto w-full flex-wrap justify-start gap-1 rounded-2xl p-1">
                         <TabsTrigger value="editor">
                             <Pencil />
                             Editor
@@ -624,184 +768,355 @@ export default function PostEdit({
                         </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="editor" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-                    <div className="grid gap-4">
-                    {!can.update && (
-                    <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
-                        {(post.status === 'scheduled' || post.status === 'published') && (
-                            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                                <Lock className="size-4 shrink-0" />
-                                This post is {post.status_label.toLowerCase()} and is locked for editing. Move it to a
-                                different status to make changes.
-                            </div>
-                        )}
-                        <div className="grid gap-1">
-                            <Label>Master caption</Label>
-                            <p className="rounded-md border border-border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
-                                {post.master_caption || <span className="text-muted-foreground">No caption yet.</span>}
-                            </p>
-                        </div>
-
-                        <div className="grid gap-1">
-                            <Label>Hashtags</Label>
-                            {post.hashtags.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {post.hashtags.map((tag) => (
-                                        <Badge key={tag} variant="secondary">{tag}</Badge>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">No hashtags.</p>
-                            )}
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label>Target accounts</Label>
-                            {post.targets.length > 0 ? (
-                                <div className="grid gap-2">
-                                    {post.targets.map((target) => {
-                                        const AccountIcon = platformIcon[target.platform ?? ''] ?? Share2;
-
-                                        return (
-                                            <div
-                                                key={target.id}
-                                                className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 p-2.5 text-sm"
-                                            >
-                                                <AccountIcon className="size-4 text-primary" />
-                                                <span className="font-medium">{target.handle ?? '—'}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {target.scheduled_local_date ?? '—'} {target.scheduled_local_time ?? ''}
-                                                </span>
-                                                {target.status !== 'pending' && (
-                                                    <Badge variant={target.status === 'published' ? 'success' : 'destructive'}>
-                                                        {target.status_label}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">No target accounts selected.</p>
-                            )}
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                            <div className="grid gap-1">
-                                <Label>Music</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    {(post.music?.name as string) || 'Not set'}
-                                </p>
-                            </div>
-                            <div className="grid gap-1">
-                                <Label>Location</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    {(post.location?.name as string) || 'Not set'}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label>Media</Label>
-                            {post.assets.length > 0 ? (
-                                <AssetPreviewCarousel assets={post.assets} />
-                            ) : (
-                                <p className="text-sm text-muted-foreground">No media attached.</p>
-                            )}
-                        </div>
-                    </div>
-                    )}
-                    {can.update && (
-                    <Form
-                        {...updatePost.form(post.id)}
-                        className="grid gap-4 rounded-lg border border-border bg-card p-4"
+                    <TabsContent
+                        value="editor"
+                        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start"
                     >
-                        {({ processing, errors }) => (
-                            <>
-                                <div className="grid gap-1">
-                                    <div className="flex items-center justify-between">
-                                        <Label htmlFor="master_caption">Master caption</Label>
-                                        {showAiPanel && (
-                                            <Button type="button" size="sm" variant="secondary" onClick={fetchAiSuggestions} disabled={aiLoading}>
-                                                {aiLoading ? 'Suggesting…' : 'Suggest with AI'}
-                                            </Button>
-                                        )}
-                                    </div>
-                                    <textarea
-                                        id="master_caption"
-                                        name="master_caption"
-                                        rows={4}
-                                        value={caption}
-                                        onChange={(e) => setCaption(e.target.value)}
-                                        className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                    />
-                                    <InputError message={errors.master_caption} />
-                                    {showAiPanel && aiError && (
-                                        <p className="text-xs text-destructive">{aiError}</p>
-                                    )}
-                                    {showAiPanel && aiSuggestions.length > 0 && (
-                                        <div className="mt-2 grid gap-2 rounded-md border border-border bg-muted/20 p-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-medium text-muted-foreground">
-                                                    AI suggestions
-                                                    {appliedSuggestionIndex !== null && ' · applied ✓'}
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-6 px-2 text-xs"
-                                                    onClick={() => setSuggestionsExpanded((current) => !current)}
-                                                >
-                                                    {suggestionsExpanded ? 'Collapse' : 'Show suggestions'}
-                                                </Button>
-                                            </div>
-                                            {!suggestionsExpanded && appliedSuggestionIndex !== null && (
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    Using: {aiSuggestions[appliedSuggestionIndex]?.caption}
-                                                </p>
-                                            )}
-                                            {suggestionsExpanded &&
-                                                aiSuggestions.map((suggestion, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className={`grid gap-2 rounded-md border bg-background p-3 ${
-                                                            appliedSuggestionIndex === i ? 'border-primary' : 'border-border'
-                                                        }`}
-                                                    >
-                                                        <p className="text-sm whitespace-pre-wrap">{suggestion.caption}</p>
-                                                        {suggestion.hashtags.length > 0 && (
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {suggestion.hashtags.map((tag, ti) => (
-                                                                    <Badge key={ti} variant="outline">#{tag}</Badge>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {suggestion.altText && (
-                                                            <p className="text-xs text-muted-foreground">Alt text: {suggestion.altText}</p>
-                                                        )}
-                                                        {suggestion.firstComment && (
-                                                            <p className="text-xs text-muted-foreground">First comment: {suggestion.firstComment}</p>
-                                                        )}
-                                                        {(aiPolicyWarnings[i] ?? []).length > 0 && (
-                                                            <ul className="grid gap-0.5">
-                                                                {aiPolicyWarnings[i].map((warning, wi) => (
-                                                                    <li key={wi} className="text-xs text-amber-600 dark:text-amber-500">⚠ {warning}</li>
-                                                                ))}
-                                                            </ul>
-                                                        )}
-                                                        <div>
-                                                            <Button type="button" size="sm" onClick={() => applyAiSuggestion(suggestion, i)}>
-                                                                {appliedSuggestionIndex === i ? 'Applied ✓' : 'Apply'}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                        <div className="grid gap-4">
+                            {!can.update && (
+                                <div className="border-border bg-card grid gap-4 rounded-lg border p-4">
+                                    {(post.status === 'scheduled' ||
+                                        post.status === 'published') && (
+                                        <div className="border-border bg-muted/30 text-muted-foreground flex items-center gap-2 rounded-md border p-3 text-sm">
+                                            <Lock className="size-4 shrink-0" />
+                                            This post is{' '}
+                                            {post.status_label.toLowerCase()}{' '}
+                                            and is locked for editing. Move it
+                                            to a different status to make
+                                            changes.
                                         </div>
                                     )}
-                                </div>
+                                    <div className="grid gap-1">
+                                        <Label>Master caption</Label>
+                                        <p className="border-border bg-muted/20 rounded-md border p-3 text-sm whitespace-pre-wrap">
+                                            {post.master_caption || (
+                                                <span className="text-muted-foreground">
+                                                    No caption yet.
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
 
-                                {/* Message to client — commented out for now, may be re-added later.
+                                    <div className="grid gap-1">
+                                        <Label>Hashtags</Label>
+                                        {post.hashtags.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {post.hashtags.map((tag) => (
+                                                    <Badge
+                                                        key={tag}
+                                                        variant="secondary"
+                                                    >
+                                                        {tag}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted-foreground text-sm">
+                                                No hashtags.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label>Target accounts</Label>
+                                        {post.targets.length > 0 ? (
+                                            <div className="grid gap-2">
+                                                {post.targets.map((target) => {
+                                                    const AccountIcon =
+                                                        platformIcon[
+                                                            target.platform ??
+                                                                ''
+                                                        ] ?? Share2;
+
+                                                    return (
+                                                        <div
+                                                            key={target.id}
+                                                            className="border-border bg-muted/20 flex flex-wrap items-center gap-2 rounded-md border p-2.5 text-sm"
+                                                        >
+                                                            <AccountIcon className="text-primary size-4" />
+                                                            <span className="font-medium">
+                                                                {target.handle ??
+                                                                    '—'}
+                                                            </span>
+                                                            <span className="text-muted-foreground text-xs">
+                                                                {target.scheduled_local_date ??
+                                                                    '—'}{' '}
+                                                                {target.scheduled_local_time ??
+                                                                    ''}
+                                                            </span>
+                                                            {target.status !==
+                                                                'pending' && (
+                                                                <Badge
+                                                                    variant={
+                                                                        target.status ===
+                                                                        'published'
+                                                                            ? 'success'
+                                                                            : 'destructive'
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        target.status_label
+                                                                    }
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted-foreground text-sm">
+                                                No target accounts selected.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                        <div className="grid gap-1">
+                                            <Label>Music</Label>
+                                            <p className="text-muted-foreground text-sm">
+                                                {(post.music?.name as string) ||
+                                                    'Not set'}
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label>Location</Label>
+                                            <p className="text-muted-foreground text-sm">
+                                                {(post.location
+                                                    ?.name as string) ||
+                                                    'Not set'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label>Media</Label>
+                                        {post.assets.length > 0 ? (
+                                            <AssetPreviewCarousel
+                                                assets={post.assets}
+                                            />
+                                        ) : (
+                                            <p className="text-muted-foreground text-sm">
+                                                No media attached.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {can.update && (
+                                <Form
+                                    {...updatePost.form(post.id)}
+                                    className="border-border bg-card grid gap-4 rounded-lg border p-4"
+                                >
+                                    {({ processing, errors }) => (
+                                        <>
+                                            <div className="grid gap-1">
+                                                <div className="flex items-center justify-between">
+                                                    <Label htmlFor="master_caption">
+                                                        Master caption
+                                                    </Label>
+                                                    {showAiPanel && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="secondary"
+                                                            onClick={
+                                                                fetchAiSuggestions
+                                                            }
+                                                            disabled={aiLoading}
+                                                        >
+                                                            {aiLoading
+                                                                ? 'Suggesting…'
+                                                                : 'Suggest with AI'}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                                <textarea
+                                                    id="master_caption"
+                                                    name="master_caption"
+                                                    rows={4}
+                                                    value={caption}
+                                                    onChange={(e) =>
+                                                        setCaption(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                                                />
+                                                <InputError
+                                                    message={
+                                                        errors.master_caption
+                                                    }
+                                                />
+                                                {showAiPanel && aiError && (
+                                                    <p className="text-destructive text-xs">
+                                                        {aiError}
+                                                    </p>
+                                                )}
+                                                {showAiPanel &&
+                                                    aiSuggestions.length >
+                                                        0 && (
+                                                        <div className="border-border bg-muted/20 mt-2 grid gap-2 rounded-md border p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-muted-foreground text-xs font-medium">
+                                                                    AI
+                                                                    suggestions
+                                                                    {appliedSuggestionIndex !==
+                                                                        null &&
+                                                                        ' · applied ✓'}
+                                                                </span>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-6 px-2 text-xs"
+                                                                    onClick={() =>
+                                                                        setSuggestionsExpanded(
+                                                                            (
+                                                                                current,
+                                                                            ) =>
+                                                                                !current,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {suggestionsExpanded
+                                                                        ? 'Collapse'
+                                                                        : 'Show suggestions'}
+                                                                </Button>
+                                                            </div>
+                                                            {!suggestionsExpanded &&
+                                                                appliedSuggestionIndex !==
+                                                                    null && (
+                                                                    <p className="text-muted-foreground truncate text-xs">
+                                                                        Using:{' '}
+                                                                        {
+                                                                            aiSuggestions[
+                                                                                appliedSuggestionIndex
+                                                                            ]
+                                                                                ?.caption
+                                                                        }
+                                                                    </p>
+                                                                )}
+                                                            {suggestionsExpanded &&
+                                                                aiSuggestions.map(
+                                                                    (
+                                                                        suggestion,
+                                                                        i,
+                                                                    ) => (
+                                                                        <div
+                                                                            key={
+                                                                                i
+                                                                            }
+                                                                            className={`bg-background grid gap-2 rounded-md border p-3 ${
+                                                                                appliedSuggestionIndex ===
+                                                                                i
+                                                                                    ? 'border-primary'
+                                                                                    : 'border-border'
+                                                                            }`}
+                                                                        >
+                                                                            <p className="text-sm whitespace-pre-wrap">
+                                                                                {
+                                                                                    suggestion.caption
+                                                                                }
+                                                                            </p>
+                                                                            {suggestion
+                                                                                .hashtags
+                                                                                .length >
+                                                                                0 && (
+                                                                                <div className="flex flex-wrap gap-1">
+                                                                                    {suggestion.hashtags.map(
+                                                                                        (
+                                                                                            tag,
+                                                                                            ti,
+                                                                                        ) => (
+                                                                                            <Badge
+                                                                                                key={
+                                                                                                    ti
+                                                                                                }
+                                                                                                variant="outline"
+                                                                                            >
+                                                                                                #
+                                                                                                {
+                                                                                                    tag
+                                                                                                }
+                                                                                            </Badge>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                            {suggestion.altText && (
+                                                                                <p className="text-muted-foreground text-xs">
+                                                                                    Alt
+                                                                                    text:{' '}
+                                                                                    {
+                                                                                        suggestion.altText
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {suggestion.firstComment && (
+                                                                                <p className="text-muted-foreground text-xs">
+                                                                                    First
+                                                                                    comment:{' '}
+                                                                                    {
+                                                                                        suggestion.firstComment
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {(
+                                                                                aiPolicyWarnings[
+                                                                                    i
+                                                                                ] ??
+                                                                                []
+                                                                            )
+                                                                                .length >
+                                                                                0 && (
+                                                                                <ul className="grid gap-0.5">
+                                                                                    {aiPolicyWarnings[
+                                                                                        i
+                                                                                    ].map(
+                                                                                        (
+                                                                                            warning,
+                                                                                            wi,
+                                                                                        ) => (
+                                                                                            <li
+                                                                                                key={
+                                                                                                    wi
+                                                                                                }
+                                                                                                className="text-xs text-amber-600 dark:text-amber-500"
+                                                                                            >
+                                                                                                ⚠{' '}
+                                                                                                {
+                                                                                                    warning
+                                                                                                }
+                                                                                            </li>
+                                                                                        ),
+                                                                                    )}
+                                                                                </ul>
+                                                                            )}
+                                                                            <div>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    size="sm"
+                                                                                    onClick={() =>
+                                                                                        applyAiSuggestion(
+                                                                                            suggestion,
+                                                                                            i,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    {appliedSuggestionIndex ===
+                                                                                    i
+                                                                                        ? 'Applied ✓'
+                                                                                        : 'Apply'}
+                                                                                </Button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                        </div>
+                                                    )}
+                                            </div>
+
+                                            {/* Message to client — commented out for now, may be re-added later.
                                 <div className="grid gap-1">
                                     <Label htmlFor="review_message">Message to client</Label>
                                     <textarea
@@ -817,550 +1132,975 @@ export default function PostEdit({
                                 </div>
                                 */}
 
-                                <div className="grid gap-1">
-                                    <Label htmlFor="hashtags_text">Hashtags</Label>
-                                    <HashtagInput
-                                        id="hashtags_text"
-                                        value={hashtags}
-                                        onChange={setHashtags}
-                                        suggestions={hashtagSuggestions}
-                                        placeholder="Start typing a hashtag…"
-                                    />
-                                    {hashtags.map((tag, i) => (
-                                        <input key={i} type="hidden" name={`hashtags[${i}]`} value={tag} />
-                                    ))}
-                                </div>
+                                            <div className="grid gap-1">
+                                                <Label htmlFor="hashtags_text">
+                                                    Hashtags
+                                                </Label>
+                                                <HashtagInput
+                                                    id="hashtags_text"
+                                                    value={hashtags}
+                                                    onChange={setHashtags}
+                                                    suggestions={
+                                                        hashtagSuggestions
+                                                    }
+                                                    placeholder="Start typing a hashtag…"
+                                                />
+                                                {hashtags.map((tag, i) => (
+                                                    <input
+                                                        key={i}
+                                                        type="hidden"
+                                                        name={`hashtags[${i}]`}
+                                                        value={tag}
+                                                    />
+                                                ))}
+                                            </div>
 
-                                <div className="grid gap-2">
-                                    <Label>Target accounts</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Accounts filtered to {client.name}. Each target keeps its own local schedule —
-                                        two targets in different timezones never collapse to one shared time.
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {targetAccounts.map((account) => {
-                                            const AccountIcon = platformIcon[account.platform] ?? Share2;
-                                            const selected = account.id in targetRows;
+                                            <div className="grid gap-2">
+                                                <Label>Target accounts</Label>
+                                                <p className="text-muted-foreground text-xs">
+                                                    Accounts filtered to{' '}
+                                                    {client.name}. Each target
+                                                    keeps its own local schedule
+                                                    — two targets in different
+                                                    timezones never collapse to
+                                                    one shared time.
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {targetAccounts.map(
+                                                        (account) => {
+                                                            const AccountIcon =
+                                                                platformIcon[
+                                                                    account
+                                                                        .platform
+                                                                ] ?? Share2;
+                                                            const selected =
+                                                                account.id in
+                                                                targetRows;
+
+                                                            return (
+                                                                <button
+                                                                    key={
+                                                                        account.id
+                                                                    }
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        toggleTargetAccount(
+                                                                            account.id,
+                                                                        )
+                                                                    }
+                                                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                                                        selected
+                                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                                            : 'border-border bg-muted/50 text-foreground'
+                                                                    }`}
+                                                                >
+                                                                    <AccountIcon className="size-3.5" />
+                                                                    {
+                                                                        account.handle
+                                                                    }{' '}
+                                                                    ·{' '}
+                                                                    {
+                                                                        account.timezone
+                                                                    }
+                                                                </button>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
+
+                                                {targetEntries.length === 0 && (
+                                                    <p className="text-muted-foreground text-sm">
+                                                        No target accounts
+                                                        selected.
+                                                    </p>
+                                                )}
+
+                                                <div className="grid gap-2">
+                                                    {targetEntries.map(
+                                                        (
+                                                            [accountIdStr, row],
+                                                            i,
+                                                        ) => {
+                                                            const accountId =
+                                                                Number(
+                                                                    accountIdStr,
+                                                                );
+                                                            const account =
+                                                                targetAccounts.find(
+                                                                    (a) =>
+                                                                        a.id ===
+                                                                        accountId,
+                                                                );
+                                                            const AccountIcon =
+                                                                platformIcon[
+                                                                    account?.platform ??
+                                                                        ''
+                                                                ] ?? Share2;
+                                                            const limit =
+                                                                post.targets.find(
+                                                                    (t) =>
+                                                                        t.social_account_id ===
+                                                                        accountId,
+                                                                )?.caption_limit;
+
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        accountId
+                                                                    }
+                                                                    className="border-border bg-muted/20 grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-4 sm:items-end"
+                                                                >
+                                                                    <div className="flex items-center gap-2 text-sm sm:col-span-1">
+                                                                        <AccountIcon className="text-primary size-4" />
+                                                                        <div className="flex flex-col">
+                                                                            <span>
+                                                                                {account?.handle ??
+                                                                                    accountId}
+                                                                            </span>
+                                                                            <span className="text-muted-foreground text-xs tabular-nums">
+                                                                                {
+                                                                                    caption.length
+                                                                                }
+                                                                                {limit
+                                                                                    ? ` / ${limit}`
+                                                                                    : ''}{' '}
+                                                                                chars
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="grid gap-1">
+                                                                        <Label
+                                                                            htmlFor={`target-date-${accountId}`}
+                                                                        >
+                                                                            Local
+                                                                            date
+                                                                        </Label>
+                                                                        <Input
+                                                                            id={`target-date-${accountId}`}
+                                                                            type="date"
+                                                                            value={
+                                                                                row.date
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setTargetRows(
+                                                                                    (
+                                                                                        current,
+                                                                                    ) => ({
+                                                                                        ...current,
+                                                                                        [accountId]:
+                                                                                            {
+                                                                                                ...current[
+                                                                                                    accountId
+                                                                                                ],
+                                                                                                date: e
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            },
+                                                                                    }),
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                    <div className="grid gap-1">
+                                                                        <Label
+                                                                            htmlFor={`target-time-${accountId}`}
+                                                                        >
+                                                                            Local
+                                                                            time
+                                                                        </Label>
+                                                                        <Input
+                                                                            id={`target-time-${accountId}`}
+                                                                            type="time"
+                                                                            value={
+                                                                                row.time
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setTargetRows(
+                                                                                    (
+                                                                                        current,
+                                                                                    ) => ({
+                                                                                        ...current,
+                                                                                        [accountId]:
+                                                                                            {
+                                                                                                ...current[
+                                                                                                    accountId
+                                                                                                ],
+                                                                                                time: e
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            },
+                                                                                    }),
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                    <input
+                                                                        type="hidden"
+                                                                        name={`targets[${i}][social_account_id]`}
+                                                                        value={
+                                                                            accountId
+                                                                        }
+                                                                    />
+                                                                    <input
+                                                                        type="hidden"
+                                                                        name={`targets[${i}][scheduled_local_date]`}
+                                                                        value={
+                                                                            row.date
+                                                                        }
+                                                                    />
+                                                                    <input
+                                                                        type="hidden"
+                                                                        name={`targets[${i}][scheduled_local_time]`}
+                                                                        value={
+                                                                            row.time
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
+                                                <InputError
+                                                    message={
+                                                        errors[
+                                                            'targets.0.social_account_id'
+                                                        ]
+                                                    }
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="music_search">
+                                                        Music
+                                                    </Label>
+                                                    {musicPlatforms.length >
+                                                    0 ? (
+                                                        <div className="grid gap-2">
+                                                            {musicPlatforms.length >
+                                                                1 && (
+                                                                <div className="flex gap-1.5">
+                                                                    {musicPlatforms.map(
+                                                                        (
+                                                                            platform,
+                                                                        ) => (
+                                                                            <button
+                                                                                key={
+                                                                                    platform
+                                                                                }
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    setMusicPlatform(
+                                                                                        platform,
+                                                                                    )
+                                                                                }
+                                                                                className={cn(
+                                                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                                                                                    activeMusicPlatform ===
+                                                                                        platform
+                                                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                                                        : 'border-border bg-muted/50 text-foreground',
+                                                                                )}
+                                                                            >
+                                                                                {platform ===
+                                                                                'instagram'
+                                                                                    ? 'Instagram'
+                                                                                    : 'TikTok'}
+                                                                            </button>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex gap-2">
+                                                                <Input
+                                                                    id="music_search"
+                                                                    value={
+                                                                        musicQuery
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setMusicQuery(
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    onKeyDown={(
+                                                                        e,
+                                                                    ) => {
+                                                                        if (
+                                                                            e.key ===
+                                                                            'Enter'
+                                                                        ) {
+                                                                            e.preventDefault();
+                                                                            void handleMusicSearch();
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Search a track / sound…"
+                                                                />
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    onClick={
+                                                                        handleMusicSearch
+                                                                    }
+                                                                    disabled={
+                                                                        musicSearching ||
+                                                                        musicQuery.trim() ===
+                                                                            ''
+                                                                    }
+                                                                >
+                                                                    <Search className="size-4" />
+                                                                    Search
+                                                                </Button>
+                                                            </div>
+                                                            {musicSearchError && (
+                                                                <p className="text-destructive text-sm">
+                                                                    {
+                                                                        musicSearchError
+                                                                    }
+                                                                    {musicSearchErrorCode ===
+                                                                        'meta_not_connected' &&
+                                                                        (() => {
+                                                                            const instagramAccountId =
+                                                                                targetEntries
+                                                                                    .map(
+                                                                                        ([
+                                                                                            accountIdStr,
+                                                                                        ]) =>
+                                                                                            targetAccounts.find(
+                                                                                                (
+                                                                                                    a,
+                                                                                                ) =>
+                                                                                                    a.id ===
+                                                                                                    Number(
+                                                                                                        accountIdStr,
+                                                                                                    ),
+                                                                                            ),
+                                                                                    )
+                                                                                    .find(
+                                                                                        (
+                                                                                            a,
+                                                                                        ) =>
+                                                                                            a?.platform ===
+                                                                                            'instagram',
+                                                                                    )?.id;
+
+                                                                            return instagramAccountId ? (
+                                                                                <>
+                                                                                    {' '}
+                                                                                    <a
+                                                                                        href={`/clients/${post.client_id}/social-accounts/${instagramAccountId}/facebook/connect`}
+                                                                                        className="underline"
+                                                                                    >
+                                                                                        Connect
+                                                                                        Instagram
+                                                                                        for
+                                                                                        music
+                                                                                        search
+                                                                                    </a>
+                                                                                </>
+                                                                            ) : null;
+                                                                        })()}
+                                                                </p>
+                                                            )}
+                                                            {musicResults.length >
+                                                                0 && (
+                                                                <ul className="border-border grid gap-1 rounded-md border p-1">
+                                                                    {musicResults.map(
+                                                                        (
+                                                                            track,
+                                                                        ) => (
+                                                                            <li
+                                                                                key={
+                                                                                    track.id
+                                                                                }
+                                                                            >
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        selectMusicTrack(
+                                                                                            track,
+                                                                                        )
+                                                                                    }
+                                                                                    className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
+                                                                                >
+                                                                                    <Music2 className="text-muted-foreground size-3.5 shrink-0" />
+                                                                                    <span className="min-w-0 flex-1 truncate">
+                                                                                        {
+                                                                                            track.name
+                                                                                        }
+                                                                                        {track.artist
+                                                                                            ? ` — ${track.artist}`
+                                                                                            : ''}
+                                                                                    </span>
+                                                                                </button>
+                                                                            </li>
+                                                                        ),
+                                                                    )}
+                                                                </ul>
+                                                            )}
+                                                            {musicName ? (
+                                                                <div className="border-border bg-muted/20 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                                                                    <span className="flex min-w-0 items-center gap-1.5 truncate">
+                                                                        <Music2 className="text-primary size-3.5 shrink-0" />
+                                                                        {
+                                                                            musicName
+                                                                        }
+                                                                    </span>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={
+                                                                            clearMusicTrack
+                                                                        }
+                                                                    >
+                                                                        Clear
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-muted-foreground text-xs">
+                                                                    No track
+                                                                    selected.
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-muted-foreground text-sm">
+                                                            Select an Instagram
+                                                            or TikTok target
+                                                            account to search
+                                                            for music.
+                                                        </p>
+                                                    )}
+                                                    <input
+                                                        type="hidden"
+                                                        name="music[id]"
+                                                        value={musicId}
+                                                    />
+                                                    <input
+                                                        type="hidden"
+                                                        name="music[name]"
+                                                        value={musicName}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-1">
+                                                    <Label htmlFor="location_name">
+                                                        Location
+                                                    </Label>
+                                                    <Input
+                                                        id="location_name"
+                                                        name="location[name]"
+                                                        value={locationName}
+                                                        onChange={(e) =>
+                                                            setLocationName(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="Location name"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid gap-2">
+                                                <Label>Media</Label>
+                                                {can.create_asset && (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            ref={
+                                                                assetFileInputRef
+                                                            }
+                                                            type="file"
+                                                            id="new_asset_file"
+                                                            className="hidden"
+                                                            accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.zip"
+                                                            onChange={(e) => {
+                                                                const file =
+                                                                    e.target
+                                                                        .files?.[0];
+                                                                if (file) {
+                                                                    void handleAssetUpload(
+                                                                        file,
+                                                                    );
+                                                                }
+                                                            }}
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={
+                                                                isUploadingAsset
+                                                            }
+                                                            onClick={() =>
+                                                                assetFileInputRef.current?.click()
+                                                            }
+                                                        >
+                                                            <UploadCloud className="size-4" />
+                                                            {isUploadingAsset
+                                                                ? 'Uploading…'
+                                                                : 'Upload asset'}
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                                {assets.length === 0 ? (
+                                                    <p className="text-muted-foreground text-sm">
+                                                        No assets on this client
+                                                        yet — upload one above.
+                                                    </p>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {assets.map(
+                                                                (asset) => {
+                                                                    const selected =
+                                                                        selectedAssetIds.includes(
+                                                                            asset.id,
+                                                                        );
+
+                                                                    return (
+                                                                        <button
+                                                                            key={
+                                                                                asset.id
+                                                                            }
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                toggleAsset(
+                                                                                    asset.id,
+                                                                                )
+                                                                            }
+                                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                                                                selected
+                                                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                                                    : 'border-border bg-muted/50 text-foreground'
+                                                                            }`}
+                                                                        >
+                                                                            {asset.original_filename ??
+                                                                                `Asset #${asset.id}`}
+                                                                        </button>
+                                                                    );
+                                                                },
+                                                            )}
+                                                        </div>
+                                                        {selectedAssets.length >
+                                                        0 ? (
+                                                            <AssetPreviewCarousel
+                                                                assets={
+                                                                    selectedAssets
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <p className="text-muted-foreground text-sm">
+                                                                No media
+                                                                selected.
+                                                            </p>
+                                                        )}
+                                                    </>
+                                                )}
+                                                {selectedAssetIds.map(
+                                                    (id, i) => (
+                                                        <input
+                                                            key={id}
+                                                            type="hidden"
+                                                            name={`asset_ids[${i}]`}
+                                                            value={id}
+                                                        />
+                                                    ),
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <Button
+                                                    type="submit"
+                                                    disabled={processing}
+                                                >
+                                                    Save changes
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
+                                </Form>
+                            )}
+                        </div>
+
+                        <div className="grid gap-3 lg:sticky lg:top-4">
+                            <div className="border-border bg-card rounded-lg border p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <Heading
+                                        title="Live preview"
+                                        description="A quick look at how the post will render — not pixel-perfect"
+                                    />
+                                    {activePreviewTarget && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="shrink-0"
+                                            onClick={() =>
+                                                setIsPreviewFullscreen(true)
+                                            }
+                                            aria-label="View live preview in fullscreen"
+                                        >
+                                            <Maximize2 className="size-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                                {previewTargets.length > 1 && (
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                        {previewTargets.map((t) => {
+                                            const Icon =
+                                                platformIcon[t.platform] ??
+                                                Share2;
+                                            const selected =
+                                                t.id ===
+                                                activePreviewTarget?.id;
 
                                             return (
                                                 <button
-                                                    key={account.id}
+                                                    key={t.id}
                                                     type="button"
-                                                    onClick={() => toggleTargetAccount(account.id)}
-                                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                                    onClick={() =>
+                                                        setPreviewTargetId(t.id)
+                                                    }
+                                                    className={cn(
+                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
                                                         selected
                                                             ? 'border-primary bg-primary/10 text-primary'
-                                                            : 'border-border bg-muted/50 text-foreground'
-                                                    }`}
+                                                            : 'border-border bg-muted/50 text-foreground',
+                                                    )}
                                                 >
-                                                    <AccountIcon className="size-3.5" />
-                                                    {account.handle} · {account.timezone}
+                                                    <Icon className="size-3.5" />
+                                                    {t.handle}
                                                 </button>
                                             );
                                         })}
                                     </div>
-
-                                    {targetEntries.length === 0 && (
-                                        <p className="text-sm text-muted-foreground">No target accounts selected.</p>
+                                )}
+                                <div className="mt-4 flex justify-center">
+                                    {activePreviewTarget ? (
+                                        <SocialPostPreview
+                                            target={activePreviewTarget}
+                                            caption={
+                                                can.update
+                                                    ? caption
+                                                    : (post.master_caption ??
+                                                      '')
+                                            }
+                                            hashtags={
+                                                can.update
+                                                    ? hashtags
+                                                    : post.hashtags
+                                            }
+                                            assets={previewAssets}
+                                            musicName={
+                                                can.update
+                                                    ? musicName
+                                                    : ((post.music
+                                                          ?.name as string) ??
+                                                      '')
+                                            }
+                                            locationName={
+                                                can.update
+                                                    ? locationName
+                                                    : ((post.location
+                                                          ?.name as string) ??
+                                                      '')
+                                            }
+                                        />
+                                    ) : (
+                                        <p className="text-muted-foreground text-sm">
+                                            Select a target account to preview
+                                            the post.
+                                        </p>
                                     )}
+                                </div>
+                            </div>
+                        </div>
 
-                                    <div className="grid gap-2">
-                                        {targetEntries.map(([accountIdStr, row], i) => {
-                                            const accountId = Number(accountIdStr);
-                                            const account = targetAccounts.find((a) => a.id === accountId);
-                                            const AccountIcon = platformIcon[account?.platform ?? ''] ?? Share2;
-                                            const limit = post.targets.find((t) => t.social_account_id === accountId)
-                                                ?.caption_limit;
+                        <Dialog
+                            open={isPreviewFullscreen}
+                            onOpenChange={setIsPreviewFullscreen}
+                        >
+                            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        Live preview
+                                        {activePreviewTarget
+                                            ? ` — ${activePreviewTarget.handle}`
+                                            : ''}
+                                    </DialogTitle>
+                                </DialogHeader>
+                                {previewTargets.length > 1 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {previewTargets.map((t) => {
+                                            const Icon =
+                                                platformIcon[t.platform] ??
+                                                Share2;
+                                            const selected =
+                                                t.id ===
+                                                activePreviewTarget?.id;
 
                                             return (
-                                                <div
-                                                    key={accountId}
-                                                    className="grid grid-cols-1 gap-2 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-4 sm:items-end"
+                                                <button
+                                                    key={t.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setPreviewTargetId(t.id)
+                                                    }
+                                                    className={cn(
+                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                                                        selected
+                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                            : 'border-border bg-muted/50 text-foreground',
+                                                    )}
                                                 >
-                                                    <div className="flex items-center gap-2 text-sm sm:col-span-1">
-                                                        <AccountIcon className="size-4 text-primary" />
-                                                        <div className="flex flex-col">
-                                                            <span>{account?.handle ?? accountId}</span>
-                                                            <span className="text-xs tabular-nums text-muted-foreground">
-                                                                {caption.length}
-                                                                {limit ? ` / ${limit}` : ''} chars
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="grid gap-1">
-                                                        <Label htmlFor={`target-date-${accountId}`}>Local date</Label>
-                                                        <Input
-                                                            id={`target-date-${accountId}`}
-                                                            type="date"
-                                                            value={row.date}
-                                                            onChange={(e) =>
-                                                                setTargetRows((current) => ({
-                                                                    ...current,
-                                                                    [accountId]: { ...current[accountId], date: e.target.value },
-                                                                }))
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <div className="grid gap-1">
-                                                        <Label htmlFor={`target-time-${accountId}`}>Local time</Label>
-                                                        <Input
-                                                            id={`target-time-${accountId}`}
-                                                            type="time"
-                                                            value={row.time}
-                                                            onChange={(e) =>
-                                                                setTargetRows((current) => ({
-                                                                    ...current,
-                                                                    [accountId]: { ...current[accountId], time: e.target.value },
-                                                                }))
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <input type="hidden" name={`targets[${i}][social_account_id]`} value={accountId} />
-                                                    <input type="hidden" name={`targets[${i}][scheduled_local_date]`} value={row.date} />
-                                                    <input type="hidden" name={`targets[${i}][scheduled_local_time]`} value={row.time} />
-                                                </div>
+                                                    <Icon className="size-3.5" />
+                                                    {t.handle}
+                                                </button>
                                             );
                                         })}
                                     </div>
-                                    <InputError message={errors['targets.0.social_account_id']} />
-                                </div>
-
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="music_search">Music</Label>
-                                        {musicPlatforms.length > 0 ? (
-                                            <div className="grid gap-2">
-                                                {musicPlatforms.length > 1 && (
-                                                    <div className="flex gap-1.5">
-                                                        {musicPlatforms.map((platform) => (
-                                                            <button
-                                                                key={platform}
-                                                                type="button"
-                                                                onClick={() => setMusicPlatform(platform)}
-                                                                className={cn(
-                                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                                                    activeMusicPlatform === platform
-                                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                                        : 'border-border bg-muted/50 text-foreground',
-                                                                )}
-                                                            >
-                                                                {platform === 'instagram' ? 'Instagram' : 'TikTok'}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        id="music_search"
-                                                        value={musicQuery}
-                                                        onChange={(e) => setMusicQuery(e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                handleMusicSearch();
-                                                            }
-                                                        }}
-                                                        placeholder="Search a track / sound…"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={handleMusicSearch}
-                                                        disabled={musicSearching || musicQuery.trim() === ''}
-                                                    >
-                                                        <Search className="size-4" />
-                                                        Search
-                                                    </Button>
-                                                </div>
-                                                {musicSearchError && (
-                                                    <p className="text-sm text-destructive">
-                                                        {musicSearchError}
-                                                        {musicSearchErrorCode === 'meta_not_connected' &&
-                                                            (() => {
-                                                                const instagramAccountId = targetEntries
-                                                                    .map(([accountIdStr]) => targetAccounts.find((a) => a.id === Number(accountIdStr)))
-                                                                    .find((a) => a?.platform === 'instagram')?.id;
-
-                                                                return instagramAccountId ? (
-                                                                    <>
-                                                                        {' '}
-                                                                        <a
-                                                                            href={`/clients/${post.client_id}/social-accounts/${instagramAccountId}/facebook/connect`}
-                                                                            className="underline"
-                                                                        >
-                                                                            Connect Instagram for music search
-                                                                        </a>
-                                                                    </>
-                                                                ) : null;
-                                                            })()}
-                                                    </p>
-                                                )}
-                                                {musicResults.length > 0 && (
-                                                    <ul className="grid gap-1 rounded-md border border-border p-1">
-                                                        {musicResults.map((track) => (
-                                                            <li key={track.id}>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => selectMusicTrack(track)}
-                                                                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted/50"
-                                                                >
-                                                                    <Music2 className="size-3.5 shrink-0 text-muted-foreground" />
-                                                                    <span className="min-w-0 flex-1 truncate">
-                                                                        {track.name}
-                                                                        {track.artist ? ` — ${track.artist}` : ''}
-                                                                    </span>
-                                                                </button>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                                {musicName ? (
-                                                    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
-                                                        <span className="flex min-w-0 items-center gap-1.5 truncate">
-                                                            <Music2 className="size-3.5 shrink-0 text-primary" />
-                                                            {musicName}
-                                                        </span>
-                                                        <Button type="button" variant="ghost" size="sm" onClick={clearMusicTrack}>
-                                                            Clear
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-xs text-muted-foreground">No track selected.</p>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">
-                                                Select an Instagram or TikTok target account to search for music.
-                                            </p>
-                                        )}
-                                        <input type="hidden" name="music[id]" value={musicId} />
-                                        <input type="hidden" name="music[name]" value={musicName} />
-                                    </div>
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="location_name">Location</Label>
-                                        <Input
-                                            id="location_name"
-                                            name="location[name]"
-                                            value={locationName}
-                                            onChange={(e) => setLocationName(e.target.value)}
-                                            placeholder="Location name"
+                                )}
+                                <div className="flex justify-center py-2">
+                                    {activePreviewTarget ? (
+                                        <SocialPostPreview
+                                            target={activePreviewTarget}
+                                            caption={
+                                                can.update
+                                                    ? caption
+                                                    : (post.master_caption ??
+                                                      '')
+                                            }
+                                            hashtags={
+                                                can.update
+                                                    ? hashtags
+                                                    : post.hashtags
+                                            }
+                                            assets={previewAssets}
+                                            musicName={
+                                                can.update
+                                                    ? musicName
+                                                    : ((post.music
+                                                          ?.name as string) ??
+                                                      '')
+                                            }
+                                            locationName={
+                                                can.update
+                                                    ? locationName
+                                                    : ((post.location
+                                                          ?.name as string) ??
+                                                      '')
+                                            }
                                         />
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label>Media</Label>
-                                    {can.create_asset && (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                ref={assetFileInputRef}
-                                                type="file"
-                                                id="new_asset_file"
-                                                className="hidden"
-                                                accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.zip"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        void handleAssetUpload(file);
-                                                    }
-                                                }}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={isUploadingAsset}
-                                                onClick={() => assetFileInputRef.current?.click()}
-                                            >
-                                                <UploadCloud className="size-4" />
-                                                {isUploadingAsset ? 'Uploading…' : 'Upload asset'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                    {assets.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            No assets on this client yet — upload one above.
-                                        </p>
                                     ) : (
-                                        <>
-                                            <div className="flex flex-wrap gap-2">
-                                                {assets.map((asset) => {
-                                                    const selected = selectedAssetIds.includes(asset.id);
-
-                                                    return (
-                                                        <button
-                                                            key={asset.id}
-                                                            type="button"
-                                                            onClick={() => toggleAsset(asset.id)}
-                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                                                                selected
-                                                                    ? 'border-primary bg-primary/10 text-primary'
-                                                                    : 'border-border bg-muted/50 text-foreground'
-                                                            }`}
-                                                        >
-                                                            {asset.original_filename ?? `Asset #${asset.id}`}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            {selectedAssets.length > 0 ? (
-                                                <AssetPreviewCarousel assets={selectedAssets} />
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground">No media selected.</p>
-                                            )}
-                                        </>
+                                        <p className="text-muted-foreground text-sm">
+                                            Select a target account to preview
+                                            the post.
+                                        </p>
                                     )}
-                                    {selectedAssetIds.map((id, i) => (
-                                        <input key={id} type="hidden" name={`asset_ids[${i}]`} value={id} />
-                                    ))}
                                 </div>
-
-                                <div>
-                                    <Button type="submit" disabled={processing}>
-                                        Save changes
-                                    </Button>
-                                </div>
-                            </>
-                        )}
-                    </Form>
-                    )}
-                    </div>
-
-                    <div className="grid gap-3 lg:sticky lg:top-4">
-                        <div className="rounded-lg border border-border bg-card p-4">
-                            <div className="flex items-start justify-between gap-2">
-                                <Heading title="Live preview" description="A quick look at how the post will render — not pixel-perfect" />
-                                {activePreviewTarget && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="shrink-0"
-                                        onClick={() => setIsPreviewFullscreen(true)}
-                                        aria-label="View live preview in fullscreen"
-                                    >
-                                        <Maximize2 className="size-4" />
-                                    </Button>
-                                )}
-                            </div>
-                            {previewTargets.length > 1 && (
-                                <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {previewTargets.map((t) => {
-                                        const Icon = platformIcon[t.platform] ?? Share2;
-                                        const selected = t.id === activePreviewTarget?.id;
-
-                                        return (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                onClick={() => setPreviewTargetId(t.id)}
-                                                className={cn(
-                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                                    selected
-                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                        : 'border-border bg-muted/50 text-foreground',
-                                                )}
-                                            >
-                                                <Icon className="size-3.5" />
-                                                {t.handle}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            <div className="mt-4 flex justify-center">
-                                {activePreviewTarget ? (
-                                    <SocialPostPreview
-                                        target={activePreviewTarget}
-                                        caption={can.update ? caption : post.master_caption ?? ''}
-                                        hashtags={can.update ? hashtags : post.hashtags}
-                                        assets={previewAssets}
-                                        musicName={can.update ? musicName : (post.music?.name as string) ?? ''}
-                                        locationName={can.update ? locationName : (post.location?.name as string) ?? ''}
-                                    />
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        Select a target account to preview the post.
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <Dialog open={isPreviewFullscreen} onOpenChange={setIsPreviewFullscreen}>
-                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                            <DialogHeader>
-                                <DialogTitle>Live preview{activePreviewTarget ? ` — ${activePreviewTarget.handle}` : ''}</DialogTitle>
-                            </DialogHeader>
-                            {previewTargets.length > 1 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {previewTargets.map((t) => {
-                                        const Icon = platformIcon[t.platform] ?? Share2;
-                                        const selected = t.id === activePreviewTarget?.id;
-
-                                        return (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                onClick={() => setPreviewTargetId(t.id)}
-                                                className={cn(
-                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                                    selected
-                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                        : 'border-border bg-muted/50 text-foreground',
-                                                )}
-                                            >
-                                                <Icon className="size-3.5" />
-                                                {t.handle}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            <div className="flex justify-center py-2">
-                                {activePreviewTarget ? (
-                                    <SocialPostPreview
-                                        target={activePreviewTarget}
-                                        caption={can.update ? caption : post.master_caption ?? ''}
-                                        hashtags={can.update ? hashtags : post.hashtags}
-                                        assets={previewAssets}
-                                        musicName={can.update ? musicName : (post.music?.name as string) ?? ''}
-                                        locationName={can.update ? locationName : (post.location?.name as string) ?? ''}
-                                    />
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        Select a target account to preview the post.
-                                    </p>
-                                )}
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                            </DialogContent>
+                        </Dialog>
                     </TabsContent>
 
                     <TabsContent value="checklist" className="grid gap-4">
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading
-                        title="Pre-schedule checklist"
-                        description="Re-validated server-side before any move to Scheduled"
-                    />
-                    <div className="grid gap-2">
-                        {post.checklist.items.map((item) => (
-                            <div key={item.key} className="flex items-center gap-2 text-sm">
-                                {item.passed ? (
-                                    <CheckCircle2 className="size-4 text-green-600 dark:text-green-500" />
-                                ) : (
-                                    <XCircle className="size-4 text-destructive" />
-                                )}
-                                <span className={item.passed ? '' : 'text-muted-foreground'}>{item.label}</span>
+                        <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
+                            <Heading
+                                title="Pre-schedule checklist"
+                                description="Re-validated server-side before any move to Scheduled"
+                            />
+                            <div className="grid gap-2">
+                                {post.checklist.items.map((item) => (
+                                    <div
+                                        key={item.key}
+                                        className="flex items-center gap-2 text-sm"
+                                    >
+                                        {item.passed ? (
+                                            <CheckCircle2 className="size-4 text-green-600 dark:text-green-500" />
+                                        ) : (
+                                            <XCircle className="text-destructive size-4" />
+                                        )}
+                                        <span
+                                            className={
+                                                item.passed
+                                                    ? ''
+                                                    : 'text-muted-foreground'
+                                            }
+                                        >
+                                            {item.label}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                    <Badge variant={post.checklist.passed ? 'success' : 'destructive'} className="w-fit">
-                        {post.checklist.passed ? 'All checks passed' : 'Checklist incomplete'}
-                    </Badge>
-                </div>
-
-                {allowedTransitions.length > 0 && (
-                    <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                        <Heading title="Move status" description="Only legal, authorized transitions are shown" />
-                        <div className="flex flex-wrap gap-2">
-                            {allowedTransitions.map((transitionOption) => (
-                                <Form key={transitionOption.value} {...transitionPost.form(post.id)}>
-                                    {({ processing, errors }) => (
-                                        <div className="grid gap-1">
-                                            <input type="hidden" name="to" value={transitionOption.value} />
-                                            <Button
-                                                type="submit"
-                                                size="sm"
-                                                variant={transitionOption.value === 'scheduled' && !post.checklist.passed ? 'outline' : 'default'}
-                                                disabled={
-                                                    processing ||
-                                                    (transitionOption.value === 'scheduled' && !post.checklist.passed)
-                                                }
-                                            >
-                                                {transitionOption.value === 'changes_requested' ? (
-                                                    <Circle className="size-3.5" />
-                                                ) : (
-                                                    <CheckCircle2 className="size-3.5" />
-                                                )}
-                                                Move to {transitionOption.label}
-                                            </Button>
-                                            <InputError message={errors.to} />
-                                        </div>
-                                    )}
-                                </Form>
-                            ))}
+                            <Badge
+                                variant={
+                                    post.checklist.passed
+                                        ? 'success'
+                                        : 'destructive'
+                                }
+                                className="w-fit"
+                            >
+                                {post.checklist.passed
+                                    ? 'All checks passed'
+                                    : 'Checklist incomplete'}
+                            </Badge>
                         </div>
-                    </div>
-                )}
+
+                        {allowedTransitions.length > 0 && (
+                            <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
+                                <Heading
+                                    title="Move status"
+                                    description="Only legal, authorized transitions are shown"
+                                />
+                                <div className="flex flex-wrap gap-2">
+                                    {allowedTransitions.map(
+                                        (transitionOption) => (
+                                            <Form
+                                                key={transitionOption.value}
+                                                {...transitionPost.form(
+                                                    post.id,
+                                                )}
+                                            >
+                                                {({ processing, errors }) => (
+                                                    <div className="grid gap-1">
+                                                        <input
+                                                            type="hidden"
+                                                            name="to"
+                                                            value={
+                                                                transitionOption.value
+                                                            }
+                                                        />
+                                                        <Button
+                                                            type="submit"
+                                                            size="sm"
+                                                            variant={
+                                                                transitionOption.value ===
+                                                                    'scheduled' &&
+                                                                !post.checklist
+                                                                    .passed
+                                                                    ? 'outline'
+                                                                    : 'default'
+                                                            }
+                                                            disabled={
+                                                                processing ||
+                                                                (transitionOption.value ===
+                                                                    'scheduled' &&
+                                                                    !post
+                                                                        .checklist
+                                                                        .passed)
+                                                            }
+                                                        >
+                                                            {transitionOption.value ===
+                                                            'changes_requested' ? (
+                                                                <Circle className="size-3.5" />
+                                                            ) : (
+                                                                <CheckCircle2 className="size-3.5" />
+                                                            )}
+                                                            Move to{' '}
+                                                            {
+                                                                transitionOption.label
+                                                            }
+                                                        </Button>
+                                                        <InputError
+                                                            message={errors.to}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </Form>
+                                        ),
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="comments" className="grid gap-4">
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading
-                        title="Comments"
-                        description="Internal notes are never visible to client reviewers — click a comment to see full details"
-                    />
-                    {can.comment && (
-                        <Form
-                            {...storeComment.form(post.id)}
-                            resetOnSuccess
-                            className="grid gap-2 rounded-md border border-dashed border-border p-3"
-                        >
-                            {({ processing, errors }) => (
-                                <>
-                                    <MentionTextarea
-                                        name="body"
-                                        rows={2}
-                                        placeholder="Add a comment… type @ to mention someone"
-                                        users={mentionableUsers}
-                                    />
-                                    <InputError message={errors.body} />
-                                    <div className="flex items-center justify-between gap-2">
-                                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                            <input type="checkbox" name="internal_only" value="1" />
-                                            Internal only
-                                        </label>
-                                        <Button type="submit" size="sm" disabled={processing}>
-                                            Post comment
-                                        </Button>
-                                    </div>
-                                </>
+                        <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
+                            <Heading
+                                title="Comments"
+                                description="Internal notes are never visible to client reviewers — click a comment to see full details"
+                            />
+                            {can.comment && (
+                                <Form
+                                    {...storeComment.form(post.id)}
+                                    resetOnSuccess
+                                    className="border-border grid gap-2 rounded-md border border-dashed p-3"
+                                >
+                                    {({ processing, errors }) => (
+                                        <>
+                                            <MentionTextarea
+                                                name="body"
+                                                rows={2}
+                                                placeholder="Add a comment… type @ to mention someone"
+                                                users={mentionableUsers}
+                                            />
+                                            <InputError message={errors.body} />
+                                            <div className="flex items-center justify-between gap-2">
+                                                <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                                                    <input
+                                                        type="checkbox"
+                                                        name="internal_only"
+                                                        value="1"
+                                                    />
+                                                    Internal only
+                                                </label>
+                                                <Button
+                                                    type="submit"
+                                                    size="sm"
+                                                    disabled={processing}
+                                                >
+                                                    Post comment
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
+                                </Form>
                             )}
-                        </Form>
-                    )}
-                    <div className="grid gap-3">
-                        {post.comments.length === 0 ? (
-                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                <MessageSquareQuote className="size-4" />
-                                No comments yet.
-                            </p>
-                        ) : (
-                            post.comments.map((c) => <CommentEntry key={c.id} comment={c} />)
-                        )}
-                    </div>
-                </div>
+                            <div className="grid gap-3">
+                                {post.comments.length === 0 ? (
+                                    <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                                        <MessageSquareQuote className="size-4" />
+                                        No comments yet.
+                                    </p>
+                                ) : (
+                                    post.comments.map((c) => (
+                                        <CommentEntry key={c.id} comment={c} />
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </TabsContent>
 
                     <TabsContent value="activity" className="grid gap-4">
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading
-                        title="Activity log"
-                        description="Every status transition, oldest last — click an entry to see full details"
-                    />
-                    <div className="grid gap-3">
-                        {post.activity_logs.length === 0 ? (
-                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                <History className="size-4" />
-                                No activity yet.
-                            </p>
-                        ) : (
-                            post.activity_logs.map((log) => (
-                                <ActivityLogEntry key={log.id} log={log} postId={post.id} canResend={can.resend_review_email} />
-                            ))
-                        )}
-                    </div>
-                </div>
+                        <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
+                            <Heading
+                                title="Activity log"
+                                description="Every status transition, oldest last — click an entry to see full details"
+                            />
+                            <div className="grid gap-3">
+                                {post.activity_logs.length === 0 ? (
+                                    <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                                        <History className="size-4" />
+                                        No activity yet.
+                                    </p>
+                                ) : (
+                                    post.activity_logs.map((log) => (
+                                        <ActivityLogEntry
+                                            key={log.id}
+                                            log={log}
+                                            postId={post.id}
+                                            canResend={can.resend_review_email}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </TabsContent>
                 </Tabs>
             </div>

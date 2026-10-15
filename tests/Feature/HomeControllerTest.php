@@ -31,13 +31,13 @@ class HomeControllerTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_client_reviewers_cannot_view_the_home_page()
+    public function test_client_reviewers_are_sent_to_the_portal_instead_of_the_home_page()
     {
         $user = User::factory()->role(Role::ClientReviewer)->create();
         $this->actingAs($user);
 
         $response = $this->get(route('needs-attention'));
-        $response->assertForbidden();
+        $response->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_home_lists_failed_publishes()
@@ -135,10 +135,10 @@ class HomeControllerTest extends TestCase
         );
     }
 
-    public function test_client_reviewer_scoping_does_not_apply_since_reviewers_are_forbidden()
+    public function test_client_reviewer_scoping_does_not_apply_since_reviewers_never_reach_the_page()
     {
-        // Sanity check: even if a reviewer's client has attention items, they are forbidden
-        // from the page entirely (see test_client_reviewers_cannot_view_the_home_page).
+        // Sanity check: even if a reviewer's client has attention items, they never reach the
+        // page (redirected to the portal), and the policy still forbids it as defence in depth.
         $reviewer = User::factory()->role(Role::ClientReviewer)->create();
         $client = Client::factory()->create(['org_id' => $reviewer->org_id]);
         $reviewer->forceFill(['client_id' => $client->id])->save();
@@ -151,6 +151,7 @@ class HomeControllerTest extends TestCase
         $this->actingAs($reviewer);
 
         $response = $this->get(route('needs-attention'));
-        $response->assertForbidden();
+        $response->assertRedirect(route('portal.dashboard'));
+        $this->assertFalse($reviewer->can('viewHome', Post::class));
     }
 }

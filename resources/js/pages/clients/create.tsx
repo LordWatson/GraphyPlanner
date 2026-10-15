@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { create, index, store } from '@/routes/clients';
+import { PageHeader } from '@/components/page';
 
 type Option = { value: string; label: string };
 
@@ -28,35 +29,33 @@ export default function ClientCreate({
     return (
         <>
             <Head title="Add client" />
-            <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4">
-                <div className="bg-noise relative overflow-hidden rounded-2xl bg-gradient-brand-animated p-6 text-primary-foreground shadow-agency sm:p-8">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-white/10 blur-2xl"
-                    />
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[size:22px_22px] opacity-[0.08]"
-                    />
-                    <div className="relative flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-semibold tracking-tight italic sm:text-3xl">Add client</h1>
-                        <p className="max-w-xl text-sm text-primary-foreground/80">Create a new client record</p>
-                    </div>
-                </div>
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
+                <PageHeader
+                    title="Add client"
+                    description="Create a new client record"
+                />
 
                 <Form
                     {...store.form()}
                     transform={(data) => ({
                         ...data,
-                        owner_user_id: data.owner_user_id === 'none' ? '' : data.owner_user_id,
+                        owner_user_id:
+                            data.owner_user_id === 'none'
+                                ? ''
+                                : data.owner_user_id,
                     })}
-                    className="grid gap-6 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
+                    className="border-border bg-card grid gap-6 rounded-2xl border p-4 shadow-sm sm:p-6"
                 >
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
-                                <Input id="name" name="name" required autoFocus />
+                                <Input
+                                    id="name"
+                                    name="name"
+                                    required
+                                    autoFocus
+                                />
                                 <InputError message={errors.name} />
                             </div>
 
@@ -68,7 +67,12 @@ export default function ClientCreate({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="website">Website</Label>
-                                <Input id="website" name="website" type="url" placeholder="https://" />
+                                <Input
+                                    id="website"
+                                    name="website"
+                                    type="url"
+                                    placeholder="https://"
+                                />
                                 <InputError message={errors.website} />
                             </div>
 
@@ -81,12 +85,18 @@ export default function ClientCreate({
                             <div className="grid gap-2">
                                 <Label htmlFor="status">Status</Label>
                                 <Select name="status" defaultValue="active">
-                                    <SelectTrigger id="status" className="w-full">
+                                    <SelectTrigger
+                                        id="status"
+                                        className="w-full"
+                                    >
                                         <SelectValue placeholder="Select a status" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {statuses.map((status) => (
-                                            <SelectItem key={status.value} value={status.value}>
+                                            <SelectItem
+                                                key={status.value}
+                                                value={status.value}
+                                            >
                                                 {status.label}
                                             </SelectItem>
                                         ))}
@@ -97,14 +107,25 @@ export default function ClientCreate({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="owner_user_id">Owner</Label>
-                                <Select name="owner_user_id" defaultValue="none">
-                                    <SelectTrigger id="owner_user_id" className="w-full">
+                                <Select
+                                    name="owner_user_id"
+                                    defaultValue="none"
+                                >
+                                    <SelectTrigger
+                                        id="owner_user_id"
+                                        className="w-full"
+                                    >
                                         <SelectValue placeholder="Select an owner" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">No owner</SelectItem>
+                                        <SelectItem value="none">
+                                            No owner
+                                        </SelectItem>
                                         {owners.map((owner) => (
-                                            <SelectItem key={owner.value} value={owner.value}>
+                                            <SelectItem
+                                                key={owner.value}
+                                                value={owner.value}
+                                            >
                                                 {owner.label}
                                             </SelectItem>
                                         ))}
@@ -115,12 +136,18 @@ export default function ClientCreate({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="start_date">Start date</Label>
-                                <Input id="start_date" name="start_date" type="date" />
+                                <Input
+                                    id="start_date"
+                                    name="start_date"
+                                    type="date"
+                                />
                                 <InputError message={errors.start_date} />
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="retainer_amount">Retainer amount</Label>
+                                <Label htmlFor="retainer_amount">
+                                    Retainer amount
+                                </Label>
                                 <Input
                                     id="retainer_amount"
                                     name="retainer_amount"
@@ -132,14 +159,22 @@ export default function ClientCreate({
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="billing_cycle">Billing cycle</Label>
+                                <Label htmlFor="billing_cycle">
+                                    Billing cycle
+                                </Label>
                                 <Select name="billing_cycle">
-                                    <SelectTrigger id="billing_cycle" className="w-full">
+                                    <SelectTrigger
+                                        id="billing_cycle"
+                                        className="w-full"
+                                    >
                                         <SelectValue placeholder="Select a billing cycle" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {billingCycles.map((cycle) => (
-                                            <SelectItem key={cycle.value} value={cycle.value}>
+                                            <SelectItem
+                                                key={cycle.value}
+                                                value={cycle.value}
+                                            >
                                                 {cycle.label}
                                             </SelectItem>
                                         ))}
@@ -149,14 +184,22 @@ export default function ClientCreate({
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="default_language">Default language</Label>
+                                <Label htmlFor="default_language">
+                                    Default language
+                                </Label>
                                 <Select name="default_language">
-                                    <SelectTrigger id="default_language" className="w-full">
+                                    <SelectTrigger
+                                        id="default_language"
+                                        className="w-full"
+                                    >
                                         <SelectValue placeholder="Select a language" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {languages.map((language) => (
-                                            <SelectItem key={language.value} value={language.value}>
+                                            <SelectItem
+                                                key={language.value}
+                                                value={language.value}
+                                            >
                                                 {language.label}
                                             </SelectItem>
                                         ))}
@@ -166,24 +209,34 @@ export default function ClientCreate({
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="approval_email">Approval email</Label>
-                                <Input id="approval_email" name="approval_email" type="email" />
+                                <Label htmlFor="approval_email">
+                                    Approval email
+                                </Label>
+                                <Input
+                                    id="approval_email"
+                                    name="approval_email"
+                                    type="email"
+                                />
                                 <InputError message={errors.approval_email} />
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="notes_internal">Internal notes</Label>
+                                <Label htmlFor="notes_internal">
+                                    Internal notes
+                                </Label>
                                 <textarea
                                     id="notes_internal"
                                     name="notes_internal"
                                     rows={4}
-                                    className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
                                 />
                                 <InputError message={errors.notes_internal} />
                             </div>
 
                             <div className="flex items-center gap-4">
-                                <Button disabled={processing}>Create client</Button>
+                                <Button disabled={processing}>
+                                    Create client
+                                </Button>
                             </div>
                         </>
                     )}

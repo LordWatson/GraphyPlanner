@@ -3,7 +3,10 @@
  * Inertia prop — see `HandleInertiaRequests::share()`). No currency conversion is performed;
  * this only controls how amounts are displayed.
  */
-export function formatCurrency(amount: number | string, currency: string): string {
+export function formatCurrency(
+    amount: number | string,
+    currency: string,
+): string {
     const numericAmount = typeof amount === 'string' ? Number(amount) : amount;
 
     return new Intl.NumberFormat('en-US', {
@@ -17,7 +20,10 @@ export function formatCurrency(amount: number | string, currency: string): strin
  * tight UI spaces like stat cards. Pair this with `formatCurrency()` shown in a tooltip so the
  * exact amount is still available on hover.
  */
-export function formatCurrencyCompact(amount: number | string, currency: string): string {
+export function formatCurrencyCompact(
+    amount: number | string,
+    currency: string,
+): string {
     const numericAmount = typeof amount === 'string' ? Number(amount) : amount;
 
     return new Intl.NumberFormat('en-US', {

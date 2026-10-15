@@ -9,7 +9,15 @@ export type AssetPreviewData = {
     mime_type: string | null;
 };
 
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif'];
+const IMAGE_EXTENSIONS = [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.svg',
+    '.avif',
+];
 
 function hasImageExtension(url: string | null): boolean {
     if (!url) {
@@ -36,19 +44,23 @@ export function AssetPreview({ asset }: { asset: AssetPreviewData }) {
                 <video
                     src={asset.url}
                     controls
-                    className="aspect-square w-full rounded-md border border-border bg-black object-contain"
+                    className="border-border aspect-square w-full rounded-md border bg-black object-contain"
                 >
                     <track kind="captions" />
                 </video>
             );
         }
 
-        if (asset.mime_type?.startsWith('image/') || asset.type === 'image' || hasImageExtension(asset.url)) {
+        if (
+            asset.mime_type?.startsWith('image/') ||
+            asset.type === 'image' ||
+            hasImageExtension(asset.url)
+        ) {
             return (
                 <img
                     src={asset.url}
                     alt={label}
-                    className="aspect-square w-full rounded-md border border-border object-cover"
+                    className="border-border aspect-square w-full rounded-md border object-cover"
                 />
             );
         }
@@ -87,7 +99,7 @@ export function AssetPreview({ asset }: { asset: AssetPreviewData }) {
                 <img
                     src={asset.url}
                     alt={label}
-                    className="aspect-square w-full rounded-md border border-border object-cover"
+                    className="border-border aspect-square w-full rounded-md border object-cover"
                 />
             );
         }

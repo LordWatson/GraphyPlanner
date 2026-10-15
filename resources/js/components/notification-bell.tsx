@@ -8,7 +8,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { index as indexNotifications, read as readNotification, readAll as readAllNotifications } from '@/routes/notifications';
+import {
+    index as indexNotifications,
+    read as readNotification,
+    readAll as readAllNotifications,
+} from '@/routes/notifications';
 import { router, usePage } from '@inertiajs/react';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -34,7 +38,9 @@ export function NotificationBell() {
 
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [notifications, setNotifications] = useState<NotificationItem[] | null>(null);
+    const [notifications, setNotifications] = useState<
+        NotificationItem[] | null
+    >(null);
 
     useEffect(() => {
         if (!open || notifications !== null) {
@@ -43,12 +49,14 @@ export function NotificationBell() {
 
         setLoading(true);
 
-        fetch(indexNotifications.url(), {
+        void fetch(indexNotifications.url(), {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         })
             .then((response) => response.json())
-            .then((data: { notifications: NotificationItem[] }) => setNotifications(data.notifications))
+            .then((data: { notifications: NotificationItem[] }) =>
+                setNotifications(data.notifications),
+            )
             .finally(() => setLoading(false));
     }, [open, notifications]);
 
@@ -58,29 +66,40 @@ export function NotificationBell() {
     };
 
     const handleMarkAllAsRead = () => {
-        router.post(readAllNotifications.url(), {}, {
-            onSuccess: () => setNotifications(null),
-        });
+        router.post(
+            readAllNotifications.url(),
+            {},
+            {
+                onSuccess: () => setNotifications(null),
+            },
+        );
     };
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-                    <Bell className="size-5" />
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="relative size-8 rounded-full"
+                    aria-label="Notifications"
+                >
+                    <Bell className="size-4" />
                     {unreadCount > 0 && (
                         <Badge
-                            variant="destructive"
-                            className="absolute -top-1 -right-1 h-5 min-w-5 justify-center rounded-full px-1 text-[10px]"
+                            variant="solid"
+                            className="border-background bg-primary text-primary-foreground absolute -top-1.5 -right-1.5 h-[18px] min-w-[18px] justify-center border-2 px-1 font-mono text-[9.5px]"
                         >
                             {unreadCount > 99 ? '99+' : unreadCount}
                         </Badge>
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
-                <div className="flex items-center justify-between px-2 py-1.5">
-                    <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-[22rem] p-0">
+                <div className="flex items-center justify-between px-4 pt-3.5 pb-3">
+                    <DropdownMenuLabel className="p-0 font-serif text-xl font-normal">
+                        Inbox
+                    </DropdownMenuLabel>
                     {unreadCount > 0 && (
                         <button
                             type="button"
@@ -92,24 +111,38 @@ export function NotificationBell() {
                         </button>
                     )}
                 </div>
-                <DropdownMenuSeparator />
-                <div className="max-h-96 overflow-y-auto">
-                    {loading && <p className="text-muted-foreground px-2 py-4 text-center text-sm">Loading…</p>}
-                    {!loading && notifications !== null && notifications.length === 0 && (
-                        <p className="text-muted-foreground px-2 py-4 text-center text-sm">You're all caught up.</p>
+                <DropdownMenuSeparator className="m-0" />
+                <div className="max-h-96 overflow-y-auto p-1.5">
+                    {loading && (
+                        <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+                            Loading…
+                        </p>
                     )}
+                    {!loading &&
+                        notifications !== null &&
+                        notifications.length === 0 && (
+                            <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+                                You're all caught up.
+                            </p>
+                        )}
                     {!loading &&
                         notifications?.map((notification) => (
                             <DropdownMenuItem
                                 key={notification.id}
-                                className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
+                                className="flex flex-col items-start gap-0.5 px-2.5 py-2.5 whitespace-normal"
                                 onSelect={() => handleSelect(notification)}
                             >
                                 <span className="flex w-full items-center gap-2 font-medium">
-                                    {!notification.read_at && <span className="bg-primary inline-block size-1.5 shrink-0 rounded-full" />}
+                                    {!notification.read_at && (
+                                        <span className="bg-primary inline-block size-1.5 shrink-0 rounded-full" />
+                                    )}
                                     {notification.title}
                                 </span>
-                                {notification.body && <span className="text-muted-foreground text-xs">{notification.body}</span>}
+                                {notification.body && (
+                                    <span className="text-muted-foreground text-xs">
+                                        {notification.body}
+                                    </span>
+                                )}
                             </DropdownMenuItem>
                         ))}
                 </div>
