@@ -25,7 +25,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import Heading from '@/components/heading';
-import { HashtagInput } from '@/components/hashtag-input';
+import { HashtagInput, normalizeTag } from '@/components/hashtag-input';
 import InputError from '@/components/input-error';
 import {
     MentionTextarea,
@@ -519,7 +519,12 @@ export default function PostEdit({
         }
 
         setCaption(suggestion.caption);
-        setHashtags(suggestion.hashtags ?? []);
+        // AI suggestions come back as "#demo"; the hashtag field stores bare tags.
+        setHashtags([
+            ...new Set(
+                (suggestion.hashtags ?? []).map(normalizeTag).filter(Boolean),
+            ),
+        ]);
         setAppliedSuggestionIndex(index);
         setSuggestionsExpanded(false);
     };

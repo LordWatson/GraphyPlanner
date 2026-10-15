@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  * since some users type "#launch" and others just "launch" (the server also normalizes this on
  * save, but doing it client-side keeps the chips/suggestions consistent as you type).
  */
-function normalizeTag(raw: string): string {
+export function normalizeTag(raw: string): string {
     return raw.trim().replace(/^#+/, '');
 }
 
