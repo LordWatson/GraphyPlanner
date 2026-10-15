@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Invoice;
@@ -38,6 +39,35 @@ class ClientPortalAccessTest extends TestCase
         );
     }
 
+    /**
+     * The shared `portal.pendingApprovals` prop drives the portal nav's "Approvals" badge: only
+     * this contact's own `waiting_client` posts count, and staff never receive the key's payload.
+     */
+    public function test_portal_pending_approvals_count_is_shared_for_client_reviewers_only(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $otherClient = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()
+            ->for($org, 'organization')
+            ->role(Role::ClientReviewer)
+            ->create(['client_id' => $client->id]);
+
+        Post::factory()->for($client)->count(2)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
+        Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Approved]);
+        Post::factory()->for($otherClient)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
+
+        $this->actingAs($reviewer)
+            ->get(route('portal.posts.index'))
+            ->assertInertia(fn ($page) => $page->where('portal.pendingApprovals', 2));
+
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+
+        $this->actingAs($owner)
+            ->get(route('dashboard'))
+            ->assertInertia(fn ($page) => $page->where('portal', null));
+    }
+
     public function test_non_client_reviewer_roles_are_rejected_from_the_portal(): void
     {
         $org = Organization::factory()->create();
@@ -55,7 +85,7 @@ class ClientPortalAccessTest extends TestCase
             ->role(Role::ClientReviewer)
             ->create(['client_id' => $client->id]);
 
-        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
         $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id]);
 
         $this->actingAs($reviewer)->get(route('portal.posts.show', $post))->assertOk();
@@ -90,6 +120,53 @@ class ClientPortalAccessTest extends TestCase
         $otherInvoice = Invoice::factory()->for($clientB)->create(['org_id' => $org->id]);
 
         $this->actingAs($reviewer)->get(route('portal.invoices.show', $otherInvoice))->assertNotFound();
+    }
+
+    /**
+     * Pre-review internal stages never reach the portal: their detail page, decision and comment
+     * endpoints all 404, exactly like another client's post.
+     */
+    public function test_client_reviewer_cannot_open_or_comment_on_an_internal_draft(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()
+            ->for($org, 'organization')
+            ->role(Role::ClientReviewer)
+            ->create(['client_id' => $client->id]);
+
+        foreach ([PostStatus::Idea, PostStatus::Draft, PostStatus::InternalReview] as $status) {
+            $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => $status]);
+
+            $this->actingAs($reviewer)->get(route('portal.posts.show', $post))->assertNotFound();
+            $this->actingAs($reviewer)
+                ->post(route('portal.posts.comments.store', $post), ['body' => 'Peeking'])
+                ->assertNotFound();
+        }
+
+        $this->assertDatabaseMissing('post_comments', ['body' => 'Peeking']);
+    }
+
+    public function test_an_internal_status_filter_on_the_post_list_is_ignored(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()
+            ->for($org, 'organization')
+            ->role(Role::ClientReviewer)
+            ->create(['client_id' => $client->id]);
+
+        Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+        $waiting = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
+
+        $this->actingAs($reviewer)
+            ->get(route('portal.posts.index', ['status' => 'draft']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('posts', 1)
+                ->where('posts.0.id', $waiting->id)
+                ->where('filters.status', null)
+            );
     }
 
     public function test_guests_are_redirected_to_login_from_the_portal(): void

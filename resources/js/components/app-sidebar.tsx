@@ -1,7 +1,13 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Building2, CalendarDays, FolderGit2, LayoutGrid, ListChecks, UsersRound, UserSquare2 } from 'lucide-react';
+import {
+    Building2,
+    CalendarDays,
+    LayoutGrid,
+    ListChecks,
+    Settings2,
+    UsersRound,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -12,36 +18,18 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarSeparator,
 } from '@/components/ui/sidebar';
+import { useCurrentUrl } from '@/hooks/use-current-url';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as clientsIndex } from '@/routes/clients';
-import { dashboard as portalDashboard } from '@/routes/portal';
+import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
 import type { Auth, NavItem } from '@/types';
 
-// `Role::ClientReviewer` cannot use these org-internal items (see `ClientPolicy::viewAny` and
-// `PostPolicy::viewHome`) — they get a link into their own client portal instead.
-const clientReviewerNavItems: NavItem[] = [
-    {
-        title: 'Home',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Calendar',
-        href: calendar(),
-        icon: CalendarDays,
-    },
-    {
-        title: 'Client portal',
-        href: portalDashboard(),
-        icon: UserSquare2,
-    },
-];
-
 const mainNavItems: NavItem[] = [
     {
-        title: 'Home',
+        title: 'Overview',
         href: dashboard(),
         icon: LayoutGrid,
     },
@@ -69,34 +57,33 @@ const staffNavItem: NavItem = {
     icon: UsersRound,
 };
 
-const footerNavItems: NavItem[] = [
-    /*{
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },*/
-];
-
 export function AppSidebar() {
     const { auth } = usePage<{ auth: Auth }>().props;
-    const items =
-        auth.user.role === 'client_reviewer'
-            ? clientReviewerNavItems
-            : auth.user.role === 'owner'
-              ? [...mainNavItems, staffNavItem]
-              : mainNavItems;
+    const { currentUrl } = useCurrentUrl();
+
+    // Client portal contacts never render this shell (`AppLayout` swaps to `ClientPortalLayout`).
+    const items = mainNavItems;
+
+    const accountItems: NavItem[] = [
+        ...(auth.user.role === 'owner' ? [staffNavItem] : []),
+        {
+            title: 'Settings',
+            href: editProfile(),
+            icon: Settings2,
+            isActive: currentUrl.startsWith('/settings'),
+        },
+    ];
 
     return (
-        <Sidebar collapsible="icon">
-            <SidebarHeader>
+        <Sidebar collapsible="icon" variant="inset">
+            <SidebarHeader className="px-3 pt-4 pb-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            className="hover:bg-transparent active:bg-transparent"
+                        >
                             <Link href={dashboard()} prefetch>
                                 <AppLogo />
                             </Link>
@@ -105,12 +92,13 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
-                <NavMain items={items} />
+            <SidebarContent className="overflow-x-hidden pt-2">
+                <NavMain items={items} label="Studio" />
+                <SidebarSeparator className="bg-sidebar-border/70 mx-5 w-auto group-data-[collapsible=icon]:mx-2" />
+                <NavMain items={accountItems} label="Team" />
             </SidebarContent>
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+            <SidebarFooter className="p-3">
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

@@ -24,33 +24,19 @@ use Inertia\Response;
  */
 class PortalPostController extends Controller
 {
-    /**
-     * Statuses a client contact is allowed to see at all — pre-review internal stages (idea,
-     * draft, internal review) never reach the portal.
-     *
-     * @var list<PostStatus>
-     */
-    private const VISIBLE_STATUSES = [
-        PostStatus::WaitingClient,
-        PostStatus::ChangesRequested,
-        PostStatus::Approved,
-        PostStatus::Scheduled,
-        PostStatus::Publishing,
-        PostStatus::Published,
-        PostStatus::Failed,
-        PostStatus::Archived,
-    ];
-
     public function index(Request $request): Response
     {
+        // An internal-only status in the query string is ignored rather than honoured, so
+        // `?status=draft` can never surface pre-review posts.
         $status = PostStatus::tryFrom((string) $request->query('status'));
+        $status = $status?->isClientVisible() ? $status : null;
 
         $posts = Post::query()
             ->where('client_id', $request->user()->client_id)
             ->when(
                 $status,
                 fn ($query) => $query->where('status', $status),
-                fn ($query) => $query->whereIn('status', self::VISIBLE_STATUSES),
+                fn ($query) => $query->whereIn('status', PostStatus::clientVisible()),
             )
             ->with(['targets.socialAccount'])
             ->latest()
@@ -64,7 +50,7 @@ class PortalPostController extends Controller
             'filters' => ['status' => $status?->value],
             'statuses' => array_map(
                 fn (PostStatus $s) => ['value' => $s->value, 'label' => $s->label()],
-                self::VISIBLE_STATUSES,
+                PostStatus::clientVisible(),
             ),
         ]);
     }

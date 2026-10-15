@@ -1,10 +1,17 @@
 import { Form, Head } from '@inertiajs/react';
-import { CheckCircle2, MessageSquareWarning } from 'lucide-react';
+import {
+    CalendarClock,
+    CheckCircle2,
+    MessageSquareWarning,
+} from 'lucide-react';
 
-import AppLogoIcon from '@/components/app-logo-icon';
-import { AssetPreview, type AssetPreviewData } from '@/components/asset-preview';
+import {
+    AssetPreview,
+    type AssetPreviewData,
+} from '@/components/asset-preview';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { PublicShell, PublicTitle } from '@/components/public-shell';
+import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 
 type AssetData = AssetPreviewData;
@@ -36,12 +43,6 @@ type PostData = {
     comments: CommentData[];
 };
 
-const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline' | 'destructive'> = {
-    waiting_client: 'warning',
-    changes_requested: 'destructive',
-    approved: 'success',
-};
-
 export default function ReviewShow({
     token,
     client,
@@ -54,140 +55,174 @@ export default function ReviewShow({
     return (
         <>
             <Head title={`Review a post — ${client.name}`} />
-            <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
-                <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-brand opacity-[0.10] blur-3xl"
-                />
+            <PublicShell width="lg" context={client.name}>
+                <PublicTitle
+                    kicker={`For ${client.name}`}
+                    title={
+                        post.can_decide ? (
+                            <>
+                                Ready for your <em>review</em>.
+                            </>
+                        ) : (
+                            <>
+                                Thanks — it&apos;s <em>reviewed</em>.
+                            </>
+                        )
+                    }
+                >
+                    <StatusPill
+                        kind="post"
+                        value={post.status}
+                        label={post.status_label}
+                    />
+                </PublicTitle>
 
-                <header className="mx-auto flex w-full max-w-2xl items-center gap-2 px-6 py-8">
-                    <span className="flex size-9 items-center justify-center rounded-lg bg-gradient-brand shadow-lg shadow-primary/20">
-                        <AppLogoIcon className="size-5 fill-current text-white" />
-                    </span>
-                    <span className="text-lg font-semibold">Graphy</span>
-                </header>
+                {post.review_message && (
+                    <figure className="bg-ink text-ink-foreground relative rounded-2xl p-6">
+                        <span
+                            aria-hidden
+                            className="text-primary absolute -top-3 left-6 font-serif text-6xl leading-none"
+                        >
+                            “
+                        </span>
+                        <blockquote className="font-serif text-xl leading-snug whitespace-pre-wrap">
+                            {post.review_message}
+                        </blockquote>
+                        <figcaption className="eyebrow text-ink-foreground/55 mt-3">
+                            A note from the studio
+                        </figcaption>
+                    </figure>
+                )}
 
-                <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 pb-16">
-                    <div className="flex flex-col gap-2">
-                        <p className="text-sm text-muted-foreground">Reviewing for {client.name}</p>
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Content ready for your review</span>
-                        </h1>
-                    </div>
-
-                    <div className="rounded-xl border border-border bg-card p-6 shadow-lg shadow-black/[0.03]">
-                        <div className="mb-4 flex items-center justify-between gap-2">
-                            <Badge variant={postStatusVariant[post.status] ?? 'outline'}>{post.status_label}</Badge>
+                <article className="border-border bg-card shadow-paper overflow-hidden rounded-2xl border">
+                    {post.assets.length > 0 && (
+                        <div className="border-border bg-muted/40 grid grid-cols-2 gap-1.5 border-b p-1.5 sm:grid-cols-3">
+                            {post.assets.map((asset) => (
+                                <AssetPreview key={asset.id} asset={asset} />
+                            ))}
                         </div>
+                    )}
 
-                        {post.review_message && (
-                            <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm leading-relaxed whitespace-pre-wrap">
-                                {post.review_message}
-                            </div>
-                        )}
-
+                    <div className="flex flex-col gap-4 p-6">
                         {post.master_caption && (
-                            <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap">{post.master_caption}</p>
+                            <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                                {post.master_caption}
+                            </p>
                         )}
 
                         {post.hashtags.length > 0 && (
-                            <p className="mb-4 text-sm text-primary">{post.hashtags.map((tag) => `#${tag}`).join(' ')}</p>
-                        )}
-
-                        {post.assets.length > 0 && (
-                            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                {post.assets.map((asset) => (
-                                    <AssetPreview key={asset.id} asset={asset} />
-                                ))}
-                            </div>
+                            <p className="text-primary text-sm">
+                                {post.hashtags
+                                    .map((tag) => `#${tag}`)
+                                    .join(' ')}
+                            </p>
                         )}
 
                         {post.targets.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
+                            <ul className="divide-border/70 border-border flex flex-col divide-y border-t pt-2">
                                 {post.targets.map((target, i) => (
-                                    <span
+                                    <li
                                         key={i}
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+                                        className="flex items-center justify-between gap-3 py-2 text-sm"
                                     >
-                                        {target.handle} · {target.scheduled_local_date} {target.scheduled_local_time}
-                                    </span>
+                                        <span className="flex items-center gap-2">
+                                            <span className="eyebrow text-muted-foreground">
+                                                {target.platform}
+                                            </span>
+                                            <span className="font-medium">
+                                                {target.handle}
+                                            </span>
+                                        </span>
+                                        <span className="text-muted-foreground inline-flex items-center gap-1.5 font-mono text-xs tabular-nums">
+                                            <CalendarClock className="size-3.5" />
+                                            {target.scheduled_local_date}{' '}
+                                            {target.scheduled_local_time}
+                                        </span>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         )}
                     </div>
+                </article>
 
-                    {post.comments.length > 0 && (
-                        <div className="rounded-xl border border-border bg-card p-6 shadow-lg shadow-black/[0.03]">
-                            <p className="mb-3 text-sm font-medium">Comments</p>
-                            <div className="flex flex-col gap-3">
-                                {post.comments.map((comment) => (
-                                    <div key={comment.id} className="rounded-md border border-border bg-muted/20 p-3 text-sm">
-                                        <p className="whitespace-pre-wrap">{comment.body}</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">{comment.user_name ?? 'Team'}</p>
-                                    </div>
-                                ))}
+                {post.comments.length > 0 && (
+                    <section className="flex flex-col gap-3">
+                        <h2 className="eyebrow text-muted-foreground">
+                            Conversation
+                        </h2>
+                        {post.comments.map((comment) => (
+                            <div
+                                key={comment.id}
+                                className="border-border bg-card rounded-2xl rounded-tl-sm border p-4 text-sm"
+                            >
+                                <p className="whitespace-pre-wrap">
+                                    {comment.body}
+                                </p>
+                                <p className="text-muted-foreground mt-2 text-xs">
+                                    — {comment.user_name ?? 'Team'}
+                                </p>
                             </div>
-                        </div>
-                    )}
+                        ))}
+                    </section>
+                )}
 
-                    {post.can_decide ? (
-                        <Form
-                            action={`/review/${token}`}
-                            method="post"
-                            className="grid gap-4 rounded-xl border border-border bg-card p-6 shadow-lg shadow-black/[0.03]"
-                        >
-                            {({ processing, errors }) => (
-                                <>
-                                    <p className="text-sm font-medium">What would you like to do with this post?</p>
-                                    <InputError message={errors.decision} />
-                                    <div className="flex flex-col gap-3 sm:flex-row">
-                                        <Button
-                                            type="submit"
-                                            name="decision"
-                                            value="approved"
-                                            size="lg"
-                                            className="flex-1 shadow-lg shadow-primary/20"
-                                            disabled={processing}
-                                        >
-                                            <CheckCircle2 className="size-4" />
-                                            Approve
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            name="decision"
-                                            value="changes_requested"
-                                            size="lg"
-                                            variant="outline"
-                                            className="flex-1 border-destructive/40 text-destructive hover:bg-destructive/10"
-                                            disabled={processing}
-                                        >
-                                            <MessageSquareWarning className="size-4" />
-                                            Request changes
-                                        </Button>
-                                    </div>
-                                    <div className="grid gap-1">
-                                        <textarea
-                                            name="comment"
-                                            rows={3}
-                                            placeholder="Add a note (optional) — e.g. what you'd like changed"
-                                            className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                        />
-                                        <InputError message={errors.comment} />
-                                    </div>
-                                </>
-                            )}
-                        </Form>
-                    ) : (
-                        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                            This post has already been reviewed — no further action is needed.
-                        </div>
-                    )}
-                </main>
-
-                <footer className="mx-auto w-full max-w-2xl px-6 py-6 text-center text-xs text-muted-foreground">
-                    &copy; {new Date().getFullYear()} Graphy. All rights reserved.
-                </footer>
-            </div>
+                {post.can_decide ? (
+                    <Form
+                        action={`/review/${token}`}
+                        method="post"
+                        className="border-border bg-card flex flex-col gap-4 rounded-2xl border p-5 sm:p-6"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <p className="font-serif text-2xl leading-tight">
+                                    How does it look?
+                                </p>
+                                <div className="grid gap-1.5">
+                                    <textarea
+                                        name="comment"
+                                        rows={3}
+                                        placeholder="Add a note (optional) — e.g. what you'd like changed"
+                                        className="border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/40 flex w-full rounded-xl border px-3.5 py-2.5 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                                    />
+                                    <InputError message={errors.comment} />
+                                </div>
+                                <InputError message={errors.decision} />
+                                <div className="flex flex-col gap-3 sm:flex-row-reverse">
+                                    <Button
+                                        type="submit"
+                                        name="decision"
+                                        value="approved"
+                                        size="lg"
+                                        className="bg-success text-success-foreground hover:bg-success/90 h-14 flex-1 text-base"
+                                        disabled={processing}
+                                    >
+                                        <CheckCircle2 className="size-5" />
+                                        Approve
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        name="decision"
+                                        value="changes_requested"
+                                        size="lg"
+                                        variant="outline"
+                                        className="border-destructive/35 text-destructive hover:border-destructive/60 hover:bg-destructive/5 h-14 flex-1 text-base"
+                                        disabled={processing}
+                                    >
+                                        <MessageSquareWarning className="size-5" />
+                                        Request changes
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </Form>
+                ) : (
+                    <div className="border-border text-muted-foreground flex items-center gap-3 rounded-2xl border border-dashed p-5 text-sm">
+                        <CheckCircle2 className="text-success size-5 shrink-0" />
+                        This post has already been reviewed — no further action
+                        is needed.
+                    </div>
+                )}
+            </PublicShell>
         </>
     );
 }

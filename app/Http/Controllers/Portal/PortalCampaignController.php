@@ -18,28 +18,11 @@ use Inertia\Response;
  */
 class PortalCampaignController extends Controller
 {
-    /**
-     * Statuses a client contact is allowed to see, mirroring `PortalPostController` — pre-review
-     * internal stages (idea, draft, internal review) never reach the portal.
-     *
-     * @var list<PostStatus>
-     */
-    private const VISIBLE_STATUSES = [
-        PostStatus::WaitingClient,
-        PostStatus::ChangesRequested,
-        PostStatus::Approved,
-        PostStatus::Scheduled,
-        PostStatus::Publishing,
-        PostStatus::Published,
-        PostStatus::Failed,
-        PostStatus::Archived,
-    ];
-
     public function index(Request $request): Response
     {
         $campaigns = Campaign::query()
             ->where('client_id', $request->user()->client_id)
-            ->withCount(['posts' => fn ($query) => $query->whereIn('status', self::VISIBLE_STATUSES)])
+            ->withCount(['posts' => fn ($query) => $query->whereIn('status', PostStatus::clientVisible())])
             ->latest()
             ->get()
             ->map(fn (Campaign $campaign) => [
@@ -72,7 +55,7 @@ class PortalCampaignController extends Controller
                 'goal' => $campaign->goal,
             ],
             'posts' => $campaign->posts()
-                ->whereIn('status', self::VISIBLE_STATUSES)
+                ->whereIn('status', PostStatus::clientVisible())
                 ->with('targets.socialAccount')
                 ->latest()
                 ->get()

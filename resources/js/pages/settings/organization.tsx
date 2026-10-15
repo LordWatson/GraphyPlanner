@@ -28,7 +28,10 @@ type OrganizationProps = {
     currencies: Option[];
 };
 
-export default function Organization({ organization, currencies }: OrganizationProps) {
+export default function Organization({
+    organization,
+    currencies,
+}: OrganizationProps) {
     return (
         <>
             <Head title="Organization settings" />
@@ -59,9 +62,7 @@ export default function Organization({ organization, currencies }: OrganizationP
                                 <Input
                                     id="default_timezone"
                                     className="mt-1 block w-full"
-                                    defaultValue={
-                                        organization.default_timezone
-                                    }
+                                    defaultValue={organization.default_timezone}
                                     name="default_timezone"
                                     required
                                     placeholder="e.g. Europe/Berlin"
@@ -82,13 +83,20 @@ export default function Organization({ organization, currencies }: OrganizationP
                                     name="default_currency"
                                     defaultValue={organization.default_currency}
                                 >
-                                    <SelectTrigger id="default_currency" className="w-full">
+                                    <SelectTrigger
+                                        id="default_currency"
+                                        className="w-full"
+                                    >
                                         <SelectValue placeholder="Select a currency" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {currencies.map((currency) => (
-                                            <SelectItem key={currency.value} value={currency.value}>
-                                                {currency.value} — {currency.label}
+                                            <SelectItem
+                                                key={currency.value}
+                                                value={currency.value}
+                                            >
+                                                {currency.value} —{' '}
+                                                {currency.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -149,7 +157,9 @@ export default function Organization({ organization, currencies }: OrganizationP
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="xai_key">xAI (Grok) API key</Label>
+                                <Label htmlFor="xai_key">
+                                    xAI (Grok) API key
+                                </Label>
 
                                 <Input
                                     id="xai_key"

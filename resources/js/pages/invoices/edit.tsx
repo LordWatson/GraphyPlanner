@@ -5,8 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { index as indexClients } from '@/routes/clients';
-import { show as showInvoice, update as updateInvoice } from '@/routes/invoices';
+import {
+    show as showInvoice,
+    update as updateInvoice,
+} from '@/routes/invoices';
 import { store as storePdf } from '@/routes/invoices/pdf';
+import { PageHeader } from '@/components/page';
 
 type InvoiceData = {
     id: number;
@@ -23,42 +27,47 @@ type InvoiceData = {
     pdf_original_filename: string | null;
 };
 
-export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData; client: { id: number; name: string } }) {
+export default function InvoiceEdit({
+    invoice,
+    client,
+}: {
+    invoice: InvoiceData;
+    client: { id: number; name: string };
+}) {
     const { currency } = usePage().props;
 
     return (
         <>
-            <Head title={`Edit invoice ${invoice.invoice_number} — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
+            <Head
+                title={`Edit invoice ${invoice.invoice_number} — ${client.name}`}
+            />
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <div className="flex flex-col gap-4">
                     <Link
                         href={showInvoice(invoice.id)}
-                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
                     >
                         <ArrowLeft className="size-4" />
                         Back to {invoice.invoice_number}
                     </Link>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Edit invoice</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
+                <PageHeader
+                    title="Edit invoice"
+                    description={
+                        <>
                             {invoice.invoice_number} — {client.name}
-                        </p>
-                    </div>
-                </div>
+                        </>
+                    }
+                />
 
-                <Form {...updateInvoice.form(invoice.id)} className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <Form
+                    {...updateInvoice.form(invoice.id)}
+                    className="border-border bg-card grid gap-4 rounded-2xl border p-4 shadow-sm"
+                >
                     {({ processing, errors }) => (
                         <>
-                            <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <div className="grid gap-1">
                                     <Label htmlFor="amount">Amount</Label>
                                     <Input
@@ -74,23 +83,47 @@ export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData;
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor="currency">Currency</Label>
-                                    <Input id="currency" value={currency} disabled readOnly />
-                                    <p className="text-xs text-muted-foreground">Set at the organization level.</p>
+                                    <Input
+                                        id="currency"
+                                        value={currency}
+                                        disabled
+                                        readOnly
+                                    />
+                                    <p className="text-muted-foreground text-xs">
+                                        Set at the organization level.
+                                    </p>
                                 </div>
                                 <div className="grid gap-1">
-                                    <Label htmlFor="issue_date">Issue date</Label>
-                                    <Input id="issue_date" name="issue_date" type="date" defaultValue={invoice.issue_date} required />
+                                    <Label htmlFor="issue_date">
+                                        Issue date
+                                    </Label>
+                                    <Input
+                                        id="issue_date"
+                                        name="issue_date"
+                                        type="date"
+                                        defaultValue={invoice.issue_date}
+                                        required
+                                    />
                                     <InputError message={errors.issue_date} />
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor="due_date">Due date</Label>
-                                    <Input id="due_date" name="due_date" type="date" defaultValue={invoice.due_date ?? ''} />
+                                    <Input
+                                        id="due_date"
+                                        name="due_date"
+                                        type="date"
+                                        defaultValue={invoice.due_date ?? ''}
+                                    />
                                     <InputError message={errors.due_date} />
                                 </div>
                             </div>
                             <div className="grid gap-1">
                                 <Label htmlFor="description">Description</Label>
-                                <Input id="description" name="description" defaultValue={invoice.description ?? ''} />
+                                <Input
+                                    id="description"
+                                    name="description"
+                                    defaultValue={invoice.description ?? ''}
+                                />
                                 <InputError message={errors.description} />
                             </div>
                             <div>
@@ -102,35 +135,60 @@ export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData;
                     )}
                 </Form>
 
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
+                <div className="border-border bg-card grid gap-3 rounded-2xl border p-4 shadow-sm">
                     <Label>Invoice PDF</Label>
                     {invoice.pdf_url && (
                         <div className="grid gap-2">
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                                 {invoice.pdf_original_filename ?? 'invoice.pdf'}
                             </p>
                             <iframe
                                 src={invoice.pdf_url}
                                 title="Invoice PDF"
-                                className="h-[50vh] w-full rounded-md border border-border"
+                                className="border-border h-[50vh] w-full rounded-md border"
                             />
                         </div>
                     )}
                     {invoice.is_finalized ? (
-                        <p className="text-xs text-muted-foreground">
-                            This invoice is finalized — generate its branded PDF from the invoice page. Manual upload
-                            below remains available as a one-off override.
+                        <p className="text-muted-foreground text-xs">
+                            This invoice is finalized — generate its branded PDF
+                            from the invoice page. Manual upload below remains
+                            available as a one-off override.
                         </p>
                     ) : null}
-                    <Form {...storePdf.form(invoice.id)} encType="multipart/form-data" resetOnSuccess className="grid gap-2">
-                        {({ processing: uploadProcessing, errors: uploadErrors }) => (
+                    <Form
+                        {...storePdf.form(invoice.id)}
+                        encType="multipart/form-data"
+                        resetOnSuccess
+                        className="grid gap-2"
+                    >
+                        {({
+                            processing: uploadProcessing,
+                            errors: uploadErrors,
+                        }) => (
                             <>
-                                <Label htmlFor="pdf">{invoice.pdf_url ? 'Replace invoice PDF' : 'Upload invoice PDF'}</Label>
-                                <Input id="pdf" name="pdf" type="file" accept="application/pdf" />
+                                <Label htmlFor="pdf">
+                                    {invoice.pdf_url
+                                        ? 'Replace invoice PDF'
+                                        : 'Upload invoice PDF'}
+                                </Label>
+                                <Input
+                                    id="pdf"
+                                    name="pdf"
+                                    type="file"
+                                    accept="application/pdf"
+                                />
                                 <InputError message={uploadErrors.pdf} />
                                 <div>
-                                    <Button type="submit" size="sm" variant="outline" disabled={uploadProcessing}>
-                                        {invoice.pdf_url ? 'Replace file' : 'Upload file'}
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={uploadProcessing}
+                                    >
+                                        {invoice.pdf_url
+                                            ? 'Replace file'
+                                            : 'Upload file'}
                                     </Button>
                                 </div>
                             </>
@@ -143,5 +201,8 @@ export default function InvoiceEdit({ invoice, client }: { invoice: InvoiceData;
 }
 
 InvoiceEdit.layout = {
-    breadcrumbs: [{ title: 'Clients', href: indexClients() }, { title: 'Edit invoice', href: indexClients() }],
+    breadcrumbs: [
+        { title: 'Clients', href: indexClients() },
+        { title: 'Edit invoice', href: indexClients() },
+    ],
 };

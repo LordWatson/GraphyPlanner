@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureClientPortalAccess;
 use App\Http\Middleware\EnsurePreviewMode;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RedirectClientReviewersToPortal;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'preview' => EnsurePreviewMode::class,
             'portal' => EnsureClientPortalAccess::class,
+            'portal.redirect' => RedirectClientReviewersToPortal::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -1,8 +1,7 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { ArrowLeft, Pencil, Receipt, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import InputError from '@/components/input-error';
@@ -18,7 +17,12 @@ import invoicesRoutes, {
     finalize as finalizeInvoice,
     generatePdf as generateInvoicePdf,
 } from '@/routes/invoices';
-import { update as updateInvoiceItem, destroy as destroyInvoiceItem } from '@/routes/invoice-items';
+import {
+    update as updateInvoiceItem,
+    destroy as destroyInvoiceItem,
+} from '@/routes/invoice-items';
+import { PageHeader } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 
 type InvoiceItemData = {
     id: number;
@@ -50,12 +54,6 @@ type InvoiceData = {
     items_subtotal: number;
 };
 
-const invoiceStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
-    draft: 'secondary',
-    sent: 'warning',
-    paid: 'success',
-};
-
 export default function InvoiceShow({
     invoice,
     client,
@@ -78,70 +76,89 @@ export default function InvoiceShow({
 
     return (
         <>
-            <Head title={`Invoice ${invoice.invoice_number} — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
+            <Head
+                title={`Invoice ${invoice.invoice_number} — ${client.name}`}
+            />
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <div className="flex flex-col gap-4">
                     <Link
                         href={showClient(client.id)}
-                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
                     >
                         <ArrowLeft className="size-4" />
                         Back to {client.name}
                     </Link>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <Receipt className="size-5" />
-                            </span>
-                            <div className="flex flex-col gap-1">
-                                <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                                    <span className="text-gradient-brand">{invoice.invoice_number}</span>
-                                </h1>
-                                <p className="text-sm text-muted-foreground">Client: {client.name}</p>
-                            </div>
-                        </div>
-                        <Badge variant={invoiceStatusVariant[invoice.status] ?? 'outline'}>{invoice.status_label}</Badge>
-                    </div>
-                </div>
+                <PageHeader
+                    eyebrow={`Invoice — ${client.name}`}
+                    title={
+                        <span className="font-mono text-[0.8em] tracking-[-0.04em]">
+                            {invoice.invoice_number}
+                        </span>
+                    }
+                    meta={
+                        <StatusPill
+                            kind="invoice"
+                            value={invoice.status}
+                            label={invoice.status_label}
+                        />
+                    }
+                />
 
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="border-border bg-card grid gap-4 rounded-2xl border p-4 shadow-sm">
                     <Heading title="Invoice details" />
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">Amount</span>
+                            <span className="text-muted-foreground text-xs">
+                                Amount
+                            </span>
                             <span className="text-sm font-medium tabular-nums">
                                 {formatCurrency(invoice.amount, currency)}
                             </span>
                         </div>
                         <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">Issue date</span>
-                            <span className="text-sm font-medium">{invoice.issue_date}</span>
+                            <span className="text-muted-foreground text-xs">
+                                Issue date
+                            </span>
+                            <span className="text-sm font-medium">
+                                {invoice.issue_date}
+                            </span>
                         </div>
                         <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">Due date</span>
-                            <span className="text-sm font-medium">{invoice.due_date ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs">
+                                Due date
+                            </span>
+                            <span className="text-sm font-medium">
+                                {invoice.due_date ?? '—'}
+                            </span>
                         </div>
                         <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">Description</span>
-                            <span className="text-sm font-medium">{invoice.description ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs">
+                                Description
+                            </span>
+                            <span className="text-sm font-medium">
+                                {invoice.description ?? '—'}
+                            </span>
                         </div>
                         {invoice.sent_at && (
                             <div className="grid gap-1">
-                                <span className="text-xs text-muted-foreground">Sent</span>
-                                <span className="text-sm font-medium">{invoice.sent_at}</span>
+                                <span className="text-muted-foreground text-xs">
+                                    Sent
+                                </span>
+                                <span className="text-sm font-medium">
+                                    {invoice.sent_at}
+                                </span>
                             </div>
                         )}
                         {invoice.paid_at && (
                             <div className="grid gap-1">
-                                <span className="text-xs text-muted-foreground">Paid</span>
-                                <span className="text-sm font-medium">{invoice.paid_at}</span>
+                                <span className="text-muted-foreground text-xs">
+                                    Paid
+                                </span>
+                                <span className="text-sm font-medium">
+                                    {invoice.paid_at}
+                                </span>
                             </div>
                         )}
                     </div>
@@ -158,7 +175,12 @@ export default function InvoiceShow({
                         {can.send && (
                             <Form {...sendInvoice.form(invoice.id)}>
                                 {({ processing }) => (
-                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
                                         Send
                                     </Button>
                                 )}
@@ -167,7 +189,12 @@ export default function InvoiceShow({
                         {can.mark_paid && (
                             <Form {...markPaidInvoice.form(invoice.id)}>
                                 {({ processing }) => (
-                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
                                         Mark paid
                                     </Button>
                                 )}
@@ -176,7 +203,12 @@ export default function InvoiceShow({
                         {can.finalize && (
                             <Form {...finalizeInvoice.form(invoice.id)}>
                                 {({ processing }) => (
-                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
                                         Finalize
                                     </Button>
                                 )}
@@ -185,7 +217,12 @@ export default function InvoiceShow({
                         {can.delete && (
                             <Form {...destroyInvoice.form(invoice.id)}>
                                 {({ processing }) => (
-                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
                                         <Trash2 />
                                         Delete
                                     </Button>
@@ -195,7 +232,7 @@ export default function InvoiceShow({
                     </div>
                 </div>
 
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="border-border bg-card grid gap-4 rounded-2xl border p-4 shadow-sm">
                     <Heading
                         title="Items"
                         description={
@@ -213,60 +250,102 @@ export default function InvoiceShow({
                                         key={item.id}
                                         {...updateInvoiceItem.form(item.id)}
                                         onSuccess={() => setEditingItemId(null)}
-                                        className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-5 sm:items-end"
+                                        className="border-border grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-5 sm:items-end"
                                     >
                                         {({ processing, errors }) => (
                                             <>
                                                 <div className="grid gap-1 sm:col-span-2">
-                                                    <Label htmlFor={`description-${item.id}`}>Description</Label>
+                                                    <Label
+                                                        htmlFor={`description-${item.id}`}
+                                                    >
+                                                        Description
+                                                    </Label>
                                                     <Input
                                                         id={`description-${item.id}`}
                                                         name="description"
-                                                        defaultValue={item.description}
+                                                        defaultValue={
+                                                            item.description
+                                                        }
                                                     />
-                                                    <InputError message={errors.description} />
+                                                    <InputError
+                                                        message={
+                                                            errors.description
+                                                        }
+                                                    />
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Checkbox
                                                         id={`is_billable-${item.id}`}
                                                         name="is_billable"
                                                         value="1"
-                                                        defaultChecked={item.is_billable}
+                                                        defaultChecked={
+                                                            item.is_billable
+                                                        }
                                                     />
-                                                    <Label htmlFor={`is_billable-${item.id}`}>Billable</Label>
+                                                    <Label
+                                                        htmlFor={`is_billable-${item.id}`}
+                                                    >
+                                                        Billable
+                                                    </Label>
                                                 </div>
                                                 <div className="grid gap-1">
-                                                    <Label htmlFor={`price-${item.id}`}>Price</Label>
+                                                    <Label
+                                                        htmlFor={`price-${item.id}`}
+                                                    >
+                                                        Price
+                                                    </Label>
                                                     <Input
                                                         id={`price-${item.id}`}
                                                         name="price"
                                                         type="number"
                                                         step="0.01"
                                                         min="0"
-                                                        defaultValue={item.price ?? ''}
+                                                        defaultValue={
+                                                            item.price ?? ''
+                                                        }
                                                     />
-                                                    <InputError message={errors.price} />
+                                                    <InputError
+                                                        message={errors.price}
+                                                    />
                                                 </div>
                                                 <div className="grid gap-1">
-                                                    <Label htmlFor={`quantity-${item.id}`}>Quantity</Label>
+                                                    <Label
+                                                        htmlFor={`quantity-${item.id}`}
+                                                    >
+                                                        Quantity
+                                                    </Label>
                                                     <Input
                                                         id={`quantity-${item.id}`}
                                                         name="quantity"
                                                         type="number"
                                                         min="1"
-                                                        defaultValue={item.quantity}
+                                                        defaultValue={
+                                                            item.quantity
+                                                        }
                                                     />
-                                                    <InputError message={errors.quantity} />
+                                                    <InputError
+                                                        message={
+                                                            errors.quantity
+                                                        }
+                                                    />
                                                 </div>
                                                 <div className="flex items-center gap-2 sm:col-span-5">
-                                                    <Button type="submit" size="sm" disabled={processing}>
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={processing}
+                                                    >
                                                         Save
                                                     </Button>
                                                     <Button
                                                         type="button"
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => setEditingItemId(null)}
+                                                        onClick={() =>
+                                                            setEditingItemId(
+                                                                null,
+                                                            )
+                                                        }
                                                     >
                                                         Cancel
                                                     </Button>
@@ -277,11 +356,13 @@ export default function InvoiceShow({
                                 ) : (
                                     <div
                                         key={item.id}
-                                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3"
+                                        className="border-border bg-card hover:border-primary/30 hover:bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 shadow-sm transition-colors"
                                     >
                                         <div className="grid gap-0.5">
-                                            <span className="text-sm font-medium">{item.description}</span>
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className="text-sm font-medium">
+                                                {item.description}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
                                                 {item.is_billable
                                                     ? `${formatCurrency(item.price ?? '0', currency)} × ${item.quantity}`
                                                     : 'Not billable'}
@@ -289,7 +370,10 @@ export default function InvoiceShow({
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className="text-sm font-medium tabular-nums">
-                                                {formatCurrency(item.line_total, currency)}
+                                                {formatCurrency(
+                                                    item.line_total,
+                                                    currency,
+                                                )}
                                             </span>
                                             {can.manage_items && (
                                                 <div className="flex items-center gap-1">
@@ -297,17 +381,27 @@ export default function InvoiceShow({
                                                         type="button"
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => setEditingItemId(item.id)}
+                                                        onClick={() =>
+                                                            setEditingItemId(
+                                                                item.id,
+                                                            )
+                                                        }
                                                     >
                                                         <Pencil />
                                                     </Button>
-                                                    <Form {...destroyInvoiceItem.form(item.id)}>
+                                                    <Form
+                                                        {...destroyInvoiceItem.form(
+                                                            item.id,
+                                                        )}
+                                                    >
                                                         {({ processing }) => (
                                                             <Button
                                                                 type="submit"
                                                                 size="sm"
                                                                 variant="outline"
-                                                                disabled={processing}
+                                                                disabled={
+                                                                    processing
+                                                                }
                                                             >
                                                                 <Trash2 />
                                                             </Button>
@@ -321,38 +415,73 @@ export default function InvoiceShow({
                             )}
                         </div>
                     ) : (
-                        <p className="text-sm text-muted-foreground">No items added yet.</p>
+                        <p className="text-muted-foreground text-sm">
+                            No items added yet.
+                        </p>
                     )}
 
                     {can.manage_items && (
                         <Form
                             {...invoicesRoutes.items.store.form(invoice.id)}
                             resetOnSuccess
-                            className="grid gap-2 rounded-md border border-dashed border-border p-3 sm:grid-cols-5 sm:items-end"
+                            className="border-border grid grid-cols-1 gap-2 rounded-md border border-dashed p-3 sm:grid-cols-5 sm:items-end"
                         >
                             {({ processing, errors }) => (
                                 <>
                                     <div className="grid gap-1 sm:col-span-2">
-                                        <Label htmlFor="new-description">Description</Label>
-                                        <Input id="new-description" name="description" placeholder="e.g. Reel edit" />
-                                        <InputError message={errors.description} />
+                                        <Label htmlFor="new-description">
+                                            Description
+                                        </Label>
+                                        <Input
+                                            id="new-description"
+                                            name="description"
+                                            placeholder="e.g. Reel edit"
+                                        />
+                                        <InputError
+                                            message={errors.description}
+                                        />
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Checkbox id="new-is_billable" name="is_billable" value="1" defaultChecked />
-                                        <Label htmlFor="new-is_billable">Billable</Label>
+                                        <Checkbox
+                                            id="new-is_billable"
+                                            name="is_billable"
+                                            value="1"
+                                            defaultChecked
+                                        />
+                                        <Label htmlFor="new-is_billable">
+                                            Billable
+                                        </Label>
                                     </div>
                                     <div className="grid gap-1">
                                         <Label htmlFor="new-price">Price</Label>
-                                        <Input id="new-price" name="price" type="number" step="0.01" min="0" />
+                                        <Input
+                                            id="new-price"
+                                            name="price"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                        />
                                         <InputError message={errors.price} />
                                     </div>
                                     <div className="grid gap-1">
-                                        <Label htmlFor="new-quantity">Quantity</Label>
-                                        <Input id="new-quantity" name="quantity" type="number" min="1" defaultValue={1} />
+                                        <Label htmlFor="new-quantity">
+                                            Quantity
+                                        </Label>
+                                        <Input
+                                            id="new-quantity"
+                                            name="quantity"
+                                            type="number"
+                                            min="1"
+                                            defaultValue={1}
+                                        />
                                         <InputError message={errors.quantity} />
                                     </div>
                                     <div className="sm:col-span-5">
-                                        <Button type="submit" size="sm" disabled={processing}>
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={processing}
+                                        >
                                             Add item
                                         </Button>
                                     </div>
@@ -361,36 +490,61 @@ export default function InvoiceShow({
                         </Form>
                     )}
 
-                    <div className="grid gap-1 border-t border-border pt-3">
+                    <div className="border-border grid gap-1 border-t pt-3">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Items subtotal</span>
+                            <span className="text-muted-foreground">
+                                Items subtotal
+                            </span>
                             <span className="font-medium tabular-nums">
-                                {formatCurrency(invoice.items_subtotal, currency)}
+                                {formatCurrency(
+                                    invoice.items_subtotal,
+                                    currency,
+                                )}
                             </span>
                         </div>
                         {invoice.is_finalized && (
                             <>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Retainer</span>
+                                    <span className="text-muted-foreground">
+                                        Retainer
+                                    </span>
                                     <span className="font-medium tabular-nums">
-                                        {formatCurrency(invoice.retainer_amount_snapshot ?? '0', currency)}
+                                        {formatCurrency(
+                                            invoice.retainer_amount_snapshot ??
+                                                '0',
+                                            currency,
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm font-semibold">
                                     <span>Total</span>
-                                    <span className="tabular-nums">{formatCurrency(invoice.amount, currency)}</span>
+                                    <span className="tabular-nums">
+                                        {formatCurrency(
+                                            invoice.amount,
+                                            currency,
+                                        )}
+                                    </span>
                                 </div>
                             </>
                         )}
                     </div>
                 </div>
 
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading title="Invoice PDF" description="Uploaded by your organization" />
+                <div className="border-border bg-card grid gap-3 rounded-2xl border p-4 shadow-sm">
+                    <Heading
+                        title="Invoice PDF"
+                        description="Uploaded by your organization"
+                    />
                     {can.generate_pdf && (
                         <Form {...generateInvoicePdf.form(invoice.id)}>
                             {({ processing }) => (
-                                <Button type="submit" size="sm" variant="outline" disabled={processing} className="w-fit">
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={processing}
+                                    className="w-fit"
+                                >
                                     Generate branded PDF
                                 </Button>
                             )}
@@ -398,20 +552,23 @@ export default function InvoiceShow({
                     )}
                     {invoice.pdf_url ? (
                         <div className="grid gap-2">
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                                 {invoice.pdf_original_filename ?? 'invoice.pdf'}
                             </p>
                             <iframe
                                 src={invoice.pdf_url}
                                 title="Invoice PDF"
-                                className="h-[70vh] w-full rounded-md border border-border"
+                                className="border-border h-[70vh] w-full rounded-md border"
                             />
                         </div>
                     ) : (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                             No PDF uploaded yet.{' '}
                             {can.update && (
-                                <Link href={editInvoice(invoice.id)} className="underline">
+                                <Link
+                                    href={editInvoice(invoice.id)}
+                                    className="underline"
+                                >
                                     Upload one from the edit page.
                                 </Link>
                             )}

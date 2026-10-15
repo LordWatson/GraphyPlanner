@@ -8,19 +8,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { index } from '@/routes/clients';
 import { update } from '@/routes/clients/brand-brain';
 import { store as storePersona } from '@/routes/clients/brand-brain/persona';
+import { PageHeader } from '@/components/page';
 
 type BrandBrainData = {
     voice: { tone?: string; personality?: string; do_nots?: string[] } | null;
-    audience: { description?: string; demographics?: string; pain_points?: string[] } | null;
-    offer: { value_proposition?: string; key_products?: string[]; pricing_notes?: string } | null;
+    audience: {
+        description?: string;
+        demographics?: string;
+        pain_points?: string[];
+    } | null;
+    offer: {
+        value_proposition?: string;
+        key_products?: string[];
+        pricing_notes?: string;
+    } | null;
     visual: {
         color_palette?: string[];
         typography?: string;
         imagery_style?: string;
         logo_usage_notes?: string;
     } | null;
-    music_policy: { allowed_genres?: string[]; disallowed_genres?: string[]; notes?: string } | null;
-    hashtag_policy: { always_use?: string[]; never_use?: string[]; rotation_notes?: string } | null;
+    music_policy: {
+        allowed_genres?: string[];
+        disallowed_genres?: string[];
+        notes?: string;
+    } | null;
+    hashtag_policy: {
+        always_use?: string[];
+        never_use?: string[];
+        rotation_notes?: string;
+    } | null;
     content_pillars: string[] | null;
     persona_url: string | null;
     persona_original_filename: string | null;
@@ -47,195 +64,332 @@ export default function BrandBrainEdit({
     return (
         <>
             <Head title={`Brand brain — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Brand brain</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
-                            Voice, audience, and creative rules for {client.name}.
-                        </p>
-                    </div>
-                </div>
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
+                <PageHeader
+                    eyebrow="Brand brain"
+                    title={<>{client.name}</>}
+                    description="Voice, audience, and creative rules for this client."
+                />
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList>
+                <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="space-y-6"
+                >
+                    <TabsList className="bg-muted/60 h-auto w-full flex-wrap justify-start gap-1 rounded-2xl p-1">
                         <TabsTrigger value="voice">Voice</TabsTrigger>
                         <TabsTrigger value="audience">Audience</TabsTrigger>
                         <TabsTrigger value="offer">Offer</TabsTrigger>
                         <TabsTrigger value="visual">Visual</TabsTrigger>
                         <TabsTrigger value="music">Music policy</TabsTrigger>
-                        <TabsTrigger value="hashtags">Hashtag policy</TabsTrigger>
-                        <TabsTrigger value="pillars">Content pillars</TabsTrigger>
+                        <TabsTrigger value="hashtags">
+                            Hashtag policy
+                        </TabsTrigger>
+                        <TabsTrigger value="pillars">
+                            Content pillars
+                        </TabsTrigger>
                         <TabsTrigger value="persona">Brand persona</TabsTrigger>
                     </TabsList>
 
                     <Form {...update.form(client.id)} className="space-y-6">
-                    {({ processing, errors }) => (
-                        <>
-                                <TabsContent value="voice" className="space-y-4 pt-4">
+                        {({ processing, errors }) => (
+                            <>
+                                <TabsContent
+                                    value="voice"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
                                         <Label htmlFor="voice_tone">Tone</Label>
                                         <Input
                                             id="voice_tone"
                                             name="voice[tone]"
-                                            defaultValue={brandBrain.voice?.tone ?? ''}
+                                            defaultValue={
+                                                brandBrain.voice?.tone ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['voice.tone']} />
+                                        <InputError
+                                            message={errors['voice.tone']}
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="voice_personality">Personality</Label>
+                                        <Label htmlFor="voice_personality">
+                                            Personality
+                                        </Label>
                                         <Input
                                             id="voice_personality"
                                             name="voice[personality]"
-                                            defaultValue={brandBrain.voice?.personality ?? ''}
+                                            defaultValue={
+                                                brandBrain.voice?.personality ??
+                                                ''
+                                            }
                                         />
-                                        <InputError message={errors['voice.personality']} />
+                                        <InputError
+                                            message={
+                                                errors['voice.personality']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="voice_do_nots">Do not (one per line)</Label>
+                                        <Label htmlFor="voice_do_nots">
+                                            Do not (one per line)
+                                        </Label>
                                         <textarea
                                             id="voice_do_nots"
                                             name="voice[do_nots]"
                                             rows={4}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.voice?.do_nots)}
+                                            defaultValue={toLines(
+                                                brandBrain.voice?.do_nots,
+                                            )}
                                         />
-                                        <InputError message={errors['voice.do_nots']} />
+                                        <InputError
+                                            message={errors['voice.do_nots']}
+                                        />
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="audience" className="space-y-4 pt-4">
+                                <TabsContent
+                                    value="audience"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
-                                        <Label htmlFor="audience_description">Description</Label>
+                                        <Label htmlFor="audience_description">
+                                            Description
+                                        </Label>
                                         <textarea
                                             id="audience_description"
                                             name="audience[description]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.audience?.description ?? ''}
+                                            defaultValue={
+                                                brandBrain.audience
+                                                    ?.description ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['audience.description']} />
+                                        <InputError
+                                            message={
+                                                errors['audience.description']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="audience_demographics">Demographics</Label>
+                                        <Label htmlFor="audience_demographics">
+                                            Demographics
+                                        </Label>
                                         <Input
                                             id="audience_demographics"
                                             name="audience[demographics]"
-                                            defaultValue={brandBrain.audience?.demographics ?? ''}
+                                            defaultValue={
+                                                brandBrain.audience
+                                                    ?.demographics ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['audience.demographics']} />
+                                        <InputError
+                                            message={
+                                                errors['audience.demographics']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="audience_pain_points">Pain points (one per line)</Label>
+                                        <Label htmlFor="audience_pain_points">
+                                            Pain points (one per line)
+                                        </Label>
                                         <textarea
                                             id="audience_pain_points"
                                             name="audience[pain_points]"
                                             rows={4}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.audience?.pain_points)}
+                                            defaultValue={toLines(
+                                                brandBrain.audience
+                                                    ?.pain_points,
+                                            )}
                                         />
-                                        <InputError message={errors['audience.pain_points']} />
+                                        <InputError
+                                            message={
+                                                errors['audience.pain_points']
+                                            }
+                                        />
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="offer" className="space-y-4 pt-4">
+                                <TabsContent
+                                    value="offer"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
-                                        <Label htmlFor="offer_value_proposition">Value proposition</Label>
+                                        <Label htmlFor="offer_value_proposition">
+                                            Value proposition
+                                        </Label>
                                         <textarea
                                             id="offer_value_proposition"
                                             name="offer[value_proposition]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.offer?.value_proposition ?? ''}
+                                            defaultValue={
+                                                brandBrain.offer
+                                                    ?.value_proposition ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['offer.value_proposition']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'offer.value_proposition'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="offer_key_products">Key products/services (one per line)</Label>
+                                        <Label htmlFor="offer_key_products">
+                                            Key products/services (one per line)
+                                        </Label>
                                         <textarea
                                             id="offer_key_products"
                                             name="offer[key_products]"
                                             rows={4}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.offer?.key_products)}
+                                            defaultValue={toLines(
+                                                brandBrain.offer?.key_products,
+                                            )}
                                         />
-                                        <InputError message={errors['offer.key_products']} />
+                                        <InputError
+                                            message={
+                                                errors['offer.key_products']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="offer_pricing_notes">Pricing notes</Label>
+                                        <Label htmlFor="offer_pricing_notes">
+                                            Pricing notes
+                                        </Label>
                                         <textarea
                                             id="offer_pricing_notes"
                                             name="offer[pricing_notes]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.offer?.pricing_notes ?? ''}
+                                            defaultValue={
+                                                brandBrain.offer
+                                                    ?.pricing_notes ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['offer.pricing_notes']} />
+                                        <InputError
+                                            message={
+                                                errors['offer.pricing_notes']
+                                            }
+                                        />
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="visual" className="space-y-4 pt-4">
+                                <TabsContent
+                                    value="visual"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
-                                        <Label htmlFor="visual_color_palette">Color palette (one per line)</Label>
+                                        <Label htmlFor="visual_color_palette">
+                                            Color palette (one per line)
+                                        </Label>
                                         <textarea
                                             id="visual_color_palette"
                                             name="visual[color_palette]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.visual?.color_palette)}
+                                            defaultValue={toLines(
+                                                brandBrain.visual
+                                                    ?.color_palette,
+                                            )}
                                         />
-                                        <InputError message={errors['visual.color_palette']} />
+                                        <InputError
+                                            message={
+                                                errors['visual.color_palette']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="visual_typography">Typography</Label>
+                                        <Label htmlFor="visual_typography">
+                                            Typography
+                                        </Label>
                                         <Input
                                             id="visual_typography"
                                             name="visual[typography]"
-                                            defaultValue={brandBrain.visual?.typography ?? ''}
+                                            defaultValue={
+                                                brandBrain.visual?.typography ??
+                                                ''
+                                            }
                                         />
-                                        <InputError message={errors['visual.typography']} />
+                                        <InputError
+                                            message={
+                                                errors['visual.typography']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="visual_imagery_style">Imagery style</Label>
+                                        <Label htmlFor="visual_imagery_style">
+                                            Imagery style
+                                        </Label>
                                         <textarea
                                             id="visual_imagery_style"
                                             name="visual[imagery_style]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.visual?.imagery_style ?? ''}
+                                            defaultValue={
+                                                brandBrain.visual
+                                                    ?.imagery_style ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['visual.imagery_style']} />
+                                        <InputError
+                                            message={
+                                                errors['visual.imagery_style']
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="visual_logo_usage_notes">Logo usage notes</Label>
+                                        <Label htmlFor="visual_logo_usage_notes">
+                                            Logo usage notes
+                                        </Label>
                                         <textarea
                                             id="visual_logo_usage_notes"
                                             name="visual[logo_usage_notes]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.visual?.logo_usage_notes ?? ''}
+                                            defaultValue={
+                                                brandBrain.visual
+                                                    ?.logo_usage_notes ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['visual.logo_usage_notes']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'visual.logo_usage_notes'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="music" className="space-y-4 pt-4">
+                                <TabsContent
+                                    value="music"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
-                                        <Label htmlFor="music_allowed_genres">Allowed genres (one per line)</Label>
+                                        <Label htmlFor="music_allowed_genres">
+                                            Allowed genres (one per line)
+                                        </Label>
                                         <textarea
                                             id="music_allowed_genres"
                                             name="music_policy[allowed_genres]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.music_policy?.allowed_genres)}
+                                            defaultValue={toLines(
+                                                brandBrain.music_policy
+                                                    ?.allowed_genres,
+                                            )}
                                         />
-                                        <InputError message={errors['music_policy.allowed_genres']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'music_policy.allowed_genres'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="music_disallowed_genres">
@@ -246,93 +400,159 @@ export default function BrandBrainEdit({
                                             name="music_policy[disallowed_genres]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.music_policy?.disallowed_genres)}
+                                            defaultValue={toLines(
+                                                brandBrain.music_policy
+                                                    ?.disallowed_genres,
+                                            )}
                                         />
-                                        <InputError message={errors['music_policy.disallowed_genres']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'music_policy.disallowed_genres'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="music_notes">Notes</Label>
+                                        <Label htmlFor="music_notes">
+                                            Notes
+                                        </Label>
                                         <textarea
                                             id="music_notes"
                                             name="music_policy[notes]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.music_policy?.notes ?? ''}
+                                            defaultValue={
+                                                brandBrain.music_policy
+                                                    ?.notes ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['music_policy.notes']} />
+                                        <InputError
+                                            message={
+                                                errors['music_policy.notes']
+                                            }
+                                        />
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="hashtags" className="space-y-4 pt-4">
+                                <TabsContent
+                                    value="hashtags"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
-                                        <Label htmlFor="hashtags_always_use">Always use (one per line)</Label>
+                                        <Label htmlFor="hashtags_always_use">
+                                            Always use (one per line)
+                                        </Label>
                                         <textarea
                                             id="hashtags_always_use"
                                             name="hashtag_policy[always_use]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.hashtag_policy?.always_use)}
+                                            defaultValue={toLines(
+                                                brandBrain.hashtag_policy
+                                                    ?.always_use,
+                                            )}
                                         />
-                                        <InputError message={errors['hashtag_policy.always_use']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'hashtag_policy.always_use'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="hashtags_never_use">Never use (one per line)</Label>
+                                        <Label htmlFor="hashtags_never_use">
+                                            Never use (one per line)
+                                        </Label>
                                         <textarea
                                             id="hashtags_never_use"
                                             name="hashtag_policy[never_use]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.hashtag_policy?.never_use)}
+                                            defaultValue={toLines(
+                                                brandBrain.hashtag_policy
+                                                    ?.never_use,
+                                            )}
                                         />
-                                        <InputError message={errors['hashtag_policy.never_use']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'hashtag_policy.never_use'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="hashtags_rotation_notes">Rotation notes</Label>
+                                        <Label htmlFor="hashtags_rotation_notes">
+                                            Rotation notes
+                                        </Label>
                                         <textarea
                                             id="hashtags_rotation_notes"
                                             name="hashtag_policy[rotation_notes]"
                                             rows={3}
                                             className={textareaClass}
-                                            defaultValue={brandBrain.hashtag_policy?.rotation_notes ?? ''}
+                                            defaultValue={
+                                                brandBrain.hashtag_policy
+                                                    ?.rotation_notes ?? ''
+                                            }
                                         />
-                                        <InputError message={errors['hashtag_policy.rotation_notes']} />
+                                        <InputError
+                                            message={
+                                                errors[
+                                                    'hashtag_policy.rotation_notes'
+                                                ]
+                                            }
+                                        />
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="pillars" className="space-y-4 pt-4">
+                                <TabsContent
+                                    value="pillars"
+                                    className="space-y-4 pt-4"
+                                >
                                     <div className="grid gap-2">
-                                        <Label htmlFor="content_pillars">Content pillars (one per line)</Label>
+                                        <Label htmlFor="content_pillars">
+                                            Content pillars (one per line)
+                                        </Label>
                                         <textarea
                                             id="content_pillars"
                                             name="content_pillars"
                                             rows={6}
                                             className={textareaClass}
-                                            defaultValue={toLines(brandBrain.content_pillars)}
+                                            defaultValue={toLines(
+                                                brandBrain.content_pillars,
+                                            )}
                                         />
-                                        <InputError message={errors.content_pillars} />
+                                        <InputError
+                                            message={errors.content_pillars}
+                                        />
                                     </div>
                                 </TabsContent>
 
-                            {can.update && activeTab !== 'persona' && (
-                                <div className="flex items-center gap-4">
-                                    <Button disabled={processing}>Save brand brain</Button>
-                                </div>
-                            )}
-                        </>
-                    )}
+                                {can.update && activeTab !== 'persona' && (
+                                    <div className="flex items-center gap-4">
+                                        <Button disabled={processing}>
+                                            Save brand brain
+                                        </Button>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </Form>
 
                     <TabsContent value="persona" className="space-y-4 pt-4">
                         {brandBrain.persona_url && (
                             <div className="grid gap-2">
                                 <Label>Current brand persona</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    {brandBrain.persona_original_filename ?? 'brand-persona.pdf'}
+                                <p className="text-muted-foreground text-sm">
+                                    {brandBrain.persona_original_filename ??
+                                        'brand-persona.pdf'}
                                 </p>
                                 <iframe
                                     src={brandBrain.persona_url}
                                     title="Brand persona PDF"
-                                    className="h-[70vh] w-full rounded-md border border-border"
+                                    className="border-border h-[70vh] w-full rounded-md border"
                                 />
                             </div>
                         )}
@@ -344,16 +564,34 @@ export default function BrandBrainEdit({
                                 resetOnSuccess
                                 className="grid gap-2"
                             >
-                                {({ processing: uploadProcessing, errors: uploadErrors }) => (
+                                {({
+                                    processing: uploadProcessing,
+                                    errors: uploadErrors,
+                                }) => (
                                     <>
                                         <Label htmlFor="persona">
-                                            {brandBrain.persona_url ? 'Replace brand persona PDF' : 'Upload brand persona PDF'}
+                                            {brandBrain.persona_url
+                                                ? 'Replace brand persona PDF'
+                                                : 'Upload brand persona PDF'}
                                         </Label>
-                                        <Input id="persona" name="persona" type="file" accept="application/pdf" />
-                                        <InputError message={uploadErrors.persona} />
+                                        <Input
+                                            id="persona"
+                                            name="persona"
+                                            type="file"
+                                            accept="application/pdf"
+                                        />
+                                        <InputError
+                                            message={uploadErrors.persona}
+                                        />
                                         <div>
-                                            <Button type="submit" size="sm" disabled={uploadProcessing}>
-                                                {brandBrain.persona_url ? 'Replace file' : 'Upload file'}
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                disabled={uploadProcessing}
+                                            >
+                                                {brandBrain.persona_url
+                                                    ? 'Replace file'
+                                                    : 'Upload file'}
                                             </Button>
                                         </div>
                                     </>
@@ -368,5 +606,8 @@ export default function BrandBrainEdit({
 }
 
 BrandBrainEdit.layout = {
-    breadcrumbs: [{ title: 'Clients', href: index() }, { title: 'Brand brain', href: index() }],
+    breadcrumbs: [
+        { title: 'Clients', href: index() },
+        { title: 'Brand brain', href: index() },
+    ],
 };

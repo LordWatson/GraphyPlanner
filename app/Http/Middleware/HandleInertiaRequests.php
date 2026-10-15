@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Models\Post;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -48,6 +50,16 @@ class HandleInertiaRequests extends Middleware
             'preview' => $request->is('preview', 'preview/*'),
             'client' => $user && $user->role === Role::ClientReviewer && $user->client
                 ? ['name' => $user->client->name]
+                : null,
+            // Client portal chrome: the "Approvals" nav badge. A separate key (not part of `client`)
+            // because several portal pages pass their own `client` page prop, which would replace it.
+            'portal' => $user && $user->role === Role::ClientReviewer && $user->client_id
+                ? [
+                    'pendingApprovals' => Post::query()
+                        ->where('client_id', $user->client_id)
+                        ->where('status', PostStatus::WaitingClient)
+                        ->count(),
+                ]
                 : null,
             // Shared on every Inertia response so the notification bell's unread badge is always
             // up to date without a dedicated round-trip; the dropdown's own list is lazy-loaded

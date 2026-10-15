@@ -23,7 +23,13 @@ function isVideoAsset(asset: PreviewAsset): boolean {
  * one large preview; multiple assets render as a small carousel (one at a time, prev/next
  * controls) plus a thumbnail strip so the user can jump directly to an asset.
  */
-export function AssetPreviewCarousel({ assets, className }: { assets: PreviewAsset[]; className?: string }) {
+export function AssetPreviewCarousel({
+    assets,
+    className,
+}: {
+    assets: PreviewAsset[];
+    className?: string;
+}) {
     const [index, setIndex] = useState(0);
 
     if (assets.length === 0) {
@@ -39,8 +45,11 @@ export function AssetPreviewCarousel({ assets, className }: { assets: PreviewAss
 
     return (
         <div className={cn('grid gap-2', className)}>
-            <div className="relative flex items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
-                <AssetPreviewMedia asset={active} className="max-h-72 w-full object-contain" />
+            <div className="border-border bg-muted/30 relative flex items-center justify-center overflow-hidden rounded-lg border">
+                <AssetPreviewMedia
+                    asset={active}
+                    className="max-h-72 w-full object-contain"
+                />
 
                 {assets.length > 1 && (
                     <>
@@ -62,7 +71,7 @@ export function AssetPreviewCarousel({ assets, className }: { assets: PreviewAss
                         >
                             <ChevronRight />
                         </Button>
-                        <span className="absolute right-2 bottom-2 rounded-full bg-background/80 px-2 py-0.5 text-xs text-muted-foreground">
+                        <span className="bg-background/80 text-muted-foreground absolute right-2 bottom-2 rounded-full px-2 py-0.5 text-xs">
                             {activeIndex + 1} / {assets.length}
                         </span>
                     </>
@@ -70,7 +79,9 @@ export function AssetPreviewCarousel({ assets, className }: { assets: PreviewAss
             </div>
 
             {active.original_filename && (
-                <p className="truncate text-xs text-muted-foreground">{active.original_filename}</p>
+                <p className="text-muted-foreground truncate text-xs">
+                    {active.original_filename}
+                </p>
             )}
 
             {assets.length > 1 && (
@@ -82,10 +93,16 @@ export function AssetPreviewCarousel({ assets, className }: { assets: PreviewAss
                             onClick={() => setIndex(i)}
                             className={cn(
                                 'size-14 shrink-0 overflow-hidden rounded-md border transition-colors',
-                                i === activeIndex ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/40',
+                                i === activeIndex
+                                    ? 'border-primary ring-primary/30 ring-2'
+                                    : 'border-border hover:border-primary/40',
                             )}
                         >
-                            <AssetPreviewMedia asset={asset} className="size-full object-cover" muted />
+                            <AssetPreviewMedia
+                                asset={asset}
+                                className="size-full object-cover"
+                                muted
+                            />
                         </button>
                     ))}
                 </div>
@@ -94,18 +111,45 @@ export function AssetPreviewCarousel({ assets, className }: { assets: PreviewAss
     );
 }
 
-function AssetPreviewMedia({ asset, className, muted }: { asset: PreviewAsset; className?: string; muted?: boolean }) {
+function AssetPreviewMedia({
+    asset,
+    className,
+    muted,
+}: {
+    asset: PreviewAsset;
+    className?: string;
+    muted?: boolean;
+}) {
     if (!asset.url) {
         return (
-            <div className={cn('flex h-24 items-center justify-center bg-muted/50 text-muted-foreground', className)}>
+            <div
+                className={cn(
+                    'bg-muted/50 text-muted-foreground flex h-24 items-center justify-center',
+                    className,
+                )}
+            >
                 <FileQuestion className="size-6" />
             </div>
         );
     }
 
     if (isVideoAsset(asset)) {
-        return <video src={asset.url} className={className} controls={!muted} muted={muted} playsInline />;
+        return (
+            <video
+                src={asset.url}
+                className={className}
+                controls={!muted}
+                muted={muted}
+                playsInline
+            />
+        );
     }
 
-    return <img src={asset.url} alt={asset.original_filename ?? 'Asset preview'} className={className} />;
+    return (
+        <img
+            src={asset.url}
+            alt={asset.original_filename ?? 'Asset preview'}
+            className={className}
+        />
+    );
 }

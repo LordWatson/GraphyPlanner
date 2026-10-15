@@ -1,7 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
-import { Building2, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ArrowUpRight, Building2, Plus } from 'lucide-react';
+import { EmptyState, Page, PageHeader } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { resolveStatus, toneBgClass } from '@/lib/status';
+import { cn } from '@/lib/utils';
 import { create, index, show } from '@/routes/clients';
 
 type ClientRow = {
@@ -14,18 +17,7 @@ type ClientRow = {
     health_reason: string;
 };
 
-const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
-    active: 'success',
-    paused: 'warning',
-    offboarding: 'secondary',
-    archived: 'outline',
-};
-
-const healthVariant: Record<string, 'success' | 'warning' | 'destructive'> = {
-    green: 'success',
-    amber: 'warning',
-    red: 'destructive',
-};
+const healthOrder = ['red', 'amber', 'green'] as const;
 
 export default function ClientsIndex({
     clients,
@@ -34,100 +26,135 @@ export default function ClientsIndex({
     clients: ClientRow[];
     can: { create: boolean };
 }) {
+    const healthCounts = healthOrder.map((health) => ({
+        health,
+        count: clients.filter((client) => client.health === health).length,
+    }));
+
     return (
         <>
             <Head title="Clients" />
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Client roster</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
-                            Every brand your team manages, with health and status at a glance.
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center justify-end">
-                    {can.create && (
-                        <Button asChild>
-                            <Link href={create()}>
-                                <Plus />
-                                Add client
-                            </Link>
-                        </Button>
-                    )}
-                </div>
+            <Page>
+                <PageHeader
+                    eyebrow={`Clients — ${String(clients.length).padStart(2, '0')} on the books`}
+                    title={
+                        <>
+                            The <em>roster</em>
+                        </>
+                    }
+                    description="Every brand your studio manages, with retainer health and status at a glance."
+                    meta={
+                        clients.length > 0 &&
+                        healthCounts.map(({ health, count }) => (
+                            <span
+                                key={health}
+                                className="border-border bg-card inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                            >
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        'size-1.5 rounded-full',
+                                        toneBgClass[
+                                            resolveStatus('health', health).tone
+                                        ],
+                                    )}
+                                />
+                                <span className="font-mono tabular-nums">
+                                    {count}
+                                </span>
+                                <span className="text-muted-foreground">
+                                    {resolveStatus('health', health).label}
+                                </span>
+                            </span>
+                        ))
+                    }
+                    actions={
+                        can.create && (
+                            <Button asChild>
+                                <Link href={create()}>
+                                    <Plus />
+                                    Add client
+                                </Link>
+                            </Button>
+                        )
+                    }
+                />
 
                 {clients.length === 0 ? (
-                    <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card/50 p-8 text-center">
-                        <Building2 className="size-6 text-muted-foreground" />
-                        <p className="text-sm font-medium">No clients yet</p>
-                        <p className="max-w-sm text-xs text-muted-foreground">
-                            Add your first client to start organizing brands, campaigns, and posts.
-                        </p>
-                        {can.create && (
-                            <Button asChild size="sm" className="mt-2">
-                                <Link href={create()}>Add your first client</Link>
-                            </Button>
-                        )}
-                    </div>
+                    <EmptyState
+                        icon={Building2}
+                        title="No clients yet."
+                        description="Add your first client to start organising brands, campaigns, and posts."
+                        action={
+                            can.create && (
+                                <Button asChild>
+                                    <Link href={create()}>
+                                        <Plus />
+                                        Add your first client
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
                 ) : (
-                    <div className="overflow-hidden rounded-lg border border-border bg-card">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                                    <th className="px-4 py-2 font-medium">Name</th>
-                                    <th className="px-4 py-2 font-medium">Industry</th>
-                                    <th className="px-4 py-2 font-medium">Language</th>
-                                    <th className="px-4 py-2 font-medium">Status</th>
-                                    <th className="px-4 py-2 font-medium">Health</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {clients.map((client) => (
-                                    <tr
-                                        key={client.id}
-                                        className="border-b border-border last:border-0 hover:bg-muted/50"
+                    <div className="animate-rise border-border bg-card overflow-hidden rounded-2xl border">
+                        <div className="eyebrow border-border text-muted-foreground hidden grid-cols-[3rem_minmax(0,2fr)_minmax(0,1.2fr)_5rem_8rem_7rem_2rem] items-center gap-4 border-b px-5 py-3 md:grid">
+                            <span>No.</span>
+                            <span>Client</span>
+                            <span>Industry</span>
+                            <span>Lang</span>
+                            <span>Status</span>
+                            <span>Health</span>
+                            <span />
+                        </div>
+                        <ul className="divide-border/70 divide-y">
+                            {clients.map((client, i) => (
+                                <li key={client.id}>
+                                    <Link
+                                        href={show(client.id)}
+                                        className="group hover:bg-muted/50 grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors md:grid-cols-[3rem_minmax(0,2fr)_minmax(0,1.2fr)_5rem_8rem_7rem_2rem]"
                                     >
-                                        <td className="px-4 py-2">
-                                            <Link
-                                                href={show(client.id)}
-                                                className="font-medium hover:underline"
-                                            >
+                                        <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                                            {String(i + 1).padStart(2, '0')}
+                                        </span>
+                                        <span className="flex min-w-0 items-center gap-3">
+                                            <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-full border font-serif text-lg leading-none italic transition-colors">
+                                                {client.name.charAt(0)}
+                                            </span>
+                                            <span className="group-hover:text-primary truncate font-serif text-2xl leading-tight tracking-[-0.01em] transition-colors">
                                                 {client.name}
-                                            </Link>
-                                        </td>
-                                        <td className="px-4 py-2 text-muted-foreground">
+                                            </span>
+                                        </span>
+                                        <ArrowUpRight className="text-muted-foreground group-hover:text-primary size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:hidden" />
+                                        <span className="text-muted-foreground col-start-2 truncate text-sm md:col-start-auto">
                                             {client.industry ?? '—'}
-                                        </td>
-                                        <td className="px-4 py-2 text-muted-foreground">
+                                        </span>
+                                        <span className="text-muted-foreground hidden font-mono text-xs uppercase md:inline">
                                             {client.default_language ?? '—'}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <Badge variant={statusVariant[client.status] ?? 'outline'}>
-                                                {client.status}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <Badge
-                                                variant={healthVariant[client.health] ?? 'outline'}
-                                                title={client.health_reason}
-                                            >
-                                                {client.health}
-                                            </Badge>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        </span>
+                                        <span className="col-start-2 flex flex-wrap gap-1.5 md:col-start-auto md:contents">
+                                            <span>
+                                                <StatusPill
+                                                    kind="client"
+                                                    value={client.status}
+                                                />
+                                            </span>
+                                            <span>
+                                                <StatusPill
+                                                    kind="health"
+                                                    value={client.health}
+                                                    title={client.health_reason}
+                                                />
+                                            </span>
+                                        </span>
+                                        <ArrowUpRight className="text-muted-foreground group-hover:text-primary hidden size-4 justify-self-end transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:block" />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
-            </div>
+            </Page>
         </>
     );
 }

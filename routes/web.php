@@ -15,6 +15,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
 use App\Http\Controllers\Portal\PortalDashboardController;
@@ -66,11 +67,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
 
-    Route::get('dashboard', DashboardController::class)->name('dashboard');
+    // Client portal contacts are sent to their `/portal/*` equivalents (see
+    // `RedirectClientReviewersToPortal`) — the internal dashboard/calendar/home are staff-only UI.
+    Route::middleware('portal.redirect')->group(function () {
+        Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
+        Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
 
-    Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
+        Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
+    });
 
     Route::resource('clients', ClientController::class);
 
@@ -153,6 +158,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('clients/{client}/posts', [PostController::class, 'store'])
         ->name('clients.posts.store');
     Route::get('posts/{post}/edit', [PostController::class, 'edit'])
+        ->middleware('portal.redirect')
         ->name('posts.edit');
     Route::put('posts/{post}', [PostController::class, 'update'])
         ->name('posts.update');
@@ -207,6 +213,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // `{post}`/`{invoice}` to that user's own `client_id`.
 Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'portal'])->group(function () {
     Route::get('/', [PortalDashboardController::class, 'index'])->name('dashboard');
+    Route::get('calendar', [PortalCalendarController::class, 'index'])->name('calendar');
     Route::get('company', [PortalClientController::class, 'show'])->name('company');
     Route::get('campaigns', [PortalCampaignController::class, 'index'])->name('campaigns.index');
     Route::get('campaigns/{campaign}', [PortalCampaignController::class, 'show'])->name('campaigns.show');

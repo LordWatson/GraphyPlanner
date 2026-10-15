@@ -1,11 +1,37 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, CalendarDays, Clock, ImageOff, RefreshCw, Users, WifiOff } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+    AlertTriangle,
+    ArrowRight,
+    ArrowUpRight,
+    CalendarDays,
+    CheckCircle2,
+    Clock,
+    FilePenLine,
+    HeartPulse,
+    ImageOff,
+    LineChart,
+    RefreshCw,
+    Users,
+    WifiOff,
+} from 'lucide-react';
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    Legend,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
-import { Badge } from '@/components/ui/badge';
+import { EmptyState, Page, PageHeader, Panel, Stat } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
+import { Button } from '@/components/ui/button';
 import { calendar, dashboard, needsAttention } from '@/routes';
-import { edit as editPost } from '@/routes/posts';
 import { show as showClient } from '@/routes/clients';
+import { edit as editPost } from '@/routes/posts';
+import type { Auth } from '@/types';
 
 type DashboardSummary = {
     clients: number;
@@ -86,24 +112,51 @@ type DashboardProps = {
     publishReliability: PublishReliability;
 };
 
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
+const dayFormatter = new Intl.DateTimeFormat('en-US', { day: '2-digit' });
+const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
-    month: 'short',
+});
+const todayFormatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
     day: 'numeric',
+    month: 'long',
 });
 
-const attentionIcons = {
-    failed: AlertTriangle,
-    disconnected: WifiOff,
-    waiting: Clock,
-    missing_media: ImageOff,
+const attentionMeta = {
+    failed: {
+        icon: AlertTriangle,
+        className: 'text-destructive bg-destructive/10',
+    },
+    disconnected: { icon: WifiOff, className: 'text-warning bg-warning/12' },
+    waiting: { icon: Clock, className: 'text-info bg-info/10' },
+    missing_media: { icon: ImageOff, className: 'text-foreground/60 bg-muted' },
 } as const;
 
-const healthBadgeVariant: Record<ClientHealthRow['status'], 'destructive' | 'warning' | 'success'> = {
-    red: 'destructive',
-    amber: 'warning',
-    green: 'success',
+const chartTooltipStyle = {
+    borderRadius: '0.75rem',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-popover)',
+    color: 'var(--color-popover-foreground)',
+    fontSize: 12,
+    padding: '8px 12px',
+    boxShadow: '0 18px 40px -24px oklch(0.2 0.012 55 / 0.4)',
 };
+
+const axisTick = {
+    fontSize: 11,
+    fontFamily: 'var(--font-mono)',
+    fill: 'var(--color-muted-foreground)',
+};
+
+function greeting(): string {
+    const hour = new Date().getHours();
+
+    if (hour < 12) {
+        return 'Good morning';
+    }
+
+    return hour < 18 ? 'Good afternoon' : 'Good evening';
+}
 
 export default function Dashboard({
     summary,
@@ -114,23 +167,29 @@ export default function Dashboard({
     unapprovedDraftsList,
     publishReliability,
 }: DashboardProps) {
-    const { currency } = usePage().props;
+    const { currency, auth } = usePage<{ currency: string; auth: Auth }>()
+        .props;
+    const firstName = auth.user.name.split(' ')[0];
 
     const currencyFormatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency,
         maximumFractionDigits: 0,
     });
+    const compactCurrency = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        notation: 'compact',
+        maximumFractionDigits: 1,
+    });
 
-    const summaryCards = [
-        { icon: AlertTriangle, label: 'Needs attention', hint: 'Items that need a decision today', value: summary.needsAttention },
-        { icon: CalendarDays, label: 'Scheduled next 24h', hint: 'Posts going out soon', value: summary.scheduledNext24h },
-        { icon: ImageOff, label: 'Unapproved drafts', hint: 'Not yet approved or scheduled', value: summary.unapprovedDrafts },
-        { icon: Users, label: 'Active clients', hint: 'Clients currently active', value: summary.activeClients },
-    ];
-
-    const hasInvoiceData = invoiceTotals.some((month) => month.invoiced > 0 || month.paid > 0);
-    const totalInvoiced = invoiceTotals.reduce((sum, month) => sum + month.invoiced, 0);
+    const hasInvoiceData = invoiceTotals.some(
+        (month) => month.invoiced > 0 || month.paid > 0,
+    );
+    const totalInvoiced = invoiceTotals.reduce(
+        (sum, month) => sum + month.invoiced,
+        0,
+    );
     const totalPaid = invoiceTotals.reduce((sum, month) => sum + month.paid, 0);
 
     const publishReliabilityMonthly = publishReliability.monthly;
@@ -140,323 +199,584 @@ export default function Dashboard({
 
     return (
         <>
-            <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                            <span className="text-gradient-brand">Studio overview</span>
-                        </h1>
-                        <p className="max-w-xl text-sm text-muted-foreground">
-                            A snapshot of every client, brand, and post moving through the pipeline right now.
-                        </p>
-                    </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-4">
-                    {summaryCards.map(({ icon: Icon, label, hint, value }) => (
-                        <div
-                            key={label}
-                            className="relative flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
-                        >
-                            <span
-                                aria-hidden
-                                className="absolute inset-x-0 top-0 h-1 bg-gradient-brand"
-                            />
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                                <span className="flex size-8 items-center justify-center rounded-md bg-gradient-brand text-white shadow-sm">
-                                    <Icon className="size-4" />
-                                </span>
-                                <span className="text-xs">{label}</span>
-                            </div>
-                            <span className="text-3xl font-bold tabular-nums">{value}</span>
-                            <span className="text-xs text-muted-foreground">{hint}</span>
-                        </div>
-                    ))}
-                </div>
-
-                {(needsAttentionItems.length > 0 || clientHealth.length > 0) && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-                            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex flex-col gap-1">
-                                    <h2 className="text-sm font-semibold">Needs attention</h2>
-                                    <p className="text-xs text-muted-foreground">The work that needs a decision today</p>
-                                </div>
-                                <Link href={needsAttention()} className="text-xs font-medium text-primary hover:underline">
-                                    View all
+            <Head title="Overview" />
+            <Page>
+                <PageHeader
+                    eyebrow={`Overview — ${todayFormatter.format(new Date())}`}
+                    title={
+                        <>
+                            {greeting()}, <em>{firstName}</em>.
+                        </>
+                    }
+                    description="Everything your studio is shipping right now — what's blocked, what's going out, and how every client is tracking."
+                    actions={
+                        <>
+                            <Button variant="outline" asChild>
+                                <Link href={calendar()}>
+                                    <CalendarDays />
+                                    Calendar
                                 </Link>
-                            </div>
-                            {needsAttentionItems.length > 0 ? (
-                                <div className="flex flex-col gap-2">
-                                    {needsAttentionItems.map((row) => {
-                                        const Icon = attentionIcons[row.type];
-                                        const href = row.post_id
-                                            ? editPost(row.post_id)
-                                            : row.client_id
-                                                ? showClient(row.client_id)
-                                                : undefined;
-                                        const content = (
-                                            <>
-                                                <div className="flex items-center gap-3">
-                                                    <Icon className="size-4 shrink-0 text-muted-foreground" />
-                                                    <div className="flex flex-col">
-                                                        <span className="text-sm font-medium">{row.title}</span>
-                                                        <span className="text-xs text-muted-foreground">{row.subtitle}</span>
-                                                    </div>
-                                                </div>
-                                                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                                                    {row.client_name ?? 'Unknown client'}
-                                                </span>
-                                            </>
-                                        );
+                            </Button>
+                            <Button asChild>
+                                <Link href={needsAttention()}>
+                                    Review queue
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        </>
+                    }
+                />
 
-                                        return href ? (
-                                            <Link
-                                                key={row.key}
-                                                href={href}
-                                                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 hover:bg-muted/50"
+                <div className="animate-rise grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <Link
+                        href={needsAttention()}
+                        className="group focus-visible:ring-ring/40 col-span-2 rounded-2xl outline-none focus-visible:ring-[3px] lg:col-span-1"
+                    >
+                        <Stat
+                            tone="ink"
+                            icon={AlertTriangle}
+                            label="Needs attention"
+                            value={summary.needsAttention}
+                            hint={
+                                <span className="inline-flex items-center gap-1">
+                                    Decisions waiting today
+                                    <ArrowUpRight className="size-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                                </span>
+                            }
+                            className="h-full"
+                        />
+                    </Link>
+                    <Stat
+                        icon={CalendarDays}
+                        label="Next 24 hours"
+                        value={summary.scheduledNext24h}
+                        hint="Posts scheduled to go out"
+                    />
+                    <Stat
+                        icon={FilePenLine}
+                        label="Unapproved"
+                        value={summary.unapprovedDrafts}
+                        hint="Drafts not yet signed off"
+                    />
+                    <Stat
+                        icon={Users}
+                        label="Active clients"
+                        value={summary.activeClients}
+                        hint={`${summary.brands} brands · ${summary.scheduledPosts} scheduled`}
+                        className="col-span-2 sm:col-span-1"
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_1fr]">
+                    <Panel
+                        eyebrow="Queue"
+                        title="Needs attention"
+                        actions={
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={needsAttention()}>
+                                    View all
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        }
+                        bodyClassName="p-2"
+                    >
+                        {needsAttentionItems.length > 0 ? (
+                            <ul className="flex flex-col">
+                                {needsAttentionItems.map((row) => {
+                                    const meta = attentionMeta[row.type];
+                                    const href = row.post_id
+                                        ? editPost(row.post_id)
+                                        : row.client_id
+                                          ? showClient(row.client_id)
+                                          : undefined;
+                                    const content = (
+                                        <>
+                                            <span
+                                                className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${meta.className}`}
                                             >
-                                                {content}
-                                            </Link>
-                                        ) : (
-                                            <div key={row.key} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-                                                {content}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <p className="py-8 text-center text-xs text-muted-foreground">Nothing needs attention right now.</p>
-                            )}
-                        </div>
+                                                <meta.icon className="size-4" />
+                                            </span>
+                                            <span className="flex min-w-0 flex-1 flex-col">
+                                                <span className="truncate text-sm font-medium">
+                                                    {row.title}
+                                                </span>
+                                                <span className="text-muted-foreground truncate text-xs">
+                                                    {row.subtitle}
+                                                </span>
+                                            </span>
+                                            <span className="eyebrow text-muted-foreground hidden shrink-0 sm:inline">
+                                                {row.client_name ??
+                                                    'Unknown client'}
+                                            </span>
+                                        </>
+                                    );
 
-                        <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-                            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                            <div className="flex flex-col gap-1">
-                                <h2 className="text-sm font-semibold">Client health</h2>
-                                <p className="text-xs text-muted-foreground">Retainer status across every active client</p>
-                            </div>
-                            {clientHealth.length > 0 ? (
-                                <ul className="flex flex-col divide-y divide-border">
-                                    {clientHealth.map((client) => (
-                                        <li key={client.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                                            <Link href={showClient(client.id)} className="flex flex-col hover:underline">
-                                                <span className="font-medium">{client.name}</span>
-                                                <span className="text-xs text-muted-foreground">
+                                    return (
+                                        <li key={row.key}>
+                                            {href ? (
+                                                <Link
+                                                    href={href}
+                                                    className="hover:bg-muted/70 flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors"
+                                                >
+                                                    {content}
+                                                </Link>
+                                            ) : (
+                                                <div className="flex items-center gap-3 px-3 py-2.5">
+                                                    {content}
+                                                </div>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                compact
+                                icon={CheckCircle2}
+                                title="All clear."
+                                description="Nothing is blocked right now — enjoy it."
+                                className="m-3 border-0"
+                            />
+                        )}
+                    </Panel>
+
+                    <Panel
+                        eyebrow="Retainers"
+                        title="Client health"
+                        icon={HeartPulse}
+                        bodyClassName="p-0"
+                    >
+                        {clientHealth.length > 0 ? (
+                            <ul className="divide-border/70 divide-y">
+                                {clientHealth.map((client) => (
+                                    <li key={client.id}>
+                                        <Link
+                                            href={showClient(client.id)}
+                                            title={client.reason}
+                                            className="group hover:bg-muted/50 flex items-center justify-between gap-3 px-5 py-3 transition-colors"
+                                        >
+                                            <span className="flex min-w-0 flex-col">
+                                                <span className="group-hover:text-primary truncate text-sm font-medium">
+                                                    {client.name}
+                                                </span>
+                                                <span className="text-muted-foreground truncate font-mono text-[11px] tabular-nums">
                                                     {client.post_count} posts
-                                                    {client.retainer_amount !== null
-                                                        ? ` · ${currencyFormatter.format(client.retainer_amount)}${client.billing_cycle_label ? `/${client.billing_cycle_label.toLowerCase()}` : ''}`
+                                                    {client.retainer_amount !==
+                                                    null
+                                                        ? ` · ${currencyFormatter.format(client.retainer_amount)}${client.billing_cycle_label ? ` / ${client.billing_cycle_label.toLowerCase()}` : ''}`
                                                         : ''}
                                                 </span>
-                                            </Link>
-                                            <Badge variant={healthBadgeVariant[client.status]} className="whitespace-nowrap text-[10px]">
-                                                {client.status_label}
-                                            </Badge>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="py-8 text-center text-xs text-muted-foreground">No clients yet.</p>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {(invoiceTotals.length > 0 || upcomingPosts.length > 0) && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {invoiceTotals.length > 0 && (
-                            <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-                                <span
-                                    aria-hidden
-                                    className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.05]"
-                                />
-                                <span
-                                    aria-hidden
-                                    className="absolute inset-x-0 top-0 h-1 bg-gradient-brand"
-                                />
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div className="flex flex-col gap-1">
-                                        <h2 className="text-sm font-semibold">Invoice revenue</h2>
-                                        <p className="text-xs text-muted-foreground">
-                                            Invoiced vs. paid amounts over the last {invoiceTotals.length} months
-                                        </p>
-                                    </div>
-                                    {hasInvoiceData && (
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-2xl font-bold tabular-nums text-gradient-brand">
-                                                {currencyFormatter.format(totalPaid)}
                                             </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                of {currencyFormatter.format(totalInvoiced)} invoiced
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                                {hasInvoiceData ? (
-                                    <div className="h-64 w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={invoiceTotals} barGap={4}>
-                                                <defs>
-                                                    <linearGradient id="invoiceGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.9} />
-                                                        <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.5} />
-                                                    </linearGradient>
-                                                    <linearGradient id="paidGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={1} />
-                                                        <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0.65} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-                                                <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-                                                <YAxis
-                                                    tick={{ fontSize: 12 }}
-                                                    tickLine={false}
-                                                    axisLine={false}
-                                                    tickFormatter={(value: number) => currencyFormatter.format(value)}
-                                                />
-                                                <Tooltip
-                                                    cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
-                                                    contentStyle={{
-                                                        borderRadius: 'var(--radius)',
-                                                        borderColor: 'var(--color-border)',
-                                                        fontSize: 12,
-                                                    }}
-                                                    formatter={(value) => currencyFormatter.format(Number(value))}
-                                                />
-                                                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                                                <Bar dataKey="invoiced" name="Invoiced" fill="url(#invoiceGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                                                <Bar dataKey="paid" name="Paid" fill="url(#paidGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                ) : (
-                                    <p className="py-8 text-center text-xs text-muted-foreground">
-                                        No invoices raised in this period yet.
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                        <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-                            <span
-                                aria-hidden
-                                className="absolute inset-x-0 top-0 h-1 bg-gradient-brand"
+                                            <StatusPill
+                                                kind="health"
+                                                value={client.status}
+                                                label={client.status_label}
+                                            />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                compact
+                                icon={Users}
+                                title="No clients yet."
+                                className="m-4"
                             />
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex flex-col gap-1">
-                                    <h2 className="text-sm font-semibold">Upcoming posts</h2>
-                                    <p className="text-xs text-muted-foreground">Scheduled in the next 7 days</p>
+                        )}
+                    </Panel>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_1fr]">
+                    {invoiceTotals.length > 0 && (
+                        <Panel
+                            eyebrow={`Revenue — last ${invoiceTotals.length} months`}
+                            title="Invoiced vs. paid"
+                            icon={LineChart}
+                            actions={
+                                hasInvoiceData && (
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-serif text-3xl leading-none tabular-nums">
+                                            {compactCurrency.format(totalPaid)}
+                                        </span>
+                                        <span className="text-muted-foreground text-[11px]">
+                                            of{' '}
+                                            {compactCurrency.format(
+                                                totalInvoiced,
+                                            )}{' '}
+                                            invoiced
+                                        </span>
+                                    </div>
+                                )
+                            }
+                        >
+                            {hasInvoiceData ? (
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <AreaChart
+                                            data={invoiceTotals}
+                                            margin={{
+                                                top: 8,
+                                                right: 8,
+                                                left: 0,
+                                                bottom: 0,
+                                            }}
+                                        >
+                                            <defs>
+                                                <linearGradient
+                                                    id="invoiceGradient"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="0"
+                                                    y2="1"
+                                                >
+                                                    <stop
+                                                        offset="0%"
+                                                        stopColor="var(--color-chart-1)"
+                                                        stopOpacity={0.22}
+                                                    />
+                                                    <stop
+                                                        offset="100%"
+                                                        stopColor="var(--color-chart-1)"
+                                                        stopOpacity={0}
+                                                    />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid
+                                                vertical={false}
+                                                stroke="var(--color-border)"
+                                                strokeDasharray="2 4"
+                                            />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={axisTick}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                dy={6}
+                                            />
+                                            <YAxis
+                                                tick={axisTick}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                width={56}
+                                                tickFormatter={(
+                                                    value: number,
+                                                ) =>
+                                                    compactCurrency.format(
+                                                        value,
+                                                    )
+                                                }
+                                            />
+                                            <Tooltip
+                                                cursor={{
+                                                    stroke: 'var(--color-foreground)',
+                                                    strokeOpacity: 0.2,
+                                                    strokeWidth: 1,
+                                                }}
+                                                contentStyle={chartTooltipStyle}
+                                                formatter={(value) =>
+                                                    currencyFormatter.format(
+                                                        Number(value),
+                                                    )
+                                                }
+                                            />
+                                            <Legend
+                                                verticalAlign="top"
+                                                align="right"
+                                                height={28}
+                                                iconType="circle"
+                                                iconSize={8}
+                                                wrapperStyle={{ fontSize: 12 }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="invoiced"
+                                                name="Invoiced"
+                                                stroke="var(--color-chart-1)"
+                                                strokeWidth={2}
+                                                fill="url(#invoiceGradient)"
+                                                activeDot={{
+                                                    r: 4,
+                                                    strokeWidth: 2,
+                                                    stroke: 'var(--color-card)',
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="paid"
+                                                name="Paid"
+                                                stroke="var(--color-chart-2)"
+                                                strokeWidth={2}
+                                                fill="none"
+                                                activeDot={{
+                                                    r: 4,
+                                                    strokeWidth: 2,
+                                                    stroke: 'var(--color-card)',
+                                                }}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
                                 </div>
-                                <Link href={calendar()} className="text-xs font-medium text-primary hover:underline">
-                                    View calendar
+                            ) : (
+                                <EmptyState
+                                    compact
+                                    title="No invoices yet."
+                                    description="Raised invoices will chart here month by month."
+                                    className="border-0"
+                                />
+                            )}
+                        </Panel>
+                    )}
+
+                    <Panel
+                        eyebrow="Next 7 days"
+                        title="Going out"
+                        actions={
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={calendar()}>
+                                    Calendar
+                                    <ArrowRight />
                                 </Link>
-                            </div>
-                            {upcomingPosts.length > 0 ? (
-                                <ul className="flex flex-col divide-y divide-border">
-                                    {upcomingPosts.map((occurrence) => (
-                                        <li key={occurrence.target_id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{occurrence.client_name ?? 'Unknown client'}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {occurrence.platform ?? 'Unknown platform'}
-                                                    {occurrence.handle ? ` · ${occurrence.handle}` : ''}
+                            </Button>
+                        }
+                        bodyClassName="p-2"
+                        className={
+                            invoiceTotals.length === 0
+                                ? 'lg:col-span-2'
+                                : undefined
+                        }
+                    >
+                        {upcomingPosts.length > 0 ? (
+                            <ul className="flex flex-col">
+                                {upcomingPosts.map((occurrence) => {
+                                    const date = occurrence.date
+                                        ? new Date(occurrence.date)
+                                        : null;
+
+                                    return (
+                                        <li key={occurrence.target_id}>
+                                            <div className="flex items-center gap-4 rounded-xl px-3 py-2.5">
+                                                <span className="border-border flex w-11 shrink-0 flex-col items-center border-r pr-4">
+                                                    <span className="font-serif text-2xl leading-none tabular-nums">
+                                                        {date
+                                                            ? dayFormatter.format(
+                                                                  date,
+                                                              )
+                                                            : '—'}
+                                                    </span>
+                                                    <span className="eyebrow text-muted-foreground text-[9.5px]">
+                                                        {date
+                                                            ? weekdayFormatter.format(
+                                                                  date,
+                                                              )
+                                                            : ''}
+                                                    </span>
+                                                </span>
+                                                <span className="flex min-w-0 flex-1 flex-col">
+                                                    <span className="truncate text-sm font-medium">
+                                                        {occurrence.client_name ??
+                                                            'Unknown client'}
+                                                    </span>
+                                                    <span className="text-muted-foreground truncate text-xs capitalize">
+                                                        {occurrence.platform ??
+                                                            'Unknown platform'}
+                                                        {occurrence.handle
+                                                            ? ` · ${occurrence.handle}`
+                                                            : ''}
+                                                    </span>
+                                                </span>
+                                                <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                                                    {occurrence.time}
                                                 </span>
                                             </div>
-                                            <span className="whitespace-nowrap text-xs text-muted-foreground">
-                                                {occurrence.date ? dateFormatter.format(new Date(occurrence.date)) : ''} {occurrence.time}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                compact
+                                icon={CalendarDays}
+                                title="A quiet week."
+                                description="No posts are scheduled in the next 7 days."
+                                className="m-3 border-0"
+                            />
+                        )}
+                    </Panel>
+                </div>
+
+                {(hasPublishReliabilityData ||
+                    unapprovedDraftsList.length > 0) && (
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_1fr]">
+                        {hasPublishReliabilityData && (
+                            <Panel
+                                eyebrow={`Reliability — last ${publishReliabilityMonthly.length} months`}
+                                title="Publish attempts"
+                                icon={RefreshCw}
+                                actions={
+                                    publishReliability.averageAttemptsToSuccess !==
+                                        null && (
+                                        <div className="flex flex-col items-end">
+                                            <span className="font-serif text-3xl leading-none tabular-nums">
+                                                {publishReliability.averageAttemptsToSuccess.toFixed(
+                                                    2,
+                                                )}
                                             </span>
+                                            <span className="text-muted-foreground text-[11px]">
+                                                avg. attempts to publish
+                                            </span>
+                                        </div>
+                                    )
+                                }
+                            >
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <AreaChart
+                                            data={publishReliabilityMonthly}
+                                            margin={{
+                                                top: 8,
+                                                right: 8,
+                                                left: 0,
+                                                bottom: 0,
+                                            }}
+                                        >
+                                            <defs>
+                                                <linearGradient
+                                                    id="publishedGradient"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="0"
+                                                    y2="1"
+                                                >
+                                                    <stop
+                                                        offset="0%"
+                                                        stopColor="var(--color-success)"
+                                                        stopOpacity={0.2}
+                                                    />
+                                                    <stop
+                                                        offset="100%"
+                                                        stopColor="var(--color-success)"
+                                                        stopOpacity={0}
+                                                    />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid
+                                                vertical={false}
+                                                stroke="var(--color-border)"
+                                                strokeDasharray="2 4"
+                                            />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={axisTick}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                dy={6}
+                                            />
+                                            <YAxis
+                                                tick={axisTick}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                allowDecimals={false}
+                                                width={32}
+                                            />
+                                            <Tooltip
+                                                cursor={{
+                                                    stroke: 'var(--color-foreground)',
+                                                    strokeOpacity: 0.2,
+                                                    strokeWidth: 1,
+                                                }}
+                                                contentStyle={chartTooltipStyle}
+                                            />
+                                            <Legend
+                                                verticalAlign="top"
+                                                align="right"
+                                                height={28}
+                                                iconType="circle"
+                                                iconSize={8}
+                                                wrapperStyle={{ fontSize: 12 }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="published"
+                                                name="Published"
+                                                stroke="var(--color-success)"
+                                                strokeWidth={2}
+                                                fill="url(#publishedGradient)"
+                                                activeDot={{
+                                                    r: 4,
+                                                    strokeWidth: 2,
+                                                    stroke: 'var(--color-card)',
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="failed"
+                                                name="Failed"
+                                                stroke="var(--color-destructive)"
+                                                strokeWidth={2}
+                                                strokeDasharray="4 3"
+                                                fill="none"
+                                                activeDot={{
+                                                    r: 4,
+                                                    strokeWidth: 2,
+                                                    stroke: 'var(--color-card)',
+                                                }}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </Panel>
+                        )}
+
+                        {unapprovedDraftsList.length > 0 && (
+                            <Panel
+                                eyebrow="In review"
+                                title="Unapproved drafts"
+                                icon={FilePenLine}
+                                bodyClassName="p-0"
+                                className={
+                                    !hasPublishReliabilityData
+                                        ? 'lg:col-span-2'
+                                        : undefined
+                                }
+                            >
+                                <ul className="divide-border/70 divide-y">
+                                    {unapprovedDraftsList.map((draft) => (
+                                        <li key={draft.post_id}>
+                                            <Link
+                                                href={editPost(draft.post_id)}
+                                                className="group hover:bg-muted/50 flex items-center justify-between gap-3 px-5 py-3 transition-colors"
+                                            >
+                                                <span className="flex min-w-0 flex-col">
+                                                    <span className="group-hover:text-primary truncate text-sm font-medium">
+                                                        {draft.title}
+                                                    </span>
+                                                    <span className="text-muted-foreground truncate text-xs">
+                                                        {draft.client_name ??
+                                                            'Unknown client'}
+                                                    </span>
+                                                </span>
+                                                <StatusPill
+                                                    kind="post"
+                                                    value={draft.status}
+                                                    label={draft.status_label}
+                                                />
+                                            </Link>
                                         </li>
                                     ))}
                                 </ul>
-                            ) : (
-                                <p className="py-8 text-center text-xs text-muted-foreground">
-                                    No posts scheduled in the next 7 days.
-                                </p>
-                            )}
-                        </div>
+                            </Panel>
+                        )}
                     </div>
                 )}
-
-                {hasPublishReliabilityData && (
-                    <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="flex flex-col gap-1">
-                                <h2 className="text-sm font-semibold">Publish reliability</h2>
-                                <p className="text-xs text-muted-foreground">
-                                    Failed vs. successful publish attempts over the last {publishReliabilityMonthly.length} months
-                                </p>
-                            </div>
-                            {publishReliability.averageAttemptsToSuccess !== null && (
-                                <div className="flex flex-col items-end">
-                                    <span className="flex items-center gap-1 text-2xl font-bold tabular-nums text-gradient-brand">
-                                        <RefreshCw className="size-4 text-primary" />
-                                        {publishReliability.averageAttemptsToSuccess.toFixed(2)}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">avg. attempts per successful publish</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={publishReliabilityMonthly} barGap={4}>
-                                    <defs>
-                                        <linearGradient id="failedGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="var(--color-destructive)" stopOpacity={0.9} />
-                                            <stop offset="100%" stopColor="var(--color-destructive)" stopOpacity={0.5} />
-                                        </linearGradient>
-                                        <linearGradient id="publishedGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={1} />
-                                            <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0.65} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-                                    <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-                                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                    <Tooltip
-                                        cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
-                                        contentStyle={{
-                                            borderRadius: 'var(--radius)',
-                                            borderColor: 'var(--color-border)',
-                                            fontSize: 12,
-                                        }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                                    <Bar dataKey="failed" name="Failed" fill="url(#failedGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                                    <Bar dataKey="published" name="Published" fill="url(#publishedGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                )}
-
-                {unapprovedDraftsList.length > 0 && (
-                    <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
-                        <div className="flex flex-col gap-1">
-                            <h2 className="text-sm font-semibold">Unapproved drafts</h2>
-                            <p className="text-xs text-muted-foreground">Posts still waiting on review, changes, or approval</p>
-                        </div>
-                        <ul className="flex flex-col divide-y divide-border">
-                            {unapprovedDraftsList.map((draft) => (
-                                <li key={draft.post_id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                                    <Link href={editPost(draft.post_id)} className="flex flex-col hover:underline">
-                                        <span className="font-medium">{draft.title}</span>
-                                        <span className="text-xs text-muted-foreground">{draft.client_name ?? 'Unknown client'}</span>
-                                    </Link>
-                                    <Badge variant="outline" className="whitespace-nowrap text-[10px]">
-                                        {draft.status_label}
-                                    </Badge>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
+            </Page>
         </>
     );
 }
@@ -464,7 +784,7 @@ export default function Dashboard({
 Dashboard.layout = {
     breadcrumbs: [
         {
-            title: 'Dashboard',
+            title: 'Overview',
             href: dashboard(),
         },
     ],

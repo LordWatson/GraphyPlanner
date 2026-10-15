@@ -16,7 +16,8 @@ use Symfony\Component\HttpFoundation\Response;
  * user's own `client_id` — never a value taken from the request — so a guessed id 404s instead of
  * leaking another client's data. This is applied generically (by parameter name) so future
  * `/portal/*` routes (Steps 6.4-6.6) inherit the isolation check automatically just by binding a
- * `{post}`/`{invoice}` route parameter.
+ * `{post}`/`{invoice}` route parameter. A bound `{post}` must also be in a client-visible status
+ * (`PostStatus::clientVisible()`).
  */
 class EnsureClientPortalAccess
 {
@@ -32,6 +33,12 @@ class EnsureClientPortalAccess
             $model = $request->route($parameter);
 
             if (($model instanceof Post || $model instanceof Invoice || $model instanceof Campaign) && $model->client_id !== $user->client_id) {
+                abort(404);
+            }
+
+            // Pre-review internal stages (idea/draft/internal review) never reach the portal —
+            // 404 rather than 403 so their existence isn't revealed either.
+            if ($model instanceof Post && ! $model->status->isClientVisible()) {
                 abort(404);
             }
         }

@@ -1,11 +1,15 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Clapperboard, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { index as indexClients, show as showClient } from '@/routes/clients';
-import { edit as editCampaign, destroy as destroyCampaign } from '@/routes/campaigns';
+import {
+    edit as editCampaign,
+    destroy as destroyCampaign,
+} from '@/routes/campaigns';
 import { edit as editPost } from '@/routes/posts';
+import { PageHeader } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 
 type CampaignData = {
     id: number;
@@ -23,23 +27,12 @@ type PostRow = {
     status: string;
     status_label: string;
     master_caption: string | null;
-    targets: { platform: string | null; handle: string | null; scheduled_local_date: string | null }[];
+    targets: {
+        platform: string | null;
+        handle: string | null;
+        scheduled_local_date: string | null;
+    }[];
     created_at: string | null;
-};
-
-const campaignStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
-    planning: 'secondary',
-    active: 'success',
-    completed: 'outline',
-    archived: 'outline',
-};
-
-const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline' | 'destructive'> = {
-    waiting_client: 'warning',
-    changes_requested: 'destructive',
-    approved: 'success',
-    published: 'success',
-    failed: 'destructive',
 };
 
 export default function CampaignShow({
@@ -56,56 +49,63 @@ export default function CampaignShow({
     return (
         <>
             <Head title={`${campaign.name} — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <div className="flex flex-col gap-4">
                     <Link
                         href={showClient(client.id)}
-                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
                     >
                         <ArrowLeft className="size-4" />
                         Back to {client.name}
                     </Link>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-border p-6 shadow-lg shadow-primary/10">
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-brand opacity-[0.14]"
-                    />
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <Clapperboard className="size-5" />
-                            </span>
-                            <div className="flex flex-col gap-1">
-                                <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                                    <span className="text-gradient-brand">{campaign.name}</span>
-                                </h1>
-                                <p className="text-sm text-muted-foreground">Client: {client.name}</p>
-                            </div>
-                        </div>
-                        <Badge variant={campaignStatusVariant[campaign.status] ?? 'outline'}>{campaign.status_label}</Badge>
-                    </div>
-                </div>
+                <PageHeader
+                    eyebrow={`Campaign — ${client.name}`}
+                    title={campaign.name}
+                    meta={
+                        <StatusPill
+                            kind="campaign"
+                            value={campaign.status}
+                            label={campaign.status_label}
+                        />
+                    }
+                />
 
-                <div className="grid gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="border-border bg-card grid gap-4 rounded-2xl border p-4 shadow-sm">
                     <Heading title="Campaign details" />
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">Start date</span>
-                            <span className="text-sm font-medium">{campaign.start_date ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs">
+                                Start date
+                            </span>
+                            <span className="text-sm font-medium">
+                                {campaign.start_date ?? '—'}
+                            </span>
                         </div>
                         <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">End date</span>
-                            <span className="text-sm font-medium">{campaign.end_date ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs">
+                                End date
+                            </span>
+                            <span className="text-sm font-medium">
+                                {campaign.end_date ?? '—'}
+                            </span>
                         </div>
                         <div className="col-span-full grid gap-1">
-                            <span className="text-xs text-muted-foreground">Goal</span>
-                            <span className="text-sm font-medium whitespace-pre-line">{campaign.goal ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs">
+                                Goal
+                            </span>
+                            <span className="text-sm font-medium whitespace-pre-line">
+                                {campaign.goal ?? '—'}
+                            </span>
                         </div>
                         <div className="col-span-full grid gap-1">
-                            <span className="text-xs text-muted-foreground">Notes</span>
-                            <span className="text-sm font-medium whitespace-pre-line">{campaign.notes ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs">
+                                Notes
+                            </span>
+                            <span className="text-sm font-medium whitespace-pre-line">
+                                {campaign.notes ?? '—'}
+                            </span>
                         </div>
                     </div>
 
@@ -121,7 +121,12 @@ export default function CampaignShow({
                         {can.delete && (
                             <Form {...destroyCampaign.form(campaign.id)}>
                                 {({ processing }) => (
-                                    <Button type="submit" size="sm" variant="outline" disabled={processing}>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
                                         <Trash2 />
                                         Delete
                                     </Button>
@@ -131,28 +136,46 @@ export default function CampaignShow({
                     </div>
                 </div>
 
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4">
-                    <Heading title="Posts" description="Posts attached to this campaign" />
+                <div className="border-border bg-card grid gap-3 rounded-2xl border p-4 shadow-sm">
+                    <Heading
+                        title="Posts"
+                        description="Posts attached to this campaign"
+                    />
                     {posts.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No posts attached to this campaign yet.</p>
+                        <p className="text-muted-foreground text-sm">
+                            No posts attached to this campaign yet.
+                        </p>
                     ) : (
                         <div className="flex flex-col gap-2">
                             {posts.map((post) => (
                                 <Link
                                     key={post.id}
                                     href={editPost(post.id)}
-                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm hover:bg-muted/40"
+                                    className="border-border bg-muted/20 hover:border-primary/30 hover:bg-muted/40 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm transition-colors"
                                 >
                                     <div className="flex flex-col">
-                                        <span className="font-medium">{post.master_caption ?? 'Untitled post'}</span>
-                                        <span className="truncate text-xs text-muted-foreground">
-                                            {post.targets.map((target) => target.handle ?? target.platform).filter(Boolean).join(', ') ||
+                                        <span className="font-medium">
+                                            {post.master_caption ??
+                                                'Untitled post'}
+                                        </span>
+                                        <span className="text-muted-foreground truncate text-xs">
+                                            {post.targets
+                                                .map(
+                                                    (target) =>
+                                                        target.handle ??
+                                                        target.platform,
+                                                )
+                                                .filter(Boolean)
+                                                .join(', ') ||
                                                 'No target accounts'}
                                         </span>
                                     </div>
-                                    <Badge variant={postStatusVariant[post.status] ?? 'outline'} className="whitespace-nowrap text-[10px]">
-                                        {post.status_label}
-                                    </Badge>
+                                    <StatusPill
+                                        kind="post"
+                                        value={post.status}
+                                        label={post.status_label}
+                                        className="whitespace-nowrap"
+                                    />
                                 </Link>
                             ))}
                         </div>

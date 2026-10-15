@@ -1,4 +1,17 @@
-import { Bookmark, ChevronLeft, ChevronRight, Facebook, Heart, Instagram, Linkedin, MessageCircle, Music2, Send, Share2, ThumbsUp } from 'lucide-react';
+import {
+    Bookmark,
+    ChevronLeft,
+    ChevronRight,
+    Facebook,
+    Heart,
+    Instagram,
+    Linkedin,
+    MessageCircle,
+    Music2,
+    Send,
+    Share2,
+    ThumbsUp,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { PreviewAsset } from '@/components/asset-preview-carousel';
@@ -31,25 +44,61 @@ function isVideoAsset(asset: PreviewAsset): boolean {
     return /\.(mp4|mov|webm|m4v)$/i.test(asset.url ?? '');
 }
 
-function PreviewMedia({ asset, className }: { asset: PreviewAsset | undefined; className?: string }) {
+function PreviewMedia({
+    asset,
+    className,
+}: {
+    asset: PreviewAsset | undefined;
+    className?: string;
+}) {
     if (!asset || !asset.url) {
         return (
-            <div className={cn('flex items-center justify-center bg-muted text-xs text-muted-foreground', className)}>
+            <div
+                className={cn(
+                    'bg-muted text-muted-foreground flex items-center justify-center text-xs',
+                    className,
+                )}
+            >
                 No media
             </div>
         );
     }
 
     if (isVideoAsset(asset)) {
-        return <video src={asset.url} className={cn('h-full w-full object-cover', className)} muted playsInline loop autoPlay />;
+        return (
+            <video
+                src={asset.url}
+                className={cn('h-full w-full object-cover', className)}
+                muted
+                playsInline
+                loop
+                autoPlay
+            />
+        );
     }
 
-    return <img src={asset.url} alt="" className={cn('h-full w-full object-cover', className)} />;
+    return (
+        <img
+            src={asset.url}
+            alt=""
+            className={cn('h-full w-full object-cover', className)}
+        />
+    );
 }
 
-function CaptionWithHashtags({ caption, hashtags }: { caption: string; hashtags: string[] }) {
+function CaptionWithHashtags({
+    caption,
+    hashtags,
+}: {
+    caption: string;
+    hashtags: string[];
+}) {
     if (!caption && hashtags.length === 0) {
-        return <span className="text-muted-foreground italic">Your caption will appear here…</span>;
+        return (
+            <span className="text-muted-foreground italic">
+                Your caption will appear here…
+            </span>
+        );
     }
 
     return (
@@ -58,7 +107,9 @@ function CaptionWithHashtags({ caption, hashtags }: { caption: string; hashtags:
             {hashtags.length > 0 && (
                 <span className="text-primary">
                     {caption ? ' ' : ''}
-                    {hashtags.map((tag) => `#${tag}`).join(' ')}
+                    {hashtags
+                        .map((tag) => `#${tag.replace(/^#+/, '')}`)
+                        .join(' ')}
                 </span>
             )}
         </>
@@ -82,25 +133,36 @@ function InstagramPreview({
     const active = assets[Math.min(assetIndex, Math.max(assets.length - 1, 0))];
 
     return (
-        <div className="w-full overflow-hidden rounded-lg border border-border bg-card text-sm">
+        <div className="border-border bg-card w-full overflow-hidden rounded-lg border text-sm">
             <div className="flex items-center gap-2 p-2.5">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-brand text-xs font-semibold text-primary-foreground">
+                <span className="bg-gradient-brand text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
                     {handle.slice(0, 1).toUpperCase() || '?'}
                 </span>
                 <div className="grid min-w-0 flex-1 leading-tight">
-                    <span className="truncate font-semibold">{handle || 'your_handle'}</span>
-                    {locationName && <span className="truncate text-xs text-muted-foreground">{locationName}</span>}
+                    <span className="truncate font-semibold">
+                        {handle || 'your_handle'}
+                    </span>
+                    {locationName && (
+                        <span className="text-muted-foreground truncate text-xs">
+                            {locationName}
+                        </span>
+                    )}
                 </div>
             </div>
 
-            <div className="relative aspect-square w-full bg-muted">
+            <div className="bg-muted relative aspect-square w-full">
                 <PreviewMedia asset={active} />
                 {assets.length > 1 && (
                     <>
                         <button
                             type="button"
                             aria-label="Previous media"
-                            onClick={() => setAssetIndex((i) => (i - 1 + assets.length) % assets.length)}
+                            onClick={() =>
+                                setAssetIndex(
+                                    (i) =>
+                                        (i - 1 + assets.length) % assets.length,
+                                )
+                            }
                             className="absolute top-1/2 left-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
                         >
                             <ChevronLeft className="size-4" />
@@ -108,7 +170,9 @@ function InstagramPreview({
                         <button
                             type="button"
                             aria-label="Next media"
-                            onClick={() => setAssetIndex((i) => (i + 1) % assets.length)}
+                            onClick={() =>
+                                setAssetIndex((i) => (i + 1) % assets.length)
+                            }
                             className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
                         >
                             <ChevronRight className="size-4" />
@@ -121,7 +185,9 @@ function InstagramPreview({
                                     onClick={() => setAssetIndex(i)}
                                     className={cn(
                                         'size-1.5 rounded-full transition-colors',
-                                        i === assetIndex ? 'bg-white' : 'bg-white/50',
+                                        i === assetIndex
+                                            ? 'bg-white'
+                                            : 'bg-white/50',
                                     )}
                                 />
                             ))}
@@ -140,7 +206,9 @@ function InstagramPreview({
             </div>
 
             <div className="px-2.5 py-2 leading-snug">
-                <span className="mr-1 font-semibold">{handle || 'your_handle'}</span>
+                <span className="mr-1 font-semibold">
+                    {handle || 'your_handle'}
+                </span>
                 <CaptionWithHashtags caption={caption} hashtags={hashtags} />
             </div>
         </div>
@@ -161,7 +229,7 @@ function TikTokPreview({
     musicName?: string;
 }) {
     return (
-        <div className="relative mx-auto aspect-[9/16] w-full max-w-[340px] overflow-hidden rounded-2xl border border-border bg-black text-white shadow-lg">
+        <div className="border-border relative mx-auto aspect-[9/16] w-full max-w-[340px] overflow-hidden rounded-2xl border bg-black text-white shadow-lg">
             <div className="absolute inset-0">
                 <PreviewMedia asset={assets[0]} />
             </div>
@@ -173,7 +241,7 @@ function TikTokPreview({
             </div>
 
             <div className="absolute right-2.5 bottom-16 flex flex-col items-center gap-5 text-white">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-white bg-muted text-[11px] font-semibold text-foreground">
+                <span className="bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold">
                     {handle.slice(0, 1).toUpperCase() || '?'}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
@@ -197,14 +265,21 @@ function TikTokPreview({
                 </span>
             </div>
 
-            <div className="absolute bottom-4 left-3 right-16 grid gap-1.5 text-sm">
-                <span className="font-semibold">@{handle || 'your_handle'}</span>
+            <div className="absolute right-16 bottom-4 left-3 grid gap-1.5 text-sm">
+                <span className="font-semibold">
+                    @{handle || 'your_handle'}
+                </span>
                 <p className="line-clamp-3 leading-snug">
-                    <CaptionWithHashtags caption={caption} hashtags={hashtags} />
+                    <CaptionWithHashtags
+                        caption={caption}
+                        hashtags={hashtags}
+                    />
                 </p>
                 <span className="inline-flex items-center gap-1.5 truncate text-xs text-white/80">
                     <Music2 className="size-3.5 shrink-0" />
-                    <span className="truncate">{musicName || 'Original sound'}</span>
+                    <span className="truncate">
+                        {musicName || 'Original sound'}
+                    </span>
                 </span>
             </div>
         </div>
@@ -227,14 +302,18 @@ function FeedStylePreview({
     const Icon = platformIcon[platform] ?? Share2;
 
     return (
-        <div className="w-full overflow-hidden rounded-lg border border-border bg-card text-sm">
+        <div className="border-border bg-card w-full overflow-hidden rounded-lg border text-sm">
             <div className="flex items-center gap-2 p-2.5">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <Icon className="size-4 text-primary" />
+                <span className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
+                    <Icon className="text-primary size-4" />
                 </span>
                 <div className="grid min-w-0 flex-1 leading-tight">
-                    <span className="truncate font-semibold">{handle || 'your_handle'}</span>
-                    <span className="text-xs text-muted-foreground">Just now</span>
+                    <span className="truncate font-semibold">
+                        {handle || 'your_handle'}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                        Just now
+                    </span>
                 </div>
             </div>
 
@@ -243,12 +322,12 @@ function FeedStylePreview({
             </div>
 
             {assets.length > 0 && assets[0]?.url && (
-                <div className="aspect-video w-full bg-muted">
+                <div className="bg-muted aspect-video w-full">
                     <PreviewMedia asset={assets[0]} />
                 </div>
             )}
 
-            <div className="flex items-center gap-4 px-2.5 py-2 text-muted-foreground">
+            <div className="text-muted-foreground flex items-center gap-4 px-2.5 py-2">
                 <span className="flex items-center gap-1.5 text-xs">
                     <ThumbsUp className="size-4" /> Like
                 </span>
@@ -321,11 +400,21 @@ export function SocialPostPreview({
                     />
                 );
         }
-    }, [platform, target.handle, caption, hashtags, assets, musicName, locationName]);
+    }, [
+        platform,
+        target.handle,
+        caption,
+        hashtags,
+        assets,
+        musicName,
+        locationName,
+    ]);
 
     return (
-        <div className={cn('flex w-full flex-col items-center gap-2', className)}>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <div
+            className={cn('flex w-full flex-col items-center gap-2', className)}
+        >
+            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
                 {(() => {
                     const Icon = platformIcon[platform] ?? Share2;
                     return <Icon className="size-3.5" />;

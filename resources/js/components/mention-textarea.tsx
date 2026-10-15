@@ -22,7 +22,7 @@ export function renderCommentBody(body: string): React.ReactNode[] {
         }
 
         nodes.push(
-            <span key={`mention-${key++}`} className="font-medium text-primary">
+            <span key={`mention-${key++}`} className="text-primary font-medium">
                 @{match[1]}
             </span>,
         );
@@ -73,7 +73,9 @@ export function MentionTextarea({
             return [];
         }
 
-        return users.filter((u) => u.name.toLowerCase().includes(query.toLowerCase())).slice(0, 8);
+        return users
+            .filter((u) => u.name.toLowerCase().includes(query.toLowerCase()))
+            .slice(0, 8);
     }, [users, query, mentionStart]);
 
     const showDropdown = matches.length > 0;
@@ -112,12 +114,12 @@ export function MentionTextarea({
 
         const caret = el.selectionStart ?? el.value.length;
         const token = `@[${user.name}](${user.id}) `;
-        const next = el.value.slice(0, mentionStart) + token + el.value.slice(caret);
+        const next =
+            el.value.slice(0, mentionStart) + token + el.value.slice(caret);
 
         // Use the native value setter + a real `input` event so React/Inertia's uncontrolled
         // form handling (and any other listeners) see the change exactly as if the user typed it.
-        const setValue = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-        setValue?.call(el, next);
+        Reflect.set(window.HTMLTextAreaElement.prototype, 'value', next, el);
         el.dispatchEvent(new Event('input', { bubbles: true }));
 
         setMentionStart(null);
@@ -136,7 +138,9 @@ export function MentionTextarea({
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setHighlighted((current) => Math.min(current + 1, matches.length - 1));
+            setHighlighted((current) =>
+                Math.min(current + 1, matches.length - 1),
+            );
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             setHighlighted((current) => Math.max(current - 1, 0));
@@ -165,11 +169,11 @@ export function MentionTextarea({
                     // Delay so a click on a suggestion registers before the dropdown unmounts.
                     setTimeout(() => setMentionStart(null), 150);
                 }}
-                className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
             />
 
             {showDropdown && (
-                <ul className="absolute z-10 mt-1 max-h-56 w-full max-w-xs overflow-auto rounded-md border border-border bg-popover p-1 text-sm shadow-md">
+                <ul className="border-border bg-popover absolute z-10 mt-1 max-h-56 w-full max-w-xs overflow-auto rounded-md border p-1 text-sm shadow-md">
                     {matches.map((user, index) => (
                         <li key={user.id}>
                             <button
@@ -178,10 +182,12 @@ export function MentionTextarea({
                                 onClick={() => selectUser(user)}
                                 className={cn(
                                     'flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-left',
-                                    index === highlighted ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
+                                    index === highlighted
+                                        ? 'bg-accent text-accent-foreground'
+                                        : 'hover:bg-accent/60',
                                 )}
                             >
-                                <AtSign className="size-3.5 text-muted-foreground" />
+                                <AtSign className="text-muted-foreground size-3.5" />
                                 {user.name}
                             </button>
                         </li>

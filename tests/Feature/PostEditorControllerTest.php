@@ -223,11 +223,10 @@ class PostEditorControllerTest extends TestCase
     }
 
     /**
-     * A `Role::ClientReviewer` (or any role without `update` on the post) can still open the
-     * editor and receives the full post payload (caption, hashtags, targets, assets) even though
-     * `can.update` is false — the frontend renders it read-only rather than hiding it.
+     * A `Role::ClientReviewer` never opens the internal editor (it carries internal-only comments
+     * and the activity log) — a post they may review is deep-linked to its portal page instead.
      */
-    public function test_client_reviewer_can_view_but_not_update_their_clients_post(): void
+    public function test_client_reviewer_is_redirected_from_the_editor_to_the_portal_post(): void
     {
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
@@ -235,21 +234,30 @@ class PostEditorControllerTest extends TestCase
         $post = Post::factory()->for($client)->create([
             'org_id' => $org->id,
             'status' => PostStatus::WaitingClient,
-            'master_caption' => 'Ready for review',
-            // Post::booted() normalizes any leading "#" on save, so the stored/returned value is
-            // always bare (see PostNormalizationTest for dedicated coverage of that behavior).
-            'hashtags' => ['#launch'],
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('posts.edit', $post));
+        $this->actingAs($reviewer)
+            ->get(route('posts.edit', $post))
+            ->assertRedirect(route('portal.posts.show', $post));
+    }
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->where('post.id', $post->id)
-            ->where('post.master_caption', 'Ready for review')
-            ->where('post.hashtags', ['launch'])
-            ->where('can.update', false)
-        );
+    /**
+     * A pre-review internal draft is never revealed to a client contact, even by its edit URL —
+     * they land on the portal posts list instead of the post.
+     */
+    public function test_client_reviewer_is_redirected_to_the_portal_post_list_for_an_internal_draft(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create(['client_id' => $client->id]);
+        $post = Post::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'status' => PostStatus::Draft,
+        ]);
+
+        $this->actingAs($reviewer)
+            ->get(route('posts.edit', $post))
+            ->assertRedirect(route('portal.posts.index'));
     }
 
     /**

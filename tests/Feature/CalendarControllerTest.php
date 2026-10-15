@@ -118,41 +118,21 @@ class CalendarControllerTest extends TestCase
         );
     }
 
-    public function test_client_reviewer_only_sees_their_own_clients_posts_on_the_calendar(): void
+    /**
+     * Client portal contacts use the portal calendar instead — the internal calendar redirects
+     * them there, carrying the supported filters across.
+     */
+    public function test_client_reviewer_is_redirected_to_the_portal_calendar_with_filters(): void
     {
         $org = Organization::factory()->create();
-        $clientA = Client::factory()->for($org, 'organization')->create();
-        $clientB = Client::factory()->for($org, 'organization')->create();
+        $client = Client::factory()->for($org, 'organization')->create();
         $reviewer = User::factory()
             ->for($org, 'organization')
             ->role(Role::ClientReviewer)
-            ->create(['client_id' => $clientA->id]);
+            ->create(['client_id' => $client->id]);
 
-        $accountA = SocialAccount::factory()->for($clientA)->create(['org_id' => $org->id, 'timezone' => 'UTC']);
-        $accountB = SocialAccount::factory()->for($clientB)->create(['org_id' => $org->id, 'timezone' => 'UTC']);
-
-        $postA = Post::factory()->for($clientA)->create(['org_id' => $org->id]);
-        $postA->targets()->create([
-            'social_account_id' => $accountA->id,
-            'scheduled_local_date' => '2026-10-01',
-            'scheduled_local_time' => '09:00',
-            'scheduled_at_utc' => '2026-10-01T09:00:00+00:00',
-        ]);
-
-        $postB = Post::factory()->for($clientB)->create(['org_id' => $org->id]);
-        $postB->targets()->create([
-            'social_account_id' => $accountB->id,
-            'scheduled_local_date' => '2026-10-01',
-            'scheduled_local_time' => '09:00',
-            'scheduled_at_utc' => '2026-10-01T09:00:00+00:00',
-        ]);
-
-        $response = $this->actingAs($reviewer)->get(route('calendar'));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->has('occurrences', 1)
-            ->where('occurrences.0.post_id', $postA->id)
-        );
+        $this->actingAs($reviewer)
+            ->get(route('calendar', ['status' => 'scheduled', 'platform' => 'instagram']))
+            ->assertRedirect(route('portal.calendar', ['status' => 'scheduled', 'platform' => 'instagram']));
     }
 }

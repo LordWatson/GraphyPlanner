@@ -1,100 +1,149 @@
-import { Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
+import { Inbox } from 'lucide-react';
 
-import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
-import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
-import { index as portalPostsIndex, show as portalPostsShow } from '@/routes/portal/posts';
-
-type PostRow = {
-    id: number;
-    status: string;
-    status_label: string;
-    master_caption: string | null;
-    platform: string | null;
-    handle: string | null;
-};
+import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import type { PortalPostRowData } from '@/components/portal-post-row';
+import { PortalPostRow } from '@/components/portal-post-row';
+import { resolveStatus, toneBgClass } from '@/lib/status';
+import { cn } from '@/lib/utils';
+import { index as portalPostsIndex } from '@/routes/portal/posts';
 
 type StatusOption = { value: string; label: string };
 
-const postStatusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'outline' | 'destructive'> = {
-    waiting_client: 'warning',
-    changes_requested: 'destructive',
-    approved: 'success',
-    published: 'success',
-    failed: 'destructive',
-};
-
 /**
  * Step 6.5 — the client portal's posts list: every post visible to this client contact
- * (pre-review internal stages are excluded server-side), filterable by status.
+ * (pre-review internal stages are excluded server-side), filterable by status. Unfiltered, posts
+ * waiting on the client lead in their own group so the next action is always first.
  */
 export default function PortalPostsIndex({
     posts,
     filters,
     statuses,
 }: {
-    posts: PostRow[];
+    posts: PortalPostRowData[];
     filters: { status: string | null };
     statuses: StatusOption[];
 }) {
+    const waiting = filters.status
+        ? []
+        : posts.filter((post) => post.status === 'waiting_client');
+    const rest = filters.status
+        ? posts
+        : posts.filter((post) => post.status !== 'waiting_client');
+
+    const pill = (active: boolean) =>
+        cn(
+            'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition-colors',
+            active
+                ? 'bg-ink text-ink-foreground dark:bg-foreground dark:text-background border-transparent'
+                : 'border-border bg-card text-muted-foreground hover:text-foreground',
+        );
+
     return (
-        <ClientPortalLayout title="Posts & approvals">
-            <Heading title="Posts & approvals" description="Everything currently in flight or scheduled for your brand." />
+        <>
+            <Head title="Posts — Client portal" />
+            <Page>
+                <PageHeader
+                    eyebrow={`Posts — ${posts.length} ${filters.status ? 'matching' : 'in view'}`}
+                    title={
+                        <>
+                            Your <em>posts</em>
+                        </>
+                    }
+                    description="Everything the studio has shared with you — awaiting your review, scheduled, and live."
+                />
 
-            <div className="mt-6 flex flex-wrap gap-2">
-                <button
-                    type="button"
-                    onClick={() => router.get(portalPostsIndex())}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                        !filters.status
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border text-muted-foreground hover:bg-muted'
-                    }`}
+                <nav
+                    aria-label="Filter by status"
+                    className="-mx-1 flex [scrollbar-width:none] gap-1.5 overflow-x-auto px-1 pb-1"
                 >
-                    All
-                </button>
-                {statuses.map((status) => (
-                    <button
-                        key={status.value}
-                        type="button"
-                        onClick={() => router.get(portalPostsIndex({ query: { status: status.value } }))}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                            filters.status === status.value
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border text-muted-foreground hover:bg-muted'
-                        }`}
+                    <Link
+                        href={portalPostsIndex()}
+                        preserveScroll
+                        className={pill(!filters.status)}
+                        aria-current={!filters.status ? 'page' : undefined}
                     >
-                        {status.label}
-                    </button>
-                ))}
-            </div>
-
-            <div className="mt-6 flex flex-col gap-2">
-                {posts.length > 0 ? (
-                    posts.map((post) => (
+                        All
+                    </Link>
+                    {statuses.map((status) => (
                         <Link
-                            key={post.id}
-                            href={portalPostsShow(post.id)}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm hover:bg-muted/50"
+                            key={status.value}
+                            href={portalPostsIndex({
+                                query: { status: status.value },
+                            })}
+                            preserveScroll
+                            className={pill(filters.status === status.value)}
+                            aria-current={
+                                filters.status === status.value
+                                    ? 'page'
+                                    : undefined
+                            }
                         >
-                            <div className="flex flex-col">
-                                <span className="font-medium">{post.master_caption ?? 'Untitled post'}</span>
-                                <span className="truncate text-xs text-muted-foreground">
-                                    {post.platform ?? 'No platform'}
-                                    {post.handle ? ` · ${post.handle}` : ''}
-                                </span>
-                            </div>
-                            <Badge variant={postStatusVariant[post.status] ?? 'outline'} className="whitespace-nowrap text-[10px]">
-                                {post.status_label}
-                            </Badge>
+                            <span
+                                aria-hidden
+                                className={cn(
+                                    'size-1.5 rounded-full',
+                                    toneBgClass[
+                                        resolveStatus('post', status.value).tone
+                                    ],
+                                )}
+                            />
+                            {status.label}
                         </Link>
-                    ))
+                    ))}
+                </nav>
+
+                {posts.length === 0 ? (
+                    <EmptyState
+                        icon={Inbox}
+                        title={
+                            filters.status
+                                ? 'Nothing with this status.'
+                                : 'No posts yet.'
+                        }
+                        description={
+                            filters.status
+                                ? 'Try another filter, or view everything.'
+                                : 'Posts appear here as soon as the studio shares them with you for review.'
+                        }
+                    />
                 ) : (
-                    <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                        No posts to show here yet.
+                    <div className="animate-rise flex flex-col gap-5">
+                        {waiting.length > 0 && (
+                            <Panel
+                                eyebrow={`${waiting.length} waiting`}
+                                title="Needs your approval"
+                                bodyClassName="p-2"
+                                className="border-info/25 ring-info/5 ring-4"
+                            >
+                                {waiting.map((post) => (
+                                    <PortalPostRow key={post.id} post={post} />
+                                ))}
+                            </Panel>
+                        )}
+                        {rest.length > 0 && (
+                            <Panel
+                                eyebrow={
+                                    filters.status
+                                        ? resolveStatus('post', filters.status)
+                                              .label
+                                        : 'Everything else'
+                                }
+                                title={
+                                    filters.status
+                                        ? `${rest.length} post${rest.length === 1 ? '' : 's'}`
+                                        : 'In progress, scheduled & live'
+                                }
+                                bodyClassName="p-2"
+                            >
+                                {rest.map((post) => (
+                                    <PortalPostRow key={post.id} post={post} />
+                                ))}
+                            </Panel>
+                        )}
                     </div>
                 )}
-            </div>
-        </ClientPortalLayout>
+            </Page>
+        </>
     );
 }
