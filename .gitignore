@@ -37,3 +37,4 @@ yarn-error.log
 /public/vendor/log-viewer/img/log-viewer-128.png
 /public/fonts-manifest.dev.json
 /CLAUDE.md
+/.claude/
