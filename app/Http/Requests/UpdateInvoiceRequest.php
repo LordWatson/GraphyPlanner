@@ -20,10 +20,11 @@ class UpdateInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            // Ignored by UpdateInvoiceAction once the invoice is finalized/built from items.
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
-            'description' => ['nullable', 'string'],
+            'description' => ['nullable', 'string', 'max:5000'],
         ];
     }
 }

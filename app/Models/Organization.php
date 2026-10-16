@@ -16,13 +16,16 @@ use Illuminate\Support\Carbon;
  * @property string $slug
  * @property string $default_timezone
  * @property string $default_currency
+ * @property string|null $billing_details
+ * @property string|null $payment_instructions
+ * @property int $invoice_payment_terms_days
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
  * @property string|null $xai_key
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
+#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -40,6 +43,7 @@ class Organization extends Model
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
             'xai_key' => 'encrypted',
+            'invoice_payment_terms_days' => 'integer',
         ];
     }
 

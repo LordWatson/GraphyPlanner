@@ -3,6 +3,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -28,6 +29,8 @@ type ClientData = {
     billing_cycle: string | null;
     default_language: string | null;
     approval_email: string | null;
+    billing_email: string | null;
+    billing_address: string | null;
     notes_internal: string | null;
 };
 
@@ -266,6 +269,38 @@ export default function ClientEdit({
                                     defaultValue={client.approval_email ?? ''}
                                 />
                                 <InputError message={errors.approval_email} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="billing_email">
+                                    Billing email
+                                </Label>
+                                <Input
+                                    id="billing_email"
+                                    name="billing_email"
+                                    type="email"
+                                    placeholder="accounts@client.com"
+                                    defaultValue={client.billing_email ?? ''}
+                                />
+                                <p className="text-muted-foreground text-xs">
+                                    Where invoices are emailed. Falls back to
+                                    the approval email when blank.
+                                </p>
+                                <InputError message={errors.billing_email} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="billing_address">
+                                    Billing address
+                                </Label>
+                                <Textarea
+                                    id="billing_address"
+                                    name="billing_address"
+                                    rows={3}
+                                    placeholder="Printed in the invoice's “Billed to” block"
+                                    defaultValue={client.billing_address ?? ''}
+                                />
+                                <InputError message={errors.billing_address} />
                             </div>
 
                             <div className="grid gap-2">

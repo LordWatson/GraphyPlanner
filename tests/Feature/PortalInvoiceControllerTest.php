@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -93,5 +94,44 @@ class PortalInvoiceControllerTest extends TestCase
         $otherInvoice = Invoice::factory()->for($clientB)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent]);
 
         $this->actingAs($reviewer)->get(route('portal.invoices.show', $otherInvoice))->assertNotFound();
+    }
+
+    public function test_draft_invoices_are_never_shown_to_the_client(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = $this->makeReviewer($client);
+        $draft = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        $sent = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent]);
+
+        $this->actingAs($reviewer)->get(route('portal.invoices.index'))
+            ->assertInertia(fn ($page) => $page->has('invoices', 1)->where('invoices.0.id', $sent->id));
+
+        $this->actingAs($reviewer)->get(route('portal.invoices.show', $draft))->assertNotFound();
+    }
+
+    public function test_the_portal_detail_flags_overdue_invoices_and_shows_items_and_payment_instructions(): void
+    {
+        $org = Organization::factory()->create(['payment_instructions' => 'Sort code 00-00-00']);
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = $this->makeReviewer($client);
+        $invoice = Invoice::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'status' => InvoiceStatus::Sent,
+            'due_date' => now()->subDays(2)->toDateString(),
+            'void_reason' => 'internal only',
+        ]);
+        InvoiceItem::factory()->for($invoice)->create(['org_id' => $org->id, 'description' => 'Reel edit']);
+
+        $this->actingAs($reviewer)->get(route('portal.invoices.show', $invoice))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('portal/invoices/show')
+                ->where('invoice.is_overdue', true)
+                ->where('invoice.display_status', 'overdue')
+                ->where('invoice.items.0.description', 'Reel edit')
+                ->missing('invoice.void_reason')
+                ->where('studio.payment_instructions', 'Sort code 00-00-00')
+            );
     }
 }

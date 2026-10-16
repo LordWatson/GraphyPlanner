@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\BillingCycle;
+use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
+use App\Services\ClientHealthService;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,13 +32,15 @@ use Illuminate\Support\Carbon;
  * @property string|null $default_language
  * @property string|null $notes_internal
  * @property string|null $approval_email
+ * @property string|null $billing_email
+ * @property string|null $billing_address
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
-    'default_language', 'notes_internal', 'approval_email',
+    'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
 ])]
 class Client extends Model
 {
@@ -88,6 +92,15 @@ class Client extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Where invoices for this client are emailed: the dedicated billing contact, falling back to
+     * the approval contact when no billing email has been set.
+     */
+    public function invoiceRecipientEmail(): ?string
+    {
+        return $this->billing_email ?: $this->approval_email;
     }
 
     /**
@@ -149,10 +162,10 @@ class Client extends Model
     /**
      * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
      *
-     * @return array{status: \App\Enums\ClientHealth, reason: string}
+     * @return array{status: ClientHealth, reason: string}
      */
     public function health(): array
     {
-        return app(\App\Services\ClientHealthService::class)->compute($this);
+        return app(ClientHealthService::class)->compute($this);
     }
 }

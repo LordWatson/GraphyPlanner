@@ -29,20 +29,21 @@ class FinalizeInvoiceAction
             ]);
         }
 
-        if ($invoice->items()->doesntExist()) {
+        $retainerAmount = (float) ($invoice->client->retainer_amount ?? 0);
+
+        // A pure retainer invoice (no extra items) is fine as long as there's a retainer to bill.
+        if ($invoice->items()->doesntExist() && $retainerAmount <= 0) {
             throw ValidationException::withMessages([
                 'invoice' => 'Add at least one line item before finalizing.',
             ]);
         }
 
-        return DB::transaction(function () use ($invoice) {
-            $itemsSubtotal = $invoice->items->sum(fn ($item) => $item->lineTotal());
-            $retainerAmount = (float) ($invoice->client->retainer_amount ?? 0);
-
+        return DB::transaction(function () use ($invoice, $retainerAmount) {
             $invoice->update([
-                'amount' => $itemsSubtotal + $retainerAmount,
+                'amount' => $invoice->itemsSubtotal() + $retainerAmount,
                 'retainer_amount_snapshot' => $retainerAmount,
                 'is_finalized' => true,
+                'finalized_at' => now(),
             ]);
 
             Log::info('Invoice finalized', [

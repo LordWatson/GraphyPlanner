@@ -46,15 +46,28 @@ class FinalizeInvoiceActionTest extends TestCase
         $this->assertSame('100.00', $result->amount);
     }
 
-    public function test_it_rejects_finalizing_an_invoice_with_no_items(): void
+    public function test_it_rejects_finalizing_an_invoice_with_no_items_and_no_retainer(): void
     {
         $org = Organization::factory()->create();
-        $client = Client::factory()->for($org, 'organization')->create();
+        $client = Client::factory()->for($org, 'organization')->create(['retainer_amount' => null]);
         $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
 
         $this->expectException(ValidationException::class);
 
         (new FinalizeInvoiceAction)($invoice);
+    }
+
+    public function test_it_finalizes_a_pure_retainer_invoice_without_items(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create(['retainer_amount' => 1200]);
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+
+        $result = (new FinalizeInvoiceAction)($invoice);
+
+        $this->assertTrue($result->is_finalized);
+        $this->assertNotNull($result->finalized_at);
+        $this->assertSame('1200.00', $result->amount);
     }
 
     public function test_it_rejects_finalizing_a_non_draft_invoice(): void

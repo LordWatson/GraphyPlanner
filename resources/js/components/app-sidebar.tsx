@@ -4,6 +4,7 @@ import {
     CalendarDays,
     LayoutGrid,
     ListChecks,
+    Receipt,
     Settings2,
     UsersRound,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ import {
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as clientsIndex } from '@/routes/clients';
+import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
 import type { Auth, NavItem } from '@/types';
@@ -50,6 +52,13 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+// Billing roles only — see `InvoicePolicy::viewLedger`.
+const invoicesNavItem: NavItem = {
+    title: 'Invoices',
+    href: invoicesIndex(),
+    icon: Receipt,
+};
+
 // Owner-only — see `StaffPolicy::viewAny`.
 const staffNavItem: NavItem = {
     title: 'Staff',
@@ -62,7 +71,15 @@ export function AppSidebar() {
     const { currentUrl } = useCurrentUrl();
 
     // Client portal contacts never render this shell (`AppLayout` swaps to `ClientPortalLayout`).
-    const items = mainNavItems;
+    const canViewLedger =
+        auth.user.role === 'owner' || auth.user.role === 'strategist';
+    const items = canViewLedger
+        ? [
+              ...mainNavItems.slice(0, 2),
+              invoicesNavItem,
+              ...mainNavItems.slice(2),
+          ]
+        : mainNavItems;
 
     const accountItems: NavItem[] = [
         ...(auth.user.role === 'owner' ? [staffNavItem] : []),

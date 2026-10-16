@@ -88,6 +88,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');
+    Route::get('invoices', [InvoiceController::class, 'index'])
+        ->name('invoices.index');
+    Route::get('invoices/export', [InvoiceController::class, 'export'])
+        ->name('invoices.export');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
     Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
@@ -106,6 +110,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoices.mark-paid');
     Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
         ->name('invoices.finalize');
+    Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind'])
+        ->name('invoices.remind');
+    Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])
+        ->name('invoices.void');
+    Route::post('invoices/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])
+        ->name('invoices.duplicate');
 
     Route::post('invoices/{invoice}/items', [InvoiceItemController::class, 'store'])
         ->name('invoices.items.store');
@@ -250,6 +260,10 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');
+    Route::get('invoices', [InvoiceController::class, 'index'])
+        ->name('invoices.index');
+    Route::get('invoices/export', [InvoiceController::class, 'export'])
+        ->name('invoices.export');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
     Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
@@ -268,6 +282,12 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('invoices.mark-paid');
     Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
         ->name('invoices.finalize');
+    Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind'])
+        ->name('invoices.remind');
+    Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])
+        ->name('invoices.void');
+    Route::post('invoices/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])
+        ->name('invoices.duplicate');
 
     Route::post('invoices/{invoice}/items', [InvoiceItemController::class, 'store'])
         ->name('invoices.items.store');

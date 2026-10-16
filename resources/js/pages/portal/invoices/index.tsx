@@ -2,6 +2,7 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowUpRight, Receipt } from 'lucide-react';
 
 import { EmptyState, Page, PageHeader, Stat } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/currency';
 import { show as portalInvoicesShow } from '@/routes/portal/invoices';
@@ -15,7 +16,11 @@ type InvoiceRow = {
     currency: string;
     issue_date: string;
     due_date: string | null;
+    display_status: string;
+    display_status_label: string;
     is_unpaid: boolean;
+    is_overdue: boolean;
+    days_overdue: number;
 };
 
 /**
@@ -33,9 +38,12 @@ export default function PortalInvoicesIndex({
         .filter((invoice) => invoice.is_unpaid)
         .reduce((sum, invoice) => sum + Number(invoice.amount), 0);
     const paid = invoices
-        .filter((invoice) => !invoice.is_unpaid)
+        .filter((invoice) => invoice.status === 'paid')
         .reduce((sum, invoice) => sum + Number(invoice.amount), 0);
     const unpaidCount = invoices.filter((invoice) => invoice.is_unpaid).length;
+    const overdueCount = invoices.filter(
+        (invoice) => invoice.is_overdue,
+    ).length;
 
     return (
         <>
@@ -66,7 +74,7 @@ export default function PortalInvoicesIndex({
                                 value={formatCurrency(outstanding, currency)}
                                 hint={
                                     unpaidCount > 0
-                                        ? `${unpaidCount} unpaid invoice${unpaidCount === 1 ? '' : 's'}`
+                                        ? `${unpaidCount} unpaid invoice${unpaidCount === 1 ? '' : 's'}${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}`
                                         : 'Nothing to pay — thank you'
                                 }
                                 className="[&_.font-serif]:text-4xl"
@@ -126,25 +134,26 @@ export default function PortalInvoicesIndex({
                                                 )}
                                             </span>
                                             <span className="justify-self-end md:justify-self-start">
-                                                <Badge
-                                                    variant={
-                                                        invoice.is_unpaid
-                                                            ? 'warning'
-                                                            : 'success'
-                                                    }
-                                                >
-                                                    <span
-                                                        aria-hidden
-                                                        className={
-                                                            invoice.is_unpaid
-                                                                ? 'bg-warning size-1.5 rounded-full'
-                                                                : 'bg-success size-1.5 rounded-full'
+                                                {invoice.is_unpaid &&
+                                                !invoice.is_overdue ? (
+                                                    <Badge variant="warning">
+                                                        <span
+                                                            aria-hidden
+                                                            className="bg-warning size-1.5 rounded-full"
+                                                        />
+                                                        Unpaid
+                                                    </Badge>
+                                                ) : (
+                                                    <StatusPill
+                                                        kind="invoice"
+                                                        value={
+                                                            invoice.display_status
+                                                        }
+                                                        label={
+                                                            invoice.display_status_label
                                                         }
                                                     />
-                                                    {invoice.is_unpaid
-                                                        ? 'Unpaid'
-                                                        : invoice.status_label}
-                                                </Badge>
+                                                )}
                                             </span>
                                             <ArrowUpRight className="text-muted-foreground group-hover:text-primary hidden size-4 justify-self-end transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:block" />
                                         </Link>

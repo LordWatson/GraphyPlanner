@@ -41,6 +41,8 @@ class StoreClientRequest extends FormRequest
             'default_language' => ['nullable', 'string', 'max:10'],
             'notes_internal' => ['nullable', 'string'],
             'approval_email' => ['nullable', 'email', 'max:255'],
+            'billing_email' => ['nullable', 'email', 'max:255'],
+            'billing_address' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

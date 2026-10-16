@@ -127,4 +127,36 @@ class OrganizationSettingsControllerTest extends TestCase
         $response->assertDontSee('super-secret-upload-post-key', false);
         $response->assertDontSee('super-secret-xai-key', false);
     }
+
+    public function test_owner_can_update_the_invoicing_profile()
+    {
+        $user = User::factory()->role(Role::Owner)->create();
+
+        $this->actingAs($user)->put(route('organization.update'), [
+            'default_timezone' => 'Europe/London',
+            'default_currency' => 'GBP',
+            'billing_details' => "14 Canal Street\nManchester",
+            'payment_instructions' => 'Sort code 00-00-00',
+            'invoice_payment_terms_days' => 30,
+        ])->assertRedirect(route('organization.edit'));
+
+        $organization = $user->organization->fresh();
+        $this->assertSame("14 Canal Street\nManchester", $organization->billing_details);
+        $this->assertSame('Sort code 00-00-00', $organization->payment_instructions);
+        $this->assertSame(30, $organization->invoice_payment_terms_days);
+
+        $this->actingAs($user)->get(route('organization.edit'))
+            ->assertInertia(fn ($page) => $page->where('organization.invoice_payment_terms_days', 30));
+    }
+
+    public function test_payment_terms_must_be_within_a_year()
+    {
+        $user = User::factory()->role(Role::Owner)->create();
+
+        $this->actingAs($user)->put(route('organization.update'), [
+            'default_timezone' => 'Europe/London',
+            'default_currency' => 'GBP',
+            'invoice_payment_terms_days' => 400,
+        ])->assertSessionHasErrors('invoice_payment_terms_days');
+    }
 }

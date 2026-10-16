@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Enums\InvoiceStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Support\Invoices\InvoicePresenter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,7 +15,7 @@ use Inertia\Response;
  * client-scoping intent, but access is enforced by `EnsureClientPortalAccess` scoping every query
  * to the logged-in contact's own `client_id` (never a value taken from the request), per §3's "no
  * billing visibility beyond their own invoices" boundary — no create/edit/send/mark-paid actions
- * are exposed here.
+ * are exposed here. Drafts are the studio's work in progress and are never shown to the client.
  */
 class PortalInvoiceController extends Controller
 {
@@ -22,9 +23,12 @@ class PortalInvoiceController extends Controller
     {
         $invoices = Invoice::query()
             ->where('client_id', $request->user()->client_id)
+            ->where('status', '!=', InvoiceStatus::Draft)
+            ->with('items')
             ->latest('issue_date')
+            ->latest('id')
             ->get()
-            ->map(fn (Invoice $invoice) => $this->transform($invoice))
+            ->map(fn (Invoice $invoice) => InvoicePresenter::portal($invoice))
             ->values();
 
         return Inertia::render('portal/invoices/index', [
@@ -32,30 +36,18 @@ class PortalInvoiceController extends Controller
         ]);
     }
 
-    public function show(Invoice $invoice): Response
+    public function show(Request $request, Invoice $invoice): Response
     {
-        return Inertia::render('portal/invoices/show', [
-            'invoice' => $this->transform($invoice),
-        ]);
-    }
+        abort_if($invoice->status === InvoiceStatus::Draft, 404);
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function transform(Invoice $invoice): array
-    {
-        return [
-            'id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'status' => $invoice->status->value,
-            'status_label' => $invoice->status->label(),
-            'amount' => (string) $invoice->amount,
-            'currency' => $invoice->currency,
-            'issue_date' => $invoice->issue_date->toDateString(),
-            'due_date' => $invoice->due_date?->toDateString(),
-            'is_unpaid' => $invoice->status !== InvoiceStatus::Paid,
-            'pdf_url' => $invoice->pdf_url,
-            'pdf_original_filename' => $invoice->pdf_original_filename,
-        ];
+        return Inertia::render('portal/invoices/show', [
+            'invoice' => InvoicePresenter::portal($invoice),
+            'studio' => [
+                'name' => $invoice->organization->name,
+                'payment_instructions' => $invoice->status === InvoiceStatus::Sent
+                    ? $invoice->organization->payment_instructions
+                    : null,
+            ],
+        ]);
     }
 }

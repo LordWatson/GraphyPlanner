@@ -11,12 +11,23 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InvoiceControllerTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Lifecycle actions (send / mark paid / void) now (re)generate the branded PDF and email
+        // the client — keep both off the real disk and mailer.
+        Storage::fake('public');
+        Mail::fake();
+    }
 
     public function test_owner_can_create_an_invoice_for_a_client(): void
     {
@@ -29,12 +40,10 @@ class InvoiceControllerTest extends TestCase
             'issue_date' => now()->toDateString(),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
-        $this->assertDatabaseHas('invoices', [
-            'client_id' => $client->id,
-            'org_id' => $org->id,
-            'status' => InvoiceStatus::Draft->value,
-        ]);
+        $invoice = Invoice::where('client_id', $client->id)->sole();
+        $response->assertRedirect(route('invoices.show', $invoice));
+        $this->assertSame(InvoiceStatus::Draft, $invoice->status);
+        $this->assertSame($org->id, $invoice->org_id);
     }
 
     public function test_invoice_numbers_do_not_collide_across_organizations_with_the_same_invoice_count(): void
@@ -61,13 +70,13 @@ class InvoiceControllerTest extends TestCase
             'amount' => 1000,
             'issue_date' => now()->toDateString(),
         ]);
-        $responseA->assertRedirect(route('clients.show', $clientA));
+        $responseA->assertRedirect(route('invoices.show', Invoice::where('org_id', $orgA->id)->where('invoice_number', 'INV-000006')->sole()));
 
         $responseB = $this->actingAs($ownerB)->post(route('clients.invoices.store', $clientB), [
             'amount' => 1000,
             'issue_date' => now()->toDateString(),
         ]);
-        $responseB->assertRedirect(route('clients.show', $clientB));
+        $responseB->assertRedirect(route('invoices.show', Invoice::where('org_id', $orgB->id)->where('invoice_number', 'INV-000006')->sole()));
 
         $this->assertDatabaseHas('invoices', ['org_id' => $orgA->id, 'invoice_number' => 'INV-000006']);
         $this->assertDatabaseHas('invoices', ['org_id' => $orgB->id, 'invoice_number' => 'INV-000006']);
@@ -91,7 +100,7 @@ class InvoiceControllerTest extends TestCase
             'issue_date' => now()->toDateString(),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('invoices.show', Invoice::where('invoice_number', 'INV-000004')->sole()));
         $this->assertDatabaseHas('invoices', [
             'org_id' => $org->id,
             'invoice_number' => 'INV-000004',
@@ -121,7 +130,7 @@ class InvoiceControllerTest extends TestCase
         $client = Client::factory()->for($org, 'organization')->create();
         $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
 
-        $response = $this->actingAs($owner)->post(route('invoices.send', $invoice));
+        $response = $this->actingAs($owner)->from(route('clients.show', $client))->post(route('invoices.send', $invoice));
 
         $response->assertRedirect(route('clients.show', $client));
         $invoice->refresh();
@@ -149,7 +158,7 @@ class InvoiceControllerTest extends TestCase
         $client = Client::factory()->for($org, 'organization')->create();
         $invoice = Invoice::factory()->for($client)->sent()->create(['org_id' => $org->id]);
 
-        $response = $this->actingAs($owner)->post(route('invoices.mark-paid', $invoice));
+        $response = $this->actingAs($owner)->from(route('clients.show', $client))->post(route('invoices.mark-paid', $invoice));
 
         $response->assertRedirect(route('clients.show', $client));
         $invoice->refresh();
@@ -470,11 +479,11 @@ class InvoiceControllerTest extends TestCase
         $this->assertSame('200.00', $invoice->retainer_amount_snapshot);
     }
 
-    public function test_finalizing_an_invoice_with_no_items_is_rejected(): void
+    public function test_finalizing_an_invoice_with_no_items_and_no_retainer_is_rejected(): void
     {
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
-        $client = Client::factory()->for($org, 'organization')->create();
+        $client = Client::factory()->for($org, 'organization')->create(['retainer_amount' => null]);
         $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
 
         $response = $this->actingAs($owner)->post(route('invoices.finalize', $invoice));
@@ -558,7 +567,7 @@ class InvoiceControllerTest extends TestCase
         Storage::disk('public')->assertExists($invoice->pdf_path);
     }
 
-    public function test_generating_a_pdf_for_a_non_finalized_invoice_is_rejected(): void
+    public function test_generating_a_pdf_for_an_itemised_invoice_that_is_not_finalized_is_rejected(): void
     {
         Storage::fake('public');
 
@@ -566,6 +575,7 @@ class InvoiceControllerTest extends TestCase
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
         $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft]);
+        InvoiceItem::factory()->for($invoice)->create(['org_id' => $org->id]);
 
         $response = $this->actingAs($owner)->post(route('invoices.generate-pdf', $invoice));
 

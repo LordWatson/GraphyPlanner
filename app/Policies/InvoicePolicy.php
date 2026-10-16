@@ -18,6 +18,15 @@ class InvoicePolicy
     }
 
     /**
+     * Determine whether the user can view the organization-wide invoice ledger (and export it).
+     */
+    public function viewLedger(User $user): bool
+    {
+        return $user->org_id !== null
+            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+    }
+
+    /**
      * Determine whether the user can view a specific invoice.
      */
     public function view(User $user, Invoice $invoice): bool
@@ -74,6 +83,39 @@ class InvoicePolicy
      * Determine whether the user can delete an invoice.
      */
     public function delete(User $user, Invoice $invoice): bool
+    {
+        return $user->org_id === $invoice->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+    }
+
+    /**
+     * Determine whether the user can void a sent invoice.
+     */
+    public function void(User $user, Invoice $invoice): bool
+    {
+        return $this->manages($user, $invoice);
+    }
+
+    /**
+     * Determine whether the user can send a payment reminder for an invoice.
+     */
+    public function remind(User $user, Invoice $invoice): bool
+    {
+        return $this->manages($user, $invoice);
+    }
+
+    /**
+     * Determine whether the user can start a new draft from an existing invoice.
+     */
+    public function duplicate(User $user, Invoice $invoice): bool
+    {
+        return $this->manages($user, $invoice);
+    }
+
+    /**
+     * Same-org Owner/Strategist — the billing roles.
+     */
+    private function manages(User $user, Invoice $invoice): bool
     {
         return $user->org_id === $invoice->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist], true);

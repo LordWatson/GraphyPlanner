@@ -1,316 +1,387 @@
+@php
+    /*
+     * "Studio Paper" invoice — the portal's visual language translated for dompdf: warm cream paper,
+     * an ink header band, Instrument Serif headline with one italic orange accent word, DM Mono
+     * spec-sheet labels, hairline tables, and ink (never orange) for the emphasised total.
+     *
+     * dompdf has no flexbox/grid and no OKLCH, so layout is tables and the brand tokens from
+     * resources/css/app.css are inlined as their sRGB hex equivalents.
+     */
+    use App\Support\MoneyFormatter;
+
+    $money = fn ($amount) => MoneyFormatter::format((float) $amount, $invoice->currency);
+    $date = fn ($value) => $value?->format('j M Y');
+
+    $displayStatus = $invoice->displayStatus();
+    $tones = [
+        'draft' => ['bg' => '#f0ece6', 'fg' => '#4a423b', 'dot' => '#8a8178'],
+        'sent' => ['bg' => '#e6eff8', 'fg' => '#1f5f99', 'dot' => '#2a75ba'],
+        'overdue' => ['bg' => '#fbe5e3', 'fg' => '#b0191c', 'dot' => '#d81f23'],
+        'paid' => ['bg' => '#e2f2e8', 'fg' => '#136b3e', 'dot' => '#1a8a51'],
+        'void' => ['bg' => '#f0ece6', 'fg' => '#6a615a', 'dot' => '#aaa39d'],
+    ];
+    $tone = $tones[$displayStatus] ?? $tones['draft'];
+
+    [$headlineLead, $headlineAccent] = match ($displayStatus) {
+        'sent' => ['Payment', 'due'],
+        'overdue' => ['Payment', 'overdue'],
+        'paid' => ['Paid in', 'full'],
+        'void' => ['Invoice', 'void'],
+        default => ['Draft', 'invoice'],
+    };
+
+    $subline = match ($displayStatus) {
+        'sent' => $invoice->due_date
+            ? 'Please pay '.$money($invoice->amount).' by '.$date($invoice->due_date).'.'
+            : 'Please pay '.$money($invoice->amount).' on receipt.',
+        'overdue' => 'This invoice was due on '.$date($invoice->due_date).' — '.$invoice->daysOverdue().' '.\Illuminate\Support\Str::plural('day', $invoice->daysOverdue()).' ago. Please arrange payment as soon as possible.',
+        'paid' => 'Received '.$date($invoice->paid_at).'. Thank you — keep this copy as your receipt.',
+        'void' => 'This invoice has been cancelled and nothing is owed.'.($invoice->void_reason ? ' '.$invoice->void_reason : ''),
+        default => 'A preview of your upcoming invoice — not yet issued.',
+    };
+
+    $isSettled = in_array($displayStatus, ['paid', 'void'], true);
+    $amountLabel = match ($displayStatus) {
+        'paid' => 'Amount paid',
+        'void' => 'Amount (void)',
+        default => 'Amount due',
+    };
+
+    $retainer = (float) ($invoice->retainer_amount_snapshot ?? 0);
+    $retainerLabel = $client->billing_cycle ? $client->billing_cycle->label().' retainer' : 'Retainer';
+    $hasItems = $items->isNotEmpty();
+    $index = 0;
+
+    $logo = 'data:image/svg+xml;base64,'.base64_encode(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">'
+        .'<rect width="40" height="40" rx="10" fill="#f1561e"/>'
+        .'<g transform="translate(8 8) scale(0.75)" fill="#fefdfb">'
+        .'<rect x="2" y="2" width="12" height="12" rx="3"/>'
+        .'<path d="M18 14V2a12 12 0 0 1 12 12H18Z"/>'
+        .'<rect x="2" y="18" width="12" height="12" rx="3"/>'
+        .'<rect x="18" y="18" width="12" height="12" rx="6"/>'
+        .'</g></svg>'
+    );
+
+    $font = fn (string $file) => str_replace('\\', '/', $fontDir.'/'.$file);
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
-        @page {
-            margin: 0 0 40px 0;
+        @font-face { font-family: 'Instrument Sans'; font-weight: normal; font-style: normal; src: url('{{ $font('InstrumentSans-Regular.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'Instrument Sans'; font-weight: bold; font-style: normal; src: url('{{ $font('InstrumentSans-SemiBold.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'Instrument Serif'; font-weight: normal; font-style: normal; src: url('{{ $font('InstrumentSerif-Regular.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'Instrument Serif'; font-weight: normal; font-style: italic; src: url('{{ $font('InstrumentSerif-Italic.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'DM Mono'; font-weight: normal; font-style: normal; src: url('{{ $font('DMMono-Regular.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'DM Mono'; font-weight: bold; font-style: normal; src: url('{{ $font('DMMono-Medium.ttf') }}') format('truetype'); }
+
+        /* Top/bottom margins keep continuation pages off the edges; the header band pulls itself
+           back up into the first page's top margin. */
+        @page { margin: 34px 0 78px 0; }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: #f9f5f0;
         }
 
         body {
-            font-family: 'DejaVu Sans', sans-serif;
-            color: #2b2420;
-            font-size: 12px;
+            font-family: 'Instrument Sans', 'DejaVu Sans', sans-serif;
+            font-size: 11px;
             line-height: 1.5;
-            margin: 0;
+            color: #1a1511;
         }
 
-        .page-padding {
-            padding: 0 42px;
+        table { border-collapse: collapse; width: 100%; }
+        td, th { vertical-align: top; padding: 0; }
+
+        .serif { font-family: 'Instrument Serif', 'DejaVu Serif', serif; font-weight: normal; }
+        .mono { font-family: 'DM Mono', 'DejaVu Sans Mono', monospace; }
+        .muted { color: #6a615a; }
+        .right { text-align: right; }
+        .nums { font-family: 'DM Mono', 'DejaVu Sans Mono', monospace; }
+
+        .eyebrow {
+            font-family: 'DM Mono', 'DejaVu Sans Mono', monospace;
+            font-size: 8.5px;
+            letter-spacing: 1.3px;
+            text-transform: uppercase;
+            color: #6a615a;
         }
 
+        .square {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 1.5px;
+            background-color: #f1561e;
+            margin-right: 6px;
+        }
+
+        /* Ink header band — the "desk" the paper sheet sits on. */
         .band {
-            background-color: #1a1512;
-            background-image: linear-gradient(120deg, #1a1512 0%, #2e2520 45%, #a4471c 150%);
-            padding: 34px 42px 30px 42px;
-            margin-bottom: 0;
+            background-color: #1a1511;
+            color: #f5f1ec;
+            padding: 56px 52px 22px;
+            margin-top: -34px;
         }
 
-        .band table {
-            width: 100%;
+        .band .logo { width: 34px; height: 34px; }
+        .band .studio { font-size: 22px; line-height: 1; color: #f5f1ec; padding-left: 12px; }
+        .band .studio-caption { font-size: 8px; letter-spacing: 1.4px; color: #aaa39d; padding-left: 12px; padding-top: 5px; }
+        .band .doc-label { color: #aaa39d; }
+        .band .doc-number { font-size: 15px; color: #f5f1ec; letter-spacing: 0.4px; padding-top: 3px; }
+
+        .sheet { padding: 26px 52px 0; }
+
+        .headline {
+            font-size: 46px;
+            line-height: 0.95;
+            letter-spacing: -0.6px;
+            color: #1a1511;
+            margin: 10px 0 0;
         }
 
-        .band td {
-            vertical-align: top;
-        }
+        .headline em { font-style: italic; color: #f1561e; }
 
-        .logo-mark {
-            display: inline-block;
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background-color: #e8824a;
-            color: #1a1512;
-            font-size: 16px;
-            font-weight: 700;
-            text-align: center;
-            line-height: 34px;
-        }
-
-        .brand-row td {
-            vertical-align: middle;
-        }
-
-        .brand {
-            font-size: 22px;
-            font-weight: 700;
-            color: #ffffff;
-            letter-spacing: 0.5px;
-            padding-left: 10px;
-        }
-
-        .brand-accent {
-            color: #e8824a;
-        }
-
-        .brand-sub {
-            font-size: 9px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #c9beb3;
-            margin-top: 6px;
-            padding-left: 44px;
-        }
-
-        .invoice-title {
-            font-size: 26px;
-            font-weight: 700;
-            color: #ffffff;
-            text-align: right;
-            letter-spacing: 3px;
-        }
-
-        .invoice-meta {
-            text-align: right;
-            color: #e3d9cf;
-            font-size: 10.5px;
+        .subline {
+            font-size: 12px;
+            color: #6a615a;
             margin-top: 8px;
+            line-height: 1.45;
         }
 
-        .status-pill {
+        .pill {
             display: inline-block;
-            margin-top: 12px;
-            padding: 4px 12px;
+            padding: 3px 10px 3px 9px;
             border-radius: 10px;
-            background-color: rgba(232, 130, 74, 0.25);
-            color: #f7c3a1;
-            font-size: 9px;
-            letter-spacing: 1.2px;
-            text-transform: uppercase;
-            font-weight: 700;
+            font-size: 9.5px;
+            font-weight: bold;
+            letter-spacing: 0.2px;
         }
 
-        .accent-strip {
+        .pill .dot {
+            display: inline-block;
+            width: 5px;
             height: 5px;
-            background-image: linear-gradient(90deg, #d9641e 0%, #e8824a 45%, #f3b27a 100%);
-            margin-bottom: 30px;
+            border-radius: 2.5px;
+            margin-right: 5px;
         }
 
-        .section-label {
-            font-size: 9px;
-            letter-spacing: 1.6px;
-            text-transform: uppercase;
-            color: #b4581f;
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-
-        .parties {
-            width: 100%;
-            margin-bottom: 28px;
+        /* Spec sheet — invoice no. / dates / the amount in an ink cell. */
+        .spec {
+            margin-top: 20px;
             border-collapse: separate;
-            border-spacing: 14px 0;
-            margin-left: -14px;
-            margin-right: -14px;
+            border-spacing: 0;
+            border: 1px solid #e2ddd6;
+            border-radius: 12px;
+            background-color: #fefdfb;
         }
 
-        .parties td {
-            vertical-align: top;
-            width: 50%;
-            padding: 16px 18px;
-            background-color: #faf6f1;
-            border: 1px solid #ece4da;
-            border-top: 2px solid #d9641e;
-            border-radius: 3px;
+        .spec td { padding: 12px 16px; border-left: 1px solid #e2ddd6; }
+        .spec td.first { border-left: none; }
+        .spec .value { font-size: 12px; margin-top: 5px; color: #1a1511; }
+
+        .spec td.amount {
+            background-color: #1a1511;
+            color: #f5f1ec;
+            border-left: none;
+            border-radius: 0 11px 11px 0;
+            width: 34%;
         }
 
-        .party-name {
-            font-size: 15px;
-            font-weight: 700;
-            color: #1a1512;
-        }
+        .spec td.amount.settled { background-color: #f0ece6; color: #1a1511; }
+        .spec td.amount .eyebrow { color: #aaa39d; }
+        .spec td.amount.settled .eyebrow { color: #6a615a; }
+        .spec td.amount .figure { font-size: 28px; line-height: 1; margin-top: 6px; letter-spacing: -0.3px; }
 
-        .party-sub {
-            font-size: 10px;
-            color: #8a8178;
-            margin-top: 3px;
-        }
+        .parties { margin-top: 22px; }
+        .parties td { width: 50%; padding-right: 24px; }
+        .party-name { font-size: 14px; font-weight: bold; margin-top: 5px; margin-bottom: 2px; color: #1a1511; }
+        .party-line { color: #6a615a; font-size: 10px; line-height: 1.35; }
 
-        table.items {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 24px;
-        }
-
-        table.items thead th {
+        /* Line items — flat, hairline rows, mono index. */
+        .items { margin-top: 22px; }
+        .items th {
             text-align: left;
-            font-size: 9px;
-            letter-spacing: 1.4px;
-            text-transform: uppercase;
-            color: #ffffff;
-            background-color: #1a1512;
-            padding: 11px 12px;
+            padding: 0 8px 9px;
+            border-bottom: 1px solid #1a1511;
+        }
+        .items th.right { text-align: right; }
+        .items th.first, .items td.first { padding-left: 0; }
+        .items th.last, .items td.last { padding-right: 0; }
+        .items td {
+            padding: 7px 8px;
+            border-bottom: 1px solid #e2ddd6;
+            font-size: 10.5px;
+            line-height: 1.35;
+        }
+        .items .idx { color: #aaa39d; font-size: 9px; width: 28px; padding-top: 8.5px; }
+        .items .desc { color: #1a1511; }
+        .items .num { text-align: right; white-space: nowrap; font-size: 10px; }
+        .items tr.included .desc { color: #6a615a; }
+        .tag {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 1px 7px;
+            border-radius: 8px;
+            background-color: #f0ece6;
+            color: #6a615a;
+            font-size: 8.5px;
+            font-weight: bold;
         }
 
-        table.items thead th:first-child {
-            border-top-left-radius: 5px;
-            border-bottom-left-radius: 5px;
+        .totals { width: 290px; margin-top: 14px; margin-left: auto; }
+        .totals td { padding: 5px 0; font-size: 11px; color: #6a615a; }
+        .totals td.num { text-align: right; color: #1a1511; }
+        .totals .grand td { padding: 0; }
+        .grand-block {
+            background-color: #1a1511;
+            color: #f5f1ec;
+            border-radius: 10px;
+            padding: 11px 16px;
         }
+        .grand-block.settled { background-color: #f0ece6; color: #1a1511; }
+        .grand-block .eyebrow { color: #aaa39d; padding-top: 9px; }
+        .grand-block.settled .eyebrow { color: #6a615a; }
+        .grand-block .figure { font-size: 25px; line-height: 1; text-align: right; color: #f5f1ec; }
+        .grand-block.settled .figure { color: #1a1511; }
 
-        table.items thead th:last-child {
-            border-top-right-radius: 5px;
-            border-bottom-right-radius: 5px;
+        .cards { margin-top: 22px; }
+        .cards td { width: 50%; }
+        .cards td.gap { width: 16px; }
+        .card {
+            border: 1px solid #e2ddd6;
+            border-radius: 12px;
+            background-color: #fefdfb;
+            padding: 12px 16px;
         }
+        .card .body { margin-top: 6px; font-size: 10px; color: #1a1511; line-height: 1.4; }
 
-        table.items tbody td {
-            padding: 11px 12px;
-            border-bottom: 1px solid #ece4da;
-            font-size: 11px;
-        }
-
-        table.items tbody tr:nth-child(even) td {
-            background-color: #faf6f1;
-        }
-
-        table.items tbody td.not-billable {
-            color: #a39d95;
-            font-style: italic;
-        }
-
-        table.items tbody td:first-child {
-            border-left: 2px solid transparent;
-        }
-
-        .text-right {
-            text-align: right;
-        }
-
-        table.totals {
-            width: 300px;
-            margin-left: auto;
-            border-collapse: collapse;
-            margin-top: 4px;
-        }
-
-        table.totals td {
-            padding: 7px 12px;
-            font-size: 11px;
-            color: #5c554c;
-        }
-
-        table.totals tr.grand-total td {
-            background-color: #1a1512;
-            background-image: linear-gradient(90deg, #1a1512 0%, #2e2520 100%);
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: 700;
-            padding: 12px;
-        }
-
-        table.totals tr.grand-total td:first-child {
-            border-radius: 5px 0 0 5px;
-        }
-
-        table.totals tr.grand-total td:last-child {
-            border-radius: 0 5px 5px 0;
-            color: #f3b27a;
-        }
-
-        .notes {
-            margin-top: 28px;
-            padding: 16px 18px;
-            background-color: #faf6f1;
-            border-left: 3px solid #d9641e;
-            border-radius: 3px;
-            font-size: 11px;
-        }
-
-        .thanks {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 13px;
-            font-weight: 700;
-            color: #1a1512;
-            letter-spacing: 0.5px;
-        }
-
-        .thanks .brand-accent {
-            color: #d9641e;
-        }
+        .thanks { margin-top: 22px; font-size: 19px; color: #1a1511; }
+        .thanks em { font-style: italic; color: #f1561e; }
 
         .footer {
-            margin-top: 34px;
-            padding: 18px 42px 0 42px;
-            border-top: 1px solid #ece4da;
-            font-size: 9px;
-            color: #a39d95;
-            text-align: center;
-            letter-spacing: 0.6px;
+            position: fixed;
+            left: 52px;
+            right: 52px;
+            /* A4 is 1123px tall at dompdf's 96dpi; minus the 34px/78px page margins this sits
+               ~24px into the bottom margin. (dompdf drops fixed boxes anchored with a negative
+               `bottom`.) */
+            top: 1034px;
+            height: 30px;
+            border-top: 1px solid #e2ddd6;
+            padding-top: 10px;
         }
+        .footer .wordmark { font-size: 13px; color: #1a1511; }
+        .footer .wordmark .dot { color: #f1561e; font-style: normal; }
 
-        .footer .dot {
-            color: #d9641e;
-        }
     </style>
 </head>
 <body>
-    <div class="band">
-        <table class="brand-row">
-            <tr>
-                <td>
-                    <span class="logo-mark">{{ strtoupper(substr($organization->name, 0, 1)) }}</span>
-                    <span class="brand">{{ $organization->name }}<span class="brand-accent">.</span></span>
-                </td>
-                <td>
-                    <div class="invoice-title">INVOICE</div>
-                </td>
-            </tr>
-        </table>
+
+    <div class="footer">
         <table>
             <tr>
-                <td>
-                    <div class="brand-sub">Design &amp; Content Studio</div>
-                </td>
-                <td>
-                    <div class="invoice-meta">
-                        #{{ $invoice->invoice_number }}<br>
-                        Issued {{ $invoice->issue_date->format('M j, Y') }}
-                        @if ($invoice->due_date)
-                            &middot; Due {{ $invoice->due_date->format('M j, Y') }}
-                        @endif
-                    </div>
-                    <div class="text-right">
-                        <span class="status-pill">{{ $invoice->status->label() }}</span>
-                    </div>
+                <td class="eyebrow" style="vertical-align: middle;">{{ $organization->name }} &nbsp;&middot;&nbsp; {{ $invoice->invoice_number }}</td>
+                <td class="right" style="vertical-align: middle;">
+                    <span class="eyebrow" style="letter-spacing: 1px;">Prepared with</span>
+                    <span class="serif wordmark"><em>graphy</em><span class="dot">.</span></span>
                 </td>
             </tr>
         </table>
     </div>
-    <div class="accent-strip"></div>
 
-    <div class="page-padding">
+    <div class="band">
+        <table>
+            <tr>
+                <td style="vertical-align: middle;">
+                    <table style="width: auto;">
+                        <tr>
+                            <td style="vertical-align: middle;"><img class="logo" src="{{ $logo }}" alt=""></td>
+                            <td style="vertical-align: middle;">
+                                <div class="serif studio">{{ $organization->name }}</div>
+                                <div class="mono studio-caption">INVOICE</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td class="right" style="vertical-align: middle;">
+                    <div class="eyebrow doc-label">Invoice no.</div>
+                    <div class="mono doc-number">{{ $invoice->invoice_number }}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="sheet">
+        <table>
+            <tr>
+                <td style="vertical-align: middle;">
+                    <span class="eyebrow"><span class="square"></span>Issued {{ $date($invoice->issue_date) }} &mdash; for {{ $client->name }}</span>
+                </td>
+                <td class="right" style="vertical-align: middle;">
+                    <span class="pill" style="background-color: {{ $tone['bg'] }}; color: {{ $tone['fg'] }};"><span class="dot" style="background-color: {{ $tone['dot'] }};"></span>{{ $invoice->displayStatusLabel() }}</span>
+                </td>
+            </tr>
+        </table>
+
+        <div class="serif headline">{{ $headlineLead }} <em>{{ $headlineAccent }}</em>.</div>
+        <div class="subline">{{ $subline }}</div>
+
+        <table class="spec">
+            <tr>
+                <td class="first">
+                    <div class="eyebrow">Invoice no.</div>
+                    <div class="mono value">{{ $invoice->invoice_number }}</div>
+                </td>
+                <td>
+                    <div class="eyebrow">Issued</div>
+                    <div class="mono value">{{ $date($invoice->issue_date) }}</div>
+                </td>
+                <td>
+                    <div class="eyebrow">{{ $displayStatus === 'paid' ? 'Paid' : 'Due' }}</div>
+                    <div class="mono value">
+                        @if ($displayStatus === 'paid')
+                            {{ $date($invoice->paid_at) }}
+                        @else
+                            {{ $invoice->due_date ? $date($invoice->due_date) : 'On receipt' }}
+                        @endif
+                    </div>
+                </td>
+                <td class="amount {{ $isSettled ? 'settled' : '' }}">
+                    <div class="eyebrow">{{ $amountLabel }}</div>
+                    <div class="serif figure">{{ $money($invoice->amount) }}</div>
+                </td>
+            </tr>
+        </table>
+
         <table class="parties">
             <tr>
                 <td>
-                    <div class="section-label">Billed to</div>
-                    <div class="party-name">{{ $client->name }}</div>
-                    <div class="party-sub">Client account</div>
+                    <div class="eyebrow">Billed to</div>
+                    <div class="party-name">{{ $client->legal_name ?: $client->name }}</div>
+                    @if ($client->legal_name && $client->legal_name !== $client->name)
+                        <div class="party-line">{{ $client->name }}</div>
+                    @endif
+                    @if ($client->billing_address)
+                        <div class="party-line">{!! nl2br(e($client->billing_address)) !!}</div>
+                    @endif
+                    @if ($client->invoiceRecipientEmail())
+                        <div class="party-line">{{ $client->invoiceRecipientEmail() }}</div>
+                    @endif
                 </td>
                 <td>
-                    <div class="section-label">Currency</div>
-                    <div class="party-name">{{ strtoupper($invoice->currency) }}</div>
-                    <div class="party-sub">All amounts below are in this currency</div>
+                    <div class="eyebrow">From</div>
+                    <div class="party-name">{{ $organization->name }}</div>
+                    @if ($organization->billing_details)
+                        <div class="party-line">{!! nl2br(e($organization->billing_details)) !!}</div>
+                    @endif
                 </td>
             </tr>
         </table>
@@ -318,58 +389,112 @@
         <table class="items">
             <thead>
                 <tr>
-                    <th>Description</th>
-                    <th class="text-right">Qty</th>
-                    <th class="text-right">Price</th>
-                    <th class="text-right">Total</th>
+                    <th class="eyebrow first">No.</th>
+                    <th class="eyebrow">Description</th>
+                    <th class="eyebrow right" style="width: 36px;">Qty</th>
+                    <th class="eyebrow right" style="width: 96px; white-space: nowrap;">Unit price</th>
+                    <th class="eyebrow right last" style="width: 96px;">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach ($items as $item)
+                @if ($hasItems)
+                    @foreach ($items as $item)
+                        <tr class="{{ $item->is_billable ? '' : 'included' }}">
+                            <td class="mono idx first">{{ str_pad((string) ++$index, 2, '0', STR_PAD_LEFT) }}</td>
+                            <td class="desc">
+                                {{ $item->description }}
+                                @unless ($item->is_billable)
+                                    <span class="tag">Included</span>
+                                @endunless
+                            </td>
+                            <td class="nums num">{{ $item->quantity }}</td>
+                            <td class="nums num">{{ $item->is_billable && $item->price !== null ? $money($item->price) : '—' }}</td>
+                            <td class="nums num last">{{ $item->is_billable ? $money($item->lineTotal()) : '—' }}</td>
+                        </tr>
+                    @endforeach
+                @endif
+                @if ($retainer > 0)
                     <tr>
-                        <td class="{{ $item->is_billable ? '' : 'not-billable' }}">
-                            {{ $item->description }}
-                            @unless ($item->is_billable)
-                                (not billable)
-                            @endunless
-                        </td>
-                        <td class="text-right">{{ $item->quantity }}</td>
-                        <td class="text-right">
-                            {{ $item->is_billable && $item->price !== null ? \App\Support\MoneyFormatter::format((float) $item->price, $invoice->currency) : '—' }}
-                        </td>
-                        <td class="text-right">{{ \App\Support\MoneyFormatter::format($item->lineTotal(), $invoice->currency) }}</td>
+                        <td class="mono idx first">{{ str_pad((string) ++$index, 2, '0', STR_PAD_LEFT) }}</td>
+                        <td class="desc">{{ $retainerLabel }}</td>
+                        <td class="nums num">1</td>
+                        <td class="nums num">{{ $money($retainer) }}</td>
+                        <td class="nums num last">{{ $money($retainer) }}</td>
                     </tr>
-                @endforeach
+                @endif
+                @if (! $hasItems && $retainer <= 0)
+                    <tr>
+                        <td class="mono idx first">01</td>
+                        <td class="desc">{{ $invoice->description ?: 'Professional services' }}</td>
+                        <td class="nums num">1</td>
+                        <td class="nums num">{{ $money($invoice->amount) }}</td>
+                        <td class="nums num last">{{ $money($invoice->amount) }}</td>
+                    </tr>
+                @endif
             </tbody>
         </table>
 
         <table class="totals">
-            <tr>
-                <td>Items subtotal</td>
-                <td class="text-right">{{ \App\Support\MoneyFormatter::format($itemsSubtotal, $invoice->currency) }}</td>
-            </tr>
-            <tr>
-                <td>Retainer</td>
-                <td class="text-right">{{ \App\Support\MoneyFormatter::format((float) $invoice->retainer_amount_snapshot, $invoice->currency) }}</td>
-            </tr>
-            <tr class="grand-total">
-                <td>Total due</td>
-                <td class="text-right">{{ \App\Support\MoneyFormatter::format((float) $invoice->amount, $invoice->currency) }}</td>
+            <tr class="grand">
+                <td colspan="2">
+                    <div class="grand-block {{ $isSettled ? 'settled' : '' }}">
+                        <table>
+                            <tr>
+                                <td class="eyebrow">{{ match ($displayStatus) { 'paid' => 'Total paid', 'void' => 'Total (void)', default => 'Total due' } }}</td>
+                                <td class="serif figure">{{ $money($invoice->amount) }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
             </tr>
         </table>
 
-        @if ($invoice->description)
-            <div class="notes">
-                <div class="section-label">Notes</div>
-                <div>{{ $invoice->description }}</div>
-            </div>
+        @php
+            $showPayment = ! $isSettled && $organization->payment_instructions;
+            $showNotes = (bool) $invoice->description && ($hasItems || $retainer > 0);
+            $showReceipt = $displayStatus === 'paid';
+        @endphp
+
+        @if ($showNotes || $showPayment || $showReceipt)
+            <table class="cards">
+                <tr>
+                    @if ($showNotes)
+                        <td>
+                            <div class="card">
+                                <div class="eyebrow">Notes</div>
+                                <div class="body">{!! nl2br(e($invoice->description)) !!}</div>
+                            </div>
+                        </td>
+                    @endif
+                    @if ($showNotes && ($showPayment || $showReceipt))
+                        <td class="gap"></td>
+                    @endif
+                    @if ($showPayment)
+                        <td>
+                            <div class="card">
+                                <div class="eyebrow"><span class="square"></span>How to pay</div>
+                                <div class="body">{!! nl2br(e($organization->payment_instructions)) !!}</div>
+                                <div class="body muted">Please quote <span class="mono">{{ $invoice->invoice_number }}</span> as your reference.</div>
+                            </div>
+                        </td>
+                    @elseif ($showReceipt)
+                        <td>
+                            <div class="card">
+                                <div class="eyebrow">Payment received</div>
+                                <div class="body">{{ $date($invoice->paid_at) }}@if ($invoice->payment_reference) &nbsp;&middot;&nbsp; Ref. <span class="mono">{{ $invoice->payment_reference }}</span>@endif</div>
+                            </div>
+                        </td>
+                    @endif
+                    @if (! ($showNotes && ($showPayment || $showReceipt)))
+                        <td></td>
+                    @endif
+                </tr>
+            </table>
         @endif
 
-        <div class="thanks">Thank you for working with us<span class="brand-accent">.</span></div>
-    </div>
-
-    <div class="footer">
-        {{ $organization->name }} <span class="dot">&middot;</span> Generated by Graphy
+        @unless ($displayStatus === 'void')
+            <div class="serif thanks">Thank you for working <em>with us</em>.</div>
+        @endunless
     </div>
 </body>
 </html>

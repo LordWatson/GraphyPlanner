@@ -199,4 +199,28 @@ class ClientControllerTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_owner_can_save_a_billing_contact_that_designers_cannot_see(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $this->actingAs($owner)->put(route('clients.update', $client), [
+            'name' => $client->name,
+            'status' => 'active',
+            'billing_email' => 'accounts@client.test',
+            'billing_address' => '1 High Street',
+        ])->assertSessionHasNoErrors();
+
+        $client->refresh();
+        $this->assertSame('accounts@client.test', $client->billing_email);
+        $this->assertSame('accounts@client.test', $client->invoiceRecipientEmail());
+
+        $this->actingAs($owner)->get(route('clients.show', $client))
+            ->assertInertia(fn ($page) => $page->where('client.billing_email', 'accounts@client.test'));
+        $this->actingAs($designer)->get(route('clients.show', $client))
+            ->assertInertia(fn ($page) => $page->where('client.billing_email', null)->where('client.billing_address', null));
+    }
 }

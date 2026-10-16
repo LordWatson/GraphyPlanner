@@ -23,6 +23,9 @@ class OrganizationSettingsUpdateRequest extends FormRequest
         return [
             'default_timezone' => ['required', 'timezone:all'],
             'default_currency' => ['required', 'string', 'size:3'],
+            'billing_details' => ['nullable', 'string', 'max:2000'],
+            'payment_instructions' => ['nullable', 'string', 'max:2000'],
+            'invoice_payment_terms_days' => ['nullable', 'integer', 'min:0', 'max:365'],
             'upload_post_key' => ['nullable', 'string', 'max:2048'],
             'upload_post_webhook_secret' => ['nullable', 'string', 'max:2048'],
             'xai_key' => ['nullable', 'string', 'max:2048'],

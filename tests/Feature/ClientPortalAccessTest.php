@@ -86,7 +86,8 @@ class ClientPortalAccessTest extends TestCase
             ->create(['client_id' => $client->id]);
 
         $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
-        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id]);
+        // Sent, not draft — drafts are the studio's work in progress and 404 in the portal.
+        $invoice = Invoice::factory()->for($client)->sent()->create(['org_id' => $org->id]);
 
         $this->actingAs($reviewer)->get(route('portal.posts.show', $post))->assertOk();
         $this->actingAs($reviewer)->get(route('portal.invoices.show', $invoice))->assertOk();

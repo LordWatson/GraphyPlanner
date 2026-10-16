@@ -5,6 +5,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -21,6 +22,9 @@ type OrganizationProps = {
         name: string;
         default_timezone: string;
         default_currency: string;
+        billing_details: string | null;
+        payment_instructions: string | null;
+        invoice_payment_terms_days: number;
         has_upload_post_key: boolean;
         has_upload_post_webhook_secret: boolean;
         has_xai_key: boolean;
@@ -42,7 +46,7 @@ export default function Organization({
                 <Heading
                     variant="small"
                     title="Organization"
-                    description="Manage your organization's default timezone, default currency, and publish-adapter keys (Owner only)"
+                    description="Manage your organization's defaults, invoicing profile, and publish-adapter keys (Owner only)"
                 />
 
                 <Form
@@ -105,6 +109,93 @@ export default function Organization({
                                 <InputError
                                     className="mt-2"
                                     message={errors.default_currency}
+                                />
+                            </div>
+
+                            <div className="border-border grid gap-6 border-t pt-6">
+                                <Heading
+                                    variant="small"
+                                    title="Invoicing"
+                                    description="Printed on every branded invoice PDF and included in invoice emails"
+                                />
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="invoice_payment_terms_days">
+                                        Default payment terms (days)
+                                    </Label>
+                                    <Input
+                                        id="invoice_payment_terms_days"
+                                        name="invoice_payment_terms_days"
+                                        type="number"
+                                        min={0}
+                                        max={365}
+                                        className="mt-1 block w-32"
+                                        defaultValue={
+                                            organization.invoice_payment_terms_days
+                                        }
+                                    />
+                                    <p className="text-muted-foreground text-xs">
+                                        New invoices without a due date are due
+                                        this many days after issue. 0 = due on
+                                        receipt.
+                                    </p>
+                                    <InputError
+                                        className="mt-2"
+                                        message={
+                                            errors.invoice_payment_terms_days
+                                        }
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="billing_details">
+                                        Studio billing details
+                                    </Label>
+                                    <Textarea
+                                        id="billing_details"
+                                        name="billing_details"
+                                        rows={3}
+                                        defaultValue={
+                                            organization.billing_details ?? ''
+                                        }
+                                        placeholder={
+                                            'Address, company number, VAT/tax ID…'
+                                        }
+                                    />
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.billing_details}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="payment_instructions">
+                                        How clients should pay
+                                    </Label>
+                                    <Textarea
+                                        id="payment_instructions"
+                                        name="payment_instructions"
+                                        rows={3}
+                                        defaultValue={
+                                            organization.payment_instructions ??
+                                            ''
+                                        }
+                                        placeholder={
+                                            'Bank details, payment link, or other instructions'
+                                        }
+                                    />
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.payment_instructions}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="border-border grid gap-6 border-t pt-6">
+                                <Heading
+                                    variant="small"
+                                    title="Integrations"
+                                    description="API keys for publishing and AI — stored encrypted"
                                 />
                             </div>
 

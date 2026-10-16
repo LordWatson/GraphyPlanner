@@ -18,6 +18,7 @@ import {
     Music2,
     NotebookPen,
     Pencil,
+    Plus,
     Receipt,
     Send,
     Share2,
@@ -73,19 +74,21 @@ import { store as storePost } from '@/routes/clients/posts';
 import { edit as editPost } from '@/routes/posts';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { destroy as destroyAsset } from '@/routes/assets';
-import { store as storeInvoice } from '@/routes/clients/invoices';
+import { index as invoicesIndex } from '@/routes/invoices';
+import { InvoiceLedgerList } from '@/components/invoices/invoice-ledger-list';
 import {
-    show as showInvoice,
-    send as sendInvoice,
-    markPaid as markPaidInvoice,
-} from '@/routes/invoices';
+    MarkPaidDialog,
+    SendInvoiceDialog,
+} from '@/components/invoices/invoice-action-dialogs';
+import { NewInvoiceDialog } from '@/components/invoices/new-invoice-dialog';
+import type { InvoiceAbilities, InvoiceRow } from '@/components/invoices/types';
 import { store as storeInvitation } from '@/routes/clients/invitations';
 import { destroy as destroyInvitation } from '@/routes/invitations';
 import aiClients from '@/routes/clients/ai';
 import dailyBriefs from '@/routes/clients/daily-briefs';
 import { show as showAiTrend } from '@/routes/ai-trends';
 import { show as showAiPostIdea } from '@/routes/ai-post-ideas';
-import { PageHeader } from '@/components/page';
+import { EmptyState, PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 
 type ClientData = {
@@ -103,28 +106,13 @@ type ClientData = {
     default_language: string | null;
     notes_internal: string | null;
     approval_email: string | null;
+    billing_email: string | null;
+    billing_address: string | null;
     health: string;
     health_reason: string;
 };
 
-type InvoiceData = {
-    id: number;
-    invoice_number: string;
-    status: 'draft' | 'sent' | 'paid';
-    amount: string;
-    currency: string;
-    issue_date: string;
-    due_date: string | null;
-    description: string | null;
-    sent_at: string | null;
-    paid_at: string | null;
-    can: {
-        send: boolean;
-        mark_paid: boolean;
-        update: boolean;
-        delete: boolean;
-    };
-};
+type InvoiceData = InvoiceRow & { can: InvoiceAbilities };
 
 type SocialAccountData = {
     id: number;
@@ -318,7 +306,7 @@ export default function ClientShow({
         }[];
     };
 }) {
-    const { currency } = usePage().props;
+    const { currency } = usePage<{ currency: string }>().props;
     const [activeTab, setActiveTab] = useState('social-accounts');
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>(
         'upload',
@@ -629,7 +617,7 @@ export default function ClientShow({
     );
 
     const outstandingInvoiceTotal = invoices
-        .filter((invoice) => invoice.status !== 'paid')
+        .filter((invoice) => invoice.status === 'sent')
         .reduce((total, invoice) => total + Number(invoice.amount), 0);
 
     // The primary stats are always visible as a single row of cards; everything else (billing,
@@ -1939,209 +1927,89 @@ export default function ClientShow({
                             value="billing"
                             className="border-border bg-card grid gap-4 rounded-2xl border p-5 shadow-sm"
                         >
-                            <TabHeading
-                                icon={Receipt}
-                                title="Billing history"
-                                description="Invoices raised for this client"
-                            />
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <TabHeading
+                                    icon={Receipt}
+                                    title="Billing history"
+                                    description={
+                                        (client.billing_email ??
+                                        client.approval_email)
+                                            ? `Invoices are emailed to ${client.billing_email ?? client.approval_email}`
+                                            : 'No billing email yet — add one on the client to email invoices'
+                                    }
+                                />
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="ghost" asChild>
+                                        <Link
+                                            href={invoicesIndex({
+                                                query: {
+                                                    client_id: client.id,
+                                                },
+                                            })}
+                                        >
+                                            All invoices
+                                        </Link>
+                                    </Button>
+                                    {can.createInvoice && (
+                                        <NewInvoiceDialog
+                                            clientId={client.id}
+                                            trigger={
+                                                <Button size="sm">
+                                                    <Plus />
+                                                    New invoice
+                                                </Button>
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            </div>
 
-                            <>
-                                {can.createInvoice && (
-                                    <Form
-                                        {...storeInvoice.form(client.id)}
-                                        resetOnSuccess
-                                        className="border-border bg-card/50 grid grid-cols-2 gap-3 rounded-2xl border border-dashed p-4 shadow-sm sm:grid-cols-4"
-                                    >
-                                        {({ processing, errors }) => (
+                            {invoices.length === 0 ? (
+                                <EmptyState
+                                    compact
+                                    icon={Receipt}
+                                    title="Nothing billed yet."
+                                    description="Start a draft, add what you delivered, and send it when it's ready."
+                                />
+                            ) : (
+                                <InvoiceLedgerList
+                                    invoices={invoices}
+                                    currency={currency}
+                                    showClient={false}
+                                    actions={(row) => {
+                                        const invoice = invoices.find(
+                                            (candidate) =>
+                                                candidate.id === row.id,
+                                        );
+
+                                        if (!invoice) {
+                                            return null;
+                                        }
+
+                                        return (
                                             <>
-                                                <div className="grid gap-1">
-                                                    <Label htmlFor="amount">
-                                                        Amount
-                                                    </Label>
-                                                    <Input
-                                                        id="amount"
-                                                        name="amount"
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0.01"
-                                                        required
-                                                    />
-                                                    <InputError
-                                                        message={errors.amount}
-                                                    />
-                                                </div>
-                                                <div className="grid gap-1">
-                                                    <Label htmlFor="issue_date">
-                                                        Issue date
-                                                    </Label>
-                                                    <Input
-                                                        id="issue_date"
-                                                        name="issue_date"
-                                                        type="date"
-                                                        required
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.issue_date
+                                                {invoice.can.send && (
+                                                    <SendInvoiceDialog
+                                                        invoice={invoice}
+                                                        defaultEmail={
+                                                            client.billing_email ??
+                                                            client.approval_email
                                                         }
+                                                        currency={currency}
+                                                        variant="outline"
                                                     />
-                                                </div>
-                                                <div className="grid gap-1">
-                                                    <Label htmlFor="due_date">
-                                                        Due date
-                                                    </Label>
-                                                    <Input
-                                                        id="due_date"
-                                                        name="due_date"
-                                                        type="date"
+                                                )}
+                                                {invoice.can.mark_paid && (
+                                                    <MarkPaidDialog
+                                                        invoice={invoice}
+                                                        currency={currency}
                                                     />
-                                                    <InputError
-                                                        message={
-                                                            errors.due_date
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="grid gap-1">
-                                                    <Label htmlFor="description">
-                                                        Description
-                                                    </Label>
-                                                    <Input
-                                                        id="description"
-                                                        name="description"
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.description
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="col-span-full">
-                                                    <Button
-                                                        type="submit"
-                                                        size="sm"
-                                                        disabled={processing}
-                                                    >
-                                                        Create invoice
-                                                    </Button>
-                                                </div>
+                                                )}
                                             </>
-                                        )}
-                                    </Form>
-                                )}
-
-                                {invoices.length === 0 ? (
-                                    <p className="text-muted-foreground text-sm">
-                                        No invoices yet.
-                                    </p>
-                                ) : (
-                                    <div className="grid gap-3">
-                                        {invoices.map((invoice) => (
-                                            <div
-                                                key={invoice.id}
-                                                className="border-border bg-card hover:border-primary/30 hover:bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 shadow-sm transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
-                                                        <Receipt className="size-4" />
-                                                    </span>
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <Link
-                                                                href={showInvoice(
-                                                                    invoice.id,
-                                                                )}
-                                                                className="text-sm font-medium underline"
-                                                            >
-                                                                {
-                                                                    invoice.invoice_number
-                                                                }
-                                                            </Link>
-                                                            <StatusPill
-                                                                kind="invoice"
-                                                                value={
-                                                                    invoice.status
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <span className="text-muted-foreground text-xs">
-                                                            Issued{' '}
-                                                            {invoice.issue_date}
-                                                            {invoice.due_date
-                                                                ? ` · Due ${invoice.due_date}`
-                                                                : ''}
-                                                            {invoice.sent_at
-                                                                ? ` · Sent ${invoice.sent_at}`
-                                                                : ''}
-                                                            {invoice.paid_at
-                                                                ? ` · Paid ${invoice.paid_at}`
-                                                                : ''}
-                                                        </span>
-                                                        {invoice.description && (
-                                                            <span className="text-muted-foreground text-xs">
-                                                                {
-                                                                    invoice.description
-                                                                }
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-sm font-medium tabular-nums">
-                                                        {formatCurrency(
-                                                            invoice.amount,
-                                                            currency,
-                                                        )}
-                                                    </span>
-                                                    {invoice.can.send && (
-                                                        <Form
-                                                            {...sendInvoice.form(
-                                                                invoice.id,
-                                                            )}
-                                                        >
-                                                            {({
-                                                                processing,
-                                                            }) => (
-                                                                <Button
-                                                                    type="submit"
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    Send
-                                                                </Button>
-                                                            )}
-                                                        </Form>
-                                                    )}
-                                                    {invoice.can.mark_paid && (
-                                                        <Form
-                                                            {...markPaidInvoice.form(
-                                                                invoice.id,
-                                                            )}
-                                                        >
-                                                            {({
-                                                                processing,
-                                                            }) => (
-                                                                <Button
-                                                                    type="submit"
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    Mark paid
-                                                                </Button>
-                                                            )}
-                                                        </Form>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
+                                        );
+                                    }}
+                                />
+                            )}
                         </TabsContent>
                     )}
 

@@ -67,6 +67,9 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         draft: { tone: 'neutral', label: 'Draft' },
         sent: { tone: 'info', label: 'Sent' },
         paid: { tone: 'success', label: 'Paid' },
+        // Derived by the backend (`Invoice::displayStatus()`): sent and past its due date.
+        overdue: { tone: 'danger', label: 'Overdue' },
+        void: { tone: 'muted', label: 'Void' },
     },
     connection: {
         connected: { tone: 'success', label: 'Connected' },

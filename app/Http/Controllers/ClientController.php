@@ -6,7 +6,6 @@ use App\Actions\Clients\CreateClientAction;
 use App\Actions\Clients\UpdateClientAction;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
-use App\Enums\InvoiceStatus;
 use App\Enums\Role;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
@@ -18,6 +17,7 @@ use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Support\Invoices\InvoicePresenter;
 use App\Support\Options\LanguageOptions;
 use App\Support\Options\TimezoneOptions;
 use Illuminate\Http\RedirectResponse;
@@ -117,7 +117,9 @@ class ClientController extends Controller
             ],
             'invoices' => $canViewBilling
                 ? $client->invoices()
+                    ->with('items')
                     ->latest('issue_date')
+                    ->latest('id')
                     ->get()
                     ->map(fn (Invoice $invoice) => $this->transformInvoice($invoice, $user))
                 : [],
@@ -266,6 +268,8 @@ class ClientController extends Controller
             'default_language' => $client->default_language,
             'notes_internal' => $client->notes_internal,
             'approval_email' => $client->approval_email,
+            'billing_email' => $canViewBilling ? $client->billing_email : null,
+            'billing_address' => $canViewBilling ? $client->billing_address : null,
             'health' => $health['status']->value,
             'health_reason' => $health['reason'],
         ];
@@ -279,22 +283,8 @@ class ClientController extends Controller
     private function transformInvoice(Invoice $invoice, User $user): array
     {
         return [
-            'id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'status' => $invoice->status->value,
-            'amount' => $invoice->amount,
-            'currency' => $invoice->currency,
-            'issue_date' => $invoice->issue_date->toDateString(),
-            'due_date' => $invoice->due_date?->toDateString(),
-            'description' => $invoice->description,
-            'sent_at' => $invoice->sent_at?->toIso8601String(),
-            'paid_at' => $invoice->paid_at?->toIso8601String(),
-            'can' => [
-                'send' => $invoice->status === InvoiceStatus::Draft && $user->can('send', $invoice),
-                'mark_paid' => $invoice->status === InvoiceStatus::Sent && $user->can('markPaid', $invoice),
-                'update' => $user->can('update', $invoice),
-                'delete' => $user->can('delete', $invoice),
-            ],
+            ...InvoicePresenter::row($invoice),
+            'can' => InvoicePresenter::abilities($invoice, $user),
         ];
     }
 

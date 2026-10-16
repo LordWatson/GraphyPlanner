@@ -21,10 +21,11 @@ class StoreInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            // Optional: leave it empty to build the invoice from line items instead.
+            'amount' => ['nullable', 'numeric', 'min:0.01', 'max:99999999.99'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
-            'description' => ['nullable', 'string'],
+            'description' => ['nullable', 'string', 'max:5000'],
         ];
     }
 }
