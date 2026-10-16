@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Assets\SearchClientAssetsAction;
+use App\Enums\AssetType;
 use App\Enums\Role;
 use App\Models\Asset;
 use App\Models\Client;
@@ -226,5 +228,100 @@ class AssetControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page->has('assets', 1));
+    }
+
+    /**
+     * The post editor's "Browse library" dialog pages through `clients.assets.index` (JSON),
+     * newest first and scoped to the one client.
+     */
+    public function test_asset_library_is_paginated_newest_first_and_scoped_to_the_client(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $otherClient = Client::factory()->for($org, 'organization')->create();
+
+        Asset::factory()->count(SearchClientAssetsAction::PER_PAGE + 2)->for($client)->create();
+        $newest = Asset::factory()->for($client)->create([
+            'original_filename' => 'newest.jpg',
+            'created_at' => now()->addMinute(),
+        ]);
+        Asset::factory()->for($otherClient)->create(['original_filename' => 'not-mine.jpg']);
+
+        $first = $this->actingAs($owner)->getJson(route('clients.assets.index', $client));
+
+        $first->assertOk()
+            ->assertJsonCount(SearchClientAssetsAction::PER_PAGE, 'data')
+            ->assertJsonPath('data.0.id', $newest->id)
+            ->assertJsonPath('meta.total', SearchClientAssetsAction::PER_PAGE + 3)
+            ->assertJsonPath('meta.last_page', 2);
+
+        $this->actingAs($owner)
+            ->getJson(route('clients.assets.index', ['client' => $client, 'page' => 2]))
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('meta.current_page', 2)
+            ->assertJsonMissing(['original_filename' => 'not-mine.jpg']);
+    }
+
+    public function test_asset_library_filters_by_case_insensitive_literal_search_and_type(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $hero = Asset::factory()->for($client)->create(['original_filename' => 'Summer-HERO.jpg']);
+        $heroVideo = Asset::factory()->for($client)->create([
+            'original_filename' => 'summer-hero-cut.mp4',
+            'type' => AssetType::Video,
+        ]);
+        Asset::factory()->for($client)->create(['original_filename' => 'winter.jpg']);
+        $percent = Asset::factory()->for($client)->create(['original_filename' => '50%_off.png']);
+
+        $search = $this->actingAs($owner)
+            ->getJson(route('clients.assets.index', ['client' => $client, 'search' => 'summer-hero']))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->json('data.*.id');
+        $this->assertEqualsCanonicalizing([$hero->id, $heroVideo->id], $search);
+
+        $this->actingAs($owner)
+            ->getJson(route('clients.assets.index', ['client' => $client, 'search' => 'hero', 'type' => 'video']))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $heroVideo->id)
+            ->assertJsonPath('data.0.type', 'video');
+
+        // `%` / `_` are matched literally, not as SQL wildcards.
+        $this->actingAs($owner)
+            ->getJson(route('clients.assets.index', ['client' => $client, 'search' => '%_']))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $percent->id);
+    }
+
+    public function test_asset_library_rejects_an_unknown_type_filter(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $this->actingAs($owner)
+            ->getJson(route('clients.assets.index', ['client' => $client, 'type' => 'spreadsheet']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('type');
+    }
+
+    public function test_asset_library_is_forbidden_outside_the_users_org(): void
+    {
+        $client = Client::factory()->create();
+        $outsider = User::factory()
+            ->for(Organization::factory()->create(), 'organization')
+            ->role(Role::Owner)
+            ->create();
+
+        $this->actingAs($outsider)
+            ->getJson(route('clients.assets.index', $client))
+            ->assertForbidden();
     }
 }

@@ -150,6 +150,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
         ->name('campaigns.destroy');
 
+    Route::get('clients/{client}/assets', [AssetController::class, 'index'])
+        ->name('clients.assets.index');
     Route::post('clients/{client}/assets', [AssetController::class, 'store'])
         ->name('clients.assets.store');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])
@@ -294,6 +296,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
     Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
         ->name('campaigns.destroy');
 
+    Route::get('clients/{client}/assets', [AssetController::class, 'index'])
+        ->name('clients.assets.index');
     Route::post('clients/{client}/assets', [AssetController::class, 'store'])
         ->name('clients.assets.store');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])

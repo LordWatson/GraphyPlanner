@@ -44,6 +44,8 @@ class PostEditorControllerTest extends TestCase
             ->has('allowedTransitions', 2)
             ->where('can.update', true)
             ->where('can.create_asset', true)
+            // The client's library is paged via `clients.assets.index`, never preloaded here.
+            ->missing('availableAssets')
         );
     }
 

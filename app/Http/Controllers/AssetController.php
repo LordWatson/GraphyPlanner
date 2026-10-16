@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Actions\Assets\CreateAssetAction;
 use App\Actions\Assets\DeleteAssetAction;
+use App\Actions\Assets\SearchClientAssetsAction;
+use App\Enums\AssetType;
+use App\Http\Requests\SearchAssetsRequest;
 use App\Http\Requests\StoreAssetRequest;
 use App\Models\Asset;
 use App\Models\Client;
@@ -12,6 +15,39 @@ use Illuminate\Http\RedirectResponse;
 
 class AssetController extends Controller
 {
+    /**
+     * A page of the client's asset library as JSON, filtered by filename search and type — the
+     * post editor's "Browse library" dialog pages through this instead of preloading every asset.
+     */
+    public function index(SearchAssetsRequest $request, Client $client, SearchClientAssetsAction $action): JsonResponse
+    {
+        $type = $request->validated('type');
+
+        $assets = $action(
+            $client,
+            $request->validated('search'),
+            $type !== null ? AssetType::from($type) : null,
+            (int) ($request->validated('page') ?? 1),
+        );
+
+        return response()->json([
+            'data' => collect($assets->items())->map(fn (Asset $asset) => [
+                'id' => $asset->id,
+                'url' => $asset->url,
+                'original_filename' => $asset->original_filename,
+                'type' => $asset->type?->value,
+                'campaign_name' => $asset->campaign?->name,
+                'created_at' => $asset->created_at?->toIso8601String(),
+            ])->values(),
+            'meta' => [
+                'current_page' => $assets->currentPage(),
+                'last_page' => $assets->lastPage(),
+                'per_page' => $assets->perPage(),
+                'total' => $assets->total(),
+            ],
+        ]);
+    }
+
     /**
      * Upload or link a new asset for the given client.
      *

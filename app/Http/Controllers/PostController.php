@@ -91,12 +91,6 @@ class PostController extends Controller
                 'max_hashtags' => $account->platform->maxHashtags(),
                 'is_text_only_capable' => $account->platform->isTextOnlyCapable(),
             ]),
-            'availableAssets' => $client->assets()->latest()->get()->map(fn ($asset) => [
-                'id' => $asset->id,
-                'url' => $asset->url,
-                'original_filename' => $asset->original_filename,
-                'type' => $asset->type?->value,
-            ]),
             'allowedTransitions' => array_map(
                 fn (PostStatus $to) => ['value' => $to->value, 'label' => $to->label()],
                 $allowedTransitions,

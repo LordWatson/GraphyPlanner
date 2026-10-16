@@ -219,7 +219,6 @@ export default function PostEdit({
     post,
     client,
     targetAccounts,
-    availableAssets,
     allowedTransitions,
     can,
     hashtagSuggestions,
@@ -229,7 +228,6 @@ export default function PostEdit({
     post: PostData;
     client: { id: number; name: string };
     targetAccounts: TargetAccountData[];
-    availableAssets: AssetData[];
     allowedTransitions: TransitionOption[];
     can: {
         update: boolean;
@@ -252,8 +250,11 @@ export default function PostEdit({
     const [musicName, setMusicName] = useState(initial.musicName);
     const [locationName, setLocationName] = useState(initial.locationName);
 
-    // Assets uploaded inline are merged into the picker without a reload, so unsaved edits survive.
-    const [assets, setAssets] = useState<AssetData[]>(availableAssets);
+    // Asset details for every id the editor knows about (saved media, library picks, inline
+    // uploads). The library itself is paged server-side, so this only ever holds what's in use.
+    const [knownAssets, setKnownAssets] = useState<Record<number, AssetData>>(
+        () => Object.fromEntries(post.assets.map((asset) => [asset.id, asset])),
+    );
     const [isUploadingAsset, setIsUploadingAsset] = useState(false);
 
     const formRef = useRef<FormComponentRef>(null);
@@ -420,12 +421,12 @@ export default function PostEdit({
         });
     };
 
-    const toggleAsset = (assetId: number) => {
-        setSelectedAssetIds((current) =>
-            current.includes(assetId)
-                ? current.filter((id) => id !== assetId)
-                : [...current, assetId],
-        );
+    const setAttachedAssets = (attached: AssetData[]) => {
+        setKnownAssets((current) => ({
+            ...current,
+            ...Object.fromEntries(attached.map((asset) => [asset.id, asset])),
+        }));
+        setSelectedAssetIds(attached.map((asset) => asset.id));
     };
 
     // Posts straight to the client asset-store endpoint as JSON so the new asset can be merged in
@@ -465,7 +466,7 @@ export default function PostEdit({
             }
 
             const asset: AssetData = data.asset;
-            setAssets((current) => [asset, ...current]);
+            setKnownAssets((current) => ({ ...current, [asset.id]: asset }));
             setSelectedAssetIds((current) => [...current, asset.id]);
             toast.success('Uploaded and added to this post.');
         } catch {
@@ -479,7 +480,7 @@ export default function PostEdit({
         .map((id) => targetAccounts.find((a) => a.id === Number(id)))
         .filter((a): a is TargetAccountData => Boolean(a));
     const selectedAssets = selectedAssetIds
-        .map((id) => assets.find((asset) => asset.id === id))
+        .map((id) => knownAssets[id])
         .filter((asset): asset is AssetData => Boolean(asset));
 
     // Step 1.8.4 — music search only exists for Instagram/TikTok targets.
@@ -716,18 +717,18 @@ export default function PostEdit({
                                         <Panel
                                             eyebrow="03"
                                             title="Media"
-                                            description="Click to attach — the number is the order it appears in."
+                                            description="Upload something new or pick from the client's library — the number is the order it appears in."
                                             actions={
                                                 <span className="text-muted-foreground font-mono text-xs">
                                                     {selectedAssetIds.length}{' '}
-                                                    selected
+                                                    attached
                                                 </span>
                                             }
                                         >
                                             <MediaPicker
-                                                assets={assets}
-                                                selectedIds={selectedAssetIds}
-                                                onToggle={toggleAsset}
+                                                clientId={client.id}
+                                                selected={selectedAssets}
+                                                onChange={setAttachedAssets}
                                                 canUpload={can.create_asset}
                                                 uploading={isUploadingAsset}
                                                 onUpload={(file) =>
