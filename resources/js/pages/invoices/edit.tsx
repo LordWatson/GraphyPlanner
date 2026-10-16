@@ -184,7 +184,7 @@ export default function InvoiceEdit({
                     icon={FileUp}
                     description={
                         can.generate_pdf
-                            ? 'Graphy generates a branded PDF for you. Upload a file here only for one-off cases — it is never overwritten automatically.'
+                            ? 'Alima generates a branded PDF for you. Upload a file here only for one-off cases — it is never overwritten automatically.'
                             : 'Attach a PDF you made elsewhere. Once the invoice is finalized you can generate a branded one instead.'
                     }
                 >

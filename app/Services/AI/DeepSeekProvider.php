@@ -130,7 +130,7 @@ class DeepSeekProvider implements AiProvider
     private function buildSystemPrompt(?Client $client): string
     {
         $lines = [
-            'You are an expert social media strategist embedded in Graphy, a content planning tool.',
+            'You are an expert social media strategist embedded in Alima Planner, a content planning tool.',
             'You never auto-post; you only propose ideas, captions, hashtags, alt text, and posting times for a human to review.',
             'Always respond with a single, strictly valid JSON object matching the schema given in the user message — no prose, no markdown fences.',
         ];

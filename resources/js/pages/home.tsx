@@ -93,7 +93,7 @@ function Lane({
                 </div>
                 <span
                     className={cn(
-                        'font-serif text-5xl leading-none tabular-nums',
+                        'font-display text-4xl leading-none font-bold tabular-nums',
                         count === 0 && 'text-muted-foreground/40',
                     )}
                 >

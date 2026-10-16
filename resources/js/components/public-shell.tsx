@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { BrandMark } from '@/components/brand-mark';
+import { Eyebrow } from '@/components/page';
 import { cn } from '@/lib/utils';
 
 /**
- * Shell for token-link pages opened outside the app (client review, invites) — guidelines §7:
- * no navigation, generous whitespace, only the client's own context, mobile-first.
+ * Shell for token-link pages opened outside the app (client review, invites): no navigation,
+ * generous whitespace, only the client's own context, mobile-first. A thin Alima spectrum band
+ * (§3.8 — hero bands) crowns the page; the logo sits on calm cream below it.
  */
 export function PublicShell({
     children,
@@ -19,10 +21,7 @@ export function PublicShell({
 
     return (
         <div className="bg-background text-foreground relative flex min-h-screen flex-col">
-            <div
-                aria-hidden
-                className="bg-grid text-foreground pointer-events-none absolute inset-x-0 top-0 h-80 [mask-image:linear-gradient(to_bottom,black,transparent)]"
-            />
+            <div aria-hidden className="bg-spectrum h-1.5 w-full" />
             <header
                 className={cn(
                     'relative mx-auto flex w-full items-center justify-between gap-4 px-6 pt-8 pb-10',
@@ -52,14 +51,14 @@ export function PublicShell({
                     max,
                 )}
             >
-                <span>© {new Date().getFullYear()} Graphy</span>
-                <span>Secure link</span>
+                <span>© {new Date().getFullYear()} Alima</span>
+                <span>Marketing brighter together.</span>
             </footer>
         </div>
     );
 }
 
-/** The large serif title block used at the top of every public page. */
+/** The large display title block used at the top of every public page. */
 export function PublicTitle({
     kicker,
     title,
@@ -71,14 +70,8 @@ export function PublicTitle({
 }) {
     return (
         <div className="flex flex-col gap-3">
-            <span className="eyebrow text-muted-foreground flex items-center gap-2">
-                <span
-                    aria-hidden
-                    className="bg-primary size-1.5 rounded-[2px]"
-                />
-                {kicker}
-            </span>
-            <h1 className="[&_em]:text-primary font-serif text-[2.6rem] leading-[0.95] tracking-[-0.02em] text-balance sm:text-5xl [&_em]:italic">
+            <Eyebrow dash>{kicker}</Eyebrow>
+            <h1 className="font-display [&_em]:text-primary text-[2.4rem] leading-[1.05] text-balance sm:text-5xl [&_em]:not-italic">
                 {title}
             </h1>
             {children && (

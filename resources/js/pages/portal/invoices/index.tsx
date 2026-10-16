@@ -77,17 +77,17 @@ export default function PortalInvoicesIndex({
                                         ? `${unpaidCount} unpaid invoice${unpaidCount === 1 ? '' : 's'}${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}`
                                         : 'Nothing to pay — thank you'
                                 }
-                                className="[&_.font-serif]:text-4xl"
+                                className="[&_.font-display]:text-4xl"
                             />
                             <Stat
                                 label="Paid to date"
                                 value={formatCurrency(paid, currency)}
-                                className="[&_.font-serif]:text-4xl"
+                                className="[&_.font-display]:text-4xl"
                             />
                             <Stat
                                 label="Invoices"
                                 value={invoices.length}
-                                className="[&_.font-serif]:text-4xl"
+                                className="[&_.font-display]:text-4xl"
                             />
                         </div>
 

@@ -60,7 +60,7 @@ export default function PortalCompany({ client }: { client: ClientData }) {
 
                 <section className="animate-rise border-border bg-card grid grid-cols-1 gap-8 rounded-2xl border p-6 sm:p-8 lg:grid-cols-[14rem_1fr]">
                     <div className="flex flex-col gap-4">
-                        <span className="border-border bg-background flex size-20 items-center justify-center rounded-full border font-serif text-4xl italic">
+                        <span className="border-border bg-background font-display flex size-20 items-center justify-center rounded-full border text-3xl">
                             {client.name.charAt(0)}
                         </span>
                         <p className="text-muted-foreground text-[13px]">

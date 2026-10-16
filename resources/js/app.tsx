@@ -8,7 +8,7 @@ import AuthLayout from '@/layouts/auth-layout';
 import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'Alima';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
@@ -45,7 +45,8 @@ void createInertiaApp({
         );
     },
     progress: {
-        color: '#e8551f',
+        // Deep Teal — the progress bar can't read CSS tokens.
+        color: '#205557',
     },
 });
 

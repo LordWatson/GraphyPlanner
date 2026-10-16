@@ -64,7 +64,7 @@ export default function PortalCampaignsIndex({
                                             label={campaign.status_label}
                                         />
                                     </div>
-                                    <h2 className="group-hover:text-primary font-serif text-3xl leading-[1.05] tracking-[-0.01em]">
+                                    <h2 className="group-hover:text-primary font-display text-2xl leading-[1.05]">
                                         {campaign.name}
                                     </h2>
                                     {campaign.goal && (
@@ -87,7 +87,7 @@ export default function PortalCampaignsIndex({
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="text-right">
-                                            <span className="block font-serif text-2xl leading-none tabular-nums">
+                                            <span className="font-display block text-xl leading-none font-bold tabular-nums">
                                                 {campaign.posts_count}
                                             </span>
                                             <span className="eyebrow text-muted-foreground">

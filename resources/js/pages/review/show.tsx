@@ -81,11 +81,11 @@ export default function ReviewShow({
                     <figure className="bg-ink text-ink-foreground relative rounded-2xl p-6">
                         <span
                             aria-hidden
-                            className="text-primary absolute -top-3 left-6 font-serif text-6xl leading-none"
+                            className="text-lime font-display absolute -top-3 left-6 text-5xl leading-none font-bold"
                         >
                             “
                         </span>
-                        <blockquote className="font-serif text-xl leading-snug whitespace-pre-wrap">
+                        <blockquote className="text-xl leading-snug font-light whitespace-pre-wrap">
                             {post.review_message}
                         </blockquote>
                         <figcaption className="eyebrow text-ink-foreground/55 mt-3">
@@ -174,7 +174,7 @@ export default function ReviewShow({
                     >
                         {({ processing, errors }) => (
                             <>
-                                <p className="font-serif text-2xl leading-tight">
+                                <p className="font-display text-xl leading-tight">
                                     How does it look?
                                 </p>
                                 <div className="grid gap-1.5">

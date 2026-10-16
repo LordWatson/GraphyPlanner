@@ -143,13 +143,13 @@ const attentionMeta = {
 } as const;
 
 const chartTooltipStyle = {
-    borderRadius: '0.75rem',
+    borderRadius: '1rem',
     border: '1px solid var(--color-border)',
     background: 'var(--color-popover)',
     color: 'var(--color-popover-foreground)',
     fontSize: 12,
     padding: '8px 12px',
-    boxShadow: '0 18px 40px -24px oklch(0.2 0.012 55 / 0.4)',
+    boxShadow: 'var(--shadow-md)',
 };
 
 const axisTick = {
@@ -407,7 +407,7 @@ export default function Dashboard({
                             actions={
                                 hasInvoiceData && (
                                     <div className="flex flex-col items-end">
-                                        <span className="font-serif text-3xl leading-none tabular-nums">
+                                        <span className="font-display text-2xl leading-none font-bold tabular-nums">
                                             {compactCurrency.format(totalPaid)}
                                         </span>
                                         <span className="text-muted-foreground text-[11px]">
@@ -571,7 +571,7 @@ export default function Dashboard({
                                         <li key={occurrence.target_id}>
                                             <div className="flex items-center gap-4 rounded-xl px-3 py-2.5">
                                                 <span className="border-border flex w-11 shrink-0 flex-col items-center border-r pr-4">
-                                                    <span className="font-serif text-2xl leading-none tabular-nums">
+                                                    <span className="font-display text-xl leading-none font-bold tabular-nums">
                                                         {date
                                                             ? dayFormatter.format(
                                                                   date,
@@ -631,7 +631,7 @@ export default function Dashboard({
                                     publishReliability.averageAttemptsToSuccess !==
                                         null && (
                                         <div className="flex flex-col items-end">
-                                            <span className="font-serif text-3xl leading-none tabular-nums">
+                                            <span className="font-display text-2xl leading-none font-bold tabular-nums">
                                                 {publishReliability.averageAttemptsToSuccess.toFixed(
                                                     2,
                                                 )}

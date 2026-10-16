@@ -202,11 +202,11 @@ export default function InvoicesIndex({
                 </div>
 
                 <section className="animate-rise flex flex-col gap-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div
                             role="tablist"
                             aria-label="Filter by status"
-                            className="bg-muted inline-flex w-fit max-w-full flex-wrap gap-1 rounded-full p-1"
+                            className="bg-muted inline-flex w-fit max-w-full shrink-0 gap-1 overflow-x-auto rounded-full border p-1"
                         >
                             {statusTabs.map((tab) => {
                                 const active = filters.status === tab.value;
@@ -221,9 +221,9 @@ export default function InvoicesIndex({
                                             applyFilters({ status: tab.value })
                                         }
                                         className={cn(
-                                            'focus-visible:ring-ring/40 rounded-full px-3 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-[3px]',
+                                            'focus-visible:ring-ring/40 shrink-0 rounded-full px-3.5 py-1 text-[13px] font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px]',
                                             active
-                                                ? 'bg-card text-foreground shadow-xs'
+                                                ? 'bg-primary text-primary-foreground'
                                                 : 'text-muted-foreground hover:text-foreground',
                                         )}
                                     >

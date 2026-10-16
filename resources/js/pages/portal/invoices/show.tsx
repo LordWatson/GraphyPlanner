@@ -148,7 +148,7 @@ export default function PortalInvoiceShow({
                         </span>
                         <span
                             className={cn(
-                                'font-serif text-5xl leading-none tabular-nums',
+                                'font-display text-4xl leading-none font-bold tabular-nums',
                                 invoice.status === 'void' &&
                                     'line-through opacity-60',
                             )}
@@ -256,7 +256,7 @@ export default function PortalInvoiceShow({
                                 <span className="eyebrow text-muted-foreground">
                                     Total
                                 </span>
-                                <span className="font-serif text-2xl leading-none tabular-nums">
+                                <span className="font-display text-xl leading-none font-bold tabular-nums">
                                     {formatCurrency(invoice.amount, currency)}
                                 </span>
                             </li>
@@ -267,7 +267,7 @@ export default function PortalInvoiceShow({
                         {studio.payment_instructions && (
                             <section className="bg-ink text-ink-foreground flex flex-col gap-3 rounded-2xl p-5">
                                 <span className="eyebrow flex items-center gap-2 opacity-70">
-                                    <Landmark className="text-primary size-3.5" />
+                                    <Landmark className="text-lime size-3.5" />
                                     How to pay
                                 </span>
                                 <p className="text-sm leading-relaxed whitespace-pre-line">

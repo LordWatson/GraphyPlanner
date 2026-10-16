@@ -227,7 +227,7 @@ export function ContentCalendar({
         unit: string,
     ) => (
         <div className="flex flex-wrap items-end justify-between gap-3 pb-4">
-            <h2 className="[&_em]:text-muted-foreground font-serif text-4xl leading-none tracking-[-0.02em] [&_em]:italic">
+            <h2 className="[&_em]:text-muted-foreground font-display text-3xl leading-none [&_em]:not-italic">
                 {label}
             </h2>
             <div className="flex items-center gap-1.5">
@@ -439,7 +439,7 @@ export function ContentCalendar({
                             <div className="flex items-baseline gap-2 sm:flex-col sm:gap-0">
                                 <span
                                     className={cn(
-                                        'font-serif text-4xl leading-none tabular-nums',
+                                        'font-display text-3xl leading-none font-bold tabular-nums',
                                         dateKey === today && 'text-primary',
                                     )}
                                 >

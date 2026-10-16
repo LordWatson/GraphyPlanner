@@ -869,7 +869,7 @@ export default function ClientShow({
                                         {label}
                                     </span>
                                 </div>
-                                <span className="truncate font-serif text-4xl leading-none tabular-nums">
+                                <span className="font-display truncate text-3xl leading-none font-bold tabular-nums">
                                     {value}
                                 </span>
                                 <span className="text-muted-foreground truncate text-xs">

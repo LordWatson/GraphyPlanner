@@ -4,14 +4,15 @@ import { createContext, useContext } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Studio Paper page primitives. Every internal page is:
+ * Alima page primitives. Every internal page is:
  *
  *   <Page>
- *     <PageHeader eyebrow="Clients" title={<>The <em>roster</em></>} actions={…} />
+ *     <PageHeader eyebrow="Clients" title={<>The <em>roster</em>.</>} actions={…} />
  *     <Panel title="…">…</Panel>
  *   </Page>
  *
- * `<em>` inside a title renders as the italic orange accent word — use it for at most one word.
+ * `<em>` inside a title renders as the brand accent word (Deep Teal; Acid Lime in dark mode),
+ * upright — use it for at most one word. The eyebrow carries the layout's one rounded orange dash.
  */
 /**
  * True inside a shell that already provides page padding and max-width (the client portal), so
@@ -75,16 +76,8 @@ export function PageHeader({
             )}
         >
             <div className="flex min-w-0 flex-col gap-3">
-                {eyebrow && (
-                    <span className="eyebrow text-muted-foreground flex items-center gap-2">
-                        <span
-                            aria-hidden
-                            className="bg-primary size-1.5 rounded-[2px]"
-                        />
-                        {eyebrow}
-                    </span>
-                )}
-                <h1 className="[&_em]:text-primary font-serif text-[2.6rem] leading-[0.95] tracking-[-0.02em] text-balance sm:text-[3.25rem] [&_em]:italic">
+                {eyebrow && <Eyebrow dash>{eyebrow}</Eyebrow>}
+                <h1 className="font-display [&_em]:text-primary text-[2.25rem] leading-[1.05] text-balance sm:text-[2.75rem] [&_em]:not-italic">
                     {title}
                 </h1>
                 {description && (
@@ -107,7 +100,38 @@ export function PageHeader({
     );
 }
 
-/** A bordered paper panel with an optional editorial header row. */
+/**
+ * DM Mono spec-sheet label. `dash` prefixes the rounded Signal Orange rule — Alima allows one per
+ * layout (§4.4), so only page/hero headers use it.
+ */
+export function Eyebrow({
+    children,
+    dash = false,
+    className,
+}: {
+    children: ReactNode;
+    dash?: boolean;
+    className?: string;
+}) {
+    return (
+        <span
+            className={cn(
+                'eyebrow text-muted-foreground flex items-center gap-2.5',
+                className,
+            )}
+        >
+            {dash && (
+                <span
+                    aria-hidden
+                    className="bg-signal h-[3px] w-5 shrink-0 rounded-full"
+                />
+            )}
+            {children}
+        </span>
+    );
+}
+
+/** A soft surface panel (cards 24px, shadow.sm) with an optional header row. */
 export function Panel({
     title,
     eyebrow,
@@ -132,7 +156,7 @@ export function Panel({
     return (
         <section
             className={cn(
-                'border-border bg-card text-card-foreground flex flex-col rounded-2xl border',
+                'border-border/70 bg-card text-card-foreground flex flex-col rounded-2xl border shadow-sm',
                 className,
             )}
         >
@@ -140,7 +164,7 @@ export function Panel({
                 <div className="border-border/70 flex items-start justify-between gap-4 border-b px-5 py-4">
                     <div className="flex min-w-0 items-start gap-3">
                         {Icon && (
-                            <span className="border-border bg-background text-foreground/70 mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border">
+                            <span className="bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-full">
                                 <Icon className="size-4" />
                             </span>
                         )}
@@ -192,26 +216,20 @@ export function EmptyState({
     return (
         <div
             className={cn(
-                'border-border flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed text-center',
-                compact ? 'px-4 py-8' : 'bg-card/40 min-h-[38vh] px-6 py-14',
+                'border-border flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed text-center',
+                compact ? 'px-4 py-8' : 'bg-card/50 min-h-[38vh] px-6 py-14',
                 className,
             )}
         >
             {Icon && (
-                <span className="relative flex size-12 items-center justify-center">
-                    <span
-                        aria-hidden
-                        className="bg-accent absolute inset-0 rotate-6 rounded-xl"
-                    />
-                    <span className="border-border bg-card text-primary relative flex size-12 items-center justify-center rounded-xl border">
-                        <Icon className="size-5" />
-                    </span>
+                <span className="bg-lilac/45 text-ink dark:bg-lilac/25 dark:text-lilac flex size-12 items-center justify-center rounded-full">
+                    <Icon className="size-5" />
                 </span>
             )}
             <p
                 className={cn(
-                    'font-serif leading-tight',
-                    compact ? 'text-xl' : 'text-[1.75rem]',
+                    'font-display leading-tight',
+                    compact ? 'text-lg' : 'text-2xl',
                 )}
             >
                 {title}
@@ -226,7 +244,10 @@ export function EmptyState({
     );
 }
 
-/** A big-number stat for KPI rows. `tone="ink"` renders the inverse ink block for the hero stat. */
+/**
+ * A big-number stat for KPI rows (Poppins Bold — "big numbers", §4.2). `tone="ink"` renders the
+ * inverse Ink block for the one hero stat per row; `tone="accent"` is a Deep Teal block.
+ */
 export function Stat({
     label,
     value,
@@ -246,11 +267,10 @@ export function Stat({
         <div
             className={cn(
                 'flex flex-col justify-between gap-6 rounded-2xl border p-5',
-                tone === 'paper' && 'border-border bg-card',
+                tone === 'paper' && 'border-border/70 bg-card shadow-sm',
                 tone === 'ink' &&
                     'bg-ink text-ink-foreground border-transparent',
-                tone === 'accent' &&
-                    'border-primary/15 bg-accent text-accent-foreground',
+                tone === 'accent' && 'bg-teal text-cream border-transparent',
                 className,
             )}
         >
@@ -268,13 +288,13 @@ export function Stat({
                     <Icon
                         className={cn(
                             'size-4',
-                            tone === 'ink' ? 'text-primary' : 'opacity-50',
+                            tone === 'paper' ? 'opacity-50' : 'text-lime',
                         )}
                     />
                 )}
             </div>
             <div className="flex flex-col gap-1">
-                <span className="font-serif text-5xl leading-none tracking-[-0.02em] tabular-nums">
+                <span className="font-display text-[2.6rem] leading-none font-bold tracking-[-0.03em] tabular-nums">
                     {value}
                 </span>
                 {hint && (

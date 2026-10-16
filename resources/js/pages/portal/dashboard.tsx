@@ -116,7 +116,7 @@ export default function PortalDashboard({
                                     <span className="eyebrow text-ink-foreground/60">
                                         Needs your approval
                                     </span>
-                                    <span className="font-serif text-7xl leading-[0.85] tabular-nums">
+                                    <span className="font-display text-6xl leading-[1.05] font-bold tabular-nums">
                                         {waiting.length}
                                     </span>
                                     <span className="text-ink-foreground/70 text-sm">
@@ -126,7 +126,7 @@ export default function PortalDashboard({
                                     </span>
                                 </div>
                                 {next && (
-                                    <Button size="lg" asChild>
+                                    <Button size="lg" variant="spark" asChild>
                                         <Link
                                             href={portalPostsShow(next.post_id)}
                                         >
@@ -160,7 +160,7 @@ export default function PortalDashboard({
                                                         : ''}
                                                 </span>
                                             </span>
-                                            <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+                                            <span className="text-lime inline-flex shrink-0 items-center gap-1 text-xs font-medium">
                                                 Review
                                                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                                             </span>
@@ -222,7 +222,7 @@ export default function PortalDashboard({
                                                 className="group hover:bg-muted/60 flex items-center gap-4 rounded-xl px-3 py-2.5 transition-colors"
                                             >
                                                 <span className="border-border flex w-11 shrink-0 flex-col items-center border-r pr-4">
-                                                    <span className="font-serif text-2xl leading-none tabular-nums">
+                                                    <span className="font-display text-xl leading-none font-bold tabular-nums">
                                                         {dayFormatter.format(
                                                             date,
                                                         )}

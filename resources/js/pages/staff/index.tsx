@@ -142,7 +142,7 @@ export default function StaffIndex({
                                     href={show(member.id)}
                                     className="group border-border bg-card hover:bg-muted/40 flex items-center gap-3 rounded-2xl border p-3.5 transition-colors"
                                 >
-                                    <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-full border font-serif text-lg italic transition-colors">
+                                    <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-10 shrink-0 items-center justify-center rounded-full border text-lg transition-colors">
                                         {member.name.charAt(0).toUpperCase()}
                                     </span>
                                     <div className="flex min-w-0 flex-1 flex-col gap-1">

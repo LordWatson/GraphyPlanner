@@ -24,9 +24,7 @@ export default function Heading({
 
     return (
         <header className="mb-8 flex flex-col gap-2">
-            <h2 className="font-serif text-4xl leading-none tracking-[-0.02em]">
-                {title}
-            </h2>
+            <h2 className="font-display text-3xl leading-[1.1]">{title}</h2>
             {description && (
                 <p className="text-muted-foreground text-[15px]">
                     {description}

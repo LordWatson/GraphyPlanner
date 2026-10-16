@@ -22,7 +22,7 @@ export default function StaffInviteShow({
 }) {
     return (
         <>
-            <Head title={`Join ${organization.name} on Graphy`} />
+            <Head title={`Join ${organization.name} on Alima`} />
             <PublicShell context={organization.name}>
                 <PublicTitle
                     kicker="You're invited to join"

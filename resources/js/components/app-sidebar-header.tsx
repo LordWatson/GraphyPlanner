@@ -15,7 +15,7 @@ export function AppSidebarHeader({
     breadcrumbs?: BreadcrumbItemType[];
 }) {
     return (
-        <header className="border-border/70 bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md md:rounded-t-[1.25rem] md:px-6">
+        <header className="border-border/70 bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md md:rounded-t-2xl md:px-6">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground -ml-1.5 rounded-full" />
             <span aria-hidden className="bg-border h-4 w-px" />
             <Breadcrumbs breadcrumbs={breadcrumbs} />

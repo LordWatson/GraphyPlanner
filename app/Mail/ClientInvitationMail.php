@@ -23,7 +23,7 @@ class ClientInvitationMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject("You're invited to the {$this->invitation->client->name} client portal — Graphy")
+            ->subject("You're invited to the {$this->invitation->client->name} client portal — Alima")
             ->view('emails.client-invitation');
     }
 }
