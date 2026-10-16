@@ -20,7 +20,7 @@ export default function ClientInviteShow({
 }) {
     return (
         <>
-            <Head title={`Join the ${client.name} portal — Graphy`} />
+            <Head title={`Join the ${client.name} portal — AlimaPlanner`} />
             <PublicShell context={client.name}>
                 <PublicTitle
                     kicker="Your client portal"

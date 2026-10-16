@@ -17,7 +17,7 @@ export default function AuthSimpleLayout({
                     className="bg-grid text-ink-foreground pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,black,transparent_85%)]"
                 />
                 <div className="relative flex items-center justify-between">
-                    <Link href={home()} aria-label="Graphy home">
+                    <Link href={home()} aria-label="AlimaPlanner home">
                         <BrandMark size="md" wordmark />
                     </Link>
                     <span className="eyebrow text-ink-foreground/50">
@@ -42,7 +42,7 @@ export default function AuthSimpleLayout({
 
             <main className="flex flex-col px-6 py-8 sm:px-10">
                 <div className="flex items-center justify-between lg:hidden">
-                    <Link href={home()} aria-label="Graphy home">
+                    <Link href={home()} aria-label="AlimaPlanner home">
                         <BrandMark size="sm" wordmark />
                     </Link>
                 </div>
@@ -54,7 +54,7 @@ export default function AuthSimpleLayout({
                                 aria-hidden
                                 className="bg-primary size-1.5 rounded-[2px]"
                             />
-                            Graphy
+                            AlimaPlanner
                         </span>
                         <h1 className="font-serif text-[2.6rem] leading-[0.95] tracking-[-0.02em] text-balance">
                             {title}

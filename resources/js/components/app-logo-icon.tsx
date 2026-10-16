@@ -1,7 +1,7 @@
 import type { SVGAttributes } from 'react';
 
 /**
- * Graphy's mark: a 2×2 planner grid where one cell has bloomed into a quarter-circle — the
+ * AlimaPlanner's mark: a 2×2 planner grid where one cell has bloomed into a quarter-circle — the
  * calendar and the graph in one geometric glyph. Single-colour; inherits `fill-current`.
  */
 export default function AppLogoIcon(props: SVGAttributes<SVGElement>) {
