@@ -100,6 +100,7 @@ class PostEditorControllerTest extends TestCase
         ]);
 
         $response->assertRedirect(route('posts.edit', $post));
+        $response->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Post saved.']);
 
         $post->refresh();
         $this->assertSame('Updated caption', $post->master_caption);
@@ -345,5 +346,33 @@ class PostEditorControllerTest extends TestCase
             $response->assertForbidden();
             $this->assertSame('Original caption', $post->refresh()->master_caption);
         }
+    }
+
+    /**
+     * Every selectable account carries its platform's caption/hashtag limits and text-only flag,
+     * so the editor's per-channel usage counters and live readiness checklist work for channels
+     * toggled on before the post is saved (not just the post's existing targets).
+     */
+    public function test_editor_exposes_platform_limits_for_every_target_account(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+        SocialAccount::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'platform' => Platform::LinkedIn,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('posts.edit', $post));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('targetAccounts', 1)
+            ->where('targetAccounts.0.platform_label', 'LinkedIn')
+            ->where('targetAccounts.0.caption_limit', Platform::LinkedIn->captionLimit())
+            ->where('targetAccounts.0.max_hashtags', Platform::LinkedIn->maxHashtags())
+            ->where('targetAccounts.0.is_text_only_capable', true)
+        );
     }
 }

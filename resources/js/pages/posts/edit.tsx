@@ -1,172 +1,53 @@
+import type { FormComponentRef } from '@inertiajs/core';
 import { Form, Head, Link } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    ArrowRight,
-    CheckCircle2,
-    ChevronDown,
-    Circle,
-    Facebook,
-    History,
-    Instagram,
-    ListChecks,
-    Linkedin,
-    Lock,
-    Maximize2,
-    MessageSquareQuote,
-    Music2,
-    Pencil,
-    Search,
-    Share2,
-    UploadCloud,
-    User,
-    XCircle,
-} from 'lucide-react';
-import { useRef, useState } from 'react';
+import { ArrowLeft, Check, Lock, MapPin, Music2, Sparkles } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
-import Heading from '@/components/heading';
+import { confirmDialog } from '@/components/confirm-dialog';
 import { HashtagInput, normalizeTag } from '@/components/hashtag-input';
 import InputError from '@/components/input-error';
+import type { MentionableUser } from '@/components/mention-textarea';
+import { Page, PageHeader, Panel } from '@/components/page';
+import { platformIcon } from '@/components/platform-icon';
 import {
-    MentionTextarea,
-    renderCommentBody,
-    type MentionableUser,
-} from '@/components/mention-textarea';
-import { SocialPostPreview } from '@/components/social-post-preview';
+    AiCaptionSuggestions,
+    type AiCaptionSuggestion,
+} from '@/components/post-editor/ai-caption-suggestions';
+import { ChannelSchedule } from '@/components/post-editor/channel-schedule';
+import { MediaPicker } from '@/components/post-editor/media-picker';
+import { MusicField } from '@/components/post-editor/music-field';
+import { PostDiscussion } from '@/components/post-editor/post-discussion';
+import { PostWorkflow } from '@/components/post-editor/post-workflow';
+import { PreviewPanel } from '@/components/post-editor/preview-panel';
+import {
+    liveChecklist,
+    ReadinessChecklist,
+} from '@/components/post-editor/readiness-checklist';
+import type {
+    AssetData,
+    PostData,
+    ScheduleRows,
+    TargetAccountData,
+    TransitionOption,
+} from '@/components/post-editor/types';
+import { formatLocalSchedule } from '@/components/post-editor/types';
+import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { cn } from '@/lib/utils';
-import { store as storeAsset } from '@/routes/clients/assets';
 import { show as showClient } from '@/routes/clients';
-import {
-    musicSearch as musicSearchRoute,
-    update as updatePost,
-    transition as transitionPost,
-} from '@/routes/posts';
-import postActivityLogs from '@/routes/posts/activity-logs';
+import { store as storeAsset } from '@/routes/clients/assets';
+import { update as updatePost } from '@/routes/posts';
 import aiPosts from '@/routes/posts/ai';
-import { store as storeComment } from '@/routes/posts/comments';
-import { PageHeader } from '@/components/page';
-import { StatusPill } from '@/components/status-pill';
-
-type MusicTrackResult = { id: string; name: string; artist: string | null };
-
-type AiCaptionSuggestionData = {
-    caption: string;
-    hashtags: string[];
-    altText: string | null;
-    firstComment: string | null;
-};
-
-type ChecklistItem = { key: string; label: string; passed: boolean };
-
-type TargetData = {
-    id: number;
-    social_account_id: number;
-    platform: string | null;
-    handle: string | null;
-    caption_limit: number | null;
-    is_text_only_capable: boolean;
-    scheduled_local_date: string | null;
-    scheduled_local_time: string | null;
-    scheduled_at_utc: string | null;
-    status: string;
-    status_label: string;
-    external_post_id: string | null;
-    error: string | null;
-};
-
-type ActivityLogData = {
-    id: number;
-    user_name: string | null;
-    from_status: string | null;
-    to_status: string;
-    note: string | null;
-    review_url: string | null;
-    created_at: string | null;
-};
-
-type ApprovalData = {
-    id: number;
-    user_name: string | null;
-    decision: string;
-    comment: string | null;
-    created_at: string | null;
-};
-
-type CommentData = {
-    id: number;
-    user_name: string | null;
-    body: string;
-    internal_only: boolean;
-    mentioned_user_ids: number[];
-    created_at: string | null;
-};
-
-type PostData = {
-    id: number;
-    client_id: number;
-    campaign_id: number | null;
-    campaign_name: string | null;
-    status: string;
-    status_label: string;
-    approval_mode: string;
-    master_caption: string | null;
-    review_message: string | null;
-    hashtags: string[];
-    music: Record<string, unknown> | null;
-    location: Record<string, unknown> | null;
-    checklist: { items: ChecklistItem[]; passed: boolean };
-    assets: {
-        id: number;
-        url: string | null;
-        original_filename: string | null;
-        type: string | null;
-    }[];
-    targets: TargetData[];
-    activity_logs: ActivityLogData[];
-    approvals: ApprovalData[];
-    comments: CommentData[];
-};
-
-type TargetAccountData = {
-    id: number;
-    platform: string;
-    handle: string;
-    timezone: string;
-};
-
-type AvailableAssetData = {
-    id: number;
-    url: string | null;
-    original_filename: string | null;
-    type: string | null;
-};
-
-const platformIcon: Record<string, typeof Instagram> = {
-    instagram: Instagram,
-    tiktok: Music2,
-    facebook: Facebook,
-    linkedin: Linkedin,
-};
 
 /**
- * Reads Laravel's `XSRF-TOKEN` cookie so the plain `fetch()` call in `handleAssetUpload` below can
- * authenticate as a normal stateful request, mirroring the same helper on the client show page.
+ * Reads Laravel's `XSRF-TOKEN` cookie so the plain `fetch()` asset upload can authenticate as a
+ * normal stateful request, mirroring the same helper on the client show page.
  */
 function getXsrfTokenFromCookie(): string {
     const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
@@ -174,202 +55,163 @@ function getXsrfTokenFromCookie(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-function formatStatusLabel(status: string | null): string {
-    if (!status) {
-        return '—';
-    }
+type EditorState = {
+    caption: string;
+    hashtags: string[];
+    assetIds: number[];
+    schedule: ScheduleRows;
+    musicId: string;
+    musicName: string;
+    locationName: string;
+};
 
-    return status
-        .split('_')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+function initialEditorState(post: PostData): EditorState {
+    return {
+        caption: post.master_caption ?? '',
+        hashtags: post.hashtags ?? [],
+        assetIds: post.assets.map((asset) => asset.id),
+        schedule: Object.fromEntries(
+            post.targets.map((target) => [
+                target.social_account_id,
+                {
+                    date: target.scheduled_local_date ?? '',
+                    time: target.scheduled_local_time ?? '',
+                },
+            ]),
+        ),
+        musicId: (post.music?.id as string) ?? '',
+        musicName: (post.music?.name as string) ?? '',
+        locationName: (post.location?.name as string) ?? '',
+    };
 }
 
-function CommentEntry({ comment }: { comment: CommentData }) {
-    const [open, setOpen] = useState(false);
-    const body = comment.body ?? '';
-    const plainBody = body.replace(/@\[([^\]]+)\]\(\d+\)/g, '@$1');
-    const preview = plainBody.slice(0, 90);
-    const isTruncated = plainBody.length > 90;
+const captionClass =
+    'border-input bg-card focus-visible:border-ring focus-visible:ring-ring/40 dark:bg-input/30 placeholder:text-muted-foreground flex min-h-36 w-full resize-y rounded-lg border px-3.5 py-3 text-[15px] leading-relaxed outline-none focus-visible:ring-[3px]';
 
+function ReadOnlyField({
+    label,
+    children,
+}: {
+    label: string;
+    children: ReactNode;
+}) {
     return (
-        <Collapsible
-            open={open}
-            onOpenChange={setOpen}
-            className="border-border bg-card hover:border-primary/30 overflow-hidden rounded-lg border transition-colors"
-        >
-            <CollapsibleTrigger asChild>
-                <button
-                    type="button"
-                    className="hover:bg-muted/30 flex w-full items-start gap-3 p-3.5 text-left text-sm"
-                >
-                    <span className="bg-muted mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full">
-                        <User className="text-muted-foreground size-4" />
-                    </span>
-                    <div className="grid min-w-0 flex-1 gap-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">
-                                {comment.user_name ?? 'Unknown'}
-                            </span>
-                            {comment.internal_only && (
-                                <Badge variant="secondary">Internal</Badge>
-                            )}
-                            <span className="text-muted-foreground text-xs">
-                                {comment.created_at}
-                            </span>
-                        </div>
-                        {!open && (
-                            <span className="text-muted-foreground min-w-0 truncate text-xs">
-                                <MessageSquareQuote className="mr-1 inline size-3.5" />
-                                {preview}
-                                {isTruncated ? '…' : ''}
-                            </span>
-                        )}
-                    </div>
-                    <ChevronDown
-                        className={cn(
-                            'text-muted-foreground mt-1 size-4 shrink-0 transition-transform',
-                            open && 'rotate-180',
-                        )}
-                    />
-                </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="border-border/60 bg-muted/10 border-t py-3 pr-3.5 pl-[3.25rem] text-sm">
-                <div className="flex items-start gap-2">
-                    <MessageSquareQuote className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-                    <p className="text-muted-foreground min-w-0 flex-1 overflow-hidden leading-relaxed break-words whitespace-pre-wrap">
-                        {renderCommentBody(comment.body)}
-                    </p>
-                </div>
-            </CollapsibleContent>
-        </Collapsible>
+        <div className="grid gap-1.5">
+            <span className="eyebrow text-muted-foreground">{label}</span>
+            {children}
+        </div>
     );
 }
 
-function ActivityLogEntry({
-    log,
-    postId,
-    canResend,
-}: {
-    log: ActivityLogData;
-    postId: number;
-    canResend: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-    const hasNote = Boolean(log.note && log.note.trim().length > 0);
-    const hasReviewUrl = Boolean(log.review_url);
-    const hasDetails = hasNote || hasReviewUrl;
-    // Keep the collapsed preview short and non-breaking so a long note (or an embedded URL) never
-    // overflows the row — the full text is only ever rendered once expanded below.
-    const preview = hasNote ? (log.note as string).slice(0, 90) : null;
-    const isTruncated = hasNote && (log.note as string).length > 90;
+/** What viewers without edit rights (or anyone, while the post is locked) see in place of the form. */
+function ReadOnlyContent({ post }: { post: PostData }) {
+    const locked = post.status === 'scheduled' || post.status === 'published';
 
     return (
-        <Collapsible
-            open={open}
-            onOpenChange={setOpen}
-            className="border-border bg-card hover:border-primary/30 overflow-hidden rounded-lg border transition-colors"
-        >
-            <CollapsibleTrigger asChild>
-                <button
-                    type="button"
-                    disabled={!hasDetails}
-                    className={cn(
-                        'flex w-full items-start gap-3 p-3.5 text-left text-sm',
-                        hasDetails ? 'hover:bg-muted/30' : 'cursor-default',
-                    )}
-                >
-                    <span className="bg-muted mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full">
-                        <History className="text-muted-foreground size-4" />
-                    </span>
-                    <div className="grid min-w-0 flex-1 gap-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">
-                                {log.user_name ?? 'System'}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                                <StatusPill
-                                    kind="post"
-                                    value={log.from_status ?? ''}
-                                    label={formatStatusLabel(log.from_status)}
-                                />
-                                <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
-                                <StatusPill
-                                    kind="post"
-                                    value={log.to_status}
-                                    label={formatStatusLabel(log.to_status)}
-                                />
-                            </span>
-                            <span className="text-muted-foreground text-xs">
-                                {log.created_at}
-                            </span>
-                        </div>
-                        {hasNote && !open && (
-                            <span className="text-muted-foreground min-w-0 truncate text-xs">
-                                <MessageSquareQuote className="mr-1 inline size-3.5" />
-                                {preview}
-                                {isTruncated ? '…' : ''}
-                            </span>
-                        )}
-                    </div>
-                    {hasDetails && (
-                        <ChevronDown
-                            className={cn(
-                                'text-muted-foreground mt-1 size-4 shrink-0 transition-transform',
-                                open && 'rotate-180',
-                            )}
-                        />
-                    )}
-                </button>
-            </CollapsibleTrigger>
-            {hasDetails && (
-                <CollapsibleContent className="border-border/60 bg-muted/10 border-t py-3 pr-3.5 pl-[3.25rem] text-sm">
-                    <div className="grid gap-3">
-                        {hasNote && (
-                            <div className="flex items-start gap-2">
-                                <MessageSquareQuote className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-                                <p className="text-muted-foreground min-w-0 flex-1 overflow-hidden leading-relaxed break-words whitespace-pre-wrap">
-                                    {log.note}
-                                </p>
-                            </div>
-                        )}
-                        {hasReviewUrl && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-muted-foreground min-w-0 flex-1 text-xs break-all">
-                                    Review link:{' '}
-                                    <a
-                                        href={log.review_url as string}
-                                        className="underline"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        {log.review_url}
-                                    </a>
-                                </span>
-                                {canResend && (
-                                    <Form
-                                        {...postActivityLogs.resendReviewEmail.form(
-                                            [postId, log.id],
-                                        )}
-                                    >
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                size="sm"
-                                                variant="outline"
-                                                disabled={processing}
-                                            >
-                                                Resend email
-                                            </Button>
-                                        )}
-                                    </Form>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </CollapsibleContent>
+        <div className="grid gap-5">
+            {locked && (
+                <div className="border-border bg-muted/50 flex items-start gap-3 rounded-2xl border p-4 text-sm">
+                    <Lock className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                    <p>
+                        <span className="font-medium">
+                            {post.status_label} posts are locked.
+                        </span>{' '}
+                        <span className="text-muted-foreground">
+                            Move it back to draft from the workflow above to
+                            make changes.
+                        </span>
+                    </p>
+                </div>
             )}
-        </Collapsible>
+            <Panel eyebrow="01" title="Content">
+                <div className="grid gap-5">
+                    <ReadOnlyField label="Caption">
+                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                            {post.master_caption || (
+                                <span className="text-muted-foreground">
+                                    No caption yet.
+                                </span>
+                            )}
+                        </p>
+                    </ReadOnlyField>
+                    {post.hashtags.length > 0 && (
+                        <ReadOnlyField label="Hashtags">
+                            <div className="flex flex-wrap gap-1.5">
+                                {post.hashtags.map((tag) => (
+                                    <Badge key={tag} variant="secondary">
+                                        #{tag}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </ReadOnlyField>
+                    )}
+                </div>
+            </Panel>
+            <Panel eyebrow="02" title="Channels & schedule">
+                {post.targets.length > 0 ? (
+                    <ul className="border-border divide-border/70 divide-y rounded-xl border">
+                        {post.targets.map((target) => {
+                            const Icon = platformIcon(target.platform);
+
+                            return (
+                                <li
+                                    key={target.id}
+                                    className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm"
+                                >
+                                    <Icon className="text-foreground/70 size-4" />
+                                    <span className="font-medium">
+                                        {target.handle ?? '—'}
+                                    </span>
+                                    <span className="text-muted-foreground font-mono text-xs">
+                                        {formatLocalSchedule(
+                                            target.scheduled_local_date,
+                                            target.scheduled_local_time,
+                                        ) ?? 'No time set'}
+                                    </span>
+                                    {target.status !== 'pending' && (
+                                        <StatusPill
+                                            kind="postTarget"
+                                            value={target.status}
+                                            label={target.status_label}
+                                            className="ml-auto"
+                                        />
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                ) : (
+                    <p className="text-muted-foreground text-sm">
+                        No channels selected.
+                    </p>
+                )}
+            </Panel>
+            <Panel eyebrow="03" title="Media">
+                {post.assets.length > 0 ? (
+                    <AssetPreviewCarousel assets={post.assets} />
+                ) : (
+                    <p className="text-muted-foreground text-sm">
+                        No media attached.
+                    </p>
+                )}
+            </Panel>
+            {Boolean(post.music?.name || post.location?.name) && (
+                <Panel eyebrow="04" title="Details">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <ReadOnlyField label="Sound">
+                            <p className="text-sm">
+                                {(post.music?.name as string) || '—'}
+                            </p>
+                        </ReadOnlyField>
+                        <ReadOnlyField label="Location">
+                            <p className="text-sm">
+                                {(post.location?.name as string) || '—'}
+                            </p>
+                        </ReadOnlyField>
+                    </div>
+                </Panel>
+            )}
+        </div>
     );
 }
 
@@ -387,8 +229,8 @@ export default function PostEdit({
     post: PostData;
     client: { id: number; name: string };
     targetAccounts: TargetAccountData[];
-    availableAssets: AvailableAssetData[];
-    allowedTransitions: { value: string; label: string }[];
+    availableAssets: AssetData[];
+    allowedTransitions: TransitionOption[];
     can: {
         update: boolean;
         comment: boolean;
@@ -399,66 +241,76 @@ export default function PostEdit({
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
 }) {
-    const [caption, setCaption] = useState(post.master_caption ?? '');
-    // const [reviewMessage, setReviewMessage] = useState(post.review_message ?? ''); // Message to client — commented out for now, may be re-added later.
-    const [hashtags, setHashtags] = useState<string[]>(post.hashtags ?? []);
-    const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>(
-        post.assets.map((asset) => asset.id),
-    );
-    // Assets uploaded inline from this editor (via the "Upload asset" widget below) are merged
-    // into the picker list on the fly, without a full page reload, so the rest of the in-progress
-    // form (caption, hashtags, schedule rows, etc.) isn't lost.
-    const [assets, setAssets] = useState<AvailableAssetData[]>(availableAssets);
-    const [isUploadingAsset, setIsUploadingAsset] = useState(false);
-    const assetFileInputRef = useRef<HTMLInputElement>(null);
-    const [targetRows, setTargetRows] = useState<
-        Record<number, { date: string; time: string }>
-    >(
-        Object.fromEntries(
-            post.targets.map((target) => [
-                target.social_account_id,
-                {
-                    date: target.scheduled_local_date ?? '',
-                    time: target.scheduled_local_time ?? '',
-                },
-            ]),
-        ),
-    );
-    const [musicId, setMusicId] = useState((post.music?.id as string) ?? '');
-    const [musicName, setMusicName] = useState(
-        (post.music?.name as string) ?? '',
-    );
-    const [musicQuery, setMusicQuery] = useState('');
-    const [musicResults, setMusicResults] = useState<MusicTrackResult[]>([]);
-    const [musicSearching, setMusicSearching] = useState(false);
-    const [musicSearchError, setMusicSearchError] = useState<string | null>(
-        null,
-    );
-    // Step 1.9.5 — a distinguishable error_code (e.g. "meta_not_connected") lets this render an
-    // actionable "Connect Instagram" link instead of bare error text.
-    const [musicSearchErrorCode, setMusicSearchErrorCode] = useState<
-        string | null
-    >(null);
-    const [musicPlatform, setMusicPlatform] = useState<string | null>(null);
-    const [locationName, setLocationName] = useState(
-        (post.location?.name as string) ?? '',
-    );
+    // The page remounts with fresh props after every successful save/transition, so this snapshot
+    // is always "what's on the server" — the baseline for unsaved-changes tracking.
+    const [initial] = useState(() => initialEditorState(post));
+    const [caption, setCaption] = useState(initial.caption);
+    const [hashtags, setHashtags] = useState(initial.hashtags);
+    const [selectedAssetIds, setSelectedAssetIds] = useState(initial.assetIds);
+    const [scheduleRows, setScheduleRows] = useState(initial.schedule);
+    const [musicId, setMusicId] = useState(initial.musicId);
+    const [musicName, setMusicName] = useState(initial.musicName);
+    const [locationName, setLocationName] = useState(initial.locationName);
 
-    // Step 2.4 — "Suggest with AI" caption panel. Never overwrites the caption/hashtags fields
-    // without an explicit "Apply" click, and the result still has to go through the normal Save
-    // action below before anything is actually persisted.
-    const showAiPanel = Boolean(ai?.enabled && ai?.canUse);
+    // Assets uploaded inline are merged into the picker without a reload, so unsaved edits survive.
+    const [assets, setAssets] = useState<AssetData[]>(availableAssets);
+    const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+
+    const formRef = useRef<FormComponentRef>(null);
+
+    const isDirty =
+        can.update &&
+        JSON.stringify({
+            caption,
+            hashtags,
+            assetIds: selectedAssetIds,
+            schedule: scheduleRows,
+            musicId,
+            musicName,
+            locationName,
+        } satisfies EditorState) !== JSON.stringify(initial);
+
+    useUnsavedChangesGuard(isDirty);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (
+                (event.metaKey || event.ctrlKey) &&
+                event.key.toLowerCase() === 's'
+            ) {
+                event.preventDefault();
+
+                if (isDirty) {
+                    formRef.current?.submit();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isDirty]);
+
+    const discardChanges = () => {
+        setCaption(initial.caption);
+        setHashtags(initial.hashtags);
+        setSelectedAssetIds(initial.assetIds);
+        setScheduleRows(initial.schedule);
+        setMusicId(initial.musicId);
+        setMusicName(initial.musicName);
+        setLocationName(initial.locationName);
+    };
+
+    // Step 2.4 — "Suggest with AI". Never overwrites the caption without an explicit click, and
+    // the result still has to be saved like any other edit.
+    const showAi = Boolean(ai?.enabled && ai?.canUse);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
-    const [aiSuggestions, setAiSuggestions] = useState<
-        AiCaptionSuggestionData[]
-    >([]);
-    // Step 2.6 — per-suggestion platform policy warnings (e.g. link/hashtag rules), surfaced
-    // next to each card so a human can decide instead of the AI silently rewriting anything.
+    const [aiSuggestions, setAiSuggestions] = useState<AiCaptionSuggestion[]>(
+        [],
+    );
+    // Step 2.6 — per-suggestion platform policy warnings, surfaced for a human to decide on.
     const [aiPolicyWarnings, setAiPolicyWarnings] = useState<string[][]>([]);
-    // Once a suggestion has been applied, the card list collapses to a small summary so it
-    // doesn't keep taking up space in the editor — the user can still expand it back if they
-    // want to compare/apply a different suggestion.
     const [appliedSuggestionIndex, setAppliedSuggestionIndex] = useState<
         number | null
     >(null);
@@ -505,15 +357,18 @@ export default function PostEdit({
         }
     };
 
-    const applyAiSuggestion = (
-        suggestion: AiCaptionSuggestionData,
+    const applyAiSuggestion = async (
+        suggestion: AiCaptionSuggestion,
         index: number,
     ) => {
         if (
             caption.trim() &&
-            !window.confirm(
-                'Replace the current caption with this AI suggestion?',
-            )
+            !(await confirmDialog({
+                title: 'Replace your caption?',
+                description:
+                    'Your current caption and hashtags will be swapped for this AI suggestion. Nothing is saved until you save the post.',
+                confirmLabel: 'Replace caption',
+            }))
         ) {
             return;
         }
@@ -529,8 +384,8 @@ export default function PostEdit({
         setSuggestionsExpanded(false);
     };
 
-    const toggleTargetAccount = (accountId: number) => {
-        setTargetRows((current) => {
+    const toggleChannel = (accountId: number) => {
+        setScheduleRows((current) => {
             if (accountId in current) {
                 const next = { ...current };
                 delete next[accountId];
@@ -542,6 +397,29 @@ export default function PostEdit({
         });
     };
 
+    const updateSchedule = (
+        accountId: number,
+        field: 'date' | 'time',
+        value: string,
+    ) => {
+        setScheduleRows((current) => ({
+            ...current,
+            [accountId]: { ...current[accountId], [field]: value },
+        }));
+    };
+
+    // An explicit, user-triggered copy — each target still keeps (and is stored with) its own
+    // local date/time, so this isn't the implicit "same instant" shortcut spec §4.6 forbids.
+    const applyScheduleToAll = (sourceAccountId: number) => {
+        setScheduleRows((current) => {
+            const source = current[sourceAccountId];
+
+            return Object.fromEntries(
+                Object.keys(current).map((id) => [id, { ...source }]),
+            );
+        });
+    };
+
     const toggleAsset = (assetId: number) => {
         setSelectedAssetIds((current) =>
             current.includes(assetId)
@@ -550,10 +428,8 @@ export default function PostEdit({
         );
     };
 
-    // Lets the user upload a brand-new asset without leaving the post editor (previously they had
-    // to flick over to the client's Assets tab first). Posts straight to the same asset-store
-    // endpoint the client page uses, but as a JSON request so the response can be merged into the
-    // in-memory asset list instead of redirecting away and losing any unsaved editor changes.
+    // Posts straight to the client asset-store endpoint as JSON so the new asset can be merged in
+    // place instead of redirecting away and losing unsaved editor changes.
     const handleAssetUpload = async (file: File) => {
         setIsUploadingAsset(true);
 
@@ -561,6 +437,7 @@ export default function PostEdit({
             const formData = new FormData();
             formData.append('source', 'upload');
             formData.append('file', file);
+
             if (post.campaign_id) {
                 formData.append('campaign_id', String(post.campaign_id));
             }
@@ -575,569 +452,221 @@ export default function PostEdit({
                 },
                 body: formData,
             });
-
             const data = await response.json();
 
             if (!response.ok || !data.asset) {
-                const message =
+                toast.error(
                     typeof data?.message === 'string'
                         ? data.message
-                        : 'Unable to upload the asset.';
-                toast.error(message);
+                        : 'Unable to upload the asset.',
+                );
+
                 return;
             }
 
-            const asset: AvailableAssetData = data.asset;
+            const asset: AssetData = data.asset;
             setAssets((current) => [asset, ...current]);
             setSelectedAssetIds((current) => [...current, asset.id]);
-            toast.success('Asset uploaded and added to this post.');
+            toast.success('Uploaded and added to this post.');
         } catch {
             toast.error('Unable to upload the asset.');
         } finally {
             setIsUploadingAsset(false);
-            if (assetFileInputRef.current) {
-                assetFileInputRef.current.value = '';
-            }
         }
     };
 
-    const selectedAssets = assets.filter((asset) =>
-        selectedAssetIds.includes(asset.id),
-    );
+    const selectedAccounts = Object.keys(scheduleRows)
+        .map((id) => targetAccounts.find((a) => a.id === Number(id)))
+        .filter((a): a is TargetAccountData => Boolean(a));
+    const selectedAssets = selectedAssetIds
+        .map((id) => assets.find((asset) => asset.id === id))
+        .filter((asset): asset is AssetData => Boolean(asset));
 
-    const targetEntries = Object.entries(targetRows);
-    const [activeTab, setActiveTab] = useState('editor');
-
-    // Step 1.8.4 — the music search field only makes sense (and only has a real vendor lookup,
-    // per SearchMusicAction/UploadPostMusicProvider) for Instagram/TikTok targets, so it's shown
-    // only when at least one currently selected target account is on one of those platforms.
+    // Step 1.8.4 — music search only exists for Instagram/TikTok targets.
     const musicPlatforms = Array.from(
         new Set(
-            targetEntries
-                .map(
-                    ([accountIdStr]) =>
-                        targetAccounts.find(
-                            (a) => a.id === Number(accountIdStr),
-                        )?.platform,
-                )
-                .filter(
-                    (platform): platform is string =>
-                        platform === 'instagram' || platform === 'tiktok',
-                ),
+            selectedAccounts
+                .map((a) => a.platform)
+                .filter((p) => p === 'instagram' || p === 'tiktok'),
         ),
     );
-    const activeMusicPlatform =
-        musicPlatform && musicPlatforms.includes(musicPlatform)
-            ? musicPlatform
-            : (musicPlatforms[0] ?? null);
 
-    const handleMusicSearch = async () => {
-        if (!activeMusicPlatform || musicQuery.trim() === '') {
-            return;
-        }
+    const checklistItems = can.update
+        ? liveChecklist(post.checklist.items, {
+              caption,
+              selectedAccounts,
+              schedule: Object.values(scheduleRows),
+              mediaCount: selectedAssetIds.length,
+          })
+        : post.checklist.items;
 
-        setMusicSearching(true);
-        setMusicSearchError(null);
-        setMusicSearchErrorCode(null);
-
-        try {
-            const response = await fetch(
-                musicSearchRoute.url(post.id, {
-                    query: { query: musicQuery, platform: activeMusicPlatform },
-                }),
-                { headers: { Accept: 'application/json' } },
-            );
-            const data = await response.json();
-
-            if (!response.ok) {
-                setMusicSearchError('Unable to search music right now.');
-                setMusicResults([]);
-                return;
-            }
-
-            if (data.error) {
-                setMusicSearchError(data.error);
-                setMusicSearchErrorCode(data.error_code ?? null);
-                setMusicResults([]);
-                return;
-            }
-
-            setMusicResults(data.tracks ?? []);
-        } catch {
-            setMusicSearchError('Unable to search music right now.');
-            setMusicResults([]);
-        } finally {
-            setMusicSearching(false);
-        }
-    };
-
-    const selectMusicTrack = (track: MusicTrackResult) => {
-        setMusicId(track.id);
-        setMusicName(track.name);
-        setMusicResults([]);
-        setMusicQuery('');
-    };
-
-    const clearMusicTrack = () => {
-        setMusicId('');
-        setMusicName('');
-    };
-
-    // Live preview targets: the accounts currently selected in the form (or, read-only, the
-    // post's saved targets), each paired with its platform/handle so `SocialPostPreview` can
-    // render the right mockup. Kept separate from `targetEntries` (which drives the schedule
-    // rows) since the preview only needs platform/handle, not date/time.
     const previewTargets = can.update
-        ? targetEntries
-              .map(([accountIdStr]) =>
-                  targetAccounts.find((a) => a.id === Number(accountIdStr)),
-              )
-              .filter((a): a is TargetAccountData => Boolean(a))
-              .map((a) => ({
-                  id: a.id,
-                  platform: a.platform,
-                  handle: a.handle,
-              }))
+        ? selectedAccounts.map((a) => ({
+              id: a.id,
+              platform: a.platform,
+              handle: a.handle,
+          }))
         : post.targets.map((t) => ({
               id: t.social_account_id,
               platform: t.platform ?? '',
               handle: t.handle ?? '',
           }));
 
-    const [previewTargetId, setPreviewTargetId] = useState<
-        number | string | null
-    >(previewTargets[0]?.id ?? null);
-    const activePreviewTarget =
-        previewTargets.find((t) => t.id === previewTargetId) ??
-        previewTargets[0] ??
-        null;
-    const previewAssets = can.update ? selectedAssets : post.assets;
-    const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
-
     return (
         <>
             <Head title={`Edit post — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
-                <div className="flex flex-col gap-4">
+            <Page>
+                <div className="-mb-4">
                     <Link
                         href={showClient(client.id)}
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
                     >
                         <ArrowLeft className="size-4" />
-                        Back to {client.name}
+                        {client.name}
                     </Link>
                 </div>
 
                 <PageHeader
                     eyebrow={
                         post.campaign_name
-                            ? `Post editor — ${post.campaign_name}`
-                            : 'Post editor'
+                            ? `Post ${post.id} — ${post.campaign_name}`
+                            : `Post ${post.id}`
                     }
-                    title={client.name}
+                    title={
+                        <>
+                            {client.name} <em>post</em>
+                        </>
+                    }
                     meta={
-                        <StatusPill
-                            kind="post"
-                            value={post.status}
-                            label={post.status_label}
-                        />
+                        <>
+                            <StatusPill
+                                kind="post"
+                                value={post.status}
+                                label={post.status_label}
+                            />
+                            {post.targets.map((target) => {
+                                const Icon = platformIcon(target.platform);
+                                const when = formatLocalSchedule(
+                                    target.scheduled_local_date,
+                                    target.scheduled_local_time,
+                                );
+
+                                return (
+                                    <Badge key={target.id} variant="outline">
+                                        <Icon className="size-3" />
+                                        {target.handle}
+                                        {when && (
+                                            <span className="text-muted-foreground font-mono">
+                                                {when}
+                                            </span>
+                                        )}
+                                    </Badge>
+                                );
+                            })}
+                        </>
                     }
                 />
 
-                <Tabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    className="gap-4"
-                >
-                    <TabsList className="bg-muted/60 h-auto w-full flex-wrap justify-start gap-1 rounded-2xl p-1">
-                        <TabsTrigger value="editor">
-                            <Pencil />
-                            Editor
-                        </TabsTrigger>
-                        <TabsTrigger value="checklist">
-                            <ListChecks />
-                            Checklist &amp; status
-                        </TabsTrigger>
-                        <TabsTrigger value="comments">
-                            <MessageSquareQuote />
-                            Comments
-                            {post.comments.length > 0 && (
-                                <Badge variant="secondary" className="ml-1">
-                                    {post.comments.length}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger value="activity">
-                            <History />
-                            Activity log
-                        </TabsTrigger>
-                    </TabsList>
+                <PostWorkflow
+                    post={post}
+                    clientName={client.name}
+                    allowedTransitions={allowedTransitions}
+                    isDirty={isDirty}
+                    canResendReviewEmail={can.resend_review_email}
+                />
 
-                    <TabsContent
-                        value="editor"
-                        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start"
-                    >
-                        <div className="grid gap-4">
-                            {!can.update && (
-                                <div className="border-border bg-card grid gap-4 rounded-lg border p-4">
-                                    {(post.status === 'scheduled' ||
-                                        post.status === 'published') && (
-                                        <div className="border-border bg-muted/30 text-muted-foreground flex items-center gap-2 rounded-md border p-3 text-sm">
-                                            <Lock className="size-4 shrink-0" />
-                                            This post is{' '}
-                                            {post.status_label.toLowerCase()}{' '}
-                                            and is locked for editing. Move it
-                                            to a different status to make
-                                            changes.
-                                        </div>
-                                    )}
-                                    <div className="grid gap-1">
-                                        <Label>Master caption</Label>
-                                        <p className="border-border bg-muted/20 rounded-md border p-3 text-sm whitespace-pre-wrap">
-                                            {post.master_caption || (
-                                                <span className="text-muted-foreground">
-                                                    No caption yet.
-                                                </span>
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div className="grid gap-1">
-                                        <Label>Hashtags</Label>
-                                        {post.hashtags.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {post.hashtags.map((tag) => (
-                                                    <Badge
-                                                        key={tag}
-                                                        variant="secondary"
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+                    <div className="grid min-w-0 gap-5">
+                        {can.update ? (
+                            <Form
+                                ref={formRef}
+                                {...updatePost.form(post.id)}
+                                options={{
+                                    preserveScroll: true,
+                                    preserveState: 'errors',
+                                }}
+                                className="grid gap-5"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <Panel
+                                            eyebrow="01"
+                                            title="Content"
+                                            actions={
+                                                showAi && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={
+                                                            fetchAiSuggestions
+                                                        }
+                                                        disabled={aiLoading}
                                                     >
-                                                        {tag}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-muted-foreground text-sm">
-                                                No hashtags.
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <Label>Target accounts</Label>
-                                        {post.targets.length > 0 ? (
+                                                        <Sparkles />
+                                                        {aiLoading
+                                                            ? 'Thinking…'
+                                                            : 'Suggest with AI'}
+                                                    </Button>
+                                                )
+                                            }
+                                            bodyClassName="grid gap-5"
+                                        >
                                             <div className="grid gap-2">
-                                                {post.targets.map((target) => {
-                                                    const AccountIcon =
-                                                        platformIcon[
-                                                            target.platform ??
-                                                                ''
-                                                        ] ?? Share2;
-
-                                                    return (
-                                                        <div
-                                                            key={target.id}
-                                                            className="border-border bg-muted/20 flex flex-wrap items-center gap-2 rounded-md border p-2.5 text-sm"
-                                                        >
-                                                            <AccountIcon className="text-primary size-4" />
-                                                            <span className="font-medium">
-                                                                {target.handle ??
-                                                                    '—'}
-                                                            </span>
-                                                            <span className="text-muted-foreground text-xs">
-                                                                {target.scheduled_local_date ??
-                                                                    '—'}{' '}
-                                                                {target.scheduled_local_time ??
-                                                                    ''}
-                                                            </span>
-                                                            {target.status !==
-                                                                'pending' && (
-                                                                <Badge
-                                                                    variant={
-                                                                        target.status ===
-                                                                        'published'
-                                                                            ? 'success'
-                                                                            : 'destructive'
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        target.status_label
-                                                                    }
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <p className="text-muted-foreground text-sm">
-                                                No target accounts selected.
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <div className="grid gap-1">
-                                            <Label>Music</Label>
-                                            <p className="text-muted-foreground text-sm">
-                                                {(post.music?.name as string) ||
-                                                    'Not set'}
-                                            </p>
-                                        </div>
-                                        <div className="grid gap-1">
-                                            <Label>Location</Label>
-                                            <p className="text-muted-foreground text-sm">
-                                                {(post.location
-                                                    ?.name as string) ||
-                                                    'Not set'}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <Label>Media</Label>
-                                        {post.assets.length > 0 ? (
-                                            <AssetPreviewCarousel
-                                                assets={post.assets}
-                                            />
-                                        ) : (
-                                            <p className="text-muted-foreground text-sm">
-                                                No media attached.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            {can.update && (
-                                <Form
-                                    {...updatePost.form(post.id)}
-                                    className="border-border bg-card grid gap-4 rounded-lg border p-4"
-                                >
-                                    {({ processing, errors }) => (
-                                        <>
-                                            <div className="grid gap-1">
-                                                <div className="flex items-center justify-between">
+                                                <div className="flex items-baseline justify-between">
                                                     <Label htmlFor="master_caption">
-                                                        Master caption
+                                                        Caption
                                                     </Label>
-                                                    {showAiPanel && (
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="secondary"
-                                                            onClick={
-                                                                fetchAiSuggestions
-                                                            }
-                                                            disabled={aiLoading}
-                                                        >
-                                                            {aiLoading
-                                                                ? 'Suggesting…'
-                                                                : 'Suggest with AI'}
-                                                        </Button>
-                                                    )}
+                                                    <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+                                                        {caption.length.toLocaleString()}{' '}
+                                                        chars
+                                                    </span>
                                                 </div>
                                                 <textarea
                                                     id="master_caption"
                                                     name="master_caption"
-                                                    rows={4}
+                                                    rows={6}
                                                     value={caption}
                                                     onChange={(e) =>
                                                         setCaption(
                                                             e.target.value,
                                                         )
                                                     }
-                                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                                                    placeholder="Write the caption…"
+                                                    className={captionClass}
                                                 />
                                                 <InputError
                                                     message={
                                                         errors.master_caption
                                                     }
                                                 />
-                                                {showAiPanel && aiError && (
+                                                {aiError && (
                                                     <p className="text-destructive text-xs">
                                                         {aiError}
                                                     </p>
                                                 )}
-                                                {showAiPanel &&
-                                                    aiSuggestions.length >
-                                                        0 && (
-                                                        <div className="border-border bg-muted/20 mt-2 grid gap-2 rounded-md border p-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-muted-foreground text-xs font-medium">
-                                                                    AI
-                                                                    suggestions
-                                                                    {appliedSuggestionIndex !==
-                                                                        null &&
-                                                                        ' · applied ✓'}
-                                                                </span>
-                                                                <Button
-                                                                    type="button"
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-6 px-2 text-xs"
-                                                                    onClick={() =>
-                                                                        setSuggestionsExpanded(
-                                                                            (
-                                                                                current,
-                                                                            ) =>
-                                                                                !current,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {suggestionsExpanded
-                                                                        ? 'Collapse'
-                                                                        : 'Show suggestions'}
-                                                                </Button>
-                                                            </div>
-                                                            {!suggestionsExpanded &&
-                                                                appliedSuggestionIndex !==
-                                                                    null && (
-                                                                    <p className="text-muted-foreground truncate text-xs">
-                                                                        Using:{' '}
-                                                                        {
-                                                                            aiSuggestions[
-                                                                                appliedSuggestionIndex
-                                                                            ]
-                                                                                ?.caption
-                                                                        }
-                                                                    </p>
-                                                                )}
-                                                            {suggestionsExpanded &&
-                                                                aiSuggestions.map(
-                                                                    (
-                                                                        suggestion,
-                                                                        i,
-                                                                    ) => (
-                                                                        <div
-                                                                            key={
-                                                                                i
-                                                                            }
-                                                                            className={`bg-background grid gap-2 rounded-md border p-3 ${
-                                                                                appliedSuggestionIndex ===
-                                                                                i
-                                                                                    ? 'border-primary'
-                                                                                    : 'border-border'
-                                                                            }`}
-                                                                        >
-                                                                            <p className="text-sm whitespace-pre-wrap">
-                                                                                {
-                                                                                    suggestion.caption
-                                                                                }
-                                                                            </p>
-                                                                            {suggestion
-                                                                                .hashtags
-                                                                                .length >
-                                                                                0 && (
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {suggestion.hashtags.map(
-                                                                                        (
-                                                                                            tag,
-                                                                                            ti,
-                                                                                        ) => (
-                                                                                            <Badge
-                                                                                                key={
-                                                                                                    ti
-                                                                                                }
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                #
-                                                                                                {
-                                                                                                    tag
-                                                                                                }
-                                                                                            </Badge>
-                                                                                        ),
-                                                                                    )}
-                                                                                </div>
-                                                                            )}
-                                                                            {suggestion.altText && (
-                                                                                <p className="text-muted-foreground text-xs">
-                                                                                    Alt
-                                                                                    text:{' '}
-                                                                                    {
-                                                                                        suggestion.altText
-                                                                                    }
-                                                                                </p>
-                                                                            )}
-                                                                            {suggestion.firstComment && (
-                                                                                <p className="text-muted-foreground text-xs">
-                                                                                    First
-                                                                                    comment:{' '}
-                                                                                    {
-                                                                                        suggestion.firstComment
-                                                                                    }
-                                                                                </p>
-                                                                            )}
-                                                                            {(
-                                                                                aiPolicyWarnings[
-                                                                                    i
-                                                                                ] ??
-                                                                                []
-                                                                            )
-                                                                                .length >
-                                                                                0 && (
-                                                                                <ul className="grid gap-0.5">
-                                                                                    {aiPolicyWarnings[
-                                                                                        i
-                                                                                    ].map(
-                                                                                        (
-                                                                                            warning,
-                                                                                            wi,
-                                                                                        ) => (
-                                                                                            <li
-                                                                                                key={
-                                                                                                    wi
-                                                                                                }
-                                                                                                className="text-xs text-amber-600 dark:text-amber-500"
-                                                                                            >
-                                                                                                ⚠{' '}
-                                                                                                {
-                                                                                                    warning
-                                                                                                }
-                                                                                            </li>
-                                                                                        ),
-                                                                                    )}
-                                                                                </ul>
-                                                                            )}
-                                                                            <div>
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    size="sm"
-                                                                                    onClick={() =>
-                                                                                        applyAiSuggestion(
-                                                                                            suggestion,
-                                                                                            i,
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    {appliedSuggestionIndex ===
-                                                                                    i
-                                                                                        ? 'Applied ✓'
-                                                                                        : 'Apply'}
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                        </div>
-                                                    )}
+                                                <AiCaptionSuggestions
+                                                    suggestions={aiSuggestions}
+                                                    policyWarnings={
+                                                        aiPolicyWarnings
+                                                    }
+                                                    appliedIndex={
+                                                        appliedSuggestionIndex
+                                                    }
+                                                    expanded={
+                                                        suggestionsExpanded
+                                                    }
+                                                    onToggleExpanded={() =>
+                                                        setSuggestionsExpanded(
+                                                            (current) =>
+                                                                !current,
+                                                        )
+                                                    }
+                                                    onApply={applyAiSuggestion}
+                                                />
                                             </div>
 
-                                            {/* Message to client — commented out for now, may be re-added later.
-                                <div className="grid gap-1">
-                                    <Label htmlFor="review_message">Message to client</Label>
-                                    <textarea
-                                        id="review_message"
-                                        name="review_message"
-                                        rows={3}
-                                        value={reviewMessage}
-                                        onChange={(e) => setReviewMessage(e.target.value)}
-                                        placeholder="Optional note shown to the client alongside the review request email..."
-                                        className="border-input dark:bg-input/30 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                    />
-                                    <InputError message={errors.review_message} />
-                                </div>
-                                */}
-
-                                            <div className="grid gap-1">
+                                            <div className="grid gap-2">
                                                 <Label htmlFor="hashtags_text">
                                                     Hashtags
                                                 </Label>
@@ -1159,956 +688,207 @@ export default function PostEdit({
                                                     />
                                                 ))}
                                             </div>
+                                        </Panel>
 
-                                            <div className="grid gap-2">
-                                                <Label>Target accounts</Label>
-                                                <p className="text-muted-foreground text-xs">
-                                                    Accounts filtered to{' '}
-                                                    {client.name}. Each target
-                                                    keeps its own local schedule
-                                                    — two targets in different
-                                                    timezones never collapse to
-                                                    one shared time.
-                                                </p>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {targetAccounts.map(
-                                                        (account) => {
-                                                            const AccountIcon =
-                                                                platformIcon[
-                                                                    account
-                                                                        .platform
-                                                                ] ?? Share2;
-                                                            const selected =
-                                                                account.id in
-                                                                targetRows;
+                                        <Panel
+                                            eyebrow="02"
+                                            title="Channels & schedule"
+                                            description="Each channel publishes at its own local time."
+                                        >
+                                            <ChannelSchedule
+                                                accounts={targetAccounts}
+                                                rows={scheduleRows}
+                                                onToggle={toggleChannel}
+                                                onChange={updateSchedule}
+                                                onApplyToAll={
+                                                    applyScheduleToAll
+                                                }
+                                                captionLength={caption.length}
+                                                hashtagCount={hashtags.length}
+                                                error={
+                                                    errors[
+                                                        'targets.0.social_account_id'
+                                                    ]
+                                                }
+                                            />
+                                        </Panel>
 
-                                                            return (
-                                                                <button
-                                                                    key={
-                                                                        account.id
-                                                                    }
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        toggleTargetAccount(
-                                                                            account.id,
-                                                                        )
-                                                                    }
-                                                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                                                                        selected
-                                                                            ? 'border-primary bg-primary/10 text-primary'
-                                                                            : 'border-border bg-muted/50 text-foreground'
-                                                                    }`}
-                                                                >
-                                                                    <AccountIcon className="size-3.5" />
-                                                                    {
-                                                                        account.handle
-                                                                    }{' '}
-                                                                    ·{' '}
-                                                                    {
-                                                                        account.timezone
-                                                                    }
-                                                                </button>
-                                                            );
-                                                        },
-                                                    )}
-                                                </div>
+                                        <Panel
+                                            eyebrow="03"
+                                            title="Media"
+                                            description="Click to attach — the number is the order it appears in."
+                                            actions={
+                                                <span className="text-muted-foreground font-mono text-xs">
+                                                    {selectedAssetIds.length}{' '}
+                                                    selected
+                                                </span>
+                                            }
+                                        >
+                                            <MediaPicker
+                                                assets={assets}
+                                                selectedIds={selectedAssetIds}
+                                                onToggle={toggleAsset}
+                                                canUpload={can.create_asset}
+                                                uploading={isUploadingAsset}
+                                                onUpload={(file) =>
+                                                    void handleAssetUpload(file)
+                                                }
+                                            />
+                                        </Panel>
 
-                                                {targetEntries.length === 0 && (
-                                                    <p className="text-muted-foreground text-sm">
-                                                        No target accounts
-                                                        selected.
-                                                    </p>
-                                                )}
-
-                                                <div className="grid gap-2">
-                                                    {targetEntries.map(
-                                                        (
-                                                            [accountIdStr, row],
-                                                            i,
-                                                        ) => {
-                                                            const accountId =
-                                                                Number(
-                                                                    accountIdStr,
-                                                                );
-                                                            const account =
-                                                                targetAccounts.find(
-                                                                    (a) =>
-                                                                        a.id ===
-                                                                        accountId,
-                                                                );
-                                                            const AccountIcon =
-                                                                platformIcon[
-                                                                    account?.platform ??
-                                                                        ''
-                                                                ] ?? Share2;
-                                                            const limit =
-                                                                post.targets.find(
-                                                                    (t) =>
-                                                                        t.social_account_id ===
-                                                                        accountId,
-                                                                )?.caption_limit;
-
-                                                            return (
-                                                                <div
-                                                                    key={
-                                                                        accountId
-                                                                    }
-                                                                    className="border-border bg-muted/20 grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-4 sm:items-end"
-                                                                >
-                                                                    <div className="flex items-center gap-2 text-sm sm:col-span-1">
-                                                                        <AccountIcon className="text-primary size-4" />
-                                                                        <div className="flex flex-col">
-                                                                            <span>
-                                                                                {account?.handle ??
-                                                                                    accountId}
-                                                                            </span>
-                                                                            <span className="text-muted-foreground text-xs tabular-nums">
-                                                                                {
-                                                                                    caption.length
-                                                                                }
-                                                                                {limit
-                                                                                    ? ` / ${limit}`
-                                                                                    : ''}{' '}
-                                                                                chars
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="grid gap-1">
-                                                                        <Label
-                                                                            htmlFor={`target-date-${accountId}`}
-                                                                        >
-                                                                            Local
-                                                                            date
-                                                                        </Label>
-                                                                        <Input
-                                                                            id={`target-date-${accountId}`}
-                                                                            type="date"
-                                                                            value={
-                                                                                row.date
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                setTargetRows(
-                                                                                    (
-                                                                                        current,
-                                                                                    ) => ({
-                                                                                        ...current,
-                                                                                        [accountId]:
-                                                                                            {
-                                                                                                ...current[
-                                                                                                    accountId
-                                                                                                ],
-                                                                                                date: e
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                            },
-                                                                                    }),
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    </div>
-                                                                    <div className="grid gap-1">
-                                                                        <Label
-                                                                            htmlFor={`target-time-${accountId}`}
-                                                                        >
-                                                                            Local
-                                                                            time
-                                                                        </Label>
-                                                                        <Input
-                                                                            id={`target-time-${accountId}`}
-                                                                            type="time"
-                                                                            value={
-                                                                                row.time
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                setTargetRows(
-                                                                                    (
-                                                                                        current,
-                                                                                    ) => ({
-                                                                                        ...current,
-                                                                                        [accountId]:
-                                                                                            {
-                                                                                                ...current[
-                                                                                                    accountId
-                                                                                                ],
-                                                                                                time: e
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                            },
-                                                                                    }),
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    </div>
-                                                                    <input
-                                                                        type="hidden"
-                                                                        name={`targets[${i}][social_account_id]`}
-                                                                        value={
-                                                                            accountId
-                                                                        }
-                                                                    />
-                                                                    <input
-                                                                        type="hidden"
-                                                                        name={`targets[${i}][scheduled_local_date]`}
-                                                                        value={
-                                                                            row.date
-                                                                        }
-                                                                    />
-                                                                    <input
-                                                                        type="hidden"
-                                                                        name={`targets[${i}][scheduled_local_time]`}
-                                                                        value={
-                                                                            row.time
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            );
-                                                        },
-                                                    )}
-                                                </div>
-                                                <InputError
-                                                    message={
-                                                        errors[
-                                                            'targets.0.social_account_id'
-                                                        ]
+                                        <Panel
+                                            eyebrow="04"
+                                            title="Details"
+                                            bodyClassName="grid gap-5 sm:grid-cols-2"
+                                        >
+                                            <div className="grid content-start gap-2">
+                                                <Label
+                                                    htmlFor="music_search"
+                                                    className="flex items-center gap-1.5"
+                                                >
+                                                    <Music2 className="text-muted-foreground size-3.5" />
+                                                    Sound
+                                                </Label>
+                                                <MusicField
+                                                    postId={post.id}
+                                                    clientId={post.client_id}
+                                                    platforms={musicPlatforms}
+                                                    instagramAccountId={
+                                                        selectedAccounts.find(
+                                                            (a) =>
+                                                                a.platform ===
+                                                                'instagram',
+                                                        )?.id ?? null
                                                     }
+                                                    musicId={musicId}
+                                                    musicName={musicName}
+                                                    onChange={(track) => {
+                                                        setMusicId(track.id);
+                                                        setMusicName(
+                                                            track.name,
+                                                        );
+                                                    }}
                                                 />
                                             </div>
-
-                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                                <div className="grid gap-1">
-                                                    <Label htmlFor="music_search">
-                                                        Music
-                                                    </Label>
-                                                    {musicPlatforms.length >
-                                                    0 ? (
-                                                        <div className="grid gap-2">
-                                                            {musicPlatforms.length >
-                                                                1 && (
-                                                                <div className="flex gap-1.5">
-                                                                    {musicPlatforms.map(
-                                                                        (
-                                                                            platform,
-                                                                        ) => (
-                                                                            <button
-                                                                                key={
-                                                                                    platform
-                                                                                }
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    setMusicPlatform(
-                                                                                        platform,
-                                                                                    )
-                                                                                }
-                                                                                className={cn(
-                                                                                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                                                                    activeMusicPlatform ===
-                                                                                        platform
-                                                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                                                        : 'border-border bg-muted/50 text-foreground',
-                                                                                )}
-                                                                            >
-                                                                                {platform ===
-                                                                                'instagram'
-                                                                                    ? 'Instagram'
-                                                                                    : 'TikTok'}
-                                                                            </button>
-                                                                        ),
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <div className="flex gap-2">
-                                                                <Input
-                                                                    id="music_search"
-                                                                    value={
-                                                                        musicQuery
-                                                                    }
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        setMusicQuery(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
-                                                                    onKeyDown={(
-                                                                        e,
-                                                                    ) => {
-                                                                        if (
-                                                                            e.key ===
-                                                                            'Enter'
-                                                                        ) {
-                                                                            e.preventDefault();
-                                                                            void handleMusicSearch();
-                                                                        }
-                                                                    }}
-                                                                    placeholder="Search a track / sound…"
-                                                                />
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    onClick={
-                                                                        handleMusicSearch
-                                                                    }
-                                                                    disabled={
-                                                                        musicSearching ||
-                                                                        musicQuery.trim() ===
-                                                                            ''
-                                                                    }
-                                                                >
-                                                                    <Search className="size-4" />
-                                                                    Search
-                                                                </Button>
-                                                            </div>
-                                                            {musicSearchError && (
-                                                                <p className="text-destructive text-sm">
-                                                                    {
-                                                                        musicSearchError
-                                                                    }
-                                                                    {musicSearchErrorCode ===
-                                                                        'meta_not_connected' &&
-                                                                        (() => {
-                                                                            const instagramAccountId =
-                                                                                targetEntries
-                                                                                    .map(
-                                                                                        ([
-                                                                                            accountIdStr,
-                                                                                        ]) =>
-                                                                                            targetAccounts.find(
-                                                                                                (
-                                                                                                    a,
-                                                                                                ) =>
-                                                                                                    a.id ===
-                                                                                                    Number(
-                                                                                                        accountIdStr,
-                                                                                                    ),
-                                                                                            ),
-                                                                                    )
-                                                                                    .find(
-                                                                                        (
-                                                                                            a,
-                                                                                        ) =>
-                                                                                            a?.platform ===
-                                                                                            'instagram',
-                                                                                    )?.id;
-
-                                                                            return instagramAccountId ? (
-                                                                                <>
-                                                                                    {' '}
-                                                                                    <a
-                                                                                        href={`/clients/${post.client_id}/social-accounts/${instagramAccountId}/facebook/connect`}
-                                                                                        className="underline"
-                                                                                    >
-                                                                                        Connect
-                                                                                        Instagram
-                                                                                        for
-                                                                                        music
-                                                                                        search
-                                                                                    </a>
-                                                                                </>
-                                                                            ) : null;
-                                                                        })()}
-                                                                </p>
-                                                            )}
-                                                            {musicResults.length >
-                                                                0 && (
-                                                                <ul className="border-border grid gap-1 rounded-md border p-1">
-                                                                    {musicResults.map(
-                                                                        (
-                                                                            track,
-                                                                        ) => (
-                                                                            <li
-                                                                                key={
-                                                                                    track.id
-                                                                                }
-                                                                            >
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        selectMusicTrack(
-                                                                                            track,
-                                                                                        )
-                                                                                    }
-                                                                                    className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
-                                                                                >
-                                                                                    <Music2 className="text-muted-foreground size-3.5 shrink-0" />
-                                                                                    <span className="min-w-0 flex-1 truncate">
-                                                                                        {
-                                                                                            track.name
-                                                                                        }
-                                                                                        {track.artist
-                                                                                            ? ` — ${track.artist}`
-                                                                                            : ''}
-                                                                                    </span>
-                                                                                </button>
-                                                                            </li>
-                                                                        ),
-                                                                    )}
-                                                                </ul>
-                                                            )}
-                                                            {musicName ? (
-                                                                <div className="border-border bg-muted/20 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                                                                    <span className="flex min-w-0 items-center gap-1.5 truncate">
-                                                                        <Music2 className="text-primary size-3.5 shrink-0" />
-                                                                        {
-                                                                            musicName
-                                                                        }
-                                                                    </span>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        onClick={
-                                                                            clearMusicTrack
-                                                                        }
-                                                                    >
-                                                                        Clear
-                                                                    </Button>
-                                                                </div>
-                                                            ) : (
-                                                                <p className="text-muted-foreground text-xs">
-                                                                    No track
-                                                                    selected.
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-muted-foreground text-sm">
-                                                            Select an Instagram
-                                                            or TikTok target
-                                                            account to search
-                                                            for music.
-                                                        </p>
-                                                    )}
-                                                    <input
-                                                        type="hidden"
-                                                        name="music[id]"
-                                                        value={musicId}
-                                                    />
-                                                    <input
-                                                        type="hidden"
-                                                        name="music[name]"
-                                                        value={musicName}
-                                                    />
-                                                </div>
-                                                <div className="grid gap-1">
-                                                    <Label htmlFor="location_name">
-                                                        Location
-                                                    </Label>
-                                                    <Input
-                                                        id="location_name"
-                                                        name="location[name]"
-                                                        value={locationName}
-                                                        onChange={(e) =>
-                                                            setLocationName(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Location name"
-                                                    />
-                                                </div>
+                                            <div className="grid content-start gap-2">
+                                                <Label
+                                                    htmlFor="location_name"
+                                                    className="flex items-center gap-1.5"
+                                                >
+                                                    <MapPin className="text-muted-foreground size-3.5" />
+                                                    Location
+                                                </Label>
+                                                <Input
+                                                    id="location_name"
+                                                    name="location[name]"
+                                                    value={locationName}
+                                                    onChange={(e) =>
+                                                        setLocationName(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. Shoreditch, London"
+                                                />
                                             </div>
+                                        </Panel>
 
-                                            <div className="grid gap-2">
-                                                <Label>Media</Label>
-                                                {can.create_asset && (
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            ref={
-                                                                assetFileInputRef
-                                                            }
-                                                            type="file"
-                                                            id="new_asset_file"
-                                                            className="hidden"
-                                                            accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.zip"
-                                                            onChange={(e) => {
-                                                                const file =
-                                                                    e.target
-                                                                        .files?.[0];
-                                                                if (file) {
-                                                                    void handleAssetUpload(
-                                                                        file,
-                                                                    );
-                                                                }
-                                                            }}
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            disabled={
-                                                                isUploadingAsset
-                                                            }
-                                                            onClick={() =>
-                                                                assetFileInputRef.current?.click()
-                                                            }
-                                                        >
-                                                            <UploadCloud className="size-4" />
-                                                            {isUploadingAsset
-                                                                ? 'Uploading…'
-                                                                : 'Upload asset'}
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                                {assets.length === 0 ? (
-                                                    <p className="text-muted-foreground text-sm">
-                                                        No assets on this client
-                                                        yet — upload one above.
-                                                    </p>
-                                                ) : (
+                                        <div
+                                            className={cn(
+                                                'bg-card/95 shadow-paper sticky bottom-4 z-10 flex items-center justify-between gap-3 rounded-full border py-2 pr-2 pl-5 backdrop-blur transition-colors',
+                                                isDirty
+                                                    ? 'border-foreground/20'
+                                                    : 'border-border',
+                                            )}
+                                        >
+                                            <span className="flex items-center gap-2 text-sm">
+                                                {isDirty ? (
                                                     <>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {assets.map(
-                                                                (asset) => {
-                                                                    const selected =
-                                                                        selectedAssetIds.includes(
-                                                                            asset.id,
-                                                                        );
-
-                                                                    return (
-                                                                        <button
-                                                                            key={
-                                                                                asset.id
-                                                                            }
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                toggleAsset(
-                                                                                    asset.id,
-                                                                                )
-                                                                            }
-                                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                                                                                selected
-                                                                                    ? 'border-primary bg-primary/10 text-primary'
-                                                                                    : 'border-border bg-muted/50 text-foreground'
-                                                                            }`}
-                                                                        >
-                                                                            {asset.original_filename ??
-                                                                                `Asset #${asset.id}`}
-                                                                        </button>
-                                                                    );
-                                                                },
-                                                            )}
-                                                        </div>
-                                                        {selectedAssets.length >
-                                                        0 ? (
-                                                            <AssetPreviewCarousel
-                                                                assets={
-                                                                    selectedAssets
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <p className="text-muted-foreground text-sm">
-                                                                No media
-                                                                selected.
-                                                            </p>
-                                                        )}
+                                                        <span className="bg-warning size-2 rounded-full" />
+                                                        Unsaved changes
+                                                        <kbd className="text-muted-foreground hidden font-mono text-[11px] sm:inline">
+                                                            Ctrl/⌘ S
+                                                        </kbd>
                                                     </>
+                                                ) : (
+                                                    <span className="text-muted-foreground flex items-center gap-1.5">
+                                                        <Check className="text-success size-4" />
+                                                        All changes saved
+                                                    </span>
                                                 )}
-                                                {selectedAssetIds.map(
-                                                    (id, i) => (
-                                                        <input
-                                                            key={id}
-                                                            type="hidden"
-                                                            name={`asset_ids[${i}]`}
-                                                            value={id}
-                                                        />
-                                                    ),
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                {isDirty && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        onClick={discardChanges}
+                                                        disabled={processing}
+                                                    >
+                                                        Discard
+                                                    </Button>
                                                 )}
-                                            </div>
-
-                                            <div>
                                                 <Button
                                                     type="submit"
-                                                    disabled={processing}
+                                                    variant="secondary"
+                                                    disabled={
+                                                        processing || !isDirty
+                                                    }
                                                 >
-                                                    Save changes
+                                                    {processing
+                                                        ? 'Saving…'
+                                                        : 'Save changes'}
                                                 </Button>
-                                            </div>
-                                        </>
-                                    )}
-                                </Form>
-                            )}
-                        </div>
-
-                        <div className="grid gap-3 lg:sticky lg:top-4">
-                            <div className="border-border bg-card rounded-lg border p-4">
-                                <div className="flex items-start justify-between gap-2">
-                                    <Heading
-                                        title="Live preview"
-                                        description="A quick look at how the post will render — not pixel-perfect"
-                                    />
-                                    {activePreviewTarget && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="icon"
-                                            className="shrink-0"
-                                            onClick={() =>
-                                                setIsPreviewFullscreen(true)
-                                            }
-                                            aria-label="View live preview in fullscreen"
-                                        >
-                                            <Maximize2 className="size-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                                {previewTargets.length > 1 && (
-                                    <div className="mt-3 flex flex-wrap gap-1.5">
-                                        {previewTargets.map((t) => {
-                                            const Icon =
-                                                platformIcon[t.platform] ??
-                                                Share2;
-                                            const selected =
-                                                t.id ===
-                                                activePreviewTarget?.id;
-
-                                            return (
-                                                <button
-                                                    key={t.id}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setPreviewTargetId(t.id)
-                                                    }
-                                                    className={cn(
-                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                                        selected
-                                                            ? 'border-primary bg-primary/10 text-primary'
-                                                            : 'border-border bg-muted/50 text-foreground',
-                                                    )}
-                                                >
-                                                    <Icon className="size-3.5" />
-                                                    {t.handle}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                            </span>
+                                        </div>
+                                    </>
                                 )}
-                                <div className="mt-4 flex justify-center">
-                                    {activePreviewTarget ? (
-                                        <SocialPostPreview
-                                            target={activePreviewTarget}
-                                            caption={
-                                                can.update
-                                                    ? caption
-                                                    : (post.master_caption ??
-                                                      '')
-                                            }
-                                            hashtags={
-                                                can.update
-                                                    ? hashtags
-                                                    : post.hashtags
-                                            }
-                                            assets={previewAssets}
-                                            musicName={
-                                                can.update
-                                                    ? musicName
-                                                    : ((post.music
-                                                          ?.name as string) ??
-                                                      '')
-                                            }
-                                            locationName={
-                                                can.update
-                                                    ? locationName
-                                                    : ((post.location
-                                                          ?.name as string) ??
-                                                      '')
-                                            }
-                                        />
-                                    ) : (
-                                        <p className="text-muted-foreground text-sm">
-                                            Select a target account to preview
-                                            the post.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <Dialog
-                            open={isPreviewFullscreen}
-                            onOpenChange={setIsPreviewFullscreen}
-                        >
-                            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                                <DialogHeader>
-                                    <DialogTitle>
-                                        Live preview
-                                        {activePreviewTarget
-                                            ? ` — ${activePreviewTarget.handle}`
-                                            : ''}
-                                    </DialogTitle>
-                                </DialogHeader>
-                                {previewTargets.length > 1 && (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {previewTargets.map((t) => {
-                                            const Icon =
-                                                platformIcon[t.platform] ??
-                                                Share2;
-                                            const selected =
-                                                t.id ===
-                                                activePreviewTarget?.id;
-
-                                            return (
-                                                <button
-                                                    key={t.id}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setPreviewTargetId(t.id)
-                                                    }
-                                                    className={cn(
-                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                                        selected
-                                                            ? 'border-primary bg-primary/10 text-primary'
-                                                            : 'border-border bg-muted/50 text-foreground',
-                                                    )}
-                                                >
-                                                    <Icon className="size-3.5" />
-                                                    {t.handle}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                                <div className="flex justify-center py-2">
-                                    {activePreviewTarget ? (
-                                        <SocialPostPreview
-                                            target={activePreviewTarget}
-                                            caption={
-                                                can.update
-                                                    ? caption
-                                                    : (post.master_caption ??
-                                                      '')
-                                            }
-                                            hashtags={
-                                                can.update
-                                                    ? hashtags
-                                                    : post.hashtags
-                                            }
-                                            assets={previewAssets}
-                                            musicName={
-                                                can.update
-                                                    ? musicName
-                                                    : ((post.music
-                                                          ?.name as string) ??
-                                                      '')
-                                            }
-                                            locationName={
-                                                can.update
-                                                    ? locationName
-                                                    : ((post.location
-                                                          ?.name as string) ??
-                                                      '')
-                                            }
-                                        />
-                                    ) : (
-                                        <p className="text-muted-foreground text-sm">
-                                            Select a target account to preview
-                                            the post.
-                                        </p>
-                                    )}
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    </TabsContent>
-
-                    <TabsContent value="checklist" className="grid gap-4">
-                        <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
-                            <Heading
-                                title="Pre-schedule checklist"
-                                description="Re-validated server-side before any move to Scheduled"
-                            />
-                            <div className="grid gap-2">
-                                {post.checklist.items.map((item) => (
-                                    <div
-                                        key={item.key}
-                                        className="flex items-center gap-2 text-sm"
-                                    >
-                                        {item.passed ? (
-                                            <CheckCircle2 className="size-4 text-green-600 dark:text-green-500" />
-                                        ) : (
-                                            <XCircle className="text-destructive size-4" />
-                                        )}
-                                        <span
-                                            className={
-                                                item.passed
-                                                    ? ''
-                                                    : 'text-muted-foreground'
-                                            }
-                                        >
-                                            {item.label}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            <Badge
-                                variant={
-                                    post.checklist.passed
-                                        ? 'success'
-                                        : 'destructive'
-                                }
-                                className="w-fit"
-                            >
-                                {post.checklist.passed
-                                    ? 'All checks passed'
-                                    : 'Checklist incomplete'}
-                            </Badge>
-                        </div>
-
-                        {allowedTransitions.length > 0 && (
-                            <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
-                                <Heading
-                                    title="Move status"
-                                    description="Only legal, authorized transitions are shown"
-                                />
-                                <div className="flex flex-wrap gap-2">
-                                    {allowedTransitions.map(
-                                        (transitionOption) => (
-                                            <Form
-                                                key={transitionOption.value}
-                                                {...transitionPost.form(
-                                                    post.id,
-                                                )}
-                                            >
-                                                {({ processing, errors }) => (
-                                                    <div className="grid gap-1">
-                                                        <input
-                                                            type="hidden"
-                                                            name="to"
-                                                            value={
-                                                                transitionOption.value
-                                                            }
-                                                        />
-                                                        <Button
-                                                            type="submit"
-                                                            size="sm"
-                                                            variant={
-                                                                transitionOption.value ===
-                                                                    'scheduled' &&
-                                                                !post.checklist
-                                                                    .passed
-                                                                    ? 'outline'
-                                                                    : 'default'
-                                                            }
-                                                            disabled={
-                                                                processing ||
-                                                                (transitionOption.value ===
-                                                                    'scheduled' &&
-                                                                    !post
-                                                                        .checklist
-                                                                        .passed)
-                                                            }
-                                                        >
-                                                            {transitionOption.value ===
-                                                            'changes_requested' ? (
-                                                                <Circle className="size-3.5" />
-                                                            ) : (
-                                                                <CheckCircle2 className="size-3.5" />
-                                                            )}
-                                                            Move to{' '}
-                                                            {
-                                                                transitionOption.label
-                                                            }
-                                                        </Button>
-                                                        <InputError
-                                                            message={errors.to}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </Form>
-                                        ),
-                                    )}
-                                </div>
-                            </div>
+                            </Form>
+                        ) : (
+                            <ReadOnlyContent post={post} />
                         )}
-                    </TabsContent>
 
-                    <TabsContent value="comments" className="grid gap-4">
-                        <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
-                            <Heading
-                                title="Comments"
-                                description="Internal notes are never visible to client reviewers — click a comment to see full details"
-                            />
-                            {can.comment && (
-                                <Form
-                                    {...storeComment.form(post.id)}
-                                    resetOnSuccess
-                                    className="border-border grid gap-2 rounded-md border border-dashed p-3"
-                                >
-                                    {({ processing, errors }) => (
-                                        <>
-                                            <MentionTextarea
-                                                name="body"
-                                                rows={2}
-                                                placeholder="Add a comment… type @ to mention someone"
-                                                users={mentionableUsers}
-                                            />
-                                            <InputError message={errors.body} />
-                                            <div className="flex items-center justify-between gap-2">
-                                                <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                                                    <input
-                                                        type="checkbox"
-                                                        name="internal_only"
-                                                        value="1"
-                                                    />
-                                                    Internal only
-                                                </label>
-                                                <Button
-                                                    type="submit"
-                                                    size="sm"
-                                                    disabled={processing}
-                                                >
-                                                    Post comment
-                                                </Button>
-                                            </div>
-                                        </>
-                                    )}
-                                </Form>
-                            )}
-                            <div className="grid gap-3">
-                                {post.comments.length === 0 ? (
-                                    <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                                        <MessageSquareQuote className="size-4" />
-                                        No comments yet.
-                                    </p>
-                                ) : (
-                                    post.comments.map((c) => (
-                                        <CommentEntry key={c.id} comment={c} />
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </TabsContent>
+                        <PostDiscussion
+                            postId={post.id}
+                            comments={post.comments}
+                            activityLogs={post.activity_logs}
+                            canComment={can.comment}
+                            canResendReviewEmail={can.resend_review_email}
+                            mentionableUsers={mentionableUsers}
+                        />
+                    </div>
 
-                    <TabsContent value="activity" className="grid gap-4">
-                        <div className="border-border bg-card grid gap-3 rounded-lg border p-4">
-                            <Heading
-                                title="Activity log"
-                                description="Every status transition, oldest last — click an entry to see full details"
-                            />
-                            <div className="grid gap-3">
-                                {post.activity_logs.length === 0 ? (
-                                    <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                                        <History className="size-4" />
-                                        No activity yet.
-                                    </p>
-                                ) : (
-                                    post.activity_logs.map((log) => (
-                                        <ActivityLogEntry
-                                            key={log.id}
-                                            log={log}
-                                            postId={post.id}
-                                            canResend={can.resend_review_email}
-                                        />
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </TabsContent>
-                </Tabs>
-            </div>
+                    <aside className="grid gap-5 lg:sticky lg:top-20">
+                        <ReadinessChecklist
+                            items={checklistItems}
+                            note={
+                                isDirty
+                                    ? 'Reflects your unsaved edits — save before scheduling.'
+                                    : undefined
+                            }
+                        />
+                        <PreviewPanel
+                            targets={previewTargets}
+                            caption={
+                                can.update
+                                    ? caption
+                                    : (post.master_caption ?? '')
+                            }
+                            hashtags={can.update ? hashtags : post.hashtags}
+                            assets={can.update ? selectedAssets : post.assets}
+                            musicName={
+                                can.update
+                                    ? musicName
+                                    : ((post.music?.name as string) ?? '')
+                            }
+                            locationName={
+                                can.update
+                                    ? locationName
+                                    : ((post.location?.name as string) ?? '')
+                            }
+                        />
+                    </aside>
+                </div>
+            </Page>
         </>
     );
 }

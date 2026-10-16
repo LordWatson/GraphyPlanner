@@ -1,4 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { ConfirmDialogHost } from '@/components/confirm-dialog';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -39,6 +40,7 @@ void createInertiaApp({
             <TooltipProvider delayDuration={0}>
                 {app}
                 <Toaster />
+                <ConfirmDialogHost />
             </TooltipProvider>
         );
     },

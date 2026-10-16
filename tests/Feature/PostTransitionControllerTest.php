@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ApprovalDecision;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
 use App\Enums\Role;
 use App\Jobs\PublishPostJob;
 use App\Models\Client;
@@ -85,7 +86,7 @@ class PostTransitionControllerTest extends TestCase
             'scheduled_local_date' => now()->addDay()->toDateString(),
             'scheduled_local_time' => '09:00',
             'scheduled_at_utc' => now()->addDay(),
-            'status' => \App\Enums\PostTargetStatus::Failed,
+            'status' => PostTargetStatus::Failed,
             'external_post_id' => null,
             'error' => 'Method Not Allowed',
         ]);
@@ -99,7 +100,7 @@ class PostTransitionControllerTest extends TestCase
         $target->refresh();
 
         $this->assertSame(PostStatus::Scheduled, $post->status);
-        $this->assertSame(\App\Enums\PostTargetStatus::Pending, $target->status);
+        $this->assertSame(PostTargetStatus::Pending, $target->status);
         $this->assertNull($target->error);
 
         Queue::assertPushed(PublishPostJob::class, fn (PublishPostJob $job) => $job->postId === $post->id);
@@ -228,6 +229,7 @@ class PostTransitionControllerTest extends TestCase
         ]);
 
         $response->assertRedirect(route('posts.edit', $post));
+        $response->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Comment posted.']);
 
         $comment = $post->comments()->firstOrFail();
         $this->assertSame('Internal note for the team', $comment->body);
@@ -251,5 +253,30 @@ class PostTransitionControllerTest extends TestCase
 
         $comment = $post->comments()->firstOrFail();
         $this->assertFalse($comment->internal_only);
+    }
+
+    /**
+     * The editor's workflow dialog relies on the transition redirect carrying a toast that names
+     * the destination status, and on its optional note landing on the activity log entry.
+     */
+    public function test_transition_flashes_a_toast_and_records_the_note(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        $response = $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::InternalReview->value,
+            'comment' => 'Ready for a second pair of eyes.',
+        ]);
+
+        $response->assertRedirect(route('posts.edit', $post));
+        $response->assertInertiaFlash('toast', [
+            'type' => 'success',
+            'message' => 'Post moved to Internal review.',
+        ]);
+        $this->assertSame(PostStatus::InternalReview, $post->refresh()->status);
+        $this->assertSame('Ready for a second pair of eyes.', $post->activityLogs()->latest('id')->firstOrFail()->note);
     }
 }

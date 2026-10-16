@@ -78,11 +78,18 @@ class PostController extends Controller
         return Inertia::render('posts/edit', [
             'post' => $this->transformPostForEditor($post, $evaluateChecklist),
             'client' => ['id' => $client->id, 'name' => $client->name],
+            // Per-platform limits travel with every selectable account (not just the post's saved
+            // targets) so the editor can show caption/hashtag usage and a live readiness check the
+            // moment a new channel is toggled on, before anything is saved.
             'targetAccounts' => $client->socialAccounts()->get()->map(fn ($account) => [
                 'id' => $account->id,
                 'platform' => $account->platform->value,
+                'platform_label' => $account->platform->label(),
                 'handle' => $account->handle,
                 'timezone' => $account->timezone,
+                'caption_limit' => $account->platform->captionLimit(),
+                'max_hashtags' => $account->platform->maxHashtags(),
+                'is_text_only_capable' => $account->platform->isTextOnlyCapable(),
             ]),
             'availableAssets' => $client->assets()->latest()->get()->map(fn ($asset) => [
                 'id' => $asset->id,
@@ -119,6 +126,8 @@ class PostController extends Controller
     {
         $action($post, $request->validated());
 
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post saved.')]);
+
         return to_route('posts.edit', $post);
     }
 
@@ -130,12 +139,14 @@ class PostController extends Controller
         Post $post,
         TransitionPostStatusAction $action,
     ): RedirectResponse {
-        $action(
-            $post,
-            PostStatus::from($request->validated('to')),
-            $request->user(),
-            $request->validated('comment'),
-        );
+        $to = PostStatus::from($request->validated('to'));
+
+        $action($post, $to, $request->user(), $request->validated('comment'));
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Post moved to :status.', ['status' => $to->label()]),
+        ]);
 
         return to_route('posts.edit', $post);
     }
@@ -154,6 +165,8 @@ class PostController extends Controller
             $request->validated('body'),
             (bool) $request->validated('internal_only'),
         );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Comment posted.')]);
 
         return to_route('posts.edit', $post);
     }
