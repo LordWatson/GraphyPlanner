@@ -282,7 +282,7 @@
             padding-top: 10px;
         }
         .footer .wordmark { height: 12px; vertical-align: middle; }
-
+        
     </style>
 </head>
 <body>
@@ -293,7 +293,7 @@
                 <td class="eyebrow" style="vertical-align: middle;">{{ $organization->name }} &nbsp;&middot;&nbsp; {{ $invoice->invoice_number }}</td>
                 <td class="right" style="vertical-align: middle;">
                     <span class="eyebrow" style="letter-spacing: 1px;">Prepared with</span>
-                    <span class="serif wordmark"><em>graphy</em><span class="dot">.</span></span>
+                    <img class="wordmark" src="{{ $wordmark }}" alt="Alima">
                 </td>
             </tr>
         </table>

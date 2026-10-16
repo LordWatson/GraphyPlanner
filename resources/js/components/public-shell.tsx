@@ -57,8 +57,8 @@ export function PublicShell({
                     max,
                 )}
             >
-                <span>© {new Date().getFullYear()} Graphy</span>
-                <span>Secure link</span>
+                <span>© {new Date().getFullYear()} Alima</span>
+                <span>Marketing brighter together.</span>
             </footer>
         </div>
     );

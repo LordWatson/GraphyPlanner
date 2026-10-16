@@ -108,43 +108,34 @@ export default function Welcome() {
                     </nav>
                 </header>
 
-                <main className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col gap-24 px-6 pt-14 pb-20 lg:pt-24">
-                    <section className="animate-rise grid grid-cols-1 items-end gap-12 lg:grid-cols-[1.35fr_1fr]">
-                        <div className="flex flex-col gap-8">
-                            <span className="eyebrow text-muted-foreground flex items-center gap-2">
-                                <span
-                                    aria-hidden
-                                    className="bg-primary size-1.5 rounded-[2px]"
-                                />
-                                The operating system for social studios
-                            </span>
-                            <h1 className="font-serif text-[clamp(3.5rem,9vw,7.5rem)] leading-[0.88] tracking-[-0.035em]">
-                                Social content,
-                                <br />
-                                <em className="text-primary">orchestrated.</em>
-                            </h1>
-                        </div>
-                        <div className="flex flex-col gap-6 lg:pb-3">
-                            <p className="text-muted-foreground text-lg leading-relaxed text-pretty">
-                                Graphy keeps clients, brands, campaigns and
-                                scheduled posts in one considered workspace — so
-                                your team spends its time on the work, not on
-                                tracking it.
-                            </p>
-                            {!auth.user && (
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <Button size="lg" asChild>
-                                        <Link href={register()}>
-                                            Start planning
-                                            <ArrowRight />
-                                        </Link>
-                                    </Button>
-                                    <Button size="lg" variant="outline" asChild>
-                                        <Link href={login()}>Log in</Link>
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
+                <main className="relative mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-24 px-5 pb-24 md:px-10 lg:px-20">
+                    <section className="animate-rise border-foreground relative flex min-h-[560px] flex-col justify-center gap-8 overflow-hidden border-b-2 pt-10 pb-56 sm:pb-64 lg:pb-24">
+                        <Eyebrow dash className="text-primary">
+                            Alima Planner
+                        </Eyebrow>
+                        <h1 className="font-display max-w-4xl text-[clamp(3.5rem,8vw,6rem)] leading-[1.02]">
+                            Every post, planned{' '}
+                            <span className="text-signal">brighter.</span>
+                        </h1>
+                        <p className="text-muted-foreground max-w-xl text-lg leading-relaxed text-pretty">
+                            Clients, brands, campaigns and scheduled posts in
+                            one bright workspace — so the team spends its time
+                            on the work, not on tracking it.
+                        </p>
+                        {!auth.user && (
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button size="lg" variant="spark" asChild>
+                                    <Link href={register()}>
+                                        Let&apos;s grow
+                                        <ArrowRight />
+                                    </Link>
+                                </Button>
+                                <Button size="lg" variant="outline" asChild>
+                                    <Link href={about()}>See the work</Link>
+                                </Button>
+                            </div>
+                        )}
+                        <Peek className="text-lilac right-0 w-[min(92%,30rem)] lg:-right-4" />
                     </section>
 
                     <section
@@ -219,26 +210,31 @@ export default function Welcome() {
                     </section>
                 </main>
 
-                <footer className="bg-ink text-ink-foreground relative">
-                    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-14 pb-8">
-                        <div className="flex flex-wrap items-end justify-between gap-6">
-                            <p className="font-serif text-[clamp(3rem,10vw,8rem)] leading-none tracking-[-0.03em] italic">
-                                graphy
-                                <span className="text-primary not-italic">
-                                    .
-                                </span>
-                            </p>
+                <footer className="bg-ink text-cream relative">
+                    <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-12 px-5 pt-16 pb-8 md:px-10 lg:px-20">
+                        <div className="flex flex-wrap items-end justify-between gap-8">
+                            <div className="flex flex-col gap-6">
+                                <BrandMark
+                                    size="lg"
+                                    wordmark
+                                    className="text-cream"
+                                />
+                                <p className="font-display max-w-md text-3xl leading-[1.1]">
+                                    Marketing brighter together
+                                    <span className="text-signal">.</span>
+                                </p>
+                            </div>
                             <Link
                                 href={about()}
                                 className="group text-cream/80 hover:text-cream inline-flex items-center gap-1.5 text-sm font-medium"
                             >
-                                More about Graphy
+                                More about the planner
                                 <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                             </Link>
                         </div>
-                        <div className="eyebrow border-ink-foreground/15 text-ink-foreground/50 flex justify-between border-t pt-4">
-                            <span>© {new Date().getFullYear()} Graphy</span>
-                            <span>Plan · Approve · Publish</span>
+                        <div className="eyebrow border-cream/15 text-cream/55 flex flex-wrap justify-between gap-3 border-t pt-4">
+                            <span>© {new Date().getFullYear()} Alima</span>
+                            <span>Strategy · Content · Growth · Impact</span>
                         </div>
                     </div>
                 </footer>
