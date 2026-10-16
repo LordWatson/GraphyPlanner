@@ -53,7 +53,7 @@ export default function ClientEdit({
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <PageHeader
                     title={<>Edit {client.name}</>}
-                    description="Update client details"
+                    description="Keep the record current — status, retainer and contacts."
                 />
 
                 <Form

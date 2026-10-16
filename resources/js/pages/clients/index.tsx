@@ -36,7 +36,7 @@ export default function ClientsIndex({
             <Head title="Clients" />
             <Page>
                 <PageHeader
-                    eyebrow={`Clients — ${String(clients.length).padStart(2, '0')} on the books`}
+                    eyebrow={`${String(clients.length).padStart(2, '0')} on the books`}
                     title={
                         <>
                             The <em>roster</em>
@@ -118,10 +118,10 @@ export default function ClientsIndex({
                                             {String(i + 1).padStart(2, '0')}
                                         </span>
                                         <span className="flex min-w-0 items-center gap-3">
-                                            <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-full border font-serif text-lg leading-none italic transition-colors">
+                                            <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-9 shrink-0 items-center justify-center rounded-full border text-lg leading-none transition-colors">
                                                 {client.name.charAt(0)}
                                             </span>
-                                            <span className="group-hover:text-primary truncate font-serif text-2xl leading-tight tracking-[-0.01em] transition-colors">
+                                            <span className="group-hover:text-primary font-display truncate text-xl leading-tight transition-colors">
                                                 {client.name}
                                             </span>
                                         </span>

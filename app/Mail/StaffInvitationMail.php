@@ -23,7 +23,7 @@ class StaffInvitationMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject("You're invited to join {$this->invitation->organization->name} on Graphy")
+            ->subject("You're invited to join {$this->invitation->organization->name} on Alima")
             ->view('emails.staff-invitation');
     }
 }

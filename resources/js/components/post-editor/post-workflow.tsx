@@ -412,7 +412,7 @@ export function PostWorkflow({
 
             <div className="border-border/70 flex flex-col gap-4 border-t px-5 py-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex min-w-0 flex-col gap-1">
-                    <p className="font-serif text-2xl leading-tight tracking-[-0.01em]">
+                    <p className="font-display text-xl leading-tight">
                         {guidance.headline}
                     </p>
                     <p className="text-muted-foreground text-[13px] text-pretty">

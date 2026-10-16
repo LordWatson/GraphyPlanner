@@ -135,7 +135,7 @@ function InstagramPreview({
     return (
         <div className="border-border bg-card w-full overflow-hidden rounded-lg border text-sm">
             <div className="flex items-center gap-2 p-2.5">
-                <span className="bg-gradient-brand text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
                     {handle.slice(0, 1).toUpperCase() || '?'}
                 </span>
                 <div className="grid min-w-0 flex-1 leading-tight">

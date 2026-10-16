@@ -184,7 +184,7 @@ export function describeTransition(
                 to,
                 label: 'Mark as published',
                 description:
-                    'Manual override — use when the post went live outside AlimaPlanner.',
+                    'Manual override — use when the post went live outside Alima Planner.',
                 intent: 'system',
                 icon: CheckCircle2,
                 notePlaceholder: 'Why the manual override?',

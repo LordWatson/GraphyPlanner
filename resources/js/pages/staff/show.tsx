@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { edit, index, destroy } from '@/routes/staff';
 import { PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
+import { formatDateTime } from '@/lib/dates';
 
 type Member = {
     id: number;
@@ -125,7 +126,7 @@ export default function StaffShow({
                                             )}
                                         </div>
                                         <span className="text-muted-foreground text-xs">
-                                            {log.created_at}
+                                            {formatDateTime(log.created_at)}
                                         </span>
                                     </div>
                                     {log.note && (

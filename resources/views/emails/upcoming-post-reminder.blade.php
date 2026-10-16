@@ -5,43 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Posts scheduled to go out soon</title>
 </head>
-<body style="margin:0; padding:0; background-color:#fbf9f5; font-family:'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fbf9f5; padding:32px 0;">
+<body style="margin:0; padding:0; background-color:#F5F2E8; font-family:'Poppins', Arial, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F2E8; padding:32px 0;">
         <tr>
             <td align="center">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e7e2d9;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#FBFAF6; border-radius:12px; overflow:hidden; border:1px solid #E1DDD0;">
                     <tr>
-                        <td style="background-color:#241f1a; padding:24px 32px;">
-                            <span style="font-family:'Playfair Display', Georgia, serif; font-style:italic; color:#ffffff; font-size:22px; font-weight:600; letter-spacing:-0.02em;">alimaplanner.</span>
+                        <td style="background-color:#205557; padding:24px 32px;">
+                            <img src="{{ asset('brand/alima_logo_cream@2x.png') }}" width="120" height="36" alt="Alima" style="display:block; border:0; width:120px; height:36px;">
                         </td>
                     </tr>
                     <tr>
                         <td style="padding:32px;">
-                            <h1 style="margin:0 0 12px; font-family:'Playfair Display', Georgia, serif; font-size:22px; line-height:1.3; color:#1f1f1f; font-weight:600;">
+                            <h1 style="margin:0 0 12px; font-family:'Poppins', Arial, sans-serif; font-size:22px; line-height:1.3; color:#181723; font-weight:600;">
                                 {{ count($occurrences) === 1 ? 'A post is scheduled to go out soon' : count($occurrences).' posts are scheduled to go out soon' }}
                             </h1>
-                            <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4b4b4b;">
+                            <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
                                 Here's what's due to be published for {{ $organization->name }} in the next {{ $days }} {{ Str::plural('day', $days) }}:
                             </p>
 
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                                 @foreach ($occurrences as $occurrence)
                                     <tr>
-                                        <td style="padding:14px 16px; background-color:#fbf9f5; border:1px solid #e7e2d9; border-radius:8px; margin-bottom:10px; display:block;">
-                                            <p style="margin:0 0 4px; font-size:14px; font-weight:600; color:#1f1f1f;">
+                                        <td style="padding:14px 16px; background-color:#F5F2E8; border:1px solid #E1DDD0; border-radius:8px; margin-bottom:10px; display:block;">
+                                            <p style="margin:0 0 4px; font-size:14px; font-weight:600; color:#181723;">
                                                 {{ $occurrence['client_name'] ?? 'Unknown client' }}
                                                 @if ($occurrence['handle'])
                                                     &mdash; {{ $occurrence['handle'] }}
                                                 @endif
                                             </p>
-                                            <p style="margin:0 0 4px; font-size:13px; color:#7a7a7a;">
+                                            <p style="margin:0 0 4px; font-size:13px; color:#6B6977;">
                                                 {{ $occurrence['scheduled_at_utc']?->toDayDateTimeString() }} UTC
                                                 @if ($occurrence['platform'])
                                                     &middot; {{ ucfirst($occurrence['platform']) }}
                                                 @endif
                                             </p>
                                             @if ($occurrence['master_caption'])
-                                                <p style="margin:0; font-size:13px; color:#4b4b4b;">
+                                                <p style="margin:0; font-size:13px; color:#4A4857;">
                                                     {{ \Illuminate\Support\Str::limit($occurrence['master_caption'], 140) }}
                                                 </p>
                                             @endif
@@ -51,15 +51,15 @@
                                 @endforeach
                             </table>
 
-                            <p style="margin:0; font-size:12px; line-height:1.6; color:#9a9a9a;">
+                            <p style="margin:0; font-size:12px; line-height:1.6; color:#6B6977;">
                                 This is a one-time reminder per post — you won't be notified again for the same post.
                             </p>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:20px 32px; background-color:#fbf9f5; border-top:1px solid #e7e2d9;">
-                            <p style="margin:0; font-size:12px; color:#9a9a9a;">
-                                &copy; {{ now()->year }} AlimaPlanner. This is an automated message, please don't reply
+                        <td style="padding:20px 32px; background-color:#F5F2E8; border-top:1px solid #E1DDD0;">
+                            <p style="margin:0; font-size:12px; color:#6B6977;">
+                                &copy; {{ now()->year }} Alima. Marketing brighter together. This is an automated message, please don't reply
                                 directly to this email.
                             </p>
                         </td>

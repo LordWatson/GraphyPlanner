@@ -1,8 +1,10 @@
-import { Form, Head, Link } from '@inertiajs/react';
-import { Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { Form, Head, Link, router } from '@inertiajs/react';
+import { ArrowUpRight, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { useState } from 'react';
 import StaffInvitationController from '@/actions/App/Http/Controllers/StaffInvitationController';
+import { confirmDialog } from '@/components/confirm-dialog';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { EmptyState, PageHeader, Panel, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { index, show } from '@/routes/staff';
-import { PageHeader } from '@/components/page';
+import { formatDate } from '@/lib/dates';
 
 type Member = {
     id: number;
@@ -44,228 +46,296 @@ type StaffIndexProps = {
     can: { invite: boolean };
 };
 
+function invitationState(invitation: Invitation): string {
+    if (invitation.is_pending) {
+        return 'pending';
+    }
+
+    if (invitation.accepted_at) {
+        return 'accepted';
+    }
+
+    return invitation.revoked_at ? 'revoked' : 'expired';
+}
+
+function MemberCard({ member }: { member: Member }) {
+    return (
+        <Link
+            href={show(member.id)}
+            className="group border-border/80 bg-card hover:bg-muted/40 flex items-center gap-3.5 rounded-2xl border p-3.5 shadow-sm transition-colors"
+        >
+            <span className="bg-accent text-accent-foreground group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-11 shrink-0 items-center justify-center rounded-full text-lg transition-colors">
+                {member.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[15px] font-semibold">
+                    {member.name}
+                </span>
+                <span className="text-muted-foreground truncate text-xs">
+                    {member.email}
+                </span>
+            </span>
+            {member.role && (
+                <StatusPill
+                    kind="role"
+                    value={member.role}
+                    label={member.role_label}
+                    className="shrink-0"
+                />
+            )}
+            <ArrowUpRight className="text-muted-foreground size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+        </Link>
+    );
+}
+
+function RosterGroup({
+    title,
+    caption,
+    members,
+}: {
+    title: string;
+    caption: string;
+    members: Member[];
+}) {
+    return (
+        <section className="flex flex-col gap-4">
+            <div className="border-foreground/85 flex items-baseline justify-between gap-4 border-t pt-4">
+                <h2 className="text-[17px] font-semibold tracking-[-0.01em]">
+                    {title}
+                </h2>
+                <span className="eyebrow text-muted-foreground">{caption}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {members.map((member) => (
+                    <MemberCard key={member.id} member={member} />
+                ))}
+            </div>
+        </section>
+    );
+}
+
 export default function StaffIndex({
     members,
     invitations,
     roles,
     can,
 }: StaffIndexProps) {
+    const [revokingId, setRevokingId] = useState<number | null>(null);
+
     const pendingInvitations = invitations.filter(
         (invitation) => invitation.is_pending,
     );
     const otherInvitations = invitations.filter(
         (invitation) => !invitation.is_pending,
     );
+    const studio = members.filter(
+        (member) => member.role !== 'client_reviewer',
+    );
+    const reviewers = members.filter(
+        (member) => member.role === 'client_reviewer',
+    );
+
+    const revoke = async (invitation: Invitation) => {
+        if (
+            !(await confirmDialog({
+                title: `Revoke the invite for ${invitation.email}?`,
+                description:
+                    'Their link stops working straight away. You can always send a fresh one.',
+                confirmLabel: 'Revoke invite',
+                tone: 'destructive',
+            }))
+        ) {
+            return;
+        }
+
+        router.delete(StaffInvitationController.destroy.url(invitation.id), {
+            preserveScroll: true,
+            onStart: () => setRevokingId(invitation.id),
+            onFinish: () => setRevokingId(null),
+        });
+    };
 
     return (
         <>
             <Head title="Staff" />
-            <div className="mx-auto flex w-full max-w-[1360px] flex-1 flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
+            <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-8 px-4 pt-6 pb-12 md:px-10 md:pt-10">
                 <PageHeader
-                    eyebrow="Team"
-                    title="Your team"
+                    eyebrow={`${members.length} with access`}
+                    title={
+                        <>
+                            Your <em>team</em>.
+                        </>
+                    }
                     description="Everyone with access to your organization, and anyone still waiting on an invite."
                 />
 
+                <StatStrip
+                    className="animate-rise"
+                    items={[
+                        {
+                            label: 'Studio',
+                            value: String(studio.length).padStart(2, '0'),
+                            caption: 'Owners, strategists, designers',
+                        },
+                        {
+                            label: 'Client reviewers',
+                            value: String(reviewers.length).padStart(2, '0'),
+                            caption: 'Portal access only',
+                        },
+                        {
+                            label: 'Pending',
+                            value: String(pendingInvitations.length).padStart(
+                                2,
+                                '0',
+                            ),
+                            caption: 'Invites not yet accepted',
+                        },
+                    ]}
+                />
+
                 {can.invite && (
-                    <Form
-                        {...StaffInvitationController.store.form()}
-                        resetOnSuccess
-                        className="border-border bg-card/50 grid grid-cols-2 gap-3 rounded-2xl border border-dashed p-4 shadow-sm sm:grid-cols-4"
+                    <Panel
+                        eyebrow="Grow the team"
+                        title="Invite someone"
+                        icon={UserPlus}
                     >
-                        {({ processing, errors }) => (
-                            <>
-                                <div className="col-span-2 grid gap-1">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input
-                                        id="email"
-                                        name="email"
-                                        type="email"
-                                        required
-                                    />
-                                    <InputError message={errors.email} />
-                                </div>
+                        <Form
+                            {...StaffInvitationController.store.form()}
+                            resetOnSuccess
+                            className="flex flex-col gap-4 sm:flex-row sm:items-start"
+                        >
+                            {({ processing, errors }) => (
+                                <>
+                                    <div className="grid flex-1 gap-1.5">
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input
+                                            id="email"
+                                            name="email"
+                                            type="email"
+                                            placeholder="name@studio.com"
+                                            required
+                                        />
+                                        <InputError message={errors.email} />
+                                    </div>
 
-                                <div className="col-span-2 grid gap-1 sm:col-span-1">
-                                    <Label htmlFor="role">Role</Label>
-                                    <Select
-                                        name="role"
-                                        defaultValue={roles[0]?.value}
-                                    >
-                                        <SelectTrigger id="role">
-                                            <SelectValue placeholder="Select a role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {roles.map((role) => (
-                                                <SelectItem
-                                                    key={role.value}
-                                                    value={role.value}
-                                                >
-                                                    {role.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={errors.role} />
-                                </div>
+                                    <div className="grid gap-1.5 sm:w-52">
+                                        <Label htmlFor="role">Role</Label>
+                                        <Select
+                                            name="role"
+                                            defaultValue={roles[0]?.value}
+                                        >
+                                            <SelectTrigger id="role">
+                                                <SelectValue placeholder="Select a role" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {roles.map((role) => (
+                                                    <SelectItem
+                                                        key={role.value}
+                                                        value={role.value}
+                                                    >
+                                                        {role.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError message={errors.role} />
+                                    </div>
 
-                                <div className="col-span-full flex items-end sm:col-span-1">
                                     <Button
                                         type="submit"
-                                        size="sm"
                                         disabled={processing}
+                                        className="sm:mt-5"
                                     >
                                         <UserPlus />
                                         Send invitation
                                     </Button>
-                                </div>
-                            </>
-                        )}
-                    </Form>
+                                </>
+                            )}
+                        </Form>
+                    </Panel>
                 )}
 
-                <div className="space-y-3">
-                    <h2 className="text-muted-foreground text-sm font-medium">
-                        Members
-                    </h2>
+                {members.length === 0 ? (
+                    <EmptyState
+                        icon={UsersRound}
+                        title="Just you, for now."
+                        description="Invite your strategists, designers and client reviewers to start working together."
+                    />
+                ) : (
+                    <>
+                        {studio.length > 0 && (
+                            <RosterGroup
+                                title="The studio"
+                                caption={`${studio.length} ${studio.length === 1 ? 'person' : 'people'}`}
+                                members={studio}
+                            />
+                        )}
+                        {reviewers.length > 0 && (
+                            <RosterGroup
+                                title="Client reviewers"
+                                caption="Client portal only"
+                                members={reviewers}
+                            />
+                        )}
+                    </>
+                )}
 
-                    {members.length === 0 ? (
-                        <div className="border-border bg-card/50 flex min-h-[20vh] flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed p-8 text-center">
-                            <UsersRound className="text-muted-foreground size-6" />
-                            <p className="text-sm font-medium">No staff yet</p>
+                {invitations.length > 0 && (
+                    <section className="flex flex-col gap-4">
+                        <div className="border-foreground/85 flex items-baseline justify-between gap-4 border-t pt-4">
+                            <h2 className="text-[17px] font-semibold tracking-[-0.01em]">
+                                Invitations
+                            </h2>
+                            <span className="eyebrow text-muted-foreground">
+                                {pendingInvitations.length} pending
+                            </span>
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            {members.map((member) => (
-                                <Link
-                                    key={member.id}
-                                    href={show(member.id)}
-                                    className="group border-border bg-card hover:bg-muted/40 flex items-center gap-3 rounded-2xl border p-3.5 transition-colors"
-                                >
-                                    <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-full border font-serif text-lg italic transition-colors">
-                                        {member.name.charAt(0).toUpperCase()}
-                                    </span>
-                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                        <span className="truncate text-[15px] font-semibold">
-                                            {member.name}
+                        <ul className="border-border/80 bg-card divide-border/70 flex flex-col divide-y overflow-hidden rounded-2xl border shadow-sm">
+                            {[...pendingInvitations, ...otherInvitations].map(
+                                (invitation) => (
+                                    <li
+                                        key={invitation.id}
+                                        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5"
+                                    >
+                                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                            <span className="truncate text-sm font-medium">
+                                                {invitation.email}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {invitation.role_label}
+                                                {invitation.is_pending &&
+                                                    ` · expires ${formatDate(invitation.expires_at)}`}
+                                            </span>
                                         </span>
-                                        <span className="text-muted-foreground truncate text-xs">
-                                            {member.email}
-                                        </span>
-                                    </div>
-                                    {member.role && (
                                         <StatusPill
-                                            kind="role"
-                                            value={member.role}
-                                            label={member.role_label}
+                                            kind="invitation"
+                                            value={invitationState(invitation)}
                                             className="shrink-0"
                                         />
-                                    )}
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {pendingInvitations.length > 0 && (
-                    <div className="space-y-3">
-                        <h2 className="text-muted-foreground text-sm font-medium">
-                            Pending invitations
-                        </h2>
-
-                        <div className="grid gap-3">
-                            {pendingInvitations.map((invitation) => (
-                                <div
-                                    key={invitation.id}
-                                    className="border-border bg-card hover:border-primary/30 hover:bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 shadow-sm transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
-                                            <UserPlus className="size-4" />
-                                        </span>
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">
-                                                    {invitation.email}
-                                                </span>
-                                                <Badge variant="outline">
-                                                    {invitation.role_label}
-                                                </Badge>
-                                                <Badge variant="warning">
-                                                    pending
-                                                </Badge>
-                                            </div>
-                                            <span className="text-muted-foreground text-xs">
-                                                Expires {invitation.expires_at}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {invitation.can.delete && (
-                                        <Form
-                                            {...StaffInvitationController.destroy.form(
-                                                invitation.id,
-                                            )}
-                                        >
-                                            {({ processing }) => (
+                                        {invitation.is_pending &&
+                                            invitation.can.delete && (
                                                 <Button
-                                                    type="submit"
+                                                    type="button"
                                                     size="sm"
-                                                    variant="outline"
-                                                    disabled={processing}
+                                                    variant="ghost"
+                                                    className="text-destructive hover:bg-destructive/8 hover:text-destructive"
+                                                    disabled={
+                                                        revokingId ===
+                                                        invitation.id
+                                                    }
+                                                    onClick={() =>
+                                                        revoke(invitation)
+                                                    }
                                                 >
                                                     <Trash2 />
                                                     Revoke
                                                 </Button>
                                             )}
-                                        </Form>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {otherInvitations.length > 0 && (
-                    <div className="space-y-3">
-                        <h2 className="text-muted-foreground text-sm font-medium">
-                            Invitation history
-                        </h2>
-
-                        <div className="grid gap-3">
-                            {otherInvitations.map((invitation) => (
-                                <div
-                                    key={invitation.id}
-                                    className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 shadow-sm"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">
-                                                    {invitation.email}
-                                                </span>
-                                                <Badge variant="outline">
-                                                    {invitation.role_label}
-                                                </Badge>
-                                                <Badge
-                                                    variant={
-                                                        invitation.accepted_at
-                                                            ? 'success'
-                                                            : 'secondary'
-                                                    }
-                                                >
-                                                    {invitation.accepted_at
-                                                        ? 'accepted'
-                                                        : invitation.revoked_at
-                                                          ? 'revoked'
-                                                          : 'expired'}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                                    </li>
+                                ),
+                            )}
+                        </ul>
+                    </section>
                 )}
             </div>
         </>

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Client;
+use App\Models\User;
 use Database\Seeders\PreviewSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,11 +22,32 @@ class PreviewModeTest extends TestCase
         $response->assertInertia(fn ($page) => $page->where('preview', true));
     }
 
+    /**
+     * Regression: shared props used to read `$request->user()` before the route-level `preview`
+     * middleware had signed the visitor in, so a visitor's first `/preview/*` request in a fresh
+     * session shared `auth.user = null` and the sidebar crashed on `auth.user.role`.
+     */
+    public function test_first_preview_request_shares_the_signed_in_preview_owner()
+    {
+        $this->seed(PreviewSeeder::class);
+
+        $this->assertGuest();
+
+        $response = $this->get(route('preview.dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('auth.user.email', 'preview@graphy.test')
+            ->where('auth.user.role', 'owner')
+            ->where('unreadNotificationsCount', 0)
+        );
+    }
+
     public function test_preview_mode_rejects_write_requests_with_a_403()
     {
         $this->seed(PreviewSeeder::class);
 
-        $client = \App\Models\Client::firstWhere('name', 'Fixture & Co');
+        $client = Client::firstWhere('name', 'Fixture & Co');
 
         $response = $this->post(route('preview.clients.store'), [
             'name' => 'Should Never Be Created',
@@ -45,7 +68,7 @@ class PreviewModeTest extends TestCase
 
     public function test_non_preview_routes_do_not_share_the_preview_flag()
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $this->actingAs($user);
 
         $response = $this->get(route('needs-attention'));

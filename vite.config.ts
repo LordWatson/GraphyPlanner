@@ -13,12 +13,8 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600, 700],
-                }),
-                bunny('Instrument Serif', {
-                    weights: [400],
-                    styles: ['normal', 'italic'],
+                bunny('Poppins', {
+                    weights: [300, 400, 500, 600, 700],
                 }),
                 bunny('DM Mono', {
                     weights: [400, 500],

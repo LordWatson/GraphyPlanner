@@ -13,7 +13,8 @@ import {
 import type { ReactNode } from 'react';
 
 import { BrandMark } from '@/components/brand-mark';
-import { BrandPoster } from '@/components/brand-poster';
+import { BrandPattern } from '@/components/brand-poster';
+import { Eyebrow } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { about, dashboard, home, login, register } from '@/routes';
 
@@ -22,49 +23,49 @@ const pillars = [
         icon: LayoutGrid,
         title: 'Clients, brands & campaigns in one place',
         description:
-            'Keep every client, their brand voice, and the campaigns you run for them organized side by side — no more scattered spreadsheets or lost context.',
+            'Keep every client, their brand voice, and the campaigns you run for them side by side — no scattered spreadsheets, no lost context.',
     },
     {
         icon: CalendarClock,
         title: 'A shared content calendar',
         description:
-            'Draft, schedule, and visualize every post across every client on one dependable calendar your whole team can trust and plan around.',
+            'Draft, schedule and see every post across every client on one calendar the whole team can plan around.',
     },
     {
         icon: FileCheck2,
         title: 'Transparent approvals',
         description:
-            'Every post moves through a clear status — draft, internal review, waiting on client, approved — so nobody ever has to ask "where are we on this?"',
+            'Every post moves through a clear status — draft, internal review, waiting on client, approved — so nobody has to ask "where are we on this?"',
     },
     {
         icon: ShieldCheck,
-        title: 'A dedicated client review portal',
+        title: 'A dedicated client portal',
         description:
-            'Clients approve or request changes from a clean, branded, link-based portal — no account required, no confusion about what they are looking at.',
+            'Clients approve or request changes from a clean, branded portal. No confusion about what they are looking at.',
     },
     {
         icon: Sparkles,
         title: 'AI-assisted content',
         description:
-            'Generate on-brand post ideas, caption suggestions, and trend insights powered by your BrandBrain, so your team never starts from a blank page.',
+            'On-brand post ideas, caption suggestions and trend insights from each client’s BrandBrain — never start from a blank page.',
     },
     {
         icon: PlugZap,
-        title: 'Publish anywhere, from one place',
+        title: 'Publish from one place',
         description:
-            'A pluggable publishing architecture sends approved posts straight to Instagram, TikTok, and more via Upload-Post, with status synced back automatically.',
+            'Approved posts go straight to Instagram, TikTok and more via Upload-Post, with status synced back automatically.',
     },
     {
         icon: Receipt,
         title: 'Simple client billing',
         description:
-            'Generate, send, and track invoices per client without leaving the tool you already use to manage their content.',
+            'Generate, send and track invoices per client in the same tool you use to run their content.',
     },
     {
         icon: BarChart3,
         title: 'Client health at a glance',
         description:
-            'A Red/Amber/Green health signal keeps account owners ahead of at-risk clients before they become a problem.',
+            'A Red / Amber / Green signal keeps account owners ahead of at-risk clients before they become a problem.',
     },
 ];
 
@@ -85,13 +86,13 @@ const workflow = [
         step: '03',
         title: 'Review & approve',
         description:
-            'Your team reviews internally, then clients approve or request changes from their own portal.',
+            'The team reviews internally, then clients approve or request changes from their own portal.',
     },
     {
         step: '04',
         title: 'Publish & track',
         description:
-            'Approved posts go live on schedule, and every status is tracked back to a single source of truth.',
+            'Approved posts go live on schedule, and every status tracks back to one source of truth.',
     },
 ];
 
@@ -104,8 +105,8 @@ function SectionTitle({
 }) {
     return (
         <div className="flex flex-col gap-3">
-            <span className="eyebrow text-muted-foreground">{eyebrow}</span>
-            <h2 className="[&_em]:text-primary max-w-3xl font-serif text-4xl leading-[0.95] tracking-[-0.02em] lg:text-5xl [&_em]:italic">
+            <Eyebrow className="text-primary">{eyebrow}</Eyebrow>
+            <h2 className="font-display [&_em]:text-primary max-w-3xl text-4xl leading-[1.08] lg:text-[2.75rem] [&_em]:not-italic">
                 {title}
             </h2>
         </div>
@@ -118,21 +119,16 @@ export default function About() {
     return (
         <>
             <Head title="About" />
-            <div className="bg-background text-foreground relative flex min-h-screen flex-col overflow-hidden">
-                <div
-                    aria-hidden
-                    className="bg-grid text-foreground pointer-events-none absolute inset-x-0 top-0 h-[560px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]"
-                />
-
-                <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-                    <Link href={home()} aria-label="AlimaPlanner home">
-                        <BrandMark size="sm" wordmark />
+            <div className="bg-background text-foreground relative flex min-h-screen flex-col">
+                <header className="relative mx-auto flex h-[88px] w-full max-w-[1280px] items-center justify-between px-5 md:px-10 lg:px-20">
+                    <Link href={home()} aria-label="Alima home">
+                        <BrandMark size="md" wordmark />
                     </Link>
                     <nav className="flex items-center gap-1.5">
                         {auth.user ? (
                             <Button asChild>
                                 <Link href={dashboard()}>
-                                    Open studio
+                                    Open planner
                                     <ArrowRight />
                                 </Link>
                             </Button>
@@ -141,33 +137,30 @@ export default function About() {
                                 <Button variant="ghost" asChild>
                                     <Link href={login()}>Log in</Link>
                                 </Button>
-                                <Button variant="secondary" asChild>
-                                    <Link href={register()}>Get started</Link>
+                                <Button asChild>
+                                    <Link href={register()}>
+                                        Let&apos;s talk
+                                    </Link>
                                 </Button>
                             </>
                         )}
                     </nav>
                 </header>
 
-                <main className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col gap-28 px-6 pt-14 pb-24 lg:pt-24">
+                <main className="relative mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-28 px-5 pt-12 pb-24 md:px-10 lg:px-20 lg:pt-20">
                     <section className="animate-rise flex flex-col gap-8">
-                        <span className="eyebrow text-muted-foreground flex items-center gap-2">
-                            <span
-                                aria-hidden
-                                className="bg-primary size-1.5 rounded-[2px]"
-                            />
-                            About AlimaPlanner
-                        </span>
-                        <h1 className="max-w-4xl font-serif text-[clamp(3rem,7.5vw,6.25rem)] leading-[0.9] tracking-[-0.03em]">
-                            The <em className="text-primary">studio OS</em> for
-                            running social content, end to end.
+                        <Eyebrow dash className="text-primary">
+                            About the planner
+                        </Eyebrow>
+                        <h1 className="font-display max-w-4xl text-[clamp(3rem,6.5vw,4.5rem)] leading-[1.04]">
+                            Social content, run end to end
+                            <span className="text-signal">.</span>
                         </h1>
                         <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed text-pretty">
-                            AlimaPlanner brings clients, brands, campaigns, approvals,
-                            AI assistance, and publishing together in one
-                            dependable workspace — built for design &amp;
-                            marketing agencies that juggle dozens of clients at
-                            once.
+                            Alima Planner brings clients, brands, campaigns,
+                            approvals, AI assistance and publishing together in
+                            one workspace — built for a studio that runs dozens
+                            of clients at once.
                         </p>
                     </section>
 
@@ -181,14 +174,16 @@ export default function About() {
                                 </>
                             }
                         />
-                        <div className="border-border bg-border grid w-full grid-cols-1 gap-px overflow-hidden rounded-2xl border sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="border-border/70 bg-border/70 grid w-full grid-cols-1 gap-px overflow-hidden rounded-2xl border shadow-sm sm:grid-cols-2 lg:grid-cols-4">
                             {pillars.map(
                                 ({ icon: Icon, title, description }) => (
                                     <div
                                         key={title}
-                                        className="bg-card hover:bg-muted/40 flex flex-col items-start gap-3 p-6 transition-colors"
+                                        className="bg-card flex flex-col items-start gap-3 p-6"
                                     >
-                                        <Icon className="text-primary size-5" />
+                                        <span className="bg-accent text-accent-foreground flex size-10 items-center justify-center rounded-full">
+                                            <Icon className="size-5" />
+                                        </span>
                                         <h3 className="text-[15px] font-semibold">
                                             {title}
                                         </h3>
@@ -206,8 +201,7 @@ export default function About() {
                             eyebrow="How it works"
                             title={
                                 <>
-                                    From brief to published,{' '}
-                                    <em>without the chaos</em>.
+                                    From brief to published, <em>together</em>.
                                 </>
                             }
                         />
@@ -215,12 +209,12 @@ export default function About() {
                             {workflow.map(({ step, title, description }) => (
                                 <li
                                     key={step}
-                                    className="border-foreground flex flex-col gap-3 border-t pt-5"
+                                    className="border-foreground flex flex-col gap-3 border-t-2 pt-5"
                                 >
-                                    <span className="text-primary font-mono text-xs">
+                                    <span className="text-primary font-mono text-xs font-medium">
                                         {step}
                                     </span>
-                                    <h3 className="font-serif text-3xl leading-tight">
+                                    <h3 className="font-display text-2xl leading-[1.15]">
                                         {title}
                                     </h3>
                                     <p className="text-muted-foreground text-sm leading-relaxed">
@@ -231,50 +225,60 @@ export default function About() {
                         </ol>
                     </section>
 
-                    <section className="bg-ink text-ink-foreground relative flex flex-col gap-8 overflow-hidden rounded-[1.75rem] p-10 lg:flex-row lg:items-end lg:justify-between lg:p-14">
-                        <BrandPoster className="pointer-events-none absolute -top-10 -right-10 w-64 opacity-20 lg:w-80" />
-                        <div className="relative flex max-w-xl flex-col gap-4">
-                            <h2 className="font-serif text-4xl leading-[0.95] tracking-[-0.02em] text-balance lg:text-6xl">
-                                Stop chasing approvals in{' '}
-                                <em className="text-primary">Slack threads</em>.
-                            </h2>
-                            <p className="text-ink-foreground/70 max-w-md text-[15px]">
-                                Bring your clients, content, and approvals into
-                                one dependable home.
-                            </p>
-                        </div>
-                        <div className="relative flex flex-wrap items-center gap-3">
-                            {!auth.user ? (
-                                <>
-                                    <Button size="lg" asChild>
-                                        <Link href={register()}>
-                                            Get started
+                    <section className="grid grid-cols-1 overflow-hidden rounded-2xl lg:grid-cols-[1.4fr_1fr]">
+                        <div className="bg-ink text-cream flex flex-col justify-between gap-10 p-10 lg:p-14">
+                            <div className="flex max-w-xl flex-col gap-4">
+                                <h2 className="font-display text-4xl leading-[1.08] lg:text-5xl">
+                                    Stop chasing approvals in Slack threads
+                                    <span className="text-signal">.</span>
+                                </h2>
+                                <p className="text-cream/70 max-w-md text-[15px]">
+                                    Bring clients, content and approvals into
+                                    one bright home.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                                {!auth.user ? (
+                                    <>
+                                        <Button
+                                            size="lg"
+                                            variant="spark"
+                                            asChild
+                                        >
+                                            <Link href={register()}>
+                                                Start a project
+                                                <ArrowRight />
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            size="lg"
+                                            variant="outline"
+                                            className="border-cream/60 text-cream hover:bg-cream/10 hover:text-cream"
+                                            asChild
+                                        >
+                                            <Link href={login()}>Log in</Link>
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button size="lg" variant="spark" asChild>
+                                        <Link href={dashboard()}>
+                                            Open planner
                                             <ArrowRight />
                                         </Link>
                                     </Button>
-                                    <Button
-                                        size="lg"
-                                        variant="outline"
-                                        className="border-ink-foreground/25 text-ink-foreground hover:bg-ink-foreground/10 hover:text-ink-foreground bg-transparent"
-                                        asChild
-                                    >
-                                        <Link href={login()}>Log in</Link>
-                                    </Button>
-                                </>
-                            ) : (
-                                <Button size="lg" asChild>
-                                    <Link href={dashboard()}>
-                                        Open studio
-                                        <ArrowRight />
-                                    </Link>
-                                </Button>
-                            )}
+                                )}
+                            </div>
                         </div>
+                        <BrandPattern
+                            variant="confetti"
+                            pair="teal-lilac"
+                            className="min-h-56"
+                        />
                     </section>
                 </main>
 
-                <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-6xl justify-between px-6 py-6">
-                    <span>© {new Date().getFullYear()} AlimaPlanner</span>
+                <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-[1280px] justify-between px-5 py-6 md:px-10 lg:px-20">
+                    <span>© {new Date().getFullYear()} Alima</span>
                     <Link href={about()} className="hover:text-foreground">
                         About
                     </Link>

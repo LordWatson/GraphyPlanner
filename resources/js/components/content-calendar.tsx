@@ -227,7 +227,7 @@ export function ContentCalendar({
         unit: string,
     ) => (
         <div className="flex flex-wrap items-end justify-between gap-3 pb-4">
-            <h2 className="[&_em]:text-muted-foreground font-serif text-4xl leading-none tracking-[-0.02em] [&_em]:italic">
+            <h2 className="[&_em]:text-muted-foreground font-display text-3xl leading-none [&_em]:not-italic">
                 {label}
             </h2>
             <div className="flex items-center gap-1.5">
@@ -319,9 +319,12 @@ export function ContentCalendar({
                                         key={key}
                                         className={cn(
                                             'flex min-h-28 flex-col gap-1 p-1.5',
+                                            // Opaque canvas, not a tint: a /50 tint over the
+                                            // hairline grid's border colour read heavier than
+                                            // the real days.
                                             isCurrentMonth
                                                 ? 'bg-card'
-                                                : 'bg-muted/50',
+                                                : 'bg-background',
                                         )}
                                     >
                                         {renderDayNumber(day, !isCurrentMonth)}
@@ -439,7 +442,7 @@ export function ContentCalendar({
                             <div className="flex items-baseline gap-2 sm:flex-col sm:gap-0">
                                 <span
                                     className={cn(
-                                        'font-serif text-4xl leading-none tabular-nums',
+                                        'font-display text-3xl leading-none font-bold tabular-nums',
                                         dateKey === today && 'text-primary',
                                     )}
                                 >
@@ -468,7 +471,8 @@ export function ContentCalendar({
 
     return (
         <div className="flex flex-col gap-5">
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Two deliberate rows: views + timezone, then a ruled filter strip. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <ToggleGroup
                     type="single"
                     variant="outline"
@@ -491,6 +495,26 @@ export function ContentCalendar({
                     </ToggleGroupItem>
                 </ToggleGroup>
 
+                <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    size="sm"
+                    value={tzMode}
+                    onValueChange={(value) =>
+                        value && setTzMode(value as TimezoneMode)
+                    }
+                    aria-label="Timezone"
+                >
+                    <ToggleGroupItem value="account" className="px-3">
+                        Account local
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="org" className="px-3">
+                        {orgTimezone}
+                    </ToggleGroupItem>
+                </ToggleGroup>
+            </div>
+
+            <div className="border-border flex flex-wrap items-center gap-2 border-y py-3">
                 <span className="eyebrow text-muted-foreground mr-1">
                     Filter
                 </span>
@@ -594,25 +618,6 @@ export function ContentCalendar({
                         ))}
                     </SelectContent>
                 </Select>
-
-                <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    size="sm"
-                    value={tzMode}
-                    onValueChange={(value) =>
-                        value && setTzMode(value as TimezoneMode)
-                    }
-                    aria-label="Timezone"
-                    className="lg:ml-auto"
-                >
-                    <ToggleGroupItem value="account" className="px-3">
-                        Account local
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="org" className="px-3">
-                        {orgTimezone}
-                    </ToggleGroupItem>
-                </ToggleGroup>
             </div>
 
             <div className="bg-card animate-rise rounded-2xl border p-4 sm:p-5">

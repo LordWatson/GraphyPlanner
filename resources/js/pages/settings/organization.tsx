@@ -112,7 +112,7 @@ export default function Organization({
                                 />
                             </div>
 
-                            <div className="border-border grid gap-6 border-t pt-6">
+                            <div className="grid gap-6 pt-4">
                                 <Heading
                                     variant="small"
                                     title="Invoicing"
@@ -191,7 +191,7 @@ export default function Organization({
                                 </div>
                             </div>
 
-                            <div className="border-border grid gap-6 border-t pt-6">
+                            <div className="grid gap-6 pt-4">
                                 <Heading
                                     variant="small"
                                     title="Integrations"

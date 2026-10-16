@@ -1,14 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
-import {
-    Building2,
-    CalendarDays,
-    LayoutGrid,
-    ListChecks,
-    Receipt,
-    Settings2,
-    UsersRound,
-} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
+import { Peek } from '@/components/brand-poster';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -19,9 +11,10 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import type { Chapter } from '@/lib/chapters';
+import { chapters } from '@/lib/chapters';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -29,71 +22,52 @@ import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
 import type { Auth, NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Overview',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Clients',
-        href: clientsIndex(),
-        icon: Building2,
-    },
-    {
-        title: 'Calendar',
-        href: calendar(),
-        icon: CalendarDays,
-    },
-    {
-        title: 'Needs attention',
-        href: needsAttention(),
-        icon: ListChecks,
-    },
-];
-
-// Billing roles only — see `InvoicePolicy::viewLedger`.
-const invoicesNavItem: NavItem = {
-    title: 'Invoices',
-    href: invoicesIndex(),
-    icon: Receipt,
-};
-
-// Owner-only — see `StaffPolicy::viewAny`.
-const staffNavItem: NavItem = {
-    title: 'Staff',
-    href: staffIndex(),
-    icon: UsersRound,
-};
+function navItem(
+    chapter: Chapter,
+    href: NavItem['href'],
+    isActive?: boolean,
+): NavItem {
+    return {
+        title: chapter.title,
+        href,
+        icon: chapter.icon,
+        number: chapter.number,
+        isActive,
+    };
+}
 
 export function AppSidebar() {
     const { auth } = usePage<{ auth: Auth }>().props;
     const { currentUrl } = useCurrentUrl();
 
     // Client portal contacts never render this shell (`AppLayout` swaps to `ClientPortalLayout`).
+    // Billing roles only — see `InvoicePolicy::viewLedger`.
     const canViewLedger =
         auth.user.role === 'owner' || auth.user.role === 'strategist';
-    const items = canViewLedger
-        ? [
-              ...mainNavItems.slice(0, 2),
-              invoicesNavItem,
-              ...mainNavItems.slice(2),
-          ]
-        : mainNavItems;
 
-    const accountItems: NavItem[] = [
-        ...(auth.user.role === 'owner' ? [staffNavItem] : []),
-        {
-            title: 'Settings',
-            href: editProfile(),
-            icon: Settings2,
-            isActive: currentUrl.startsWith('/settings'),
-        },
+    const studioItems: NavItem[] = [
+        navItem(chapters.overview, dashboard()),
+        navItem(chapters.attention, needsAttention()),
+        navItem(chapters.calendar, calendar()),
+        navItem(chapters.clients, clientsIndex()),
+        ...(canViewLedger ? [navItem(chapters.invoices, invoicesIndex())] : []),
+    ];
+
+    const teamItems: NavItem[] = [
+        // Owner-only — see `StaffPolicy::viewAny`.
+        ...(auth.user.role === 'owner'
+            ? [navItem(chapters.staff, staffIndex())]
+            : []),
+        navItem(
+            chapters.settings,
+            editProfile(),
+            currentUrl.replace(/^\/preview/, '').startsWith('/settings'),
+        ),
     ];
 
     return (
         <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader className="px-3 pt-4 pb-2">
+            <SidebarHeader className="px-3 pt-4 pb-3">
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton
@@ -109,13 +83,22 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent className="overflow-x-hidden pt-2">
-                <NavMain items={items} label="Studio" />
-                <SidebarSeparator className="bg-sidebar-border/70 mx-5 w-auto group-data-[collapsible=icon]:mx-2" />
-                <NavMain items={accountItems} label="Team" />
+            <SidebarContent className="gap-3 overflow-x-hidden pt-1">
+                <NavMain items={studioItems} label="Studio" />
+                <NavMain items={teamItems} label="Team" />
             </SidebarContent>
 
-            <SidebarFooter className="p-3">
+            <SidebarFooter className="gap-3 p-3">
+                {/* The peek (§5.5): tonal teal-on-teal, peeking over a hairline — never behind text. */}
+                <div
+                    aria-hidden
+                    className="border-sidebar-border relative mx-2 h-24 overflow-hidden border-b group-data-[collapsible=icon]:hidden"
+                >
+                    <Peek className="text-sidebar-accent left-1/2 w-[78%] -translate-x-1/2 translate-y-[38%]" />
+                </div>
+                <p className="eyebrow text-sidebar-foreground/65 px-2 pb-1 group-data-[collapsible=icon]:hidden">
+                    Marketing brighter together.
+                </p>
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

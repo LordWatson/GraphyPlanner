@@ -1,11 +1,12 @@
 @php
     /*
-     * "Studio Paper" invoice — the portal's visual language translated for dompdf: warm cream paper,
-     * an ink header band, Instrument Serif headline with one italic orange accent word, DM Mono
-     * spec-sheet labels, hairline tables, and ink (never orange) for the emphasised total.
+     * Alima invoice — the brand translated for dompdf: Cloud Cream paper, a Midnight Ink header band
+     * carrying the master mark on a Deep Teal tile, a Poppins SemiBold headline with one upright
+     * teal accent word, DM Mono spec-sheet labels, hairline tables, and Ink for the emphasised total.
+     * Signal Orange appears once, as the rounded eyebrow dash.
      *
-     * dompdf has no flexbox/grid and no OKLCH, so layout is tables and the brand tokens from
-     * resources/css/app.css are inlined as their sRGB hex equivalents.
+     * dompdf has no flexbox/grid, so layout is tables and the brand tokens from
+     * resources/css/app.css are inlined as hex.
      */
     use App\Support\MoneyFormatter;
 
@@ -14,11 +15,11 @@
 
     $displayStatus = $invoice->displayStatus();
     $tones = [
-        'draft' => ['bg' => '#f0ece6', 'fg' => '#4a423b', 'dot' => '#8a8178'],
-        'sent' => ['bg' => '#e6eff8', 'fg' => '#1f5f99', 'dot' => '#2a75ba'],
-        'overdue' => ['bg' => '#fbe5e3', 'fg' => '#b0191c', 'dot' => '#d81f23'],
-        'paid' => ['bg' => '#e2f2e8', 'fg' => '#136b3e', 'dot' => '#1a8a51'],
-        'void' => ['bg' => '#f0ece6', 'fg' => '#6a615a', 'dot' => '#aaa39d'],
+        'draft' => ['bg' => '#EFEBDF', 'fg' => '#4A4857', 'dot' => '#8C8A8F'],
+        'sent' => ['bg' => '#E4ECF3', 'fg' => '#2C6CAD', 'dot' => '#4E91D4'],
+        'overdue' => ['bg' => '#F4E2DD', 'fg' => '#B52A1B', 'dot' => '#B52A1B'],
+        'paid' => ['bg' => '#E2ECE3', 'fg' => '#276B43', 'dot' => '#276B43'],
+        'void' => ['bg' => '#EFEBDF', 'fg' => '#6B6977', 'dot' => '#AEACB5'],
     ];
     $tone = $tones[$displayStatus] ?? $tones['draft'];
 
@@ -52,16 +53,20 @@
     $hasItems = $items->isNotEmpty();
     $index = 0;
 
+    // Master Alima artwork (public/brand) — never redrawn. Cream mark on a Deep Teal tile, 22.5% radius.
+    $mark = (string) file_get_contents(public_path('brand/alima_mark_cream.svg'));
+    preg_match('/viewBox="([^"]+)"/', $mark, $markBox);
+    preg_match_all('/ d="([^"]+)"/', $mark, $markPaths);
+    [, , $markW, $markH] = array_map('floatval', explode(' ', $markBox[1]));
+    $markScale = 28 / $markW; // mark at 70% of the 40px tile
     $logo = 'data:image/svg+xml;base64,'.base64_encode(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">'
-        .'<rect width="40" height="40" rx="10" fill="#f1561e"/>'
-        .'<g transform="translate(8 8) scale(0.75)" fill="#fefdfb">'
-        .'<rect x="2" y="2" width="12" height="12" rx="3"/>'
-        .'<path d="M18 14V2a12 12 0 0 1 12 12H18Z"/>'
-        .'<rect x="2" y="18" width="12" height="12" rx="3"/>'
-        .'<rect x="18" y="18" width="12" height="12" rx="6"/>'
+        .'<rect width="40" height="40" rx="9" fill="#205557"/>'
+        .'<g fill="#F5F2E8" transform="translate(6 '.round((40 - $markH * $markScale) / 2, 2).') scale('.round($markScale, 5).')">'
+        .implode('', array_map(fn (string $d) => '<path d="'.$d.'"/>', $markPaths[1]))
         .'</g></svg>'
     );
+    $wordmark = 'data:image/svg+xml;base64,'.base64_encode((string) file_get_contents(public_path('brand/alima_logo_teal.svg')));
 
     $font = fn (string $file) => str_replace('\\', '/', $fontDir.'/'.$file);
 @endphp
@@ -71,10 +76,8 @@
     <meta charset="utf-8">
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
-        @font-face { font-family: 'Instrument Sans'; font-weight: normal; font-style: normal; src: url('{{ $font('InstrumentSans-Regular.ttf') }}') format('truetype'); }
-        @font-face { font-family: 'Instrument Sans'; font-weight: bold; font-style: normal; src: url('{{ $font('InstrumentSans-SemiBold.ttf') }}') format('truetype'); }
-        @font-face { font-family: 'Instrument Serif'; font-weight: normal; font-style: normal; src: url('{{ $font('InstrumentSerif-Regular.ttf') }}') format('truetype'); }
-        @font-face { font-family: 'Instrument Serif'; font-weight: normal; font-style: italic; src: url('{{ $font('InstrumentSerif-Italic.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'Poppins'; font-weight: normal; font-style: normal; src: url('{{ $font('Poppins-Regular.ttf') }}') format('truetype'); }
+        @font-face { font-family: 'Poppins'; font-weight: bold; font-style: normal; src: url('{{ $font('Poppins-SemiBold.ttf') }}') format('truetype'); }
         @font-face { font-family: 'DM Mono'; font-weight: normal; font-style: normal; src: url('{{ $font('DMMono-Regular.ttf') }}') format('truetype'); }
         @font-face { font-family: 'DM Mono'; font-weight: bold; font-style: normal; src: url('{{ $font('DMMono-Medium.ttf') }}') format('truetype'); }
 
@@ -87,22 +90,22 @@
         html, body {
             margin: 0;
             padding: 0;
-            background-color: #f9f5f0;
+            background-color: #F5F2E8;
         }
 
         body {
-            font-family: 'Instrument Sans', 'DejaVu Sans', sans-serif;
+            font-family: 'Poppins', 'DejaVu Sans', sans-serif;
             font-size: 11px;
             line-height: 1.5;
-            color: #1a1511;
+            color: #181723;
         }
 
         table { border-collapse: collapse; width: 100%; }
         td, th { vertical-align: top; padding: 0; }
 
-        .serif { font-family: 'Instrument Serif', 'DejaVu Serif', serif; font-weight: normal; }
+        .serif { font-family: 'Poppins', 'DejaVu Sans', sans-serif; font-weight: bold; letter-spacing: -0.4px; }
         .mono { font-family: 'DM Mono', 'DejaVu Sans Mono', monospace; }
-        .muted { color: #6a615a; }
+        .muted { color: #6B6977; }
         .right { text-align: right; }
         .nums { font-family: 'DM Mono', 'DejaVu Sans Mono', monospace; }
 
@@ -111,47 +114,47 @@
             font-size: 8.5px;
             letter-spacing: 1.3px;
             text-transform: uppercase;
-            color: #6a615a;
+            color: #6B6977;
         }
 
         .square {
             display: inline-block;
-            width: 6px;
-            height: 6px;
-            border-radius: 1.5px;
-            background-color: #f1561e;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            background-color: #F03D2A;
             margin-right: 6px;
         }
 
         /* Ink header band — the "desk" the paper sheet sits on. */
         .band {
-            background-color: #1a1511;
-            color: #f5f1ec;
+            background-color: #181723;
+            color: #F5F2E8;
             padding: 56px 52px 22px;
             margin-top: -34px;
         }
 
         .band .logo { width: 34px; height: 34px; }
-        .band .studio { font-size: 22px; line-height: 1; color: #f5f1ec; padding-left: 12px; }
-        .band .studio-caption { font-size: 8px; letter-spacing: 1.4px; color: #aaa39d; padding-left: 12px; padding-top: 5px; }
-        .band .doc-label { color: #aaa39d; }
-        .band .doc-number { font-size: 15px; color: #f5f1ec; letter-spacing: 0.4px; padding-top: 3px; }
+        .band .studio { font-size: 22px; line-height: 1; color: #F5F2E8; padding-left: 12px; }
+        .band .studio-caption { font-size: 8px; letter-spacing: 1.4px; color: #AEACB5; padding-left: 12px; padding-top: 5px; }
+        .band .doc-label { color: #AEACB5; }
+        .band .doc-number { font-size: 15px; color: #F5F2E8; letter-spacing: 0.4px; padding-top: 3px; }
 
         .sheet { padding: 26px 52px 0; }
 
         .headline {
-            font-size: 46px;
-            line-height: 0.95;
-            letter-spacing: -0.6px;
-            color: #1a1511;
+            font-size: 38px;
+            line-height: 1.05;
+            letter-spacing: -0.8px;
+            color: #181723;
             margin: 10px 0 0;
         }
 
-        .headline em { font-style: italic; color: #f1561e; }
+        .headline em { font-style: normal; color: #205557; }
 
         .subline {
             font-size: 12px;
-            color: #6a615a;
+            color: #6B6977;
             margin-top: 8px;
             line-height: 1.45;
         }
@@ -178,93 +181,93 @@
             margin-top: 20px;
             border-collapse: separate;
             border-spacing: 0;
-            border: 1px solid #e2ddd6;
+            border: 1px solid #E1DDD0;
             border-radius: 12px;
-            background-color: #fefdfb;
+            background-color: #FBFAF6;
         }
 
-        .spec td { padding: 12px 16px; border-left: 1px solid #e2ddd6; }
+        .spec td { padding: 12px 16px; border-left: 1px solid #E1DDD0; }
         .spec td.first { border-left: none; }
-        .spec .value { font-size: 12px; margin-top: 5px; color: #1a1511; }
+        .spec .value { font-size: 12px; margin-top: 5px; color: #181723; }
 
         .spec td.amount {
-            background-color: #1a1511;
-            color: #f5f1ec;
+            background-color: #181723;
+            color: #F5F2E8;
             border-left: none;
             border-radius: 0 11px 11px 0;
             width: 34%;
         }
 
-        .spec td.amount.settled { background-color: #f0ece6; color: #1a1511; }
-        .spec td.amount .eyebrow { color: #aaa39d; }
-        .spec td.amount.settled .eyebrow { color: #6a615a; }
+        .spec td.amount.settled { background-color: #EFEBDF; color: #181723; }
+        .spec td.amount .eyebrow { color: #AEACB5; }
+        .spec td.amount.settled .eyebrow { color: #6B6977; }
         .spec td.amount .figure { font-size: 28px; line-height: 1; margin-top: 6px; letter-spacing: -0.3px; }
 
         .parties { margin-top: 22px; }
         .parties td { width: 50%; padding-right: 24px; }
-        .party-name { font-size: 14px; font-weight: bold; margin-top: 5px; margin-bottom: 2px; color: #1a1511; }
-        .party-line { color: #6a615a; font-size: 10px; line-height: 1.35; }
+        .party-name { font-size: 14px; font-weight: bold; margin-top: 5px; margin-bottom: 2px; color: #181723; }
+        .party-line { color: #6B6977; font-size: 10px; line-height: 1.35; }
 
         /* Line items — flat, hairline rows, mono index. */
         .items { margin-top: 22px; }
         .items th {
             text-align: left;
             padding: 0 8px 9px;
-            border-bottom: 1px solid #1a1511;
+            border-bottom: 1px solid #181723;
         }
         .items th.right { text-align: right; }
         .items th.first, .items td.first { padding-left: 0; }
         .items th.last, .items td.last { padding-right: 0; }
         .items td {
             padding: 7px 8px;
-            border-bottom: 1px solid #e2ddd6;
+            border-bottom: 1px solid #E1DDD0;
             font-size: 10.5px;
             line-height: 1.35;
         }
-        .items .idx { color: #aaa39d; font-size: 9px; width: 28px; padding-top: 8.5px; }
-        .items .desc { color: #1a1511; }
+        .items .idx { color: #AEACB5; font-size: 9px; width: 28px; padding-top: 8.5px; }
+        .items .desc { color: #181723; }
         .items .num { text-align: right; white-space: nowrap; font-size: 10px; }
-        .items tr.included .desc { color: #6a615a; }
+        .items tr.included .desc { color: #6B6977; }
         .tag {
             display: inline-block;
             margin-left: 6px;
             padding: 1px 7px;
             border-radius: 8px;
-            background-color: #f0ece6;
-            color: #6a615a;
+            background-color: #EFEBDF;
+            color: #6B6977;
             font-size: 8.5px;
             font-weight: bold;
         }
 
         .totals { width: 290px; margin-top: 14px; margin-left: auto; }
-        .totals td { padding: 5px 0; font-size: 11px; color: #6a615a; }
-        .totals td.num { text-align: right; color: #1a1511; }
+        .totals td { padding: 5px 0; font-size: 11px; color: #6B6977; }
+        .totals td.num { text-align: right; color: #181723; }
         .totals .grand td { padding: 0; }
         .grand-block {
-            background-color: #1a1511;
-            color: #f5f1ec;
+            background-color: #181723;
+            color: #F5F2E8;
             border-radius: 10px;
             padding: 11px 16px;
         }
-        .grand-block.settled { background-color: #f0ece6; color: #1a1511; }
-        .grand-block .eyebrow { color: #aaa39d; padding-top: 9px; }
-        .grand-block.settled .eyebrow { color: #6a615a; }
-        .grand-block .figure { font-size: 25px; line-height: 1; text-align: right; color: #f5f1ec; }
-        .grand-block.settled .figure { color: #1a1511; }
+        .grand-block.settled { background-color: #EFEBDF; color: #181723; }
+        .grand-block .eyebrow { color: #AEACB5; padding-top: 9px; }
+        .grand-block.settled .eyebrow { color: #6B6977; }
+        .grand-block .figure { font-size: 25px; line-height: 1; text-align: right; color: #F5F2E8; }
+        .grand-block.settled .figure { color: #181723; }
 
         .cards { margin-top: 22px; }
         .cards td { width: 50%; }
         .cards td.gap { width: 16px; }
         .card {
-            border: 1px solid #e2ddd6;
+            border: 1px solid #E1DDD0;
             border-radius: 12px;
-            background-color: #fefdfb;
+            background-color: #FBFAF6;
             padding: 12px 16px;
         }
-        .card .body { margin-top: 6px; font-size: 10px; color: #1a1511; line-height: 1.4; }
+        .card .body { margin-top: 6px; font-size: 10px; color: #181723; line-height: 1.4; }
 
-        .thanks { margin-top: 22px; font-size: 19px; color: #1a1511; }
-        .thanks em { font-style: italic; color: #f1561e; }
+        .thanks { margin-top: 22px; font-size: 19px; color: #181723; }
+        .thanks em { font-style: normal; color: #205557; }
 
         .footer {
             position: fixed;
@@ -275,12 +278,11 @@
                `bottom`.) */
             top: 1034px;
             height: 30px;
-            border-top: 1px solid #e2ddd6;
+            border-top: 1px solid #E1DDD0;
             padding-top: 10px;
         }
-        .footer .wordmark { font-size: 13px; color: #1a1511; }
-        .footer .wordmark .dot { color: #f1561e; font-style: normal; }
-
+        .footer .wordmark { height: 12px; vertical-align: middle; }
+        
     </style>
 </head>
 <body>
@@ -291,7 +293,7 @@
                 <td class="eyebrow" style="vertical-align: middle;">{{ $organization->name }} &nbsp;&middot;&nbsp; {{ $invoice->invoice_number }}</td>
                 <td class="right" style="vertical-align: middle;">
                     <span class="eyebrow" style="letter-spacing: 1px;">Prepared with</span>
-                    <span class="serif wordmark"><em>alimaplanner</em><span class="dot">.</span></span>
+                    <img class="wordmark" src="{{ $wordmark }}" alt="Alima">
                 </td>
             </tr>
         </table>

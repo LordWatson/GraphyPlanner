@@ -26,11 +26,17 @@ import {
     YAxis,
 } from 'recharts';
 
-import { EmptyState, Page, PageHeader, Panel, Stat } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    Page,
+    Panel,
+    StatStrip,
+} from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { calendar, dashboard, needsAttention } from '@/routes';
-import { show as showClient } from '@/routes/clients';
+import { index as clientsIndex, show as showClient } from '@/routes/clients';
 import { edit as editPost } from '@/routes/posts';
 import type { Auth } from '@/types';
 
@@ -143,13 +149,13 @@ const attentionMeta = {
 } as const;
 
 const chartTooltipStyle = {
-    borderRadius: '0.75rem',
+    borderRadius: '1rem',
     border: '1px solid var(--color-border)',
     background: 'var(--color-popover)',
     color: 'var(--color-popover-foreground)',
     fontSize: 12,
     padding: '8px 12px',
-    boxShadow: '0 18px 40px -24px oklch(0.2 0.012 55 / 0.4)',
+    boxShadow: 'var(--shadow-md)',
 };
 
 const axisTick = {
@@ -211,71 +217,96 @@ export default function Dashboard({
         <>
             <Head title="Overview" />
             <Page>
-                <PageHeader
-                    eyebrow={`Overview — ${todayFormatter.format(new Date())}`}
+                <ChapterHero
+                    eyebrow={todayFormatter.format(new Date())}
                     title={
                         <>
                             {greeting()}, <em>{firstName}</em>.
                         </>
                     }
-                    description="Everything your studio is shipping right now — what's blocked, what's going out, and how every client is tracking."
+                    description="Here's the studio today — what's blocked, what's going out, and how every client is tracking."
                     actions={
                         <>
-                            <Button variant="outline" asChild>
+                            <Button variant="spark" size="lg" asChild>
+                                <Link href={needsAttention()}>
+                                    Review the queue
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                            <Button variant="on-ink" size="lg" asChild>
                                 <Link href={calendar()}>
                                     <CalendarDays />
                                     Calendar
                                 </Link>
                             </Button>
-                            <Button asChild>
-                                <Link href={needsAttention()}>
-                                    Review queue
-                                    <ArrowRight />
-                                </Link>
-                            </Button>
                         </>
+                    }
+                    aside={
+                        <Link
+                            href={needsAttention()}
+                            className="group focus-visible:ring-ring flex flex-col items-start gap-2 rounded-2xl outline-none focus-visible:ring-[3px] lg:items-end"
+                        >
+                            <span className="eyebrow text-cream/70 flex items-center gap-2">
+                                <AlertTriangle className="text-lime size-3.5" />
+                                Needs attention
+                            </span>
+                            <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
+                                {String(summary.needsAttention).padStart(
+                                    2,
+                                    '0',
+                                )}
+                            </span>
+                            <span className="text-cream/80 inline-flex items-center gap-1 text-sm">
+                                {summary.needsAttention === 1
+                                    ? 'Decision waiting on you'
+                                    : 'Decisions waiting on you'}
+                                <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                            </span>
+                        </Link>
                     }
                 />
 
-                <div className="animate-rise grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <Link
-                        href={needsAttention()}
-                        className="group focus-visible:ring-ring/40 col-span-2 rounded-2xl outline-none focus-visible:ring-[3px] lg:col-span-1"
-                    >
-                        <Stat
-                            tone="ink"
-                            icon={AlertTriangle}
-                            label="Needs attention"
-                            value={summary.needsAttention}
-                            hint={
-                                <span className="inline-flex items-center gap-1">
-                                    Decisions waiting today
-                                    <ArrowUpRight className="size-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                                </span>
-                            }
-                            className="h-full"
-                        />
-                    </Link>
-                    <Stat
-                        icon={CalendarDays}
-                        label="Next 24 hours"
-                        value={summary.scheduledNext24h}
-                        hint="Posts scheduled to go out"
-                    />
-                    <Stat
-                        icon={FilePenLine}
-                        label="Unapproved"
-                        value={summary.unapprovedDrafts}
-                        hint="Drafts not yet signed off"
-                    />
-                    <Stat
-                        icon={Users}
-                        label="Active clients"
-                        value={summary.activeClients}
-                        hint={`${summary.brands} brands · ${summary.scheduledPosts} scheduled`}
-                        className="col-span-2 sm:col-span-1"
-                    />
-                </div>
+                <StatStrip
+                    className="animate-rise [animation-delay:80ms]"
+                    items={[
+                        {
+                            label: 'Next 24 hours',
+                            value: summary.scheduledNext24h,
+                            caption: 'Posts going out',
+                            render: (cell) => (
+                                <Link
+                                    href={calendar()}
+                                    className="hover:bg-muted/50 block h-full rounded-lg transition-colors"
+                                >
+                                    {cell}
+                                </Link>
+                            ),
+                        },
+                        {
+                            label: 'Unapproved',
+                            value: summary.unapprovedDrafts,
+                            caption: 'Drafts awaiting sign-off',
+                        },
+                        {
+                            label: 'Active clients',
+                            value: summary.activeClients,
+                            caption: `${summary.brands} brands on the roster`,
+                            render: (cell) => (
+                                <Link
+                                    href={clientsIndex()}
+                                    className="hover:bg-muted/50 block h-full rounded-lg transition-colors"
+                                >
+                                    {cell}
+                                </Link>
+                            ),
+                        },
+                        {
+                            label: 'Scheduled',
+                            value: summary.scheduledPosts,
+                            caption: 'Posts in the pipeline',
+                        },
+                    ]}
+                />
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_1fr]">
                     <Panel
@@ -407,7 +438,7 @@ export default function Dashboard({
                             actions={
                                 hasInvoiceData && (
                                     <div className="flex flex-col items-end">
-                                        <span className="font-serif text-3xl leading-none tabular-nums">
+                                        <span className="font-display text-2xl leading-none font-bold tabular-nums">
                                             {compactCurrency.format(totalPaid)}
                                         </span>
                                         <span className="text-muted-foreground text-[11px]">
@@ -571,7 +602,7 @@ export default function Dashboard({
                                         <li key={occurrence.target_id}>
                                             <div className="flex items-center gap-4 rounded-xl px-3 py-2.5">
                                                 <span className="border-border flex w-11 shrink-0 flex-col items-center border-r pr-4">
-                                                    <span className="font-serif text-2xl leading-none tabular-nums">
+                                                    <span className="font-display text-xl leading-none font-bold tabular-nums">
                                                         {date
                                                             ? dayFormatter.format(
                                                                   date,
@@ -631,7 +662,7 @@ export default function Dashboard({
                                     publishReliability.averageAttemptsToSuccess !==
                                         null && (
                                         <div className="flex flex-col items-end">
-                                            <span className="font-serif text-3xl leading-none tabular-nums">
+                                            <span className="font-display text-2xl leading-none font-bold tabular-nums">
                                                 {publishReliability.averageAttemptsToSuccess.toFixed(
                                                     2,
                                                 )}

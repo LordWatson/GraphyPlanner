@@ -3,6 +3,7 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { show as showClient } from '@/routes/clients';
+import { formatDateTime } from '@/lib/dates';
 
 const clientAiTabUrl = (clientId: number) => `${showClient(clientId).url}#ai`;
 
@@ -39,7 +40,7 @@ export default function AiTrendShow({
                 </Link>
 
                 <PageHeader
-                    eyebrow={`AI trend — ${client.name}${trend.created_at ? ` · ${trend.created_at}` : ''}`}
+                    eyebrow={`AI trend — ${client.name}${trend.created_at ? ` · ${formatDateTime(trend.created_at)}` : ''}`}
                     title={trend.title}
                     meta={trend.platforms.map((platform, i) => (
                         <Badge key={i} variant="outline" className="capitalize">
@@ -65,9 +66,9 @@ export default function AiTrendShow({
                     <div className="bg-ink text-ink-foreground flex flex-col justify-between gap-6 rounded-2xl p-5">
                         <span className="eyebrow opacity-70">Confidence</span>
                         <div className="flex flex-col gap-3">
-                            <span className="font-serif text-6xl leading-none tabular-nums">
+                            <span className="font-display text-5xl leading-none font-bold tabular-nums">
                                 {confidence}
-                                <span className="text-primary text-3xl">%</span>
+                                <span className="text-lime text-3xl">%</span>
                             </span>
                             <div
                                 className="bg-ink-foreground/15 h-1.5 w-full overflow-hidden rounded-full"
@@ -78,7 +79,7 @@ export default function AiTrendShow({
                                 aria-label="Confidence"
                             >
                                 <div
-                                    className="bg-primary h-full rounded-full"
+                                    className="bg-lime h-full rounded-full"
                                     style={{ width: `${confidence}%` }}
                                 />
                             </div>

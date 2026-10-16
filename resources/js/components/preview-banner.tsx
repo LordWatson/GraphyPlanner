@@ -15,8 +15,8 @@ export function PreviewBanner() {
     }
 
     return (
-        <div className="bg-ink text-ink-foreground flex items-center justify-center gap-2.5 px-4 py-2 text-[13px] md:rounded-t-[1.25rem]">
-            <span className="eyebrow bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px]">
+        <div className="bg-ink text-ink-foreground flex items-center justify-center gap-2.5 px-4 py-2 text-[13px] md:rounded-t-2xl">
+            <span className="eyebrow bg-lime text-ink inline-flex items-center gap-1.5 rounded-[3px] px-1.5 py-0.5 text-[10px]">
                 <Eye className="size-3" />
                 Preview
             </span>

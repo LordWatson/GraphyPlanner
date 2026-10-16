@@ -6,7 +6,7 @@ import {
     MessageSquareWarning,
 } from 'lucide-react';
 
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import { ChapterHero, EmptyState, Page, Panel } from '@/components/page';
 import { PlatformIcon } from '@/components/platform-icon';
 import { PortalPostRow } from '@/components/portal-post-row';
 import { Button } from '@/components/ui/button';
@@ -86,7 +86,7 @@ export default function PortalDashboard({
         <>
             <Head title={`${client.name} — Client portal`} />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`Client portal — ${client.name}`}
                     title={
                         <>
@@ -99,60 +99,81 @@ export default function PortalDashboard({
                             : "You're all caught up — there's nothing waiting on your sign-off right now."
                     }
                     actions={
-                        <Button variant="outline" asChild>
-                            <Link href={portalCalendar()}>
-                                <CalendarDays />
-                                Calendar
-                            </Link>
-                        </Button>
+                        <>
+                            {next && (
+                                <Button size="lg" variant="spark" asChild>
+                                    <Link href={portalPostsShow(next.post_id)}>
+                                        Start reviewing
+                                        <ArrowRight />
+                                    </Link>
+                                </Button>
+                            )}
+                            <Button size="lg" variant="on-ink" asChild>
+                                <Link href={portalCalendar()}>
+                                    <CalendarDays />
+                                    Calendar
+                                </Link>
+                            </Button>
+                        </>
+                    }
+                    aside={
+                        waiting.length > 0 && (
+                            <div className="flex flex-col items-start gap-2 lg:items-end">
+                                <span className="eyebrow text-cream/70">
+                                    Needs your approval
+                                </span>
+                                <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
+                                    {String(waiting.length).padStart(2, '0')}
+                                </span>
+                                <span className="text-cream/80 text-sm">
+                                    {waiting.length === 1
+                                        ? 'Post ready for your review'
+                                        : 'Posts ready for your review'}
+                                </span>
+                            </div>
+                        )
                     }
                 />
 
-                <div className="animate-rise grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
+                <div className="animate-rise grid grid-cols-1 gap-5 [animation-delay:80ms] lg:grid-cols-[1.35fr_1fr]">
                     {waiting.length > 0 ? (
-                        <section className="bg-ink text-ink-foreground flex flex-col overflow-hidden rounded-2xl">
-                            <div className="flex flex-wrap items-end justify-between gap-6 p-6 sm:p-7">
-                                <div className="flex flex-col gap-3">
-                                    <span className="eyebrow text-ink-foreground/60">
-                                        Needs your approval
-                                    </span>
-                                    <span className="font-serif text-7xl leading-[0.85] tabular-nums">
-                                        {waiting.length}
-                                    </span>
-                                    <span className="text-ink-foreground/70 text-sm">
-                                        {waiting.length === 1
-                                            ? 'post is ready for your review'
-                                            : 'posts are ready for your review'}
-                                    </span>
-                                </div>
-                                {next && (
-                                    <Button size="lg" asChild>
+                        <Panel
+                            eyebrow="Your sign-off"
+                            title="Ready for review"
+                            actions={
+                                waiting.length > 4 && (
+                                    <Button variant="ghost" size="sm" asChild>
                                         <Link
-                                            href={portalPostsShow(next.post_id)}
+                                            href={portalPostsIndex({
+                                                query: {
+                                                    status: 'waiting_client',
+                                                },
+                                            })}
                                         >
-                                            Start reviewing
+                                            All {waiting.length}
                                             <ArrowRight />
                                         </Link>
                                     </Button>
-                                )}
-                            </div>
-                            <ul className="divide-ink-foreground/10 border-ink-foreground/10 divide-y border-t">
+                                )
+                            }
+                            bodyClassName="p-2"
+                        >
+                            <ul className="flex flex-col">
                                 {waiting.slice(0, 4).map((row) => (
                                     <li key={row.post_id}>
                                         <Link
                                             href={portalPostsShow(row.post_id)}
-                                            className="group hover:bg-ink-foreground/5 flex items-center gap-3.5 px-6 py-3.5 transition-colors sm:px-7"
+                                            className="group hover:bg-muted/60 flex items-center gap-3.5 rounded-xl px-3 py-3 transition-colors"
                                         >
                                             <PlatformIcon
                                                 platform={row.platform}
-                                                className="border-ink-foreground/15 bg-ink-foreground/5 text-ink-foreground/80"
                                             />
                                             <span className="flex min-w-0 flex-1 flex-col">
-                                                <span className="truncate text-sm font-medium">
+                                                <span className="group-hover:text-primary truncate text-sm font-medium">
                                                     {row.master_caption ||
                                                         'Untitled post'}
                                                 </span>
-                                                <span className="text-ink-foreground/55 truncate text-xs capitalize">
+                                                <span className="text-muted-foreground truncate text-xs capitalize">
                                                     {row.platform ??
                                                         'No platform yet'}
                                                     {row.handle
@@ -160,7 +181,7 @@ export default function PortalDashboard({
                                                         : ''}
                                                 </span>
                                             </span>
-                                            <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+                                            <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-semibold">
                                                 Review
                                                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                                             </span>
@@ -168,17 +189,7 @@ export default function PortalDashboard({
                                     </li>
                                 ))}
                             </ul>
-                            {waiting.length > 4 && (
-                                <Link
-                                    href={portalPostsIndex({
-                                        query: { status: 'waiting_client' },
-                                    })}
-                                    className="eyebrow border-ink-foreground/10 text-ink-foreground/60 hover:text-ink-foreground border-t px-6 py-3 sm:px-7"
-                                >
-                                    +{waiting.length - 4} more waiting →
-                                </Link>
-                            )}
-                        </section>
+                        </Panel>
                     ) : (
                         <EmptyState
                             icon={CheckCircle2}
@@ -222,7 +233,7 @@ export default function PortalDashboard({
                                                 className="group hover:bg-muted/60 flex items-center gap-4 rounded-xl px-3 py-2.5 transition-colors"
                                             >
                                                 <span className="border-border flex w-11 shrink-0 flex-col items-center border-r pr-4">
-                                                    <span className="font-serif text-2xl leading-none tabular-nums">
+                                                    <span className="font-display text-xl leading-none font-bold tabular-nums">
                                                         {dayFormatter.format(
                                                             date,
                                                         )}

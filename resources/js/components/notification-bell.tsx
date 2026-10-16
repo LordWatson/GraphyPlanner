@@ -97,7 +97,7 @@ export function NotificationBell() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[22rem] p-0">
                 <div className="flex items-center justify-between px-4 pt-3.5 pb-3">
-                    <DropdownMenuLabel className="p-0 font-serif text-xl font-normal">
+                    <DropdownMenuLabel className="font-display p-0 text-lg font-normal">
                         Inbox
                     </DropdownMenuLabel>
                     {unreadCount > 0 && (

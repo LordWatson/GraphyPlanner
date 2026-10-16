@@ -20,6 +20,7 @@ import { platformIcon } from '@/components/platform-icon';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { formatSchedule } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import {
     decide as decideOnPortalPost,
@@ -220,11 +221,11 @@ export default function PortalPostShow({
                             <figure className="bg-ink text-ink-foreground relative rounded-2xl p-6">
                                 <span
                                     aria-hidden
-                                    className="text-primary absolute -top-3 left-6 font-serif text-6xl leading-none"
+                                    className="text-lime font-display absolute -top-3 left-6 text-5xl leading-none font-bold"
                                 >
                                     “
                                 </span>
-                                <blockquote className="font-serif text-xl leading-snug whitespace-pre-wrap">
+                                <blockquote className="text-xl leading-snug font-light whitespace-pre-wrap">
                                     {post.review_message}
                                 </blockquote>
                                 <figcaption className="eyebrow text-ink-foreground/55 mt-3">
@@ -245,7 +246,7 @@ export default function PortalPostShow({
                                             <span className="eyebrow text-muted-foreground">
                                                 Your decision
                                             </span>
-                                            <p className="font-serif text-2xl leading-tight">
+                                            <p className="font-display text-xl leading-tight">
                                                 How does it look?
                                             </p>
                                         </div>
@@ -318,11 +319,9 @@ export default function PortalPostShow({
                                                 </span>
                                                 <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums">
                                                     <CalendarClock className="size-3.5" />
-                                                    {target.scheduled_local_date ??
-                                                        'Not scheduled'}{' '}
-                                                    {target.scheduled_local_time?.slice(
-                                                        0,
-                                                        5,
+                                                    {formatSchedule(
+                                                        target.scheduled_local_date,
+                                                        target.scheduled_local_time,
                                                     )}
                                                 </span>
                                             </li>

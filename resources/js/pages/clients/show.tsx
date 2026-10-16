@@ -98,6 +98,7 @@ import { show as showAiTrend } from '@/routes/ai-trends';
 import { show as showAiPostIdea } from '@/routes/ai-post-ideas';
 import { EmptyState, PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
+import { formatDate, formatDateRange, formatSchedule } from '@/lib/dates';
 
 type ClientData = {
     id: number;
@@ -611,7 +612,10 @@ export default function ClientShow({
             ? { icon: Languages, label: client.default_language }
             : null,
         client.start_date
-            ? { icon: CalendarDays, label: `Since ${client.start_date}` }
+            ? {
+                  icon: CalendarDays,
+                  label: `Since ${formatDate(client.start_date)}`,
+              }
             : null,
         client.approval_email
             ? { icon: Mail, label: client.approval_email }
@@ -735,7 +739,17 @@ export default function ClientShow({
                             ? `Client — ${client.legal_name}`
                             : 'Client'
                     }
-                    title={client.name}
+                    title={
+                        <span className="flex items-center gap-4 sm:gap-5">
+                            <span
+                                aria-hidden
+                                className="bg-teal text-cream flex size-14 shrink-0 items-center justify-center rounded-2xl text-[1.75rem] leading-none sm:size-[4.5rem] sm:text-[2.25rem]"
+                            >
+                                {client.name.trim().charAt(0).toUpperCase()}
+                            </span>
+                            <span className="min-w-0">{client.name}</span>
+                        </span>
+                    }
                     description={
                         <span className="flex flex-wrap items-center gap-2">
                             <StatusPill kind="client" value={client.status} />
@@ -882,7 +896,7 @@ export default function ClientShow({
                                         {label}
                                     </span>
                                 </div>
-                                <span className="truncate font-serif text-4xl leading-none tabular-nums">
+                                <span className="font-display truncate text-3xl leading-none font-bold tabular-nums">
                                     {value}
                                 </span>
                                 <span className="text-muted-foreground truncate text-xs">
@@ -1385,11 +1399,10 @@ export default function ClientShow({
                                                             />
                                                         </div>
                                                         <span className="text-muted-foreground text-xs">
-                                                            {campaign.start_date ??
-                                                                '—'}
-                                                            {campaign.end_date
-                                                                ? ` – ${campaign.end_date}`
-                                                                : ''}
+                                                            {formatDateRange(
+                                                                campaign.start_date,
+                                                                campaign.end_date,
+                                                            )}
                                                             {campaign.goal
                                                                 ? ` · ${campaign.goal}`
                                                                 : ''}
@@ -1706,11 +1719,11 @@ export default function ClientShow({
                                                                             target.handle
                                                                         }{' '}
                                                                         ·{' '}
-                                                                        {target.scheduled_local_date ??
-                                                                            '—'}
-                                                                        {target.scheduled_local_time
-                                                                            ? ` ${target.scheduled_local_time}`
-                                                                            : ''}
+                                                                        {formatSchedule(
+                                                                            target.scheduled_local_date,
+                                                                            target.scheduled_local_time,
+                                                                            '—',
+                                                                        )}
                                                                     </span>
                                                                 );
                                                             },
