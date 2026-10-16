@@ -28,12 +28,12 @@
         <h1>{{ $connected ? 'Account connected!' : 'Something went wrong' }}</h1>
         <p>
             @if ($connected)
-                You can close this window and return to Graphy.
+                You can close this window and return to AlimaPlanner.
             @else
-                We couldn't find the account you were connecting. You can close this window and try again from Graphy.
+                We couldn't find the account you were connecting. You can close this window and try again from AlimaPlanner.
             @endif
         </p>
-        <p><a href="{{ $clientUrl }}">Go back to Graphy</a></p>
+        <p><a href="{{ $clientUrl }}">Go back to AlimaPlanner</a></p>
     </div>
     <script>
         (function () {

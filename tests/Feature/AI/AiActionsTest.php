@@ -15,6 +15,7 @@ use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\ClientContextBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -36,12 +37,12 @@ class AiActionsTest extends TestCase
         {
             public function suggestCaptions(Post $post): AiCaptionSuggestions
             {
-                return new AiCaptionSuggestions();
+                return new AiCaptionSuggestions;
             }
 
             public function recommendPosts(Client $client): AiPostIdeas
             {
-                return new AiPostIdeas();
+                return new AiPostIdeas;
             }
 
             public function discoverTrends(Client $client, array $platforms): AiTrends
@@ -72,12 +73,12 @@ class AiActionsTest extends TestCase
         {
             public function suggestCaptions(Post $post): AiCaptionSuggestions
             {
-                return new AiCaptionSuggestions();
+                return new AiCaptionSuggestions;
             }
 
             public function recommendPosts(Client $client): AiPostIdeas
             {
-                return new AiPostIdeas();
+                return new AiPostIdeas;
             }
 
             public function discoverTrends(Client $client, array $platforms): AiTrends
@@ -90,7 +91,8 @@ class AiActionsTest extends TestCase
         // __PHP_Incomplete_Class after the AiTrends DTO changed shape) by seeding the
         // exact cache key the action will look up with a value that isn't an AiTrends.
         $sorted = ['instagram'];
-        Cache::put(sprintf('ai:trends:%d:%s', $client->id, implode(',', $sorted)), 'not-a-valid-trends-object', 3600);
+        $fingerprint = (new ClientContextBuilder)->fingerprint($client);
+        Cache::put(sprintf('ai:trends:%d:%s:%s', $client->id, implode(',', $sorted), $fingerprint), 'not-a-valid-trends-object', 3600);
 
         $trends = $this->app->make(DiscoverTrendsAction::class)($client, ['instagram']);
 
@@ -107,7 +109,7 @@ class AiActionsTest extends TestCase
         {
             public function suggestCaptions(Post $post): AiCaptionSuggestions
             {
-                return new AiCaptionSuggestions();
+                return new AiCaptionSuggestions;
             }
 
             public function recommendPosts(Client $client): AiPostIdeas
@@ -117,7 +119,7 @@ class AiActionsTest extends TestCase
 
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
-                return new AiTrends();
+                return new AiTrends;
             }
         });
 
@@ -161,12 +163,12 @@ class AiActionsTest extends TestCase
 
             public function recommendPosts(Client $client): AiPostIdeas
             {
-                return new AiPostIdeas();
+                return new AiPostIdeas;
             }
 
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
-                return new AiTrends();
+                return new AiTrends;
             }
         });
 

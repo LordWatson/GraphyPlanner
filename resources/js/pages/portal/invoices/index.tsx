@@ -4,7 +4,11 @@ import { ArrowUpRight, Receipt } from 'lucide-react';
 import { EmptyState, Page, PageHeader, Stat } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/currency';
+import {
+    formatCurrency,
+    formatCurrencyTotals,
+    totalsByCurrency,
+} from '@/lib/currency';
 import { show as portalInvoicesShow } from '@/routes/portal/invoices';
 import { formatDate } from '@/lib/dates';
 
@@ -35,12 +39,15 @@ export default function PortalInvoicesIndex({
 }) {
     const { currency } = usePage<{ currency: string }>().props;
 
-    const outstanding = invoices
-        .filter((invoice) => invoice.is_unpaid)
-        .reduce((sum, invoice) => sum + Number(invoice.amount), 0);
-    const paid = invoices
-        .filter((invoice) => invoice.status === 'paid')
-        .reduce((sum, invoice) => sum + Number(invoice.amount), 0);
+    // Split per currency — invoices billed in different currencies are never added together.
+    const outstanding = totalsByCurrency(
+        invoices.filter((invoice) => invoice.is_unpaid),
+        currency,
+    );
+    const paid = totalsByCurrency(
+        invoices.filter((invoice) => invoice.status === 'paid'),
+        currency,
+    );
     const unpaidCount = invoices.filter((invoice) => invoice.is_unpaid).length;
     const overdueCount = invoices.filter(
         (invoice) => invoice.is_overdue,
@@ -72,7 +79,10 @@ export default function PortalInvoicesIndex({
                             <Stat
                                 tone={unpaidCount > 0 ? 'ink' : 'paper'}
                                 label="Outstanding"
-                                value={formatCurrency(outstanding, currency)}
+                                value={formatCurrencyTotals(
+                                    outstanding,
+                                    currency,
+                                )}
                                 hint={
                                     unpaidCount > 0
                                         ? `${unpaidCount} unpaid invoice${unpaidCount === 1 ? '' : 's'}${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}`
@@ -82,7 +92,7 @@ export default function PortalInvoicesIndex({
                             />
                             <Stat
                                 label="Paid to date"
-                                value={formatCurrency(paid, currency)}
+                                value={formatCurrencyTotals(paid, currency)}
                                 className="[&_.font-display]:text-4xl"
                             />
                             <Stat
@@ -116,7 +126,7 @@ export default function PortalInvoicesIndex({
                                             <span className="text-right font-mono text-sm tabular-nums md:hidden">
                                                 {formatCurrency(
                                                     invoice.amount,
-                                                    currency,
+                                                    invoice.currency,
                                                 )}
                                             </span>
                                             <span className="text-muted-foreground font-mono text-xs tabular-nums">
@@ -131,7 +141,7 @@ export default function PortalInvoicesIndex({
                                             <span className="hidden text-right font-mono text-sm tabular-nums md:inline">
                                                 {formatCurrency(
                                                     invoice.amount,
-                                                    currency,
+                                                    invoice.currency,
                                                 )}
                                             </span>
                                             <span className="justify-self-end md:justify-self-start">

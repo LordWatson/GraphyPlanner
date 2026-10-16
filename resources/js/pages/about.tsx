@@ -119,10 +119,15 @@ export default function About() {
     return (
         <>
             <Head title="About" />
-            <div className="bg-background text-foreground relative flex min-h-screen flex-col">
-                <header className="relative mx-auto flex h-[88px] w-full max-w-[1280px] items-center justify-between px-5 md:px-10 lg:px-20">
-                    <Link href={home()} aria-label="Alima home">
-                        <BrandMark size="md" wordmark />
+            <div className="bg-background text-foreground relative flex min-h-screen flex-col overflow-hidden">
+                <div
+                    aria-hidden
+                    className="bg-grid text-foreground pointer-events-none absolute inset-x-0 top-0 h-[560px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]"
+                />
+
+                <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+                    <Link href={home()} aria-label="Graphy home">
+                        <BrandMark size="sm" wordmark />
                     </Link>
                     <nav className="flex items-center gap-1.5">
                         {auth.user ? (
@@ -149,12 +154,16 @@ export default function About() {
 
                 <main className="relative mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-28 px-5 pt-12 pb-24 md:px-10 lg:px-20 lg:pt-20">
                     <section className="animate-rise flex flex-col gap-8">
-                        <Eyebrow dash className="text-primary">
-                            About the planner
-                        </Eyebrow>
-                        <h1 className="font-display max-w-4xl text-[clamp(3rem,6.5vw,4.5rem)] leading-[1.04]">
-                            Social content, run end to end
-                            <span className="text-signal">.</span>
+                        <span className="eyebrow text-muted-foreground flex items-center gap-2">
+                            <span
+                                aria-hidden
+                                className="bg-primary size-1.5 rounded-[2px]"
+                            />
+                            About Graphy
+                        </span>
+                        <h1 className="max-w-4xl font-serif text-[clamp(3rem,7.5vw,6.25rem)] leading-[0.9] tracking-[-0.03em]">
+                            The <em className="text-primary">studio OS</em> for
+                            running social content, end to end.
                         </h1>
                         <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed text-pretty">
                             Alima Planner brings clients, brands, campaigns,
@@ -277,8 +286,8 @@ export default function About() {
                     </section>
                 </main>
 
-                <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-[1280px] justify-between px-5 py-6 md:px-10 lg:px-20">
-                    <span>© {new Date().getFullYear()} Alima</span>
+                <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-6xl justify-between px-6 py-6">
+                    <span>© {new Date().getFullYear()} Graphy</span>
                     <Link href={about()} className="hover:text-foreground">
                         About
                     </Link>

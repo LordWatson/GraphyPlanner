@@ -25,6 +25,7 @@ use App\Models\Client;
 use App\Models\Invoice;
 use App\Services\InvoiceLedgerService;
 use App\Support\Invoices\InvoicePresenter;
+use App\Support\Options\CurrencyOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -62,6 +63,7 @@ class InvoiceController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (Client $client) => ['value' => (string) $client->id, 'label' => $client->name]),
+            'currencies' => CurrencyOptions::options(),
         ]);
     }
 
@@ -125,6 +127,7 @@ class InvoiceController extends Controller
             'invoice' => InvoicePresenter::detail($invoice),
             'client' => $this->clientSummary($invoice),
             'can' => InvoicePresenter::abilities($invoice, $request->user()),
+            'currencies' => CurrencyOptions::options(),
         ]);
     }
 

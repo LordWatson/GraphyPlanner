@@ -24,29 +24,37 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { store as storeInvoice } from '@/routes/clients/invoices';
+import type { CurrencyOption } from './types';
 import { todayIso } from './types';
 
 type Option = { value: string; label: string };
 
 /**
- * Start a draft invoice. The amount is optional — most invoices are built from line items (and
+ * Start a draft invoice, billed in the chosen currency (the studio's default unless changed —
+ * every figure on the invoice then uses it). The amount is optional — most invoices are built from line items (and
  * the client's retainer) on the next screen; a fixed amount suits a simple one-off bill. Leaving
  * the due date empty applies the studio's default payment terms.
  */
 export function NewInvoiceDialog({
     clients,
     clientId,
+    currencies,
+    defaultCurrency,
     trigger,
 }: {
     /** Pick a client in the dialog (ledger page)… */
     clients?: Option[];
     /** …or create for a fixed client (client page). */
     clientId?: number;
+    currencies: CurrencyOption[];
+    /** The organization's default currency, preselected. */
+    defaultCurrency: string;
     trigger?: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
     const form = useForm({
         client_id: clientId ? String(clientId) : '',
+        currency: defaultCurrency,
         issue_date: todayIso(),
         due_date: '',
         amount: '',
@@ -119,6 +127,37 @@ export function NewInvoiceDialog({
                             <InputError message={form.errors.client_id} />
                         </div>
                     )}
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="new-invoice-currency">Currency</Label>
+                        <Select
+                            value={form.data.currency}
+                            onValueChange={(value) =>
+                                form.setData('currency', value)
+                            }
+                        >
+                            <SelectTrigger
+                                id="new-invoice-currency"
+                                className="w-full"
+                            >
+                                <SelectValue placeholder="Choose a currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {currencies.map((option) => (
+                                    <SelectItem
+                                        key={option.value}
+                                        value={option.value}
+                                    >
+                                        {option.value} — {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-muted-foreground text-xs">
+                            Every amount on this invoice is billed in this
+                            currency.
+                        </p>
+                        <InputError message={form.errors.currency} />
+                    </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="grid gap-1.5">
                             <Label htmlFor="new-invoice-issue">
@@ -159,7 +198,7 @@ export function NewInvoiceDialog({
                         <Label htmlFor="new-invoice-amount">
                             Fixed amount{' '}
                             <span className="text-muted-foreground font-normal">
-                                (optional)
+                                ({form.data.currency}, optional)
                             </span>
                         </Label>
                         <Input

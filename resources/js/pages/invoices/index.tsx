@@ -14,7 +14,7 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { InvoiceLedgerList } from '@/components/invoices/invoice-ledger-list';
 import { NewInvoiceDialog } from '@/components/invoices/new-invoice-dialog';
-import type { InvoiceRow } from '@/components/invoices/types';
+import type { CurrencyOption, InvoiceRow } from '@/components/invoices/types';
 import { EmptyState, Page, PageHeader, Stat } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { formatCurrency, formatCurrencyCompact } from '@/lib/currency';
+import type { CurrencyTotal } from '@/lib/currency';
+import { formatCurrencyTotals } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 import invoicesRoutes, { index as invoicesIndex } from '@/routes/invoices';
 
@@ -37,12 +38,13 @@ type Filters = {
     to: string | null;
 };
 
+/** Money totals are split per currency (org default first) — see `InvoiceLedgerService::summary()`. */
 type Summary = {
-    outstanding_total: number;
+    outstanding_totals: CurrencyTotal[];
     outstanding_count: number;
-    overdue_total: number;
+    overdue_totals: CurrencyTotal[];
     overdue_count: number;
-    paid_this_month_total: number;
+    paid_this_month_totals: CurrencyTotal[];
     paid_this_month_count: number;
     draft_count: number;
     average_days_to_pay: number | null;
@@ -81,11 +83,13 @@ export default function InvoicesIndex({
     summary,
     filters,
     clients,
+    currencies,
 }: {
     invoices: Paginated<InvoiceRow>;
     summary: Summary;
     filters: Filters;
     clients: Option[];
+    currencies: CurrencyOption[];
 }) {
     const { currency } = usePage<{ currency: string }>().props;
     const [search, setSearch] = useState(filters.search ?? '');
@@ -140,7 +144,11 @@ export default function InvoicesIndex({
                                 </a>
                             </Button>
                             {clients.length > 0 && (
-                                <NewInvoiceDialog clients={clients} />
+                                <NewInvoiceDialog
+                                    clients={clients}
+                                    currencies={currencies}
+                                    defaultCurrency={currency}
+                                />
                             )}
                         </>
                     }
@@ -151,18 +159,20 @@ export default function InvoicesIndex({
                         tone="ink"
                         label="Outstanding"
                         icon={Wallet}
-                        value={formatCurrencyCompact(
-                            summary.outstanding_total,
+                        value={formatCurrencyTotals(
+                            summary.outstanding_totals,
                             currency,
+                            { compact: true },
                         )}
-                        hint={`${formatCurrency(summary.outstanding_total, currency)} across ${summary.outstanding_count} invoice${summary.outstanding_count === 1 ? '' : 's'}`}
+                        hint={`${formatCurrencyTotals(summary.outstanding_totals, currency)} across ${summary.outstanding_count} invoice${summary.outstanding_count === 1 ? '' : 's'}`}
                     />
                     <Stat
                         label="Overdue"
                         icon={AlertTriangle}
-                        value={formatCurrencyCompact(
-                            summary.overdue_total,
+                        value={formatCurrencyTotals(
+                            summary.overdue_totals,
                             currency,
+                            { compact: true },
                         )}
                         hint={
                             summary.overdue_count > 0 ? (
@@ -183,9 +193,10 @@ export default function InvoicesIndex({
                     <Stat
                         label="Paid this month"
                         icon={Receipt}
-                        value={formatCurrencyCompact(
-                            summary.paid_this_month_total,
+                        value={formatCurrencyTotals(
+                            summary.paid_this_month_totals,
                             currency,
+                            { compact: true },
                         )}
                         hint={`${summary.paid_this_month_count} payment${summary.paid_this_month_count === 1 ? '' : 's'} received`}
                     />
@@ -347,16 +358,17 @@ export default function InvoicesIndex({
                             action={
                                 !hasFilters &&
                                 clients.length > 0 && (
-                                    <NewInvoiceDialog clients={clients} />
+                                    <NewInvoiceDialog
+                                        clients={clients}
+                                        currencies={currencies}
+                                        defaultCurrency={currency}
+                                    />
                                 )
                             }
                         />
                     ) : (
                         <>
-                            <InvoiceLedgerList
-                                invoices={invoices.data}
-                                currency={currency}
-                            />
+                            <InvoiceLedgerList invoices={invoices.data} />
                             {invoices.last_page > 1 && (
                                 <nav
                                     aria-label="Pagination"

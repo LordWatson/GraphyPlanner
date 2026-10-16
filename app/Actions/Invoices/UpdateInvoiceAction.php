@@ -10,10 +10,10 @@ use Illuminate\Validation\ValidationException;
 class UpdateInvoiceAction
 {
     /**
-     * Update an invoice's editable details (amount, dates, description). Status, invoice_number,
-     * org_id, client_id, and currency (always the organization's default_currency — no
-     * per-invoice override) are never touched here. Once finalized, `amount` is locked and can
-     * no longer be changed through this action.
+     * Update an invoice's editable details (amount, currency, dates, description). Status,
+     * invoice_number, org_id and client_id are never touched here. Once finalized, `amount` is
+     * locked; `currency` can only change while the invoice is an unfinalized draft (after that
+     * the total — and what the client has been sent — is fixed in that currency).
      *
      * @param  array<string, mixed>  $data
      */
@@ -29,14 +29,27 @@ class UpdateInvoiceAction
             ]);
         }
 
-        return DB::transaction(function () use ($invoice, $data) {
+        if (($data['currency'] ?? null) === null) {
             unset($data['currency']);
+        }
+
+        if (array_key_exists('currency', $data) && $data['currency'] !== $invoice->currency && ! $invoice->canChangeCurrency()) {
+            throw ValidationException::withMessages([
+                'currency' => 'The currency can only be changed while the invoice is an unfinalized draft.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($invoice, $data) {
+            $previousCurrency = $invoice->currency;
 
             $invoice->update($data);
 
             Log::info('Invoice updated', [
                 'client_id' => $invoice->client_id,
                 'invoice_id' => $invoice->id,
+                ...($invoice->currency !== $previousCurrency
+                    ? ['currency_from' => $previousCurrency, 'currency_to' => $invoice->currency]
+                    : []),
             ]);
 
             return $invoice;

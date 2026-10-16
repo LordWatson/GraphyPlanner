@@ -11,20 +11,20 @@
             <td align="center">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#FBFAF6; border-radius:12px; overflow:hidden; border:1px solid #E1DDD0;">
                     <tr>
-                        <td style="background-color:#205557; padding:24px 32px;">
-                            <img src="{{ asset('brand/alima_logo_cream@2x.png') }}" width="120" height="36" alt="Alima" style="display:block; border:0; width:120px; height:36px;">
+                        <td style="background-color:#241f1a; padding:24px 32px;">
+                            <span style="font-family:'Playfair Display', Georgia, serif; font-style:italic; color:#ffffff; font-size:22px; font-weight:600; letter-spacing:-0.02em;">graphy.</span>
                         </td>
                     </tr>
                     <tr>
                         <td style="padding:32px;">
-                            <h1 style="margin:0 0 12px; font-family:'Poppins', Arial, sans-serif; font-size:22px; line-height:1.3; color:#181723; font-weight:600;">
-                                You're invited to join {{ $invitation->organization->name }} on Alima
+                            <h1 style="margin:0 0 12px; font-family:'Playfair Display', Georgia, serif; font-size:22px; line-height:1.3; color:#1f1f1f; font-weight:600;">
+                                You're invited to join {{ $invitation->organization->name }} on Graphy
                             </h1>
                             <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
                                 Hi,
                             </p>
-                            <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
-                                You've been invited to join {{ $invitation->organization->name }} on Alima as a
+                            <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4b4b4b;">
+                                You've been invited to join {{ $invitation->organization->name }} on Graphy as a
                                 {{ $invitation->role->label() }}. Set up your account to get started.
                             </p>
 
@@ -51,9 +51,9 @@
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:20px 32px; background-color:#F5F2E8; border-top:1px solid #E1DDD0;">
-                            <p style="margin:0; font-size:12px; color:#6B6977;">
-                                &copy; {{ now()->year }} Alima. Marketing brighter together. This is an automated message, please don't reply
+                        <td style="padding:20px 32px; background-color:#fbf9f5; border-top:1px solid #e7e2d9;">
+                            <p style="margin:0; font-size:12px; color:#9a9a9a;">
+                                &copy; {{ now()->year }} Graphy. This is an automated message, please don't reply
                                 directly to this email.
                             </p>
                         </td>

@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Invoice;
+use App\Support\Options\CurrencyOptions;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateInvoiceRequest extends FormRequest
 {
@@ -19,7 +22,13 @@ class UpdateInvoiceRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Invoice $invoice */
+        $invoice = $this->route('invoice');
+
         return [
+            // Only changeable while the invoice is an unfinalized draft (enforced by
+            // UpdateInvoiceAction). The invoice's current currency is always accepted.
+            'currency' => ['nullable', 'string', Rule::in([...CurrencyOptions::codes(), $invoice->currency])],
             // Ignored by UpdateInvoiceAction once the invoice is finalized/built from items.
             'amount' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'issue_date' => ['required', 'date'],

@@ -16,14 +16,15 @@ export default function AuthSimpleLayout({
     description,
 }: AuthLayoutProps) {
     return (
-        <div className="bg-background grid min-h-svh grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
-            <aside className="bg-lime text-ink relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:gap-12 lg:p-10 xl:p-12">
-                <div className="eyebrow border-ink/85 flex items-center justify-between gap-6 border-b pb-2.5">
-                    <Link
-                        href={home()}
-                        className="hover:underline hover:underline-offset-4"
-                    >
-                        Alima Planner
+        <div className="bg-background grid min-h-svh grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
+            <aside className="bg-ink text-ink-foreground relative hidden overflow-hidden p-10 lg:flex lg:flex-col lg:justify-between">
+                <div
+                    aria-hidden
+                    className="bg-grid text-ink-foreground pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,black,transparent_85%)]"
+                />
+                <div className="relative flex items-center justify-between">
+                    <Link href={home()} aria-label="Graphy home">
+                        <BrandMark size="md" wordmark />
                     </Link>
                     <span className="hidden xl:inline">
                         Edition 01 — {new Date().getFullYear()}
@@ -49,15 +50,21 @@ export default function AuthSimpleLayout({
 
             <main className="flex flex-col px-6 py-8 sm:px-10">
                 <div className="flex items-center justify-between lg:hidden">
-                    <Link href={home()} aria-label="Alima home">
+                    <Link href={home()} aria-label="Graphy home">
                         <BrandMark size="sm" wordmark />
                     </Link>
                 </div>
 
-                <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-9 py-10">
-                    <div className="animate-rise flex flex-col gap-3.5">
-                        <Eyebrow dash>Alima Planner</Eyebrow>
-                        <h1 className="font-display text-[2.5rem] leading-[1.04] text-balance">
+                <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-8 py-10">
+                    <div className="animate-rise flex flex-col gap-3">
+                        <span className="eyebrow text-muted-foreground flex items-center gap-2">
+                            <span
+                                aria-hidden
+                                className="bg-primary size-1.5 rounded-[2px]"
+                            />
+                            Graphy
+                        </span>
+                        <h1 className="font-serif text-[2.6rem] leading-[0.95] tracking-[-0.02em] text-balance">
                             {title}
                         </h1>
                         {description && (

@@ -12,6 +12,7 @@ use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\ClientContextBuilder;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -20,9 +21,9 @@ use Throwable;
 
 /**
  * DeepSeek-backed implementation of App\Contracts\AiProvider (Step 2.2). Builds a system
- * prompt from the client's brand brain (voice, pillars, do/don'ts, audience) plus platform
- * caption-length constraints, and asks DeepSeek's chat completions endpoint for strict JSON
- * matching each method's DTO shape. Not bound by default — provider selection (Step 2.7)
+ * prompt from the client's company context (profile, full Brand Brain, current campaigns — see
+ * ClientContextBuilder) plus platform caption-length constraints, and asks DeepSeek's chat
+ * completions endpoint for strict JSON matching each method's DTO shape. Not bound by default — provider selection (Step 2.7)
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
@@ -33,8 +34,22 @@ class DeepSeekProvider implements AiProvider
      */
     private const MAX_ATTEMPTS = 2;
 
+    /**
+     * Upper bound when a truncated (`finish_reason = length`) attempt doubles max_tokens for its retry.
+     */
+    private const MAX_TOKENS_CEILING = 16000;
+
+    /**
+     * How many ideas/trends each request asks for (and keeps, if the model overshoots). Kept
+     * small so a reasoning model's answer stays well inside max_tokens and responses stay fast.
+     */
+    private const IDEAS_PER_REQUEST = 3;
+
+    private const TRENDS_PER_REQUEST = 3;
+
     public function __construct(
-        private readonly AiGuardrailService $guardrail = new AiGuardrailService(),
+        private readonly AiGuardrailService $guardrail = new AiGuardrailService,
+        private readonly ClientContextBuilder $context = new ClientContextBuilder,
     ) {}
 
     public function suggestCaptions(Post $post): AiCaptionSuggestions
@@ -45,12 +60,12 @@ class DeepSeekProvider implements AiProvider
             method: 'suggestCaptions',
             systemPrompt: $this->buildSystemPrompt($client),
             userPrompt: $this->buildCaptionsUserPrompt($post),
-            validator: fn (array $data): bool => $this->isValidCaptionSuggestionsShape($data),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'suggestions', ['caption']),
             context: ['org_id' => $client?->org_id, 'client_id' => $client?->id, 'post_id' => $post->id],
         );
 
         if ($payload === null) {
-            return new AiCaptionSuggestions();
+            return new AiCaptionSuggestions;
         }
 
         $suggestions = collect($payload['suggestions'] ?? [])
@@ -71,16 +86,17 @@ class DeepSeekProvider implements AiProvider
         $payload = $this->requestStructured(
             method: 'recommendPosts',
             systemPrompt: $this->buildSystemPrompt($client),
-            userPrompt: $this->buildRecommendPostsUserPrompt($client),
-            validator: fn (array $data): bool => $this->isValidPostIdeasShape($data),
+            userPrompt: $this->buildRecommendPostsUserPrompt(),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'ideas', ['title', 'description']),
             context: ['org_id' => $client->org_id, 'client_id' => $client->id],
         );
 
         if ($payload === null) {
-            return new AiPostIdeas();
+            return new AiPostIdeas;
         }
 
         $ideas = collect($payload['ideas'] ?? [])
+            ->take(self::IDEAS_PER_REQUEST)
             ->map(fn (array $item): AiPostIdea => new AiPostIdea(
                 title: (string) ($item['title'] ?? ''),
                 description: (string) ($item['description'] ?? ''),
@@ -100,15 +116,16 @@ class DeepSeekProvider implements AiProvider
             method: 'discoverTrends',
             systemPrompt: $this->buildSystemPrompt($client),
             userPrompt: $this->buildDiscoverTrendsUserPrompt($client, $platforms),
-            validator: fn (array $data): bool => $this->isValidTrendsShape($data),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'trends', ['title', 'summary']),
             context: ['org_id' => $client->org_id, 'client_id' => $client->id, 'platforms' => $platforms],
         );
 
         if ($payload === null) {
-            return new AiTrends();
+            return new AiTrends;
         }
 
         $trends = collect($payload['trends'] ?? [])
+            ->take(self::TRENDS_PER_REQUEST)
             ->map(fn (array $item): AiTrend => new AiTrend(
                 title: (string) ($item['title'] ?? ''),
                 summary: (string) ($item['summary'] ?? ''),
@@ -122,10 +139,10 @@ class DeepSeekProvider implements AiProvider
     }
 
     /**
-     * Build the shared system prompt: brand voice/pillars/do-not-says/audience from the brand
-     * brain (reusing BrandBrain::toGrokContext()'s markdown briefing), plus the client's
-     * industry and platform caption-length constraints so every method stays on-brand and
-     * platform-aware.
+     * Build the shared system prompt: the client's company context (profile, Brand Brain,
+     * current campaigns) from ClientContextBuilder, explicit rules telling the model to ground
+     * every result in it, plus platform caption-length constraints so every method stays
+     * on-brand and platform-aware.
      */
     private function buildSystemPrompt(?Client $client): string
     {
@@ -137,14 +154,14 @@ class DeepSeekProvider implements AiProvider
 
         if ($client !== null) {
             $lines[] = '';
-            $lines[] = 'Client industry: '.($client->industry ?? 'Unknown');
-
-            $brandBrain = $client->brandBrain;
-
-            if ($brandBrain !== null) {
-                $lines[] = '';
-                $lines[] = $brandBrain->toGrokContext()['markdown'];
-            }
+            $lines[] = 'Ground everything you propose in the company context below — generic advice that could apply to any brand is a failure:';
+            $lines[] = '- Write in the Brand Brain voice (tone and personality) and never do anything listed under "Do not".';
+            $lines[] = '- Speak to the described audience and their pain points, and reference the offer (value proposition, key products/services) where it fits naturally.';
+            $lines[] = '- Tie each idea or trend angle to one of the content pillars and, where relevant, a current campaign.';
+            $lines[] = '- Follow the hashtag policy: include every "Always use" hashtag in hashtag suggestions and never suggest a "Never use" one.';
+            $lines[] = '- Write captions in the primary content language when one is given.';
+            $lines[] = '';
+            $lines[] = $this->context->build($client);
         }
 
         $lines[] = '';
@@ -158,10 +175,14 @@ class DeepSeekProvider implements AiProvider
     private function buildCaptionsUserPrompt(Post $post): string
     {
         $lines = [
-            'Suggest 3 caption options for this post.',
+            'Suggest 3 caption options for this post, each written in the brand voice from the Brand Brain.',
             'Current draft caption: '.$this->guardrail->scrub($post->master_caption ?: '(none yet)'),
             'Target platforms: '.implode(', ', array_map(fn ($platform) => $platform->label(), $post->targetPlatforms())),
         ];
+
+        if ($post->campaign !== null) {
+            $lines[] = 'Campaign this post belongs to: '.$this->guardrail->scrub($this->context->describeCampaign($post->campaign));
+        }
 
         if (! empty($post->hashtags)) {
             $lines[] = 'Existing hashtags: '.implode(', ', $post->hashtags);
@@ -173,13 +194,11 @@ class DeepSeekProvider implements AiProvider
         return implode("\n", $lines);
     }
 
-    private function buildRecommendPostsUserPrompt(Client $client): string
+    private function buildRecommendPostsUserPrompt(): string
     {
-        $campaigns = $client->campaigns()->get()->pluck('name')->filter()->implode(', ');
-
         $lines = [
-            'Recommend 3-5 fresh post ideas for this client, tied to their active campaigns and brand pillars.',
-            'Active campaigns: '.($campaigns !== '' ? $campaigns : '(none)'),
+            'Recommend exactly '.self::IDEAS_PER_REQUEST.' fresh post ideas for this client, tied to their current campaigns and content pillars.',
+            'Each description must name the content pillar it serves and the audience pain point or offer it speaks to.',
             '',
             'Respond with JSON: {"ideas": [{"title": string, "description": string, "platforms": string[], "suggestedCaption": string|null, "suggestedPostAt": string|null}]}',
         ];
@@ -193,7 +212,8 @@ class DeepSeekProvider implements AiProvider
     private function buildDiscoverTrendsUserPrompt(Client $client, array $platforms): string
     {
         $lines = [
-            'Discover current trends relevant to this client across the given platforms.',
+            'Discover exactly '.self::TRENDS_PER_REQUEST.' current trends relevant to this client across the given platforms.',
+            'Only include trends that fit the client\'s industry, markets, audience, and content pillars; each summary must explain how this specific brand could use the trend in its own voice.',
             'Platforms: '.implode(', ', $platforms),
             'If you cannot browse the web, propose trend hypotheses and mark each with a confidence score (0.0-1.0).',
             '',
@@ -206,94 +226,186 @@ class DeepSeekProvider implements AiProvider
     /**
      * Call DeepSeek's chat completions endpoint and parse/validate the structured JSON
      * response, retrying once (per Step 2.2: "Reject and retry up to 1 time if schema invalid")
-     * when the response is missing, unparsable, or doesn't match the expected shape. Logs
-     * `info` on start/end, `warning` on a schema retry, and `error` on the final failure —
-     * never logging the API key or raw prompt contents.
+     * when the response is missing, unparsable, or doesn't match the expected shape. Every
+     * failure path logs *why* it failed (HTTP status + vendor error, empty/truncated content,
+     * JSON error, or the exact schema violation) alongside finish_reason/token usage/latency and
+     * a scrubbed, truncated excerpt of the model's response — never the API key or the prompt.
      *
+     * @param  callable(array<string, mixed>): ?string  $validator  returns null when valid, else the reason
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>|null
      */
     private function requestStructured(string $method, string $systemPrompt, string $userPrompt, callable $validator, array $context): ?array
     {
         $model = (string) config('ai.deepseek.model', 'deepseek-chat');
+        $context = [...$context, 'method' => $method, 'model' => $model];
 
-        Log::info('DeepSeek request started', [...$context, 'method' => $method, 'model' => $model]);
+        $maxTokens = (int) config('ai.deepseek.max_tokens', 1024);
+
+        Log::info('DeepSeek request started', [
+            ...$context,
+            'max_tokens' => $maxTokens,
+            'prompt_chars' => mb_strlen($systemPrompt) + mb_strlen($userPrompt),
+        ]);
+
+        $failure = null;
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
-            $payload = $this->callChatCompletions($systemPrompt, $userPrompt, $context, $method, $model);
+            $result = $this->callChatCompletions($systemPrompt, $userPrompt, [...$context, 'attempt' => $attempt, 'max_tokens' => $maxTokens], $model, $maxTokens);
 
-            if ($payload !== null && $validator($payload)) {
-                Log::info('DeepSeek request completed', [...$context, 'method' => $method, 'model' => $model, 'attempt' => $attempt]);
+            if ($result['payload'] !== null) {
+                $failure = $validator($result['payload']);
 
-                return $payload;
+                if ($failure === null) {
+                    Log::info('DeepSeek request completed', [...$context, ...$result['meta'], 'attempt' => $attempt]);
+
+                    return $result['payload'];
+                }
+
+                Log::warning('DeepSeek response failed schema validation', [
+                    ...$context,
+                    ...$result['meta'],
+                    'attempt' => $attempt,
+                    'reason' => $failure,
+                    'top_level_keys' => array_keys($result['payload']),
+                    'response_excerpt' => $this->excerpt((string) json_encode($result['payload'])),
+                ]);
+            } else {
+                $failure = $result['failure'];
             }
 
             if ($attempt < self::MAX_ATTEMPTS) {
-                Log::warning('DeepSeek response failed schema validation, retrying', [
+                // Re-sending a request that ran out of tokens with the same budget just fails the
+                // same way (reasoning models spend it all thinking), so give the retry more room.
+                $previousMaxTokens = $maxTokens;
+
+                if (($result['meta']['finish_reason'] ?? null) === 'length') {
+                    $maxTokens = min($maxTokens * 2, self::MAX_TOKENS_CEILING);
+                }
+
+                Log::warning('DeepSeek request retrying', [
                     ...$context,
-                    'method' => $method,
-                    'model' => $model,
                     'attempt' => $attempt,
+                    'reason' => $failure,
+                    'max_tokens' => $maxTokens,
+                    'max_tokens_raised_from' => $maxTokens !== $previousMaxTokens ? $previousMaxTokens : null,
                 ]);
             }
         }
 
-        Log::error('DeepSeek request failed after retries', [...$context, 'method' => $method, 'model' => $model]);
+        Log::error('DeepSeek request failed after retries', [...$context, 'attempts' => self::MAX_ATTEMPTS, 'last_reason' => $failure]);
 
         return null;
     }
 
     /**
+     * One HTTP round trip. Returns the decoded JSON payload (or null) plus response metadata
+     * (latency, finish_reason, token usage) for logging, and a short failure reason when the
+     * payload couldn't be produced — each failure is also logged here with its own diagnostics.
+     *
      * @param  array<string, mixed>  $context
-     * @return array<string, mixed>|null
+     * @return array{payload: array<string, mixed>|null, failure: string|null, meta: array<string, mixed>}
      */
-    private function callChatCompletions(string $systemPrompt, string $userPrompt, array $context, string $method, string $model): ?array
+    private function callChatCompletions(string $systemPrompt, string $userPrompt, array $context, string $model, int $maxTokens): array
     {
+        $startedAt = microtime(true);
+
         try {
             $response = $this->client()->post('/chat/completions', [
                 'model' => $model,
-                'max_tokens' => (int) config('ai.deepseek.max_tokens', 1024),
+                'max_tokens' => $maxTokens,
                 'response_format' => ['type' => 'json_object'],
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
             ]);
-        } catch (RequestException|Throwable $e) {
+        } catch (Throwable $e) {
+            $meta = ['duration_ms' => $this->elapsedMs($startedAt)];
+
+            // Http::retry() throws a RequestException once retries are exhausted on a 4xx/5xx.
+            $status = $e instanceof RequestException ? $e->response->status() : null;
+            $vendorError = $e instanceof RequestException ? $this->vendorError($e->response->json()) : null;
+
             Log::error('DeepSeek HTTP request threw an exception', [
                 ...$context,
-                'method' => $method,
-                'model' => $model,
-                'error' => $e->getMessage(),
+                ...$meta,
+                'exception' => $e::class,
+                'error' => $this->guardrail->scrub($e->getMessage()),
+                'status' => $status,
+                'vendor_error' => $vendorError,
             ]);
 
-            return null;
+            return ['payload' => null, 'failure' => 'http exception: '.($vendorError ?? $e::class), 'meta' => $meta];
         }
+
+        $meta = [
+            'duration_ms' => $this->elapsedMs($startedAt),
+            'status' => $response->status(),
+            'finish_reason' => $response->json('choices.0.finish_reason'),
+            'usage' => array_filter([
+                'prompt_tokens' => $response->json('usage.prompt_tokens'),
+                'completion_tokens' => $response->json('usage.completion_tokens'),
+                'reasoning_tokens' => $response->json('usage.completion_tokens_details.reasoning_tokens'),
+                'total_tokens' => $response->json('usage.total_tokens'),
+            ], fn ($value) => $value !== null),
+        ];
 
         if (! $response->successful()) {
+            $vendorError = $this->vendorError($response->json());
+
             Log::warning('DeepSeek request rejected', [
                 ...$context,
-                'method' => $method,
-                'model' => $model,
-                'status' => $response->status(),
+                ...$meta,
+                'vendor_error' => $vendorError,
+                'response_excerpt' => $vendorError === null ? $this->excerpt($response->body()) : null,
             ]);
 
-            return null;
+            return ['payload' => null, 'failure' => "http {$response->status()}: ".($vendorError ?? 'no error message'), 'meta' => $meta];
         }
 
+        $truncated = $meta['finish_reason'] === 'length';
         $content = $response->json('choices.0.message.content');
 
-        if (! is_string($content) || $content === '') {
-            return null;
+        if (! is_string($content) || trim($content) === '') {
+            $reasoning = $response->json('choices.0.message.reasoning_content');
+
+            Log::warning('DeepSeek returned empty content', [
+                ...$context,
+                ...$meta,
+                'has_reasoning_content' => is_string($reasoning) && $reasoning !== '',
+                'hint' => $truncated ? 'max_tokens was exhausted before any answer was written — raise DEEPSEEK_MAX_TOKENS' : null,
+            ]);
+
+            return ['payload' => null, 'failure' => $truncated ? 'empty content (truncated at max_tokens)' : 'empty content', 'meta' => $meta];
         }
 
         try {
             $decoded = json_decode($content, true, flags: JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            return null;
+        } catch (Throwable $e) {
+            Log::warning('DeepSeek returned unparsable JSON', [
+                ...$context,
+                ...$meta,
+                'json_error' => $e->getMessage(),
+                'content_chars' => mb_strlen($content),
+                'response_excerpt' => $this->excerpt($content),
+                'hint' => $truncated ? 'response was cut off at max_tokens — raise DEEPSEEK_MAX_TOKENS' : null,
+            ]);
+
+            return ['payload' => null, 'failure' => $truncated ? 'invalid JSON (truncated at max_tokens)' : 'invalid JSON: '.$e->getMessage(), 'meta' => $meta];
         }
 
-        return is_array($decoded) ? $decoded : null;
+        if (! is_array($decoded)) {
+            Log::warning('DeepSeek returned JSON that is not an object', [
+                ...$context,
+                ...$meta,
+                'response_excerpt' => $this->excerpt($content),
+            ]);
+
+            return ['payload' => null, 'failure' => 'JSON is not an object', 'meta' => $meta];
+        }
+
+        return ['payload' => $decoded, 'failure' => null, 'meta' => $meta];
     }
 
     private function client(): PendingRequest
@@ -323,59 +435,67 @@ class DeepSeekProvider implements AiProvider
         return $base + random_int(0, 100);
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function isValidCaptionSuggestionsShape(array $data): bool
+    private function elapsedMs(float $startedAt): int
     {
-        if (! isset($data['suggestions']) || ! is_array($data['suggestions'])) {
-            return false;
-        }
-
-        foreach ($data['suggestions'] as $item) {
-            if (! is_array($item) || ! isset($item['caption']) || ! is_string($item['caption'])) {
-                return false;
-            }
-        }
-
-        return true;
+        return (int) round((microtime(true) - $startedAt) * 1000);
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * Pull the human-readable message out of a DeepSeek/OpenAI-style error body, if any.
      */
-    private function isValidPostIdeasShape(array $data): bool
+    private function vendorError(mixed $body): ?string
     {
-        if (! isset($data['ideas']) || ! is_array($data['ideas'])) {
-            return false;
-        }
+        $message = is_array($body) ? ($body['error']['message'] ?? $body['message'] ?? null) : null;
 
-        foreach ($data['ideas'] as $item) {
-            if (! is_array($item) || ! isset($item['title'], $item['description'])
-                || ! is_string($item['title']) || ! is_string($item['description'])) {
-                return false;
-            }
-        }
-
-        return true;
+        return is_string($message) ? $this->guardrail->scrub($message) : null;
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * Scrubbed, length-capped slice of a model/vendor response for log context: enough to see
+     * what came back (wrong key, prose instead of JSON, cut-off output) without dumping it all.
      */
-    private function isValidTrendsShape(array $data): bool
+    private function excerpt(string $text, int $limit = 500): string
     {
-        if (! isset($data['trends']) || ! is_array($data['trends'])) {
-            return false;
+        $text = $this->guardrail->scrub($text);
+
+        if (mb_strlen($text) <= $limit) {
+            return $text;
         }
 
-        foreach ($data['trends'] as $item) {
-            if (! is_array($item) || ! isset($item['title'], $item['summary'])
-                || ! is_string($item['title']) || ! is_string($item['summary'])) {
-                return false;
+        // Keep the head and the tail: the head shows the shape, the tail shows where it was cut off.
+        return mb_substr($text, 0, $limit - 150).' … '.mb_substr($text, -150);
+    }
+
+    /**
+     * Shared shape check for every method's response: `$key` must be an array of objects, each
+     * carrying the given string fields. Returns null when valid, otherwise a precise reason
+     * (e.g. `ideas[2].description must be a string, got null`) for the log.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<int, string>  $requiredStringFields
+     */
+    private function shapeError(array $data, string $key, array $requiredStringFields): ?string
+    {
+        if (! array_key_exists($key, $data)) {
+            return "missing top-level \"{$key}\" key";
+        }
+
+        if (! is_array($data[$key])) {
+            return "\"{$key}\" must be an array, got ".get_debug_type($data[$key]);
+        }
+
+        foreach ($data[$key] as $index => $item) {
+            if (! is_array($item)) {
+                return "{$key}[{$index}] must be an object, got ".get_debug_type($item);
+            }
+
+            foreach ($requiredStringFields as $field) {
+                if (! isset($item[$field]) || ! is_string($item[$field])) {
+                    return "{$key}[{$index}].{$field} must be a string, got ".get_debug_type($item[$field] ?? null);
+                }
             }
         }
 
-        return true;
+        return null;
     }
 }

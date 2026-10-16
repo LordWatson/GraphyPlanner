@@ -69,12 +69,16 @@ export type InvoiceAbilities = {
     mark_paid: boolean;
     finalize: boolean;
     manage_items: boolean;
+    edit_currency: boolean;
     edit_amount: boolean;
     generate_pdf: boolean;
     void: boolean;
     remind: boolean;
     duplicate: boolean;
 };
+
+/** An entry of `App\Support\Options\CurrencyOptions::options()`. */
+export type CurrencyOption = { value: string; label: string };
 
 export type InvoiceClientSummary = {
     id: number;

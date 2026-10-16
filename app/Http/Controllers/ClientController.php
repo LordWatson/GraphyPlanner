@@ -18,6 +18,7 @@ use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Support\Invoices\InvoicePresenter;
+use App\Support\Options\CurrencyOptions;
 use App\Support\Options\LanguageOptions;
 use App\Support\Options\TimezoneOptions;
 use Illuminate\Http\RedirectResponse;
@@ -123,6 +124,8 @@ class ClientController extends Controller
                     ->get()
                     ->map(fn (Invoice $invoice) => $this->transformInvoice($invoice, $user))
                 : [],
+            // Billing currencies offered by the "New invoice" dialog.
+            'currencies' => $canViewBilling ? CurrencyOptions::options() : [],
             'socialAccounts' => $canViewSocialAccounts
                 ? $socialAccounts->map(fn (SocialAccount $socialAccount) => $this->transformSocialAccount($socialAccount, $user))
                 : [],

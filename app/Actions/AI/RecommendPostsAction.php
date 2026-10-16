@@ -77,12 +77,15 @@ class RecommendPostsAction
      */
     public function persist(Client $client, AiPostIdea $idea): Post
     {
-        return DB::transaction(function () use ($client, $idea) {
+        [$caption, $hashtags] = $this->splitHashtags($idea->suggestedCaption);
+
+        return DB::transaction(function () use ($client, $idea, $caption, $hashtags) {
             $post = Post::create([
                 'org_id' => $client->org_id,
                 'client_id' => $client->id,
                 'status' => PostStatus::Idea,
-                'master_caption' => $idea->suggestedCaption,
+                'master_caption' => $caption,
+                'hashtags' => $hashtags === [] ? null : $hashtags,
             ]);
 
             PersistedAiPostIdea::query()
@@ -98,5 +101,29 @@ class RecommendPostsAction
 
             return $post;
         });
+    }
+
+    /**
+     * The AI returns ideas with hashtags inline in the suggested caption ("... #launch #summer").
+     * Pull them out into bare tags (no "#") for the post's hashtags field, and tidy the caption
+     * whitespace left behind once they're removed.
+     *
+     * @return array{0: ?string, 1: array<int, string>}
+     */
+    private function splitHashtags(?string $caption): array
+    {
+        if ($caption === null) {
+            return [null, []];
+        }
+
+        preg_match_all('/#([\p{L}\p{N}_]+)/u', $caption, $matches);
+
+        $hashtags = array_values(array_unique($matches[1]));
+
+        $cleaned = (string) preg_replace('/[ \t]*#[\p{L}\p{N}_]+/u', '', $caption);
+        $cleaned = (string) preg_replace('/[ \t]+$/m', '', $cleaned);
+        $cleaned = trim((string) preg_replace("/\n{3,}/", "\n\n", $cleaned));
+
+        return [$cleaned === '' ? null : $cleaned, $hashtags];
     }
 }

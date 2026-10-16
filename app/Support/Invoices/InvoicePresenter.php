@@ -105,6 +105,7 @@ final class InvoicePresenter
             'mark_paid' => $isSent && $user->can('markPaid', $invoice),
             'finalize' => $isDraft && ! $invoice->is_finalized && $user->can('finalize', $invoice),
             'manage_items' => $isDraft && $canUpdate,
+            'edit_currency' => $invoice->canChangeCurrency() && $canUpdate,
             'edit_amount' => $isDraft && ! $invoice->is_finalized && $invoice->items->isEmpty() && $canUpdate,
             'generate_pdf' => $invoice->canGeneratePdf() && $canUpdate,
             'void' => $isSent && $user->can('void', $invoice),

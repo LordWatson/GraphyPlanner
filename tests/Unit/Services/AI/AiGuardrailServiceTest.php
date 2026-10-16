@@ -13,6 +13,7 @@ use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -34,10 +35,35 @@ class AiGuardrailServiceTest extends TestCase
             new AiCaptionSuggestion(caption: 'A perfectly on-brand caption.'),
         ]);
 
-        $result = (new AiGuardrailService())->filterCaptionSuggestions($brandBrain, $suggestions);
+        $result = (new AiGuardrailService)->filterCaptionSuggestions($brandBrain, $suggestions);
 
         $this->assertCount(1, $result->suggestions);
         $this->assertSame('A perfectly on-brand caption.', $result->suggestions[0]->caption);
+    }
+
+    public function test_it_warns_with_a_received_kept_summary_when_every_idea_is_dropped(): void
+    {
+        $brandBrain = BrandBrain::factory()->make(); // do_nots: ['Avoid slang', 'No profanity']
+        Log::spy();
+
+        (new AiGuardrailService)->filterPostIdeas($brandBrain, new AiPostIdeas([
+            new AiPostIdea(title: 'Idea', description: 'No profanity, promise'),
+        ]), ['client_id' => 7]);
+
+        Log::shouldHaveReceived('log')->withArgs(fn (string $level, string $message, array $context = []) => $level === 'warning'
+            && $message === 'AI guardrail filtered post ideas'
+            && $context === ['client_id' => 7, 'received' => 1, 'kept' => 0, 'dropped' => 1]);
+    }
+
+    public function test_it_logs_an_info_summary_when_the_provider_returned_nothing(): void
+    {
+        Log::spy();
+
+        (new AiGuardrailService)->filterTrends(null, new AiTrends);
+
+        Log::shouldHaveReceived('log')->withArgs(fn (string $level, string $message, array $context = []) => $level === 'info'
+            && $message === 'AI guardrail filtered trends'
+            && $context['received'] === 0);
     }
 
     public function test_caption_suggestions_using_a_never_use_hashtag_are_rejected(): void
@@ -49,7 +75,7 @@ class AiGuardrailServiceTest extends TestCase
             new AiCaptionSuggestion(caption: 'Another post', hashtags: ['#brand']),
         ]);
 
-        $result = (new AiGuardrailService())->filterCaptionSuggestions($brandBrain, $suggestions);
+        $result = (new AiGuardrailService)->filterCaptionSuggestions($brandBrain, $suggestions);
 
         $this->assertCount(1, $result->suggestions);
         $this->assertSame(['#brand'], $result->suggestions[0]->hashtags);
@@ -59,7 +85,7 @@ class AiGuardrailServiceTest extends TestCase
     {
         Config::set('ai.guardrails.prohibited_topics', ['politics']);
 
-        $guardrail = new AiGuardrailService();
+        $guardrail = new AiGuardrailService;
 
         $suggestions = $guardrail->filterCaptionSuggestions(null, new AiCaptionSuggestions([
             new AiCaptionSuggestion(caption: 'Let us talk about politics today'),
@@ -84,7 +110,7 @@ class AiGuardrailServiceTest extends TestCase
 
     public function test_scrub_redacts_emails_phone_numbers_and_secrets(): void
     {
-        $scrubbed = (new AiGuardrailService())->scrub(
+        $scrubbed = (new AiGuardrailService)->scrub(
             'Contact jane@example.com or 555-123-4567, key api_1234567890abcdef is leaked.'
         );
 
@@ -102,7 +128,7 @@ class AiGuardrailServiceTest extends TestCase
             hashtags: array_fill(0, 10, 'tag'),
         );
 
-        $warnings = (new AiGuardrailService())->platformWarnings(Platform::LinkedIn, $suggestion);
+        $warnings = (new AiGuardrailService)->platformWarnings(Platform::LinkedIn, $suggestion);
 
         $this->assertNotEmpty($warnings);
         $this->assertSame('Check this out https://example.com', $suggestion->caption);

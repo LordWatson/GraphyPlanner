@@ -10,6 +10,7 @@ use App\Services\AI\NullAiProvider;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class AiProviderTest extends TestCase
@@ -20,24 +21,24 @@ class AiProviderTest extends TestCase
         {
             public function suggestCaptions(Post $post): AiCaptionSuggestions
             {
-                return new AiCaptionSuggestions();
+                return new AiCaptionSuggestions;
             }
 
             public function recommendPosts(Client $client): AiPostIdeas
             {
-                return new AiPostIdeas();
+                return new AiPostIdeas;
             }
 
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
-                return new AiTrends();
+                return new AiTrends;
             }
         };
 
         $this->assertInstanceOf(AiProvider::class, $provider);
-        $this->assertInstanceOf(AiCaptionSuggestions::class, $provider->suggestCaptions(new Post()));
-        $this->assertInstanceOf(AiPostIdeas::class, $provider->recommendPosts(new Client()));
-        $this->assertInstanceOf(AiTrends::class, $provider->discoverTrends(new Client(), ['instagram']));
+        $this->assertInstanceOf(AiCaptionSuggestions::class, $provider->suggestCaptions(new Post));
+        $this->assertInstanceOf(AiPostIdeas::class, $provider->recommendPosts(new Client));
+        $this->assertInstanceOf(AiTrends::class, $provider->discoverTrends(new Client, ['instagram']));
     }
 
     public function test_the_container_resolves_ai_provider_to_the_null_provider_by_default(): void
@@ -45,9 +46,22 @@ class AiProviderTest extends TestCase
         $provider = $this->app->make(AiProvider::class);
 
         $this->assertInstanceOf(NullAiProvider::class, $provider);
-        $this->assertSame([], $provider->suggestCaptions(new Post())->suggestions);
-        $this->assertSame([], $provider->recommendPosts(new Client())->ideas);
-        $this->assertSame([], $provider->discoverTrends(new Client(), ['instagram'])->trends);
+        $this->assertSame([], $provider->suggestCaptions(new Post)->suggestions);
+        $this->assertSame([], $provider->recommendPosts(new Client)->ideas);
+        $this->assertSame([], $provider->discoverTrends(new Client, ['instagram'])->trends);
+    }
+
+    public function test_the_null_provider_logs_why_no_vendor_call_was_made(): void
+    {
+        config(['ai.enabled' => true, 'ai.deepseek.api_key' => '']);
+        Log::spy();
+
+        (new NullAiProvider)->recommendPosts(new Client);
+
+        Log::shouldHaveReceived('info')->withArgs(fn (string $message, array $context = []) => $message === 'AI request answered by NullAiProvider (no vendor call made)'
+            && $context['method'] === 'recommendPosts'
+            && $context['ai_enabled'] === true
+            && $context['api_key_configured'] === false);
     }
 
     public function test_the_container_resolves_ai_provider_to_null_when_disabled_even_with_an_api_key(): void

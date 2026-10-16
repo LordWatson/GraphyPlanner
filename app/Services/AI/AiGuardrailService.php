@@ -23,8 +23,9 @@ use Illuminate\Support\Facades\Log;
 class AiGuardrailService
 {
     /**
+     * @param  array<string, mixed>  $context
      * @return AiCaptionSuggestions filtered copy with any banned-phrase suggestion dropped and
-     *                               free-text fields scrubbed of obvious PII/secrets
+     *                              free-text fields scrubbed of obvious PII/secrets
      */
     public function filterCaptionSuggestions(?BrandBrain $brandBrain, AiCaptionSuggestions $suggestions, array $context = []): AiCaptionSuggestions
     {
@@ -50,10 +51,13 @@ class AiGuardrailService
             ->values()
             ->all();
 
+        $this->logSummary('caption suggestions', count($suggestions->suggestions), count($filtered), $context);
+
         return new AiCaptionSuggestions($filtered);
     }
 
     /**
+     * @param  array<string, mixed>  $context
      * @return AiPostIdeas filtered copy with any banned-phrase idea dropped and free-text fields
      *                     scrubbed of obvious PII/secrets
      */
@@ -77,12 +81,15 @@ class AiGuardrailService
             ->values()
             ->all();
 
+        $this->logSummary('post ideas', count($ideas->ideas), count($filtered), $context);
+
         return new AiPostIdeas($filtered);
     }
 
     /**
+     * @param  array<string, mixed>  $context
      * @return AiTrends filtered copy with any banned-phrase trend dropped and free-text fields
-     *                   scrubbed of obvious PII/secrets
+     *                  scrubbed of obvious PII/secrets
      */
     public function filterTrends(?BrandBrain $brandBrain, AiTrends $trends, array $context = []): AiTrends
     {
@@ -102,6 +109,8 @@ class AiGuardrailService
             ))
             ->values()
             ->all();
+
+        $this->logSummary('trends', count($trends->trends), count($filtered), $context);
 
         return new AiTrends($filtered);
     }
@@ -189,6 +198,25 @@ class AiGuardrailService
         Log::warning("AI guardrail rejected a {$kind} for a banned phrase", [...$context, 'phrase' => $matched]);
 
         return false;
+    }
+
+    /**
+     * One line per guardrail pass so "the panel is empty" can be traced to either the provider
+     * returning nothing (received = 0) or the guardrail dropping everything (kept = 0). Logged
+     * as a warning when items came in but none survived, since that empties the UI.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logSummary(string $kind, int $received, int $kept, array $context): void
+    {
+        $level = $received > 0 && $kept === 0 ? 'warning' : 'info';
+
+        Log::log($level, "AI guardrail filtered {$kind}", [
+            ...$context,
+            'received' => $received,
+            'kept' => $kept,
+            'dropped' => $received - $kept,
+        ]);
     }
 
     /**

@@ -57,7 +57,11 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatCurrency, formatCurrencyCompact } from '@/lib/currency';
+import {
+    formatCurrency,
+    formatCurrencyTotals,
+    totalsByCurrency,
+} from '@/lib/currency';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { edit, index, destroy as destroyClient } from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
@@ -81,7 +85,11 @@ import {
     SendInvoiceDialog,
 } from '@/components/invoices/invoice-action-dialogs';
 import { NewInvoiceDialog } from '@/components/invoices/new-invoice-dialog';
-import type { InvoiceAbilities, InvoiceRow } from '@/components/invoices/types';
+import type {
+    CurrencyOption,
+    InvoiceAbilities,
+    InvoiceRow,
+} from '@/components/invoices/types';
 import { store as storeInvitation } from '@/routes/clients/invitations';
 import { destroy as destroyInvitation } from '@/routes/invitations';
 import aiClients from '@/routes/clients/ai';
@@ -255,6 +263,7 @@ export default function ClientShow({
     client,
     can,
     invoices,
+    currencies,
     socialAccounts,
     campaigns,
     assets,
@@ -278,6 +287,7 @@ export default function ClientShow({
         createInvitation: boolean;
     };
     invoices: InvoiceData[];
+    currencies: CurrencyOption[];
     socialAccounts: SocialAccountData[];
     campaigns: CampaignData[];
     assets: AssetData[];
@@ -620,9 +630,11 @@ export default function ClientShow({
         (chip): chip is { icon: typeof Globe; label: string } => chip !== null,
     );
 
-    const outstandingInvoiceTotal = invoices
-        .filter((invoice) => invoice.status === 'sent')
-        .reduce((total, invoice) => total + Number(invoice.amount), 0);
+    // Split per currency — invoices billed in different currencies are never added together.
+    const outstandingInvoiceTotals = totalsByCurrency(
+        invoices.filter((invoice) => invoice.status === 'sent'),
+        currency,
+    );
 
     // The primary stats are always visible as a single row of cards; everything else (billing,
     // portal access, AI insights) lives behind the "More stats" dropdown below so the header
@@ -664,12 +676,13 @@ export default function ClientShow({
                   {
                       icon: Receipt,
                       label: 'Outstanding',
-                      value: formatCurrencyCompact(
-                          outstandingInvoiceTotal,
+                      value: formatCurrencyTotals(
+                          outstandingInvoiceTotals,
                           currency,
+                          { compact: true },
                       ),
-                      fullValue: formatCurrency(
-                          outstandingInvoiceTotal,
+                      fullValue: formatCurrencyTotals(
+                          outstandingInvoiceTotals,
                           currency,
                       ),
                       hint: `${invoices.length} invoice${invoices.length === 1 ? '' : 's'} total`,
@@ -1966,6 +1979,8 @@ export default function ClientShow({
                                     {can.createInvoice && (
                                         <NewInvoiceDialog
                                             clientId={client.id}
+                                            currencies={currencies}
+                                            defaultCurrency={currency}
                                             trigger={
                                                 <Button size="sm">
                                                     <Plus />
@@ -1987,7 +2002,6 @@ export default function ClientShow({
                             ) : (
                                 <InvoiceLedgerList
                                     invoices={invoices}
-                                    currency={currency}
                                     showClient={false}
                                     actions={(row) => {
                                         const invoice = invoices.find(
@@ -2008,14 +2022,12 @@ export default function ClientShow({
                                                             client.billing_email ??
                                                             client.approval_email
                                                         }
-                                                        currency={currency}
                                                         variant="outline"
                                                     />
                                                 )}
                                                 {invoice.can.mark_paid && (
                                                     <MarkPaidDialog
                                                         invoice={invoice}
-                                                        currency={currency}
                                                     />
                                                 )}
                                             </>
