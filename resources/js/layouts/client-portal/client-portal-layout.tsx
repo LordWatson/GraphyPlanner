@@ -180,7 +180,7 @@ export default function ClientPortalLayout({
             </main>
 
             <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-6xl justify-between gap-4 px-4 py-6 sm:px-6">
-                <span>© {new Date().getFullYear()} Alima</span>
+                <span>© {new Date().getFullYear()} Graphy</span>
                 <span>Your studio&apos;s client portal</span>
             </footer>
         </div>
