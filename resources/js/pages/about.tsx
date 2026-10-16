@@ -13,7 +13,7 @@ import {
 import type { ReactNode } from 'react';
 
 import { BrandMark } from '@/components/brand-mark';
-import { BrandPattern } from '@/components/brand-poster';
+import { BrandPattern, Peek } from '@/components/brand-poster';
 import { Eyebrow } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { about, dashboard, home, login, register } from '@/routes';
@@ -148,7 +148,7 @@ export default function About() {
                 </header>
 
                 <main className="relative mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-28 px-5 pt-12 pb-24 md:px-10 lg:px-20 lg:pt-20">
-                    <section className="animate-rise flex flex-col gap-8">
+                    <section className="animate-rise border-foreground relative flex min-h-[480px] flex-col justify-center gap-8 overflow-hidden border-b-2 pb-56 sm:pb-64 lg:pb-24">
                         <Eyebrow dash className="text-primary">
                             About the planner
                         </Eyebrow>
@@ -162,6 +162,7 @@ export default function About() {
                             one workspace — built for a studio that runs dozens
                             of clients at once.
                         </p>
+                        <Peek className="text-lilac right-0 w-[min(92%,30rem)] lg:-right-4" />
                     </section>
 
                     <section className="flex flex-col gap-10">

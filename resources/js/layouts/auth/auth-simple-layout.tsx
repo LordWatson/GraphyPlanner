@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { ArtworkSvg, BrandMark } from '@/components/brand-mark';
+import { Peek } from '@/components/brand-poster';
 import { wordmarkArtwork } from '@/components/brand/artwork';
 import { Eyebrow } from '@/components/page';
 import { home } from '@/routes';
@@ -14,6 +15,7 @@ export default function AuthSimpleLayout({
     children,
     title,
     description,
+    peek = false,
 }: AuthLayoutProps) {
     return (
         <div className="bg-background grid min-h-svh grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
@@ -47,7 +49,7 @@ export default function AuthSimpleLayout({
                 />
             </aside>
 
-            <main className="flex flex-col px-6 py-8 sm:px-10">
+            <main className="relative flex flex-col overflow-hidden px-6 py-8 sm:px-10">
                 <div className="flex items-center justify-between lg:hidden">
                     <Link href={home()} aria-label="Alima home">
                         <BrandMark size="sm" wordmark />
@@ -75,6 +77,10 @@ export default function AuthSimpleLayout({
                     © {new Date().getFullYear()} Alima. Marketing brighter
                     together.
                 </p>
+
+                {peek && (
+                    <Peek className="text-lilac -right-10 hidden w-56 xl:block" />
+                )}
             </main>
         </div>
     );

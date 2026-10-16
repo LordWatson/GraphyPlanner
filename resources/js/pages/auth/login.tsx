@@ -114,4 +114,5 @@ export default function Login({ status, canResetPassword }: Props) {
 Login.layout = {
     title: 'Welcome back.',
     description: 'Log in to pick up where the studio left off.',
+    peek: true,
 };

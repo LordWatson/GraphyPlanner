@@ -18,4 +18,6 @@ export type AuthLayoutProps = {
     name?: string;
     title?: string;
     description?: string;
+    /** Shows the lilac peek on the form side (login only — one graphic per layout). */
+    peek?: boolean;
 };
