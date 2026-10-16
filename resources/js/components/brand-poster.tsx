@@ -45,7 +45,11 @@ export function BrandPattern(props: PatternProps) {
     return (
         <div
             aria-hidden
-            className={cn('overflow-hidden', pairClass, props.className)}
+            className={cn(
+                'relative overflow-hidden',
+                pairClass,
+                props.className,
+            )}
         >
             <ArtworkSvg
                 artwork={
@@ -54,7 +58,9 @@ export function BrandPattern(props: PatternProps) {
                         : confettiArtwork
                 }
                 preserveAspectRatio="xMidYMid slice"
-                className="size-full"
+                // Absolute fill: the box sets the size; the artwork's tall intrinsic ratio
+                // must never stretch the row it sits in.
+                className="absolute inset-0 size-full"
             />
         </div>
     );

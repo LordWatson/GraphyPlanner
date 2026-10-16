@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { Page, PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
+import { formatDate } from '@/lib/dates';
 
 type ClientData = {
     id: number;
@@ -42,7 +43,7 @@ export default function PortalCompany({ client }: { client: ClientData }) {
             <Head title="Company — Client portal" />
             <Page>
                 <PageHeader
-                    eyebrow={`Company profile${client.start_date ? ` — with the studio since ${client.start_date}` : ''}`}
+                    eyebrow={`Company profile${client.start_date ? ` — with the studio since ${formatDate(client.start_date)}` : ''}`}
                     title={client.name}
                     description={
                         client.legal_name && client.legal_name !== client.name
@@ -60,8 +61,11 @@ export default function PortalCompany({ client }: { client: ClientData }) {
 
                 <section className="animate-rise border-border bg-card grid grid-cols-1 gap-8 rounded-2xl border p-6 sm:p-8 lg:grid-cols-[14rem_1fr]">
                     <div className="flex flex-col gap-4">
-                        <span className="border-border bg-background font-display flex size-20 items-center justify-center rounded-full border text-3xl">
-                            {client.name.charAt(0)}
+                        <span
+                            aria-hidden
+                            className="bg-teal text-cream font-display flex size-20 items-center justify-center rounded-2xl text-[2.25rem]"
+                        >
+                            {client.name.trim().charAt(0).toUpperCase()}
                         </span>
                         <p className="text-muted-foreground text-[13px]">
                             This is how your company appears to the studio.
@@ -114,7 +118,7 @@ export default function PortalCompany({ client }: { client: ClientData }) {
                             value={
                                 client.start_date && (
                                     <span className="font-mono text-sm tabular-nums">
-                                        {client.start_date}
+                                        {formatDate(client.start_date)}
                                     </span>
                                 )
                             }

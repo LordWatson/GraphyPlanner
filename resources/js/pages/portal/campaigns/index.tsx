@@ -4,6 +4,7 @@ import { ArrowUpRight, Clapperboard } from 'lucide-react';
 import { EmptyState, Page, PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { show as portalCampaignsShow } from '@/routes/portal/campaigns';
+import { formatDateRange } from '@/lib/dates';
 
 type CampaignRow = {
     id: number;
@@ -79,10 +80,10 @@ export default function PortalCampaignsIndex({
                                             Runs
                                         </span>
                                         <span className="font-mono text-xs tabular-nums">
-                                            {campaign.start_date ?? 'TBC'}
-                                            {campaign.end_date
-                                                ? ` → ${campaign.end_date}`
-                                                : ''}
+                                            {formatDateRange(
+                                                campaign.start_date,
+                                                campaign.end_date,
+                                            )}
                                         </span>
                                     </span>
                                     <span className="flex items-center gap-2">

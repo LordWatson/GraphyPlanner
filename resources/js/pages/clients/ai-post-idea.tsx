@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import aiPostIdeas from '@/routes/ai-post-ideas';
 import { show as showClient } from '@/routes/clients';
 import { edit as editPost } from '@/routes/posts';
+import { formatDateTime } from '@/lib/dates';
 
 const clientAiTabUrl = (clientId: number) => `${showClient(clientId).url}#ai`;
 
@@ -40,7 +41,7 @@ export default function AiPostIdeaShow({
                 </Link>
 
                 <PageHeader
-                    eyebrow={`Post idea — ${client.name}${idea.created_at ? ` · ${idea.created_at}` : ''}`}
+                    eyebrow={`Post idea — ${client.name}${idea.created_at ? ` · ${formatDateTime(idea.created_at)}` : ''}`}
                     title={idea.title}
                     meta={idea.platforms.map((platform, i) => (
                         <Badge key={i} variant="outline" className="capitalize">

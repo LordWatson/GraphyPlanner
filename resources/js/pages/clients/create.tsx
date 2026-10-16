@@ -32,8 +32,13 @@ export default function ClientCreate({
             <Head title="Add client" />
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
                 <PageHeader
-                    title="Add client"
-                    description="Create a new client record"
+                    eyebrow="New on the books"
+                    title={
+                        <>
+                            Add a <em>client</em>.
+                        </>
+                    }
+                    description="The basics now — voice, audience and the Brand Brain can follow once they're on the roster."
                 />
 
                 <Form

@@ -6,6 +6,7 @@ import type { PortalPostRowData } from '@/components/portal-post-row';
 import { PortalPostRow } from '@/components/portal-post-row';
 import { StatusPill } from '@/components/status-pill';
 import { index as portalCampaignsIndex } from '@/routes/portal/campaigns';
+import { formatDateRange } from '@/lib/dates';
 
 type CampaignData = {
     id: number;
@@ -41,7 +42,7 @@ export default function PortalCampaignShow({
                 </Link>
 
                 <PageHeader
-                    eyebrow={`Campaign — ${campaign.start_date ?? 'Dates TBC'}${campaign.end_date ? ` → ${campaign.end_date}` : ''}`}
+                    eyebrow={`Campaign — ${formatDateRange(campaign.start_date, campaign.end_date)}`}
                     title={campaign.name}
                     description={campaign.goal ?? undefined}
                     meta={

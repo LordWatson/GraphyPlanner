@@ -6,6 +6,7 @@ import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/currency';
 import { show as portalInvoicesShow } from '@/routes/portal/invoices';
+import { formatDate } from '@/lib/dates';
 
 type InvoiceRow = {
     id: number;
@@ -122,10 +123,10 @@ export default function PortalInvoicesIndex({
                                                 <span className="md:hidden">
                                                     Issued{' '}
                                                 </span>
-                                                {invoice.issue_date}
+                                                {formatDate(invoice.issue_date)}
                                             </span>
                                             <span className="text-muted-foreground hidden font-mono text-xs tabular-nums md:inline">
-                                                {invoice.due_date ?? '—'}
+                                                {formatDate(invoice.due_date)}
                                             </span>
                                             <span className="hidden text-right font-mono text-sm tabular-nums md:inline">
                                                 {formatCurrency(

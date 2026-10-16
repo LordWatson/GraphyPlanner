@@ -23,7 +23,8 @@ export type StatusKind =
     | 'invoice'
     | 'connection'
     | 'role'
-    | 'approval';
+    | 'approval'
+    | 'invitation';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -87,6 +88,12 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
     approval: {
         approved: { tone: 'success', label: 'Approved' },
         changes_requested: { tone: 'warning', label: 'Changes requested' },
+    },
+    invitation: {
+        pending: { tone: 'info', label: 'Pending' },
+        accepted: { tone: 'success', label: 'Accepted' },
+        revoked: { tone: 'muted', label: 'Revoked' },
+        expired: { tone: 'neutral', label: 'Expired' },
     },
 };
 

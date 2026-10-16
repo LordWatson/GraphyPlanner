@@ -36,7 +36,7 @@ export default function ClientsIndex({
             <Head title="Clients" />
             <Page>
                 <PageHeader
-                    eyebrow={`Clients — ${String(clients.length).padStart(2, '0')} on the books`}
+                    eyebrow={`${String(clients.length).padStart(2, '0')} on the books`}
                     title={
                         <>
                             The <em>roster</em>

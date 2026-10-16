@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Post;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -38,36 +39,48 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $user = $request->user();
+        // Every user-derived prop is a closure: this middleware runs *before* route middleware, so
+        // reading the user eagerly here would miss a sign-in done by route middleware — the
+        // `preview` middleware logs the visitor in, and a cold first `/preview/*` request used to
+        // share `auth.user = null`. Inertia resolves closures when the response is built.
+        $user = fn (): ?User => $request->user();
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'auth' => [
-                'user' => $user,
+            'auth' => fn (): array => [
+                'user' => $user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'preview' => $request->is('preview', 'preview/*'),
-            'client' => $user && $user->role === Role::ClientReviewer && $user->client
-                ? ['name' => $user->client->name]
-                : null,
+            'client' => function () use ($user): ?array {
+                $current = $user();
+
+                return $current && $current->role === Role::ClientReviewer && $current->client
+                    ? ['name' => $current->client->name]
+                    : null;
+            },
             // Client portal chrome: the "Approvals" nav badge. A separate key (not part of `client`)
             // because several portal pages pass their own `client` page prop, which would replace it.
-            'portal' => $user && $user->role === Role::ClientReviewer && $user->client_id
-                ? [
-                    'pendingApprovals' => Post::query()
-                        ->where('client_id', $user->client_id)
-                        ->where('status', PostStatus::WaitingClient)
-                        ->count(),
-                ]
-                : null,
+            'portal' => function () use ($user): ?array {
+                $current = $user();
+
+                return $current && $current->role === Role::ClientReviewer && $current->client_id
+                    ? [
+                        'pendingApprovals' => Post::query()
+                            ->where('client_id', $current->client_id)
+                            ->where('status', PostStatus::WaitingClient)
+                            ->count(),
+                    ]
+                    : null;
+            },
             // Shared on every Inertia response so the notification bell's unread badge is always
             // up to date without a dedicated round-trip; the dropdown's own list is lazy-loaded
             // from `notifications.index` only once opened.
-            'unreadNotificationsCount' => $user ? $user->unreadNotifications()->count() : 0,
+            'unreadNotificationsCount' => fn (): int => $user()?->unreadNotifications()->count() ?? 0,
             // The organization's default currency (ISO 4217 code), shared so every page can
             // format currency fields consistently without re-fetching the organization.
-            'currency' => $user?->organization?->default_currency ?? 'USD',
+            'currency' => fn (): string => $user()?->organization->default_currency ?? 'USD',
         ];
     }
 }

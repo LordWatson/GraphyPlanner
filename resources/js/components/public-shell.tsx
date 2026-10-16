@@ -15,9 +15,15 @@ export function PublicShell({
 }: {
     children: ReactNode;
     context?: ReactNode;
-    width?: 'md' | 'lg';
+    /** `xl` is for two-column pages (the client review: post beside the decision). */
+    width?: 'md' | 'lg' | 'xl';
 }) {
-    const max = width === 'lg' ? 'max-w-2xl' : 'max-w-md';
+    const max =
+        width === 'xl'
+            ? 'max-w-5xl'
+            : width === 'lg'
+              ? 'max-w-2xl'
+              : 'max-w-md';
 
     return (
         <div className="bg-background text-foreground relative flex min-h-screen flex-col">

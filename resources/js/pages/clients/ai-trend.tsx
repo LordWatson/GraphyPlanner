@@ -3,6 +3,7 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { show as showClient } from '@/routes/clients';
+import { formatDateTime } from '@/lib/dates';
 
 const clientAiTabUrl = (clientId: number) => `${showClient(clientId).url}#ai`;
 
@@ -39,7 +40,7 @@ export default function AiTrendShow({
                 </Link>
 
                 <PageHeader
-                    eyebrow={`AI trend — ${client.name}${trend.created_at ? ` · ${trend.created_at}` : ''}`}
+                    eyebrow={`AI trend — ${client.name}${trend.created_at ? ` · ${formatDateTime(trend.created_at)}` : ''}`}
                     title={trend.title}
                     meta={trend.platforms.map((platform, i) => (
                         <Badge key={i} variant="outline" className="capitalize">

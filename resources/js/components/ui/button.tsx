@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
  *   outline   — Secondary: ink hairline on paper ("See the work").
  *   link      — Teal underlined text ("Let's talk →").
  *   spark     — Acid Lime with ink text, only for the CTA inside an Ink block ("Ink / Lime").
+ *   on-ink    — Cream hairline secondary for use beside `spark` inside an Ink block.
  * Focus is the blue 3px ring with a 2px offset; disabled is a quiet stone fill.
  */
 const buttonVariants = cva(
@@ -30,6 +31,8 @@ const buttonVariants = cva(
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/40",
         outline:
           "border-[1.5px] border-foreground/80 bg-transparent text-foreground hover:bg-secondary active:bg-pressed dark:border-foreground/60",
+        "on-ink":
+          "border-[1.5px] border-cream/45 bg-transparent text-cream hover:border-cream hover:bg-cream/10 focus-visible:ring-offset-ink",
         ghost: "hover:bg-secondary hover:text-foreground",
         link: "rounded-none px-0 text-primary underline decoration-2 underline-offset-4 hover:text-primary-hover dark:hover:text-primary-hover",
       },

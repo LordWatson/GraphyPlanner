@@ -11,4 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Chapter number from `lib/chapters.ts`, shown as the mono index in the sidebar. */
+    number?: string;
 };

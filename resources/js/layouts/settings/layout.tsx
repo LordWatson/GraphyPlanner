@@ -46,10 +46,10 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     return (
         <Page>
             <PageHeader
-                eyebrow="Settings"
+                eyebrow="Account & studio"
                 title={
                     <>
-                        Your <em>account</em>
+                        Your <em>account</em>.
                     </>
                 }
                 description="Profile, security, appearance and — for owners — the organisation itself."
@@ -70,13 +70,20 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                     href={item.href}
                                     aria-current={active ? 'page' : undefined}
                                     className={cn(
-                                        'flex shrink-0 items-center gap-3 rounded-full px-3.5 py-2 text-sm transition-colors lg:rounded-lg',
+                                        'flex h-10 shrink-0 items-center gap-3 rounded-full px-4 text-sm transition-colors',
                                         active
-                                            ? 'bg-card text-foreground ring-border font-medium shadow-[inset_2px_0_0_var(--primary)] ring-1'
+                                            ? 'bg-foreground text-background font-semibold'
                                             : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                                     )}
                                 >
-                                    <span className="text-muted-foreground hidden font-mono text-[11px] tabular-nums lg:inline">
+                                    <span
+                                        className={cn(
+                                            'hidden font-mono text-[11px] tabular-nums lg:inline',
+                                            active
+                                                ? 'opacity-60'
+                                                : 'text-muted-foreground',
+                                        )}
+                                    >
                                         {String(index + 1).padStart(2, '0')}
                                     </span>
                                     {item.title}

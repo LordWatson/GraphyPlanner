@@ -20,6 +20,7 @@ import { platformIcon } from '@/components/platform-icon';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { formatSchedule } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import {
     decide as decideOnPortalPost,
@@ -318,11 +319,9 @@ export default function PortalPostShow({
                                                 </span>
                                                 <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums">
                                                     <CalendarClock className="size-3.5" />
-                                                    {target.scheduled_local_date ??
-                                                        'Not scheduled'}{' '}
-                                                    {target.scheduled_local_time?.slice(
-                                                        0,
-                                                        5,
+                                                    {formatSchedule(
+                                                        target.scheduled_local_date,
+                                                        target.scheduled_local_time,
                                                     )}
                                                 </span>
                                             </li>

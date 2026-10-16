@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/dates';
 /**
  * Shapes produced by `App\Support\Invoices\InvoicePresenter` — keep in sync with it.
  */
@@ -87,17 +88,7 @@ export type InvoiceClientSummary = {
 
 /** "2026-10-16" → "16 Oct 2026" (dates are plain calendar dates — no timezone shifting). */
 export function formatInvoiceDate(value: string | null): string {
-    if (!value) {
-        return '—';
-    }
-
-    const [year, month, day] = value.slice(0, 10).split('-').map(Number);
-
-    return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+    return formatDate(value);
 }
 
 /** Today as YYYY-MM-DD in the viewer's local timezone (for date input defaults). */
