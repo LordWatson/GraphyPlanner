@@ -8,6 +8,7 @@ use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Temporary placeholder implementation of AiProvider (Step 2.1), bound by
@@ -19,16 +20,38 @@ class NullAiProvider implements AiProvider
 {
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
-        return new AiCaptionSuggestions();
+        $this->logDisabled('suggestCaptions', ['post_id' => $post->id, 'client_id' => $post->client_id, 'org_id' => $post->org_id]);
+
+        return new AiCaptionSuggestions;
     }
 
     public function recommendPosts(Client $client): AiPostIdeas
     {
-        return new AiPostIdeas();
+        $this->logDisabled('recommendPosts', ['client_id' => $client->id, 'org_id' => $client->org_id]);
+
+        return new AiPostIdeas;
     }
 
     public function discoverTrends(Client $client, array $platforms): AiTrends
     {
-        return new AiTrends();
+        $this->logDisabled('discoverTrends', ['client_id' => $client->id, 'org_id' => $client->org_id, 'platforms' => $platforms]);
+
+        return new AiTrends;
+    }
+
+    /**
+     * Makes "AI returns nothing" traceable to the provider binding itself: this class is only
+     * resolved when AI_ENABLED is off or DEEPSEEK_API_KEY is empty (see AppServiceProvider).
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logDisabled(string $method, array $context): void
+    {
+        Log::info('AI request answered by NullAiProvider (no vendor call made)', [
+            ...$context,
+            'method' => $method,
+            'ai_enabled' => (bool) config('ai.enabled', false),
+            'api_key_configured' => (string) config('ai.deepseek.api_key', '') !== '',
+        ]);
     }
 }

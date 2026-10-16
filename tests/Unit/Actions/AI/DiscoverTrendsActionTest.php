@@ -4,6 +4,7 @@ namespace Tests\Unit\Actions\AI;
 
 use App\Actions\AI\DiscoverTrendsAction;
 use App\Contracts\AiProvider;
+use App\Models\BrandBrain;
 use App\Models\Client;
 use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiTrend;
@@ -27,7 +28,7 @@ class DiscoverTrendsActionTest extends TestCase
             ->withArgs(fn (Client $c, array $platforms) => $c->is($client) && $platforms === ['instagram'])
             ->andReturn($trends);
 
-        $result = (new DiscoverTrendsAction($ai, new AiGuardrailService()))($client, ['instagram']);
+        $result = (new DiscoverTrendsAction($ai, new AiGuardrailService))($client, ['instagram']);
 
         $this->assertEquals($trends, $result);
     }
@@ -40,7 +41,7 @@ class DiscoverTrendsActionTest extends TestCase
         $ai = Mockery::mock(AiProvider::class);
         $ai->shouldReceive('discoverTrends')->once()->andReturn($trends);
 
-        $action = new DiscoverTrendsAction($ai, new AiGuardrailService());
+        $action = new DiscoverTrendsAction($ai, new AiGuardrailService);
 
         $first = $action($client, ['instagram']);
         $second = $action($client, ['instagram']);
@@ -57,10 +58,30 @@ class DiscoverTrendsActionTest extends TestCase
         $ai = Mockery::mock(AiProvider::class);
         $ai->shouldReceive('discoverTrends')->once()->andReturn($trends);
 
-        $action = new DiscoverTrendsAction($ai, new AiGuardrailService());
+        $action = new DiscoverTrendsAction($ai, new AiGuardrailService);
 
         $action($client, ['instagram', 'tiktok']);
         $action($client, ['tiktok', 'instagram']);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_editing_the_brand_brain_bypasses_the_cached_trends(): void
+    {
+        $client = Client::factory()->create();
+        $brandBrain = BrandBrain::factory()->for($client)->create();
+
+        $ai = Mockery::mock(AiProvider::class);
+        $ai->shouldReceive('discoverTrends')->twice()->andReturn(new AiTrends);
+
+        $action = new DiscoverTrendsAction($ai, new AiGuardrailService);
+
+        $action($client->fresh(), ['instagram']);
+        $action($client->fresh(), ['instagram']);
+
+        $brandBrain->update(['content_pillars' => ['A brand new pillar']]);
+
+        $action($client->fresh(), ['instagram']);
 
         $this->assertTrue(true);
     }
@@ -71,9 +92,9 @@ class DiscoverTrendsActionTest extends TestCase
         $clientB = Client::factory()->create();
 
         $ai = Mockery::mock(AiProvider::class);
-        $ai->shouldReceive('discoverTrends')->twice()->andReturn(new AiTrends());
+        $ai->shouldReceive('discoverTrends')->twice()->andReturn(new AiTrends);
 
-        $action = new DiscoverTrendsAction($ai, new AiGuardrailService());
+        $action = new DiscoverTrendsAction($ai, new AiGuardrailService);
 
         $action($clientA, ['instagram']);
         $action($clientB, ['instagram']);

@@ -7,6 +7,7 @@ use App\Models\AiTrend;
 use App\Models\Client;
 use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiTrends;
+use App\Support\AI\ClientContextBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +15,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * Wraps App\Contracts\AiProvider::discoverTrends() (Step 2.3), caching the result per
  * client/platform-set for a short TTL so repeated dashboard/panel loads don't spam the
- * vendor with near-identical requests.
+ * vendor with near-identical requests. The key also carries a fingerprint of the client's
+ * company context (Brand Brain, profile, campaigns) so editing the brand brain immediately
+ * yields fresh, re-grounded trends instead of serving stale ones for the rest of the TTL.
  */
 class DiscoverTrendsAction
 {
@@ -26,6 +29,7 @@ class DiscoverTrendsAction
     public function __construct(
         private readonly AiProvider $ai,
         private readonly AiGuardrailService $guardrail,
+        private readonly ClientContextBuilder $context = new ClientContextBuilder,
     ) {}
 
     /**
@@ -112,7 +116,8 @@ class DiscoverTrendsAction
 
     /**
      * Platforms are sorted before hashing so the same set of platforms in a different order
-     * reuses the same cache entry instead of issuing a duplicate vendor call.
+     * reuses the same cache entry instead of issuing a duplicate vendor call; the context
+     * fingerprint changes whenever the brand brain/campaigns do, retiring the old entry.
      *
      * @param  array<int, string>  $platforms
      */
@@ -121,6 +126,6 @@ class DiscoverTrendsAction
         $sorted = $platforms;
         sort($sorted);
 
-        return sprintf('ai:trends:%d:%s', $client->id, implode(',', $sorted));
+        return sprintf('ai:trends:%d:%s:%s', $client->id, implode(',', $sorted), $this->context->fingerprint($client));
     }
 }
