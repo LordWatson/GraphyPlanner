@@ -1,4 +1,4 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -71,7 +71,8 @@ export default function InvoiceShow({
     client: InvoiceClientSummary;
     can: InvoiceAbilities;
 }) {
-    const { currency } = usePage<{ currency: string }>().props;
+    // Every figure on this page (items, retainer, total) is in the invoice's own currency.
+    const currency = invoice.currency;
     const [lead, accent] = headline[invoice.display_status];
     const retainerPreview =
         invoice.retainer_amount_snapshot ??
@@ -130,7 +131,6 @@ export default function InvoiceShow({
                             invoice={invoice}
                             client={client}
                             can={can}
-                            currency={currency}
                         />
                     }
                 />
@@ -316,12 +316,10 @@ function PrimaryActions({
     invoice,
     client,
     can,
-    currency,
 }: {
     invoice: InvoiceDetail;
     client: InvoiceClientSummary;
     can: InvoiceAbilities;
-    currency: string;
 }) {
     return (
         <>
@@ -350,7 +348,6 @@ function PrimaryActions({
                 <SendInvoiceDialog
                     invoice={invoice}
                     defaultEmail={client.recipient_email}
-                    currency={currency}
                     size="default"
                     variant="default"
                 />
@@ -367,7 +364,6 @@ function PrimaryActions({
             {can.mark_paid && (
                 <MarkPaidDialog
                     invoice={invoice}
-                    currency={currency}
                     size="default"
                     variant="default"
                 />

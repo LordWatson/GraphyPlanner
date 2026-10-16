@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Client;
 use App\Models\Invoice;
+use App\Support\Options\CurrencyOptions;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreInvoiceRequest extends FormRequest
 {
@@ -20,7 +23,13 @@ class StoreInvoiceRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Client $client */
+        $client = $this->route('client');
+
         return [
+            // Optional: omitted → the organization's default currency. The org default is always
+            // accepted, even if it's not in the curated list.
+            'currency' => ['nullable', 'string', Rule::in([...CurrencyOptions::codes(), $client->organization->default_currency])],
             // Optional: leave it empty to build the invoice from line items instead.
             'amount' => ['nullable', 'numeric', 'min:0.01', 'max:99999999.99'],
             'issue_date' => ['required', 'date'],

@@ -401,7 +401,7 @@ export default function Dashboard({
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_1fr]">
                     {invoiceTotals.length > 0 && (
                         <Panel
-                            eyebrow={`Revenue — last ${invoiceTotals.length} months`}
+                            eyebrow={`Revenue (${currency}) — last ${invoiceTotals.length} months`}
                             title="Invoiced vs. paid"
                             icon={LineChart}
                             actions={

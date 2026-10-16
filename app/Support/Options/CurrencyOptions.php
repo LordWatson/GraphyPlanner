@@ -35,6 +35,16 @@ final class CurrencyOptions
     ];
 
     /**
+     * The supported ISO 4217 codes (e.g. for `Rule::in()` validation).
+     *
+     * @return list<string>
+     */
+    public static function codes(): array
+    {
+        return array_keys(self::CURRENCIES);
+    }
+
+    /**
      * @return array<int, array{value: string, label: string}>
      */
     public static function options(): array

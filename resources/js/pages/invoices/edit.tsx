@@ -1,7 +1,8 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, FileUp, Lock } from 'lucide-react';
 import InputError from '@/components/input-error';
 import type {
+    CurrencyOption,
     InvoiceAbilities,
     InvoiceClientSummary,
     InvoiceDetail,
@@ -11,6 +12,13 @@ import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import {
@@ -24,13 +32,13 @@ export default function InvoiceEdit({
     invoice,
     client,
     can,
+    currencies,
 }: {
     invoice: InvoiceDetail;
     client: InvoiceClientSummary;
     can: InvoiceAbilities;
+    currencies: CurrencyOption[];
 }) {
-    const { currency } = usePage<{ currency: string }>().props;
-
     return (
         <>
             <Head title={`Edit ${invoice.invoice_number} — ${client.name}`} />
@@ -70,7 +78,7 @@ export default function InvoiceEdit({
                 <Panel
                     eyebrow="01 — Details"
                     title="Dates, amount and notes"
-                    description="The invoice number and currency are set automatically."
+                    description="The invoice number is set automatically. Every figure on the invoice uses its currency."
                 >
                     <Form
                         {...updateInvoice.form(invoice.id)}
@@ -127,7 +135,7 @@ export default function InvoiceEdit({
                                                 <Lock className="size-3.5" />
                                                 {formatCurrency(
                                                     invoice.amount,
-                                                    currency,
+                                                    invoice.currency,
                                                 )}
                                             </div>
                                         )}
@@ -144,15 +152,47 @@ export default function InvoiceEdit({
                                         <Label htmlFor="currency">
                                             Currency
                                         </Label>
-                                        <Input
-                                            id="currency"
-                                            value={currency}
-                                            disabled
-                                            readOnly
-                                        />
+                                        {can.edit_currency ? (
+                                            <Select
+                                                name="currency"
+                                                defaultValue={invoice.currency}
+                                            >
+                                                <SelectTrigger
+                                                    id="currency"
+                                                    className="w-full"
+                                                >
+                                                    <SelectValue placeholder="Choose a currency" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {currencies.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={
+                                                                    option.value
+                                                                }
+                                                                value={
+                                                                    option.value
+                                                                }
+                                                            >
+                                                                {option.value} —{' '}
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <div className="border-input bg-muted/50 text-muted-foreground flex h-9 items-center gap-2 rounded-lg border px-3 font-mono text-sm">
+                                                <Lock className="size-3.5" />
+                                                {invoice.currency}
+                                            </div>
+                                        )}
                                         <p className="text-muted-foreground text-xs">
-                                            Set at the organization level.
+                                            {can.edit_currency
+                                                ? 'Items, retainer and total are all billed in this currency.'
+                                                : 'Locked once the invoice is finalized or sent.'}
                                         </p>
+                                        <InputError message={errors.currency} />
                                     </div>
                                 </div>
                                 <div className="grid gap-1.5">

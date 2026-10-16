@@ -37,14 +37,38 @@ class InvoiceLedgerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('invoices/index')
                 ->has('invoices.data', 5)
-                ->where('summary.outstanding_total', 150)
+                ->where('summary.outstanding_totals', [['currency' => 'USD', 'total' => 150]])
                 ->where('summary.outstanding_count', 2)
-                ->where('summary.overdue_total', 100)
+                ->where('summary.overdue_totals', [['currency' => 'USD', 'total' => 100]])
                 ->where('summary.overdue_count', 1)
-                ->where('summary.paid_this_month_total', 200)
+                ->where('summary.paid_this_month_totals', [['currency' => 'USD', 'total' => 200]])
                 ->where('summary.draft_count', 1)
                 ->where('summary.average_days_to_pay', 10)
                 ->has('clients', 1)
+            );
+    }
+
+    public function test_summary_totals_are_split_per_currency_with_the_org_default_first(): void
+    {
+        $org = Organization::factory()->create(['default_currency' => 'GBP']);
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent, 'currency' => 'USD', 'amount' => 40, 'sent_at' => now()]);
+        Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent, 'currency' => 'EUR', 'amount' => 75, 'sent_at' => now()]);
+        Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent, 'currency' => 'GBP', 'amount' => 100, 'sent_at' => now()]);
+        Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent, 'currency' => 'GBP', 'amount' => 25, 'sent_at' => now()]);
+
+        $this->actingAs($owner)->get(route('invoices.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.outstanding_totals', [
+                    ['currency' => 'GBP', 'total' => 125],
+                    ['currency' => 'EUR', 'total' => 75],
+                    ['currency' => 'USD', 'total' => 40],
+                ])
+                ->where('summary.outstanding_count', 4)
+                ->where('summary.paid_this_month_totals', [])
+                ->has('currencies')
             );
     }
 

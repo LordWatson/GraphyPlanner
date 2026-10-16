@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
+use App\Models\Organization;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -57,7 +58,11 @@ class InvoiceLedgerService
     /**
      * Headline figures for the ledger page (always org-wide, independent of the active filters).
      *
-     * @return array{outstanding_total: float, outstanding_count: int, overdue_total: float, overdue_count: int, paid_this_month_total: float, paid_this_month_count: int, draft_count: int, average_days_to_pay: int|null}
+     * Money totals are split per currency (each invoice is billed in its own currency and no
+     * conversion is performed, so amounts in different currencies are never added together).
+     * The organization's default currency is listed first.
+     *
+     * @return array{outstanding_totals: list<array{currency: string, total: float}>, outstanding_count: int, overdue_totals: list<array{currency: string, total: float}>, overdue_count: int, paid_this_month_totals: list<array{currency: string, total: float}>, paid_this_month_count: int, draft_count: int, average_days_to_pay: int|null}
      */
     public function summary(int $orgId): array
     {
@@ -78,16 +83,36 @@ class InvoiceLedgerService
             ->get(['sent_at', 'paid_at'])
             ->map(fn (Invoice $invoice) => max(0, (int) $invoice->sent_at?->diffInDays($invoice->paid_at)));
 
+        $defaultCurrency = Organization::query()->whereKey($orgId)->value('default_currency');
+
         return [
-            'outstanding_total' => (float) (clone $outstanding)->sum('amount'),
+            'outstanding_totals' => $this->totalsByCurrency(clone $outstanding, $defaultCurrency),
             'outstanding_count' => $outstanding->count(),
-            'overdue_total' => (float) (clone $overdue)->sum('amount'),
+            'overdue_totals' => $this->totalsByCurrency(clone $overdue, $defaultCurrency),
             'overdue_count' => $overdue->count(),
-            'paid_this_month_total' => (float) (clone $paidThisMonth)->sum('amount'),
+            'paid_this_month_totals' => $this->totalsByCurrency(clone $paidThisMonth, $defaultCurrency),
             'paid_this_month_count' => $paidThisMonth->count(),
             'draft_count' => $base()->where('status', InvoiceStatus::Draft)->count(),
             'average_days_to_pay' => $paidDurations->isEmpty() ? null : (int) round($paidDurations->avg()),
         ];
+    }
+
+    /**
+     * Sum `amount` per currency, the organization's default currency first, then alphabetical.
+     *
+     * @param  Builder<Invoice>  $query
+     * @return list<array{currency: string, total: float}>
+     */
+    private function totalsByCurrency(Builder $query, ?string $defaultCurrency): array
+    {
+        return array_values($query
+            ->toBase()
+            ->selectRaw('currency, SUM(amount) as total')
+            ->groupBy('currency')
+            ->get()
+            ->map(fn (object $row) => ['currency' => (string) $row->currency, 'total' => (float) $row->total])
+            ->sortBy(fn (array $row) => [$row['currency'] === $defaultCurrency ? 0 : 1, $row['currency']])
+            ->all());
     }
 
     /**
