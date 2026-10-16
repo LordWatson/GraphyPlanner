@@ -18,7 +18,8 @@ class GetNeedsAttentionItemsAction
 
     /**
      * Build the Step 0.12 "Home / needs-attention" payload: failed publishes, posts waiting on
-     * client approval, posts missing required media, and disconnected social accounts. Every row
+     * internal (studio) review, posts waiting on client approval, posts missing required media, and
+     * disconnected social accounts. Every row
      * carries enough context (client, platform/handle) plus a `post_id` (or `client_id` for
      * account rows, which have no single post) so the UI can link straight to the relevant post.
      *
@@ -27,6 +28,7 @@ class GetNeedsAttentionItemsAction
      *
      * @return array{
      *     failedPublishes: array<int, array<string, mixed>>,
+     *     internalReviews: array<int, array<string, mixed>>,
      *     waitingApprovals: array<int, array<string, mixed>>,
      *     missingMedia: array<int, array<string, mixed>>,
      *     disconnectedAccounts: array<int, array<string, mixed>>,
@@ -49,6 +51,12 @@ class GetNeedsAttentionItemsAction
         $failedPublishes = $posts
             ->filter(fn (Post $post) => $post->status === PostStatus::Failed)
             ->map(fn (Post $post) => $this->transformPost($post, 'Publish failed'))
+            ->values()
+            ->all();
+
+        $internalReviews = $posts
+            ->filter(fn (Post $post) => $post->status === PostStatus::InternalReview)
+            ->map(fn (Post $post) => $this->transformPost($post, 'Waiting on internal review'))
             ->values()
             ->all();
 
@@ -100,6 +108,7 @@ class GetNeedsAttentionItemsAction
 
         return [
             'failedPublishes' => $failedPublishes,
+            'internalReviews' => $internalReviews,
             'waitingApprovals' => $waitingApprovals,
             'missingMedia' => $missingMedia,
             'disconnectedAccounts' => $disconnectedAccounts,

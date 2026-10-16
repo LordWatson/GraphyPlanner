@@ -192,6 +192,54 @@ class DashboardTest extends TestCase
         );
     }
 
+    public function test_dashboard_needs_attention_includes_posts_waiting_on_internal_review()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+
+        $failedPost = Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Failed,
+        ]);
+        $reviewPost = Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::InternalReview,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('needsAttentionItems.0.post_id', $failedPost->id)
+            ->where('needsAttentionItems.1.post_id', $reviewPost->id)
+            ->where('needsAttentionItems.1.type', 'internal_review')
+            ->where('needsAttentionItems.1.key', 'post-internal_review-'.$reviewPost->id)
+        );
+    }
+
+    public function test_dashboard_needs_attention_list_is_capped_at_four_items_but_the_count_is_not()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+
+        Post::factory()->for($client)->count(5)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Failed,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('needsAttentionItems', 4)
+            ->where('summary.needsAttention', 5)
+        );
+    }
+
     public function test_dashboard_shows_client_health_summary()
     {
         $user = User::factory()->create();

@@ -5,6 +5,7 @@ import {
     ArrowUpRight,
     CalendarDays,
     CheckCircle2,
+    ClipboardCheck,
     Clock,
     FilePenLine,
     HeartPulse,
@@ -75,7 +76,12 @@ type UpcomingPostOccurrence = {
 
 type NeedsAttentionRow = {
     key: string;
-    type: 'failed' | 'disconnected' | 'waiting' | 'missing_media';
+    type:
+        | 'failed'
+        | 'disconnected'
+        | 'internal_review'
+        | 'waiting'
+        | 'missing_media';
     title: string;
     subtitle: string;
     client_id: number | null;
@@ -128,6 +134,10 @@ const attentionMeta = {
         className: 'text-destructive bg-destructive/10',
     },
     disconnected: { icon: WifiOff, className: 'text-warning bg-warning/12' },
+    internal_review: {
+        icon: ClipboardCheck,
+        className: 'text-primary bg-primary/10',
+    },
     waiting: { icon: Clock, className: 'text-info bg-info/10' },
     missing_media: { icon: ImageOff, className: 'text-foreground/60 bg-muted' },
 } as const;

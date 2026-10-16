@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
     AlertTriangle,
     CheckCircle2,
+    ClipboardCheck,
     Clock,
     ImageOff,
     WifiOff,
@@ -39,6 +40,7 @@ type DisconnectedAccountRow = {
 
 type NeedsAttentionItems = {
     failedPublishes: PostRow[];
+    internalReviews: PostRow[];
     waitingApprovals: PostRow[];
     missingMedia: PostRow[];
     disconnectedAccounts: DisconnectedAccountRow[];
@@ -145,6 +147,7 @@ function PostRowItem({ row }: { row: PostRow }) {
 export default function Home({ items }: HomeProps) {
     const total =
         items.failedPublishes.length +
+        items.internalReviews.length +
         items.waitingApprovals.length +
         items.missingMedia.length +
         items.disconnectedAccounts.length;
@@ -219,7 +222,20 @@ export default function Home({ items }: HomeProps) {
                         ))}
                     </Lane>
                     <Lane
-                        index="03 — Approvals"
+                        index="03 — Review"
+                        icon={ClipboardCheck}
+                        title="Internal review"
+                        description="Posts waiting for the studio to sign off"
+                        count={items.internalReviews.length}
+                        accentClassName="bg-primary/10 text-primary"
+                        emptyLabel="Nothing waiting on internal review."
+                    >
+                        {items.internalReviews.map((row) => (
+                            <PostRowItem key={row.post_id} row={row} />
+                        ))}
+                    </Lane>
+                    <Lane
+                        index="04 — Approvals"
                         icon={Clock}
                         title="Waiting on the client"
                         description="Posts sitting in client review"
@@ -232,7 +248,7 @@ export default function Home({ items }: HomeProps) {
                         ))}
                     </Lane>
                     <Lane
-                        index="04 — Assets"
+                        index="05 — Assets"
                         icon={ImageOff}
                         title="Missing media"
                         description="Posts that still need media attached"

@@ -11,6 +11,7 @@ use App\Models\Post;
 use App\Models\User;
 use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostWaitingForClientReview;
+use App\Notifications\PostWaitingForInternalReview;
 use App\Services\PostNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -115,11 +116,27 @@ class TransitionPostStatusAction
     }
 
     /**
-     * Notify the interested audience for a transition: org users when a client decides
-     * (approved/changes requested), client-portal users when a post lands in `waiting_client`.
+     * Notify the interested audience for a transition: org users (minus the actor) when a post
+     * lands in `internal_review`, org users when a client decides (approved/changes requested),
+     * client-portal users when a post lands in `waiting_client`.
      */
     private function notify(Post $post, PostStatus $to, ?User $user, PostNotificationService $notifications): void
     {
+        if ($to === PostStatus::InternalReview) {
+            $recipients = $notifications->orgRecipients($post, $user);
+
+            $notifications->send($recipients, new PostWaitingForInternalReview($post));
+
+            Log::info('Internal review notification sent', [
+                'post_id' => $post->id,
+                'org_id' => $post->org_id,
+                'user_id' => $user?->id,
+                'recipient_count' => $recipients->count(),
+            ]);
+
+            return;
+        }
+
         if ($to === PostStatus::WaitingClient) {
             $notifications->send(
                 $notifications->clientPortalRecipients($post),

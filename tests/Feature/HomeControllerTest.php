@@ -63,6 +63,39 @@ class HomeControllerTest extends TestCase
         );
     }
 
+    public function test_home_lists_posts_waiting_on_internal_review()
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+        $post = Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::InternalReview,
+        ]);
+
+        $otherOrgUser = User::factory()->create();
+        $otherClient = Client::factory()->create(['org_id' => $otherOrgUser->org_id]);
+        Post::factory()->for($otherClient)->create([
+            'org_id' => $otherOrgUser->org_id,
+            'status' => PostStatus::InternalReview,
+        ]);
+
+        Post::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'status' => PostStatus::Draft,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('needs-attention'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('items.internalReviews', 1)
+            ->where('items.internalReviews.0.post_id', $post->id)
+            ->where('items.internalReviews.0.reason', 'Waiting on internal review')
+        );
+    }
+
     public function test_home_lists_posts_waiting_on_client_approval()
     {
         $user = User::factory()->create();

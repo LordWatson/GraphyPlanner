@@ -15,12 +15,12 @@ class GetDashboardNeedsAttentionListAction
     /**
      * Flatten the Step 0.12 "Home / needs-attention" categories into a single, ranked list for the
      * dashboard's "Needs attention" card: failed publishes first, then disconnected accounts, then
-     * posts waiting on the client, then posts missing media. Reuses `GetNeedsAttentionItemsAction`
+     * posts waiting on internal review, then posts waiting on the client, then posts missing media. Reuses `GetNeedsAttentionItemsAction`
      * so the dashboard and the `/home` page never disagree on what needs attention.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function __invoke(User $user, int $limit = 8): array
+    public function __invoke(User $user, int $limit = 4): array
     {
         $items = ($this->getNeedsAttentionItems)($user);
 
@@ -42,6 +42,10 @@ class GetDashboardNeedsAttentionListAction
             ];
         }
 
+        foreach ($items['internalReviews'] as $post) {
+            $rows[] = $this->postRow($post, 'internal_review');
+        }
+
         foreach ($items['waitingApprovals'] as $post) {
             $rows[] = $this->postRow($post, 'waiting');
         }
@@ -60,7 +64,7 @@ class GetDashboardNeedsAttentionListAction
     private function postRow(array $post, string $type): array
     {
         return [
-            'key' => 'post-'.$post['post_id'],
+            'key' => 'post-'.$type.'-'.$post['post_id'],
             'type' => $type,
             'title' => $post['master_caption'] ? Str::limit($post['master_caption'], 60) : 'Untitled post',
             'subtitle' => $post['reason'],

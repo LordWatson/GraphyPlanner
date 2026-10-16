@@ -13,6 +13,7 @@ use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostCommentAdded;
 use App\Notifications\PostCommentMentioned;
 use App\Notifications\PostWaitingForClientReview;
+use App\Notifications\PostWaitingForInternalReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -156,6 +157,62 @@ class NotificationTest extends TestCase
         ])->assertRedirect(route('posts.edit', $post));
 
         Notification::assertSentTo($reviewer, PostWaitingForClientReview::class);
+    }
+
+    public function test_a_post_entering_internal_review_notifies_studio_members_except_the_actor(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
+            'client_id' => $client->id,
+        ]);
+        $otherOrgUser = User::factory()->role(Role::Owner)->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        $this->actingAs($designer)->post(route('posts.transition', $post), [
+            'to' => PostStatus::InternalReview->value,
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertSentTo([$owner, $strategist], PostWaitingForInternalReview::class);
+        Notification::assertNotSentTo($designer, PostWaitingForInternalReview::class);
+        Notification::assertNotSentTo($reviewer, PostWaitingForInternalReview::class);
+        Notification::assertNotSentTo($otherOrgUser, PostWaitingForInternalReview::class);
+    }
+
+    public function test_the_internal_review_notification_links_to_the_post_editor(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['name' => 'Acme']);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $data = (new PostWaitingForInternalReview($post))->toArray($owner);
+
+        $this->assertSame(route('posts.edit', $post), $data['url']);
+        $this->assertSame($post->id, $data['post_id']);
+        $this->assertStringContainsString('Acme', $data['body']);
+    }
+
+    public function test_moving_a_post_out_of_internal_review_does_not_send_an_internal_review_notification(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::InternalReview]);
+
+        $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::Draft->value,
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertNotSentTo($strategist, PostWaitingForInternalReview::class);
     }
 
     public function test_a_client_approval_decision_notifies_org_users(): void
