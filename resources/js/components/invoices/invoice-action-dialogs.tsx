@@ -24,6 +24,7 @@ type InvoiceRef = {
     id: number;
     invoice_number: string;
     amount: string;
+    currency: string;
 };
 
 type TriggerProps = {
@@ -63,14 +64,12 @@ function DefaultTrigger({
 export function SendInvoiceDialog({
     invoice,
     defaultEmail,
-    currency,
     trigger,
     size,
     variant = 'default',
 }: {
     invoice: InvoiceRef;
     defaultEmail: string | null;
-    currency: string;
 } & TriggerProps) {
     const [open, setOpen] = useState(false);
 
@@ -91,8 +90,9 @@ export function SendInvoiceDialog({
                     <DialogTitle>Send {invoice.invoice_number}</DialogTitle>
                     <DialogDescription>
                         Emails the client a branded PDF for{' '}
-                        {formatCurrency(invoice.amount, currency)} and notifies
-                        their portal contacts. The invoice is locked once sent.
+                        {formatCurrency(invoice.amount, invoice.currency)} and
+                        notifies their portal contacts. The invoice is locked
+                        once sent.
                     </DialogDescription>
                 </DialogHeader>
                 <Form
@@ -254,13 +254,11 @@ export function RemindInvoiceDialog({
 /** Record a payment: when it arrived and an optional reference. */
 export function MarkPaidDialog({
     invoice,
-    currency,
     trigger,
     size,
     variant,
 }: {
     invoice: InvoiceRef;
-    currency: string;
 } & TriggerProps) {
     const [open, setOpen] = useState(false);
 
@@ -281,8 +279,8 @@ export function MarkPaidDialog({
                     <DialogTitle>Record payment</DialogTitle>
                     <DialogDescription>
                         Mark {invoice.invoice_number} (
-                        {formatCurrency(invoice.amount, currency)}) as paid. Its
-                        PDF is refreshed to double as a receipt.
+                        {formatCurrency(invoice.amount, invoice.currency)}) as
+                        paid. Its PDF is refreshed to double as a receipt.
                     </DialogDescription>
                 </DialogHeader>
                 <Form

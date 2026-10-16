@@ -4,6 +4,7 @@ namespace App\Actions\Invoices;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
+use App\Models\Organization;
 use Illuminate\Support\Carbon;
 
 class GetMonthlyInvoiceTotalsAction
@@ -11,6 +12,9 @@ class GetMonthlyInvoiceTotalsAction
     /**
      * Build the last `$months` months of invoiced vs. paid totals for an organization,
      * for use in the dashboard revenue chart.
+     *
+     * Only invoices billed in the organization's default currency are counted: amounts in other
+     * currencies can't be summed into the same series without a conversion (which we never do).
      *
      * Grouping is done in PHP (rather than a driver-specific SQL date function) so the
      * query behaves the same on Postgres (production) and SQLite (tests).
@@ -21,8 +25,11 @@ class GetMonthlyInvoiceTotalsAction
     {
         $start = Carbon::now()->startOfMonth()->subMonths($months - 1);
 
+        $defaultCurrency = Organization::query()->whereKey($orgId)->value('default_currency');
+
         $invoices = Invoice::query()
             ->where('org_id', $orgId)
+            ->where('currency', $defaultCurrency)
             ->where('issue_date', '>=', $start)
             ->whereIn('status', [InvoiceStatus::Sent, InvoiceStatus::Paid])
             ->get(['status', 'amount', 'issue_date']);

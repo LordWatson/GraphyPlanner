@@ -125,7 +125,7 @@ export default function About() {
                 />
 
                 <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-                    <Link href={home()} aria-label="Graphy home">
+                    <Link href={home()} aria-label="AlimaPlanner home">
                         <BrandMark size="sm" wordmark />
                     </Link>
                     <nav className="flex items-center gap-1.5">
@@ -156,14 +156,14 @@ export default function About() {
                                 aria-hidden
                                 className="bg-primary size-1.5 rounded-[2px]"
                             />
-                            About Graphy
+                            About AlimaPlanner
                         </span>
                         <h1 className="max-w-4xl font-serif text-[clamp(3rem,7.5vw,6.25rem)] leading-[0.9] tracking-[-0.03em]">
                             The <em className="text-primary">studio OS</em> for
                             running social content, end to end.
                         </h1>
                         <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed text-pretty">
-                            Graphy brings clients, brands, campaigns, approvals,
+                            AlimaPlanner brings clients, brands, campaigns, approvals,
                             AI assistance, and publishing together in one
                             dependable workspace — built for design &amp;
                             marketing agencies that juggle dozens of clients at
@@ -274,7 +274,7 @@ export default function About() {
                 </main>
 
                 <footer className="eyebrow text-muted-foreground mx-auto flex w-full max-w-6xl justify-between px-6 py-6">
-                    <span>© {new Date().getFullYear()} Graphy</span>
+                    <span>© {new Date().getFullYear()} AlimaPlanner</span>
                     <Link href={about()} className="hover:text-foreground">
                         About
                     </Link>

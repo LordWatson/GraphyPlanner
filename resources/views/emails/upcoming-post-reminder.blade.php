@@ -12,7 +12,7 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e7e2d9;">
                     <tr>
                         <td style="background-color:#241f1a; padding:24px 32px;">
-                            <span style="font-family:'Playfair Display', Georgia, serif; font-style:italic; color:#ffffff; font-size:22px; font-weight:600; letter-spacing:-0.02em;">graphy.</span>
+                            <span style="font-family:'Playfair Display', Georgia, serif; font-style:italic; color:#ffffff; font-size:22px; font-weight:600; letter-spacing:-0.02em;">alimaplanner.</span>
                         </td>
                     </tr>
                     <tr>
@@ -59,7 +59,7 @@
                     <tr>
                         <td style="padding:20px 32px; background-color:#fbf9f5; border-top:1px solid #e7e2d9;">
                             <p style="margin:0; font-size:12px; color:#9a9a9a;">
-                                &copy; {{ now()->year }} Graphy. This is an automated message, please don't reply
+                                &copy; {{ now()->year }} AlimaPlanner. This is an automated message, please don't reply
                                 directly to this email.
                             </p>
                         </td>

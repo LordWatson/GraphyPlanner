@@ -10,17 +10,15 @@ import { formatInvoiceDate } from './types';
 
 /**
  * The flat, hairline invoice ledger (brand guidelines §5 lists): mono number, client, dates,
- * amount and a status pill — overdue rows call out how late they are. Used by the org-wide
+ * amount (in each invoice's own currency) and a status pill — overdue rows call out how late they are. Used by the org-wide
  * invoices page and the client's Billing tab.
  */
 export function InvoiceLedgerList({
     invoices,
-    currency,
     showClient = true,
     actions,
 }: {
     invoices: InvoiceRow[];
-    currency: string;
     showClient?: boolean;
     /** Optional per-row actions rendered beside the row (outside the link). */
     actions?: (invoice: InvoiceRow) => ReactNode;
@@ -62,7 +60,10 @@ export function InvoiceLedgerList({
                                 {invoice.invoice_number}
                             </span>
                             <span className="text-right font-mono text-sm tabular-nums md:hidden">
-                                {formatCurrency(invoice.amount, currency)}
+                                {formatCurrency(
+                                    invoice.amount,
+                                    invoice.currency,
+                                )}
                             </span>
                             <span className="text-muted-foreground md:text-foreground min-w-0 truncate text-sm">
                                 {showClient
@@ -110,7 +111,10 @@ export function InvoiceLedgerList({
                                         'text-muted-foreground line-through',
                                 )}
                             >
-                                {formatCurrency(invoice.amount, currency)}
+                                {formatCurrency(
+                                    invoice.amount,
+                                    invoice.currency,
+                                )}
                             </span>
                             <span className="hidden md:inline">
                                 <StatusPill

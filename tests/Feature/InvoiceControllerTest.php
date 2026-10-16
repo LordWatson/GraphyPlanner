@@ -46,6 +46,54 @@ class InvoiceControllerTest extends TestCase
         $this->assertSame($org->id, $invoice->org_id);
     }
 
+    public function test_an_invoice_defaults_to_the_organizations_currency(): void
+    {
+        $org = Organization::factory()->create(['default_currency' => 'GBP']);
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $this->actingAs($owner)->post(route('clients.invoices.store', $client), [
+            'issue_date' => now()->toDateString(),
+        ]);
+
+        $this->assertSame('GBP', Invoice::where('client_id', $client->id)->sole()->currency);
+    }
+
+    public function test_an_invoice_can_be_created_in_a_chosen_currency(): void
+    {
+        $org = Organization::factory()->create(['default_currency' => 'GBP']);
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $this->actingAs($owner)->post(route('clients.invoices.store', $client), [
+            'currency' => 'EUR',
+            'amount' => 450,
+            'issue_date' => now()->toDateString(),
+        ])->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('client_id', $client->id)->sole();
+        $this->assertSame('EUR', $invoice->currency);
+
+        $this->actingAs($owner)->get(route('invoices.show', $invoice))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('invoice.currency', 'EUR'));
+    }
+
+    public function test_creating_an_invoice_rejects_an_unsupported_currency(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $response = $this->actingAs($owner)->post(route('clients.invoices.store', $client), [
+            'currency' => 'XYZ',
+            'issue_date' => now()->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('currency');
+        $this->assertSame(0, Invoice::where('client_id', $client->id)->count());
+    }
+
     public function test_invoice_numbers_do_not_collide_across_organizations_with_the_same_invoice_count(): void
     {
         // Regression test: invoice_number generation previously counted the org's existing
@@ -546,6 +594,74 @@ class InvoiceControllerTest extends TestCase
 
         $response->assertSessionHasErrors('amount');
         $this->assertSame('300.00', $invoice->fresh()->amount);
+    }
+
+    public function test_currency_can_be_changed_on_an_unfinalized_draft(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft, 'currency' => 'USD']);
+
+        $this->actingAs($owner)->get(route('invoices.edit', $invoice))
+            ->assertInertia(fn ($page) => $page->where('can.edit_currency', true)->has('currencies'));
+
+        $this->actingAs($owner)->put(route('invoices.update', $invoice), [
+            'currency' => 'CAD',
+            'issue_date' => $invoice->issue_date->toDateString(),
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('CAD', $invoice->fresh()->currency);
+    }
+
+    public function test_omitting_the_currency_on_update_keeps_the_current_one(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft, 'currency' => 'EUR']);
+
+        $this->actingAs($owner)->put(route('invoices.update', $invoice), [
+            'issue_date' => $invoice->issue_date->toDateString(),
+            'description' => 'Updated notes',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('EUR', $invoice->fresh()->currency);
+    }
+
+    public function test_currency_cannot_be_changed_once_an_invoice_is_finalized(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->finalized()->create(['org_id' => $org->id, 'status' => InvoiceStatus::Draft, 'currency' => 'USD']);
+
+        $this->actingAs($owner)->get(route('invoices.edit', $invoice))
+            ->assertInertia(fn ($page) => $page->where('can.edit_currency', false));
+
+        $response = $this->actingAs($owner)->put(route('invoices.update', $invoice), [
+            'currency' => 'EUR',
+            'issue_date' => $invoice->issue_date->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('currency');
+        $this->assertSame('USD', $invoice->fresh()->currency);
+    }
+
+    public function test_currency_cannot_be_changed_once_an_invoice_is_sent(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $invoice = Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent, 'sent_at' => now(), 'currency' => 'USD']);
+
+        $response = $this->actingAs($owner)->put(route('invoices.update', $invoice), [
+            'currency' => 'EUR',
+            'issue_date' => $invoice->issue_date->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('currency');
+        $this->assertSame('USD', $invoice->fresh()->currency);
     }
 
     public function test_owner_can_generate_a_branded_pdf_for_a_finalized_invoice(): void

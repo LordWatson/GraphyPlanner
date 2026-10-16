@@ -114,7 +114,7 @@ export default function Welcome() {
                         </div>
                         <div className="flex flex-col gap-6 lg:pb-3">
                             <p className="text-muted-foreground text-lg leading-relaxed text-pretty">
-                                Graphy keeps clients, brands, campaigns and
+                                AlimaPlanner keeps clients, brands, campaigns and
                                 scheduled posts in one considered workspace — so
                                 your team spends its time on the work, not on
                                 tracking it.
@@ -136,7 +136,7 @@ export default function Welcome() {
                     </section>
 
                     <section
-                        aria-label="A week in Graphy"
+                        aria-label="A week in AlimaPlanner"
                         className="animate-rise border-border bg-card shadow-paper rounded-[1.5rem] border p-3 [animation-delay:120ms]"
                     >
                         <div className="flex items-center justify-between px-3 pt-2 pb-4">
@@ -204,7 +204,7 @@ export default function Welcome() {
                     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-14 pb-8">
                         <div className="flex flex-wrap items-end justify-between gap-6">
                             <p className="font-serif text-[clamp(3rem,10vw,8rem)] leading-none tracking-[-0.03em] italic">
-                                graphy
+                                alimaplanner
                                 <span className="text-primary not-italic">
                                     .
                                 </span>
@@ -213,12 +213,12 @@ export default function Welcome() {
                                 href={about()}
                                 className="group text-ink-foreground/80 hover:text-ink-foreground inline-flex items-center gap-1.5 text-sm"
                             >
-                                More about Graphy
+                                More about AlimaPlanner
                                 <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                             </Link>
                         </div>
                         <div className="eyebrow border-ink-foreground/15 text-ink-foreground/50 flex justify-between border-t pt-4">
-                            <span>© {new Date().getFullYear()} Graphy</span>
+                            <span>© {new Date().getFullYear()} AlimaPlanner</span>
                             <span>Plan · Approve · Publish</span>
                         </div>
                     </div>

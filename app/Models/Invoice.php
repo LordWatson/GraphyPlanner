@@ -151,6 +151,15 @@ class Invoice extends Model
     }
 
     /**
+     * The billing currency can only change while nothing about the total is locked in: a draft
+     * that hasn't been finalized (finalizing fixes the total, sending shares it with the client).
+     */
+    public function canChangeCurrency(): bool
+    {
+        return $this->status === InvoiceStatus::Draft && ! $this->is_finalized;
+    }
+
+    /**
      * A branded PDF can be generated once there's a locked total to print: either the invoice is
      * finalized, or it's a simple fixed-amount invoice with no line items at all.
      */

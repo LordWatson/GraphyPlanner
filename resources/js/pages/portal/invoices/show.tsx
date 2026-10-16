@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Download, FileText, Landmark } from 'lucide-react';
 
 import { formatInvoiceDate } from '@/components/invoices/types';
@@ -61,7 +61,8 @@ export default function PortalInvoiceShow({
     invoice: InvoiceData;
     studio: { name: string; payment_instructions: string | null };
 }) {
-    const { currency } = usePage<{ currency: string }>().props;
+    // Every figure on the invoice is in the currency it's billed in.
+    const currency = invoice.currency;
     const [lead, accent] = headlines[invoice.display_status] ?? [
         'Your',
         'invoice',

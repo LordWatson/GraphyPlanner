@@ -81,6 +81,18 @@ class DashboardTest extends TestCase
             'paid_at' => now(),
         ]);
 
+        // Invoices billed in a currency other than the org default can't be summed into the
+        // same series (no conversions), so they're left out of the chart.
+        Invoice::factory()->for($client)->create([
+            'org_id' => $user->org_id,
+            'currency' => 'EUR',
+            'status' => InvoiceStatus::Paid,
+            'amount' => 7000,
+            'issue_date' => now()->startOfMonth(),
+            'sent_at' => now()->startOfMonth(),
+            'paid_at' => now(),
+        ]);
+
         $this->actingAs($user);
 
         $response = $this->get(route('dashboard'));

@@ -14,8 +14,8 @@ const wordmarkSizes = {
 } as const;
 
 /**
- * The single source for Graphy's logo lock-up: an orange tile carrying the mark, optionally
- * followed by the lower-case italic serif wordmark "graphy." Use this instead of hand-rolling a
+ * The single source for AlimaPlanner's logo lock-up: an orange tile carrying the mark, optionally
+ * followed by the lower-case italic serif wordmark "alimaplanner." Use this instead of hand-rolling a
  * gradient square + `AppLogoIcon` on each page.
  */
 export function BrandMark({
@@ -47,7 +47,7 @@ export function BrandMark({
                             wordmarkSizes[size],
                         )}
                     >
-                        graphy<span className="text-primary not-italic">.</span>
+                        alimaplanner<span className="text-primary not-italic">.</span>
                     </span>
                     {caption && (
                         <span className="eyebrow mt-1 text-[9.5px] opacity-60">

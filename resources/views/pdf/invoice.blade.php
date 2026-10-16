@@ -291,7 +291,7 @@
                 <td class="eyebrow" style="vertical-align: middle;">{{ $organization->name }} &nbsp;&middot;&nbsp; {{ $invoice->invoice_number }}</td>
                 <td class="right" style="vertical-align: middle;">
                     <span class="eyebrow" style="letter-spacing: 1px;">Prepared with</span>
-                    <span class="serif wordmark"><em>graphy</em><span class="dot">.</span></span>
+                    <span class="serif wordmark"><em>alimaplanner</em><span class="dot">.</span></span>
                 </td>
             </tr>
         </table>

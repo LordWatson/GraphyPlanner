@@ -15,7 +15,7 @@ class DuplicateInvoiceAction
     /**
      * Start a new draft from an existing invoice (any status) — the common "same as last month"
      * retainer flow. Copies the notes and every line item; the copy is issued today with the same
-     * payment window as the original, gets the next invoice number, and is never finalized (so a
+     * payment window and currency as the original, gets the next invoice number, and is never finalized (so a
      * changed retainer is picked up when it's finalized). A fixed-amount invoice without items
      * keeps its amount.
      */
@@ -33,6 +33,7 @@ class DuplicateInvoiceAction
                 'issue_date' => $issueDate->toDateString(),
                 'due_date' => $termsDays !== null ? $issueDate->copy()->addDays($termsDays)->toDateString() : null,
                 'description' => $source->description,
+                'currency' => $source->currency,
                 'amount' => $source->items->isEmpty() ? $source->amount : 0,
             ]);
 

@@ -86,7 +86,7 @@
                     <tr>
                         <td style="padding:18px 32px; background-color:#f9f5f0; border-top:1px solid #e2ddd6;">
                             <p style="margin:0; font-size:12px; color:#8a8178;">
-                                Sent by {{ $organization->name }} via Graphy. Questions about this invoice? Get in touch with your studio contact.
+                                Sent by {{ $organization->name }} via AlimaPlanner. Questions about this invoice? Get in touch with your studio contact.
                             </p>
                         </td>
                     </tr>

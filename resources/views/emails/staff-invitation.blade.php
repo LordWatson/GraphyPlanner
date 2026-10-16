@@ -12,19 +12,19 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e7e2d9;">
                     <tr>
                         <td style="background-color:#241f1a; padding:24px 32px;">
-                            <span style="font-family:'Playfair Display', Georgia, serif; font-style:italic; color:#ffffff; font-size:22px; font-weight:600; letter-spacing:-0.02em;">graphy.</span>
+                            <span style="font-family:'Playfair Display', Georgia, serif; font-style:italic; color:#ffffff; font-size:22px; font-weight:600; letter-spacing:-0.02em;">alimaplanner.</span>
                         </td>
                     </tr>
                     <tr>
                         <td style="padding:32px;">
                             <h1 style="margin:0 0 12px; font-family:'Playfair Display', Georgia, serif; font-size:22px; line-height:1.3; color:#1f1f1f; font-weight:600;">
-                                You're invited to join {{ $invitation->organization->name }} on Graphy
+                                You're invited to join {{ $invitation->organization->name }} on AlimaPlanner
                             </h1>
                             <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4b4b4b;">
                                 Hi,
                             </p>
                             <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4b4b4b;">
-                                You've been invited to join {{ $invitation->organization->name }} on Graphy as a
+                                You've been invited to join {{ $invitation->organization->name }} on AlimaPlanner as a
                                 {{ $invitation->role->label() }}. Set up your account to get started.
                             </p>
 
@@ -53,7 +53,7 @@
                     <tr>
                         <td style="padding:20px 32px; background-color:#fbf9f5; border-top:1px solid #e7e2d9;">
                             <p style="margin:0; font-size:12px; color:#9a9a9a;">
-                                &copy; {{ now()->year }} Graphy. This is an automated message, please don't reply
+                                &copy; {{ now()->year }} AlimaPlanner. This is an automated message, please don't reply
                                 directly to this email.
                             </p>
                         </td>

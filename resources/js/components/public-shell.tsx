@@ -52,7 +52,7 @@ export function PublicShell({
                     max,
                 )}
             >
-                <span>© {new Date().getFullYear()} Graphy</span>
+                <span>© {new Date().getFullYear()} AlimaPlanner</span>
                 <span>Secure link</span>
             </footer>
         </div>

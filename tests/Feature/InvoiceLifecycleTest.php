@@ -302,6 +302,7 @@ class InvoiceLifecycleTest extends TestCase
             'due_date' => '2026-09-15',
             'is_finalized' => true,
             'description' => 'September work',
+            'currency' => 'EUR',
         ]);
         InvoiceItem::factory()->for($source)->create(['org_id' => $this->org->id, 'description' => 'Reel edit', 'price' => 120, 'quantity' => 2, 'sort_order' => 1]);
         InvoiceItem::factory()->for($source)->create(['org_id' => $this->org->id, 'description' => 'Strategy call', 'is_billable' => false, 'sort_order' => 2]);
@@ -313,6 +314,7 @@ class InvoiceLifecycleTest extends TestCase
         $this->assertSame(InvoiceStatus::Draft, $copy->status);
         $this->assertFalse($copy->is_finalized);
         $this->assertSame('September work', $copy->description);
+        $this->assertSame('EUR', $copy->currency);
         $this->assertSame(Carbon::today()->toDateString(), $copy->issue_date->toDateString());
         $this->assertSame(Carbon::today()->addDays(14)->toDateString(), $copy->due_date->toDateString());
         $this->assertSame(['Reel edit', 'Strategy call'], $copy->items->pluck('description')->all());
