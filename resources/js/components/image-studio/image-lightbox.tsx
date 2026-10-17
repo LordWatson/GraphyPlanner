@@ -5,25 +5,25 @@ import {
     Download,
     Sparkles,
     Wand2,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { RefineForm } from '@/components/image-studio/image-tile';
-import type { StudioVariant } from '@/components/image-studio/types';
-import { SocialPostPreview } from '@/components/social-post-preview';
-import { Button } from '@/components/ui/button';
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { RefineForm } from "@/components/image-studio/image-tile";
+import type { StudioVariant } from "@/components/image-studio/types";
+import { SocialPostPreview } from "@/components/social-post-preview";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { download } from '@/routes/ai-image-variants';
+} from "@/components/ui/dialog";
+import { download } from "@/routes/ai-image-variants";
 
-const PREVIEWABLE = ['instagram', 'tiktok', 'facebook', 'linkedin'];
+const PREVIEWABLE = ["instagram", "tiktok", "facebook", "linkedin"];
 
 /**
- * Large preview of one tile beside a lightweight platform frame carrying the real caption, so the
- * team judges the image as it will appear. ←/→ move between tiles, Enter selects, R opens refine.
+ * Preview of one tile inside a lightweight platform frame carrying the real caption, so the team
+ * judges the image as it will appear. ←/→ move between tiles, Enter selects, R opens refine.
  */
 export function ImageLightbox({
     variants,
@@ -77,25 +77,25 @@ export function ImageLightbox({
 
         const target = event.target as HTMLElement;
 
-        if (['INPUT', 'TEXTAREA'].includes(target.tagName)) {
+        if (["INPUT", "TEXTAREA"].includes(target.tagName)) {
             return;
         }
 
-        if (event.key === 'ArrowRight') {
+        if (event.key === "ArrowRight") {
             event.preventDefault();
             step(1);
-        } else if (event.key === 'ArrowLeft') {
+        } else if (event.key === "ArrowLeft") {
             event.preventDefault();
             step(-1);
         } else if (
-            event.key === 'Enter' &&
+            event.key === "Enter" &&
             canManage &&
-            target.tagName !== 'BUTTON' &&
-            target.tagName !== 'A'
+            target.tagName !== "BUTTON" &&
+            target.tagName !== "A"
         ) {
             event.preventDefault();
             onToggleSelect(variant);
-        } else if (event.key.toLowerCase() === 'r' && canManage) {
+        } else if (event.key.toLowerCase() === "r" && canManage) {
             event.preventDefault();
             setRefining(true);
         }
@@ -103,7 +103,7 @@ export function ImageLightbox({
 
     const previewPlatform = PREVIEWABLE.includes(platform)
         ? platform
-        : 'instagram';
+        : "instagram";
 
     return (
         <Dialog
@@ -111,65 +111,42 @@ export function ImageLightbox({
             onOpenChange={(open) => !open && onClose()}
         >
             <DialogContent
-                className="max-h-[92vh] overflow-y-auto sm:max-w-5xl"
+                className="max-h-[92vh] overflow-y-auto sm:max-w-2xl"
                 onKeyDown={onKeyDown}
             >
                 {variant && (
                     <div className="flex flex-col gap-5">
                         <div className="flex flex-col gap-1 pr-8">
                             <DialogTitle>
-                                {variant.tier === 'final'
-                                    ? 'Final image'
+                                {variant.tier === "final"
+                                    ? "Final image"
                                     : `Draft ${(index ?? 0) + 1} of ${variants.length}`}
                             </DialogTitle>
                             <DialogDescription>
                                 ← → to browse
                                 {canManage
-                                    ? ' · Enter to select · R to refine'
-                                    : ''}
+                                    ? " · Enter to select · R to refine"
+                                    : ""}
                             </DialogDescription>
                         </div>
 
-                        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-                            <div className="bg-muted relative flex items-center justify-center overflow-hidden rounded-xl">
-                                {variant.url ? (
-                                    <img
-                                        src={variant.url}
-                                        alt={variant.alt}
-                                        className="max-h-[64vh] w-full object-contain"
-                                    />
-                                ) : null}
-                                {variants.length > 1 && (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="bg-card/90 absolute top-1/2 left-3 -translate-y-1/2"
-                                            onClick={() => step(-1)}
-                                            aria-label="Previous image"
-                                        >
-                                            <ChevronLeft />
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="bg-card/90 absolute top-1/2 right-3 -translate-y-1/2"
-                                            onClick={() => step(1)}
-                                            aria-label="Next image"
-                                        >
-                                            <ChevronRight />
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
+                        <div className="flex items-center gap-3">
+                            {variants.length > 1 && (
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="shrink-0"
+                                    onClick={() => step(-1)}
+                                    aria-label="Previous image"
+                                >
+                                    <ChevronLeft />
+                                </Button>
+                            )}
 
-                            <div className="flex flex-col gap-4">
-                                <span className="eyebrow text-muted-foreground">
-                                    How it will look
-                                </span>
+                            <div className="mx-auto w-full max-w-md min-w-0">
                                 <SocialPostPreview
                                     target={{
-                                        id: 'studio',
+                                        id: "studio",
                                         platform: previewPlatform,
                                         handle,
                                     }}
@@ -180,11 +157,23 @@ export function ImageLightbox({
                                             id: variant.assetId ?? variant.id,
                                             url: variant.url,
                                             original_filename: null,
-                                            type: 'image',
+                                            type: "image",
                                         },
                                     ]}
                                 />
                             </div>
+
+                            {variants.length > 1 && (
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="shrink-0"
+                                    onClick={() => step(1)}
+                                    aria-label="Next image"
+                                >
+                                    <ChevronRight />
+                                </Button>
+                            )}
                         </div>
 
                         {refining ? (
@@ -213,7 +202,7 @@ export function ImageLightbox({
                                         Refine
                                     </Button>
                                 )}
-                                {canManage && variant.tier === 'draft' && (
+                                {canManage && variant.tier === "draft" && (
                                     <Button
                                         variant="outline"
                                         onClick={() => onFinalize(variant)}
@@ -230,7 +219,7 @@ export function ImageLightbox({
                                         aria-pressed={selected}
                                     >
                                         <Check />
-                                        {selected ? 'Selected' : 'Select'}
+                                        {selected ? "Selected" : "Select"}
                                     </Button>
                                 )}
                             </div>
