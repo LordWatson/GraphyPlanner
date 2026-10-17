@@ -10,6 +10,7 @@ use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\Images\AiImageBrief;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -161,6 +162,81 @@ class AiGuardrailService
         }
 
         return $text;
+    }
+
+    /**
+     * Step 16.5: make an image brief safe to send to an image model. Unlike captions, a brief is
+     * never dropped (the studio must still render something); instead every banned phrase is cut
+     * out of the descriptive fields, and the `avoid` list keeps the brand's own visual do-nots but
+     * loses any "never use" hashtag or globally prohibited topic, since naming a thing in an image
+     * prompt tends to summon it. Every field is PII-scrubbed. Logs the matched phrases only.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function filterImageBrief(?BrandBrain $brandBrain, AiImageBrief $brief, array $context = []): AiImageBrief
+    {
+        $banned = $this->bannedPhrases($brandBrain);
+        $doNots = array_map(fn ($phrase) => mb_strtolower(trim((string) $phrase)), $brandBrain?->voice['do_nots'] ?? []);
+        $neverInPrompt = array_values(array_filter($banned, fn (string $phrase) => ! in_array(mb_strtolower($phrase), $doNots, true)));
+        $removed = [];
+
+        $clean = function (?string $text) use ($banned, &$removed): ?string {
+            if ($text === null) {
+                return null;
+            }
+
+            foreach ($banned as $phrase) {
+                if (mb_stripos($text, $phrase) !== false) {
+                    $removed[] = $phrase;
+                    $text = (string) preg_replace('/'.preg_quote($phrase, '/').'/iu', '', $text);
+                }
+            }
+
+            return trim((string) preg_replace('/\s{2,}/', ' ', $this->scrub($text)));
+        };
+
+        $avoid = collect($brief->avoid)
+            ->map(fn (string $item) => $this->scrub($item))
+            ->reject(function (string $item) use ($neverInPrompt, &$removed) {
+                $matched = $this->matchedBannedPhrase($item, $neverInPrompt);
+
+                if ($matched !== null) {
+                    $removed[] = $matched;
+                }
+
+                return $matched !== null;
+            })
+            ->values()
+            ->all();
+
+        $palette = collect($brief->palette)
+            ->map(fn (array $colour): array => ['name' => (string) $clean($colour['name']), 'hex' => $colour['hex']])
+            ->filter(fn (array $colour): bool => $colour['name'] !== '' || $colour['hex'] !== null)
+            ->map(fn (array $colour): array => ['name' => $colour['name'] !== '' ? $colour['name'] : (string) $colour['hex'], 'hex' => $colour['hex']])
+            ->values()
+            ->all();
+
+        $textOverlay = $clean($brief->textOverlay);
+
+        $filtered = new AiImageBrief(
+            subject: (string) $clean($brief->subject),
+            composition: (string) $clean($brief->composition),
+            mood: (string) $clean($brief->mood),
+            palette: $palette,
+            style: (string) $clean($brief->style),
+            textOverlay: $textOverlay === '' ? null : $textOverlay,
+            avoid: $avoid,
+            referenceAssetIds: $brief->referenceAssetIds,
+        );
+
+        if ($removed !== []) {
+            Log::warning('AI guardrail removed banned phrases from an image brief', [
+                ...$context,
+                'phrases' => array_values(array_unique($removed)),
+            ]);
+        }
+
+        return $filtered;
     }
 
     /**

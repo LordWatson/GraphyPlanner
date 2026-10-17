@@ -33,6 +33,9 @@ interface PublishAdapter
     /**
      * Publish (or schedule) a post to the given SocialAccount targets.
      *
+     * AI disclosure (Step 16.13): when `$post->hasAiGeneratedMedia()` is true, adapters must set
+     * the platform's AI-generated-content label wherever the vendor supports one.
+     *
      * @param  Collection<int, SocialAccount>  $targets
      * @return Collection<int, TargetResult>
      */

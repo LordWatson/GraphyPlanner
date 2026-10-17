@@ -40,7 +40,14 @@ class ClientContextBuilder
      */
     public function fingerprint(Client $client): string
     {
-        return md5($this->build($client));
+        // Visual references (Step 16.4) aren't in the text context, but they change the brand's
+        // look, so cached image briefs must invalidate when they do.
+        $references = $client->brandBrain?->referenceAssets()
+            ->get(['asset_id', 'role', 'position'])
+            ->map(fn ($reference) => $reference->asset_id.':'.$reference->role->value.':'.$reference->position)
+            ->implode(',') ?? '';
+
+        return md5($this->build($client).'|refs:'.$references);
     }
 
     private function profileSection(Client $client): string

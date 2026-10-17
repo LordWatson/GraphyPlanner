@@ -20,6 +20,19 @@ interface AssetStorage
     public function store(UploadedFile $file, string $directory): array;
 
     /**
+     * Store raw bytes (e.g. an AI-generated image, Step 16.2) under the given directory with a
+     * random filename and the given extension. Same return shape as store().
+     *
+     * @return array{disk: string, path: string, url: string, mime_type: string|null, size: int}
+     */
+    public function storeContents(string $contents, string $mimeType, string $directory, string $extension): array;
+
+    /**
+     * Read a stored file's bytes, or null when it no longer exists.
+     */
+    public function contents(string $disk, string $path): ?string;
+
+    /**
      * Resolve a publicly reachable URL for a stored file.
      */
     public function url(string $disk, string $path): string;

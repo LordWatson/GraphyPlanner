@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiImageController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
@@ -85,6 +86,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('clients.brand-brain.update');
     Route::post('clients/{client}/brand-brain/persona', [BrandBrainController::class, 'uploadPersona'])
         ->name('clients.brand-brain.persona.store');
+    // Step 16.4: Brand Brain visual references for the AI Image Studio.
+    Route::put('clients/{client}/brand-brain/references', [BrandBrainController::class, 'updateReferences'])
+        ->name('clients.brand-brain.references.update');
 
     Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
         ->name('clients.invoices.store');
@@ -202,6 +206,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('ai-post-ideas.show');
     Route::post('ai-post-ideas/{aiPostIdea}/persist', [AiController::class, 'persistIdea'])
         ->name('ai-post-ideas.persist');
+
+    // Phase 16: AI Image Studio — see AiImageController, gated behind config('ai.enabled') and
+    // AiImageGenerationPolicy (Owner/Strategist write, Designer read-only, clients never).
+    Route::post('ai-post-ideas/{aiPostIdea}/images', [AiImageController::class, 'generateForIdea'])
+        ->name('ai-post-ideas.images.store');
+    Route::post('clients/{client}/ai/images', [AiImageController::class, 'generate'])
+        ->name('clients.ai.images.store');
+    Route::get('ai-image-generations/{generation}', [AiImageController::class, 'show'])
+        ->name('ai-image-generations.show');
+    Route::post('ai-image-generations/{generation}/use', [AiImageController::class, 'useInPost'])
+        ->name('ai-image-generations.use');
+    Route::post('ai-image-variants/{variant}/refine', [AiImageController::class, 'refine'])
+        ->name('ai-image-variants.refine');
+    Route::post('ai-image-variants/{variant}/regenerate', [AiImageController::class, 'regenerate'])
+        ->name('ai-image-variants.regenerate');
+    Route::post('ai-image-variants/{variant}/finalize', [AiImageController::class, 'finalize'])
+        ->name('ai-image-variants.finalize');
+    Route::post('ai-image-variants/{variant}/discard', [AiImageController::class, 'discard'])
+        ->name('ai-image-variants.discard');
+    Route::get('ai-image-variants/{variant}/download', [AiImageController::class, 'download'])
+        ->name('ai-image-variants.download');
 
     // Step 2.5: internal-only "Daily Briefs" tab listing the nightly DailyBrief rows for a
     // client, same gating as the AI endpoints above.

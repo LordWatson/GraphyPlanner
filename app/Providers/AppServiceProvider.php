@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
+use App\Contracts\ImageProvider;
 use App\Contracts\MusicProvider;
 use App\Contracts\PublishAdapter;
+use App\Models\AiImageGeneration;
 use App\Models\Asset;
 use App\Models\BrandBrain;
 use App\Models\Campaign;
@@ -18,6 +20,7 @@ use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
 use App\Models\User;
+use App\Policies\AiImageGenerationPolicy;
 use App\Policies\AssetPolicy;
 use App\Policies\BrandBrainPolicy;
 use App\Policies\CampaignPolicy;
@@ -31,6 +34,9 @@ use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
 use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\Images\GeminiImageProvider;
+use App\Services\AI\Images\NullImageProvider;
+use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\LocalAssetStorage;
 use App\Services\Publishing\MetaGraphMusicProvider;
@@ -81,6 +87,24 @@ class AppServiceProvider extends ServiceProvider
 
             return $this->app->make(NullAiProvider::class);
         });
+
+        // ImageProvider contract (Step 16.1) resolves to the configured vendor (Gemini, Step 16.6,
+        // or OpenAI, Step 16.12) only when AI is enabled AND that vendor's key is set, the same
+        // rule as AiProvider above. Otherwise NullImageProvider renders placeholders, no vendor call.
+        $this->app->bind(ImageProvider::class, function () {
+            $provider = (string) config('ai.images.provider', 'null');
+            $hasKey = (string) config("ai.images.{$provider}.api_key", '') !== '';
+
+            if (! (bool) config('ai.enabled', false) || ! $hasKey) {
+                return $this->app->make(NullImageProvider::class);
+            }
+
+            return match ($provider) {
+                'gemini' => $this->app->make(GeminiImageProvider::class),
+                'openai' => $this->app->make(OpenAiImageProvider::class),
+                default => $this->app->make(NullImageProvider::class),
+            };
+        });
     }
 
     /**
@@ -98,6 +122,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(SocialAccount::class, SocialAccountPolicy::class);
         Gate::policy(Campaign::class, CampaignPolicy::class);
         Gate::policy(Asset::class, AssetPolicy::class);
+        Gate::policy(AiImageGeneration::class, AiImageGenerationPolicy::class);
         Gate::policy(Post::class, PostPolicy::class);
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(StaffInvitation::class, StaffInvitationPolicy::class);

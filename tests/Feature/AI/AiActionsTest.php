@@ -16,6 +16,8 @@ use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
 use App\Support\AI\ClientContextBuilder;
+use App\Support\AI\Images\AiImageBrief;
+use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -48,6 +50,11 @@ class AiActionsTest extends TestCase
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
                 return new AiTrends([new AiTrend(title: 'Trend', summary: 'Summary', platforms: $platforms, confidence: 0.9)]);
+            }
+
+            public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+            {
+                return new AiImageBrief(subject: $input->title);
             }
         });
 
@@ -85,6 +92,11 @@ class AiActionsTest extends TestCase
             {
                 return new AiTrends([new AiTrend(title: 'Fresh', summary: 'Summary', platforms: $platforms, confidence: 0.9)]);
             }
+
+            public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+            {
+                return new AiImageBrief(subject: $input->title);
+            }
         });
 
         // Simulate a stale/incompatible cache entry (e.g. one unserialized as
@@ -120,6 +132,11 @@ class AiActionsTest extends TestCase
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
                 return new AiTrends;
+            }
+
+            public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+            {
+                return new AiImageBrief(subject: $input->title);
             }
         });
 
@@ -169,6 +186,11 @@ class AiActionsTest extends TestCase
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
                 return new AiTrends;
+            }
+
+            public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+            {
+                return new AiImageBrief(subject: $input->title);
             }
         });
 

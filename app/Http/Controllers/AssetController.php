@@ -36,6 +36,7 @@ class AssetController extends Controller
                 'url' => $asset->url,
                 'original_filename' => $asset->original_filename,
                 'type' => $asset->type?->value,
+                'is_ai_generated' => $asset->is_ai_generated,
                 'campaign_name' => $asset->campaign?->name,
                 'created_at' => $asset->created_at?->toIso8601String(),
             ])->values(),

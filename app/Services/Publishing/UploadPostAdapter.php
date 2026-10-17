@@ -10,7 +10,6 @@ use App\Models\Asset;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
-use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\Publishing\TargetResult;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
@@ -508,6 +507,17 @@ class UploadPostAdapter implements PublishAdapter
 
         $this->applyHashtagCaptionOverride($account->platform, $post, $fields, $sent);
 
+        // Step 16.13 AI disclosure: Upload-Post's `is_ai_generated` alias maps to each platform's
+        // native label (TikTok `is_aigc`, Instagram, Facebook Reels). LinkedIn has no API label;
+        // it reads the C2PA credentials embedded in the vendor original, which we never re-encode.
+        // See https://docs.upload-post.com/guides/ai-content-labeling and publishing.md.
+        if ($post->hasAiGeneratedMedia()) {
+            $fields['is_ai_generated'] = 'true';
+            $sent[] = 'is_ai_generated';
+        } else {
+            $skipped[] = 'is_ai_generated';
+        }
+
         match ($account->platform) {
             Platform::Instagram => $this->applyInstagramFields($post, $fields, $sent, $skipped),
             Platform::TikTok => $this->applyTikTokFields($post, $fields, $sent, $skipped),
@@ -652,10 +662,6 @@ class UploadPostAdapter implements PublishAdapter
         } else {
             $skipped[] = 'location';
         }
-
-        // Post has no `is_ai_generated` flag yet — always skipped until the model gains one.
-        // See `.junie/modules/publishing.md` for the open question.
-        $skipped[] = 'tiktok_is_ai_generated';
     }
 
     private function client(SocialAccount $account): PendingRequest

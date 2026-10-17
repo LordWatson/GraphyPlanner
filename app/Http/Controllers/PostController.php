@@ -20,11 +20,13 @@ use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\TransitionPostRequest;
 use App\Http\Requests\UpdatePostRequest;
+use App\Models\AiImageGeneration;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Services\PostNotificationService;
+use App\Support\AI\Images\ImageStudioPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -54,6 +56,7 @@ class PostController extends Controller
         Post $post,
         EvaluatePostChecklistAction $evaluateChecklist,
         PostNotificationService $notifications,
+        ImageStudioPresenter $studio,
     ): Response {
         $this->authorize('view', $post);
 
@@ -112,6 +115,11 @@ class PostController extends Controller
                 'enabled' => (bool) config('ai.enabled', false),
                 'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
             ],
+            // Phase 16: the AI Image Studio tab (Owner/Strategist generate, Designer read-only).
+            // A closure so the studio's partial reloads (`only: ['imageStudio']`) skip the rest.
+            'imageStudio' => fn () => (bool) config('ai.enabled', false) && $user->can('viewAnyForClient', [AiImageGeneration::class, $client])
+                ? $studio->forPost($post, $user)
+                : null,
         ]);
     }
 
@@ -294,6 +302,7 @@ class PostController extends Controller
                 'url' => $asset->url,
                 'original_filename' => $asset->original_filename,
                 'type' => $asset->type?->value,
+                'is_ai_generated' => $asset->is_ai_generated,
             ])->values(),
             'targets' => $post->targets->map(fn ($target) => [
                 'id' => $target->id,

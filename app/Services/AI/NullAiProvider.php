@@ -8,6 +8,9 @@ use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\Images\AiImageBrief;
+use App\Support\AI\Images\BrandImageBriefFactory;
+use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -37,6 +40,17 @@ class NullAiProvider implements AiProvider
         $this->logDisabled('discoverTrends', ['client_id' => $client->id, 'org_id' => $client->org_id, 'platforms' => $platforms]);
 
         return new AiTrends;
+    }
+
+    /**
+     * No vendor call: a deterministic brief built from the Brand Brain, so the Image Studio still
+     * works end to end without DeepSeek (Step 16.5).
+     */
+    public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+    {
+        $this->logDisabled('draftImageBrief', ['client_id' => $client->id, 'org_id' => $client->org_id]);
+
+        return (new BrandImageBriefFactory)->defaults($client, $input);
     }
 
     /**

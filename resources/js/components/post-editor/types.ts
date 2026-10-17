@@ -52,6 +52,8 @@ export type AssetData = {
     url: string | null;
     original_filename: string | null;
     type: string | null;
+    /** Made in the AI Image Studio (Phase 16): shown with an "AI" label tag. */
+    is_ai_generated?: boolean;
 };
 
 export type PostData = {

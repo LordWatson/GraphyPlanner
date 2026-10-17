@@ -13,6 +13,9 @@ use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
 use App\Support\AI\ClientContextBuilder;
+use App\Support\AI\Images\AiImageBrief;
+use App\Support\AI\Images\BrandImageBriefFactory;
+use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -50,6 +53,7 @@ class DeepSeekProvider implements AiProvider
     public function __construct(
         private readonly AiGuardrailService $guardrail = new AiGuardrailService,
         private readonly ClientContextBuilder $context = new ClientContextBuilder,
+        private readonly BrandImageBriefFactory $briefs = new BrandImageBriefFactory,
     ) {}
 
     public function suggestCaptions(Post $post): AiCaptionSuggestions
@@ -136,6 +140,99 @@ class DeepSeekProvider implements AiProvider
             ->all();
 
         return new AiTrends($trends);
+    }
+
+    /**
+     * Step 16.5: DeepSeek as art director. Writes the creative fields of an image brief
+     * (subject, composition, mood, style) in strict JSON; the palette, references, headline and
+     * do-nots are then applied deterministically by BrandImageBriefFactory::finalize(), never left
+     * to the model. Uses the (fast) `ai.images.brief_model` when configured. Falls back to the
+     * brand-derived brief if DeepSeek fails, so "Generate" never dead-ends on the text model.
+     */
+    public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+    {
+        $payload = $this->requestStructured(
+            method: 'draftImageBrief',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildImageBriefUserPrompt($input),
+            validator: fn (array $data): ?string => $this->imageBriefShapeError($data),
+            context: ['org_id' => $client->org_id, 'client_id' => $client->id],
+            model: filled(config('ai.images.brief_model')) ? (string) config('ai.images.brief_model') : null,
+            maxTokens: (int) config('ai.images.brief_max_tokens', 1500),
+        );
+
+        if ($payload === null) {
+            return $this->briefs->defaults($client, $input);
+        }
+
+        $brief = AiImageBrief::fromArray([
+            'subject' => $payload['subject'],
+            'composition' => $payload['composition'] ?? '',
+            'mood' => $payload['mood'] ?? '',
+            'style' => $payload['style'] ?? '',
+            'avoid' => $payload['avoid'] ?? [],
+        ]);
+
+        return $this->briefs->finalize($client, $brief->with(['subject' => $this->briefs->stripHashtags($brief->subject)]), $input);
+    }
+
+    private function buildImageBriefUserPrompt(ImageBriefInput $input): string
+    {
+        $lines = [
+            'Act as the art director for one social media image for this brand.',
+            'Write a visual brief a professional photographer or illustrator could shoot from: concrete, visual, specific to this brand and its imagery style.',
+            'Rules:',
+            '- Describe only what is seen: setting, subject, props, people (generic, never real public figures), light, angle.',
+            '- Never include hashtags, @handles, URLs, third-party brands or logos.',
+            '- Never put words or text in the image; the caption carries the words.',
+            '- Respect every "Do not" in the Brand Brain and match the Visual section (imagery style, palette).',
+            '',
+            'The post this image serves:',
+            '- Title: '.$this->guardrail->scrub($input->title),
+        ];
+
+        if (filled($input->description)) {
+            $lines[] = '- Idea: '.$this->guardrail->scrub((string) $input->description);
+        }
+
+        if (filled($input->caption)) {
+            $lines[] = '- Caption: '.$this->guardrail->scrub($this->briefs->stripHashtags((string) $input->caption));
+        }
+
+        if (filled($input->campaign)) {
+            $lines[] = '- Campaign: '.$this->guardrail->scrub((string) $input->campaign);
+        }
+
+        if ($input->platforms !== []) {
+            $lines[] = '- Platforms: '.implode(', ', $input->platforms);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"subject": string (1-2 sentences), "composition": string, "mood": string, "style": string, "avoid": string[] (visual things to keep out, max 5)}';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function imageBriefShapeError(array $data): ?string
+    {
+        foreach (['subject', 'composition', 'mood', 'style'] as $field) {
+            if (! isset($data[$field]) || ! is_string($data[$field])) {
+                return "{$field} must be a string, got ".get_debug_type($data[$field] ?? null);
+            }
+        }
+
+        if (trim($data['subject']) === '') {
+            return 'subject must not be empty';
+        }
+
+        if (isset($data['avoid']) && ! is_array($data['avoid'])) {
+            return 'avoid must be an array, got '.get_debug_type($data['avoid']);
+        }
+
+        return null;
     }
 
     /**
@@ -235,12 +332,12 @@ class DeepSeekProvider implements AiProvider
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>|null
      */
-    private function requestStructured(string $method, string $systemPrompt, string $userPrompt, callable $validator, array $context): ?array
+    private function requestStructured(string $method, string $systemPrompt, string $userPrompt, callable $validator, array $context, ?string $model = null, ?int $maxTokens = null): ?array
     {
-        $model = (string) config('ai.deepseek.model', 'deepseek-chat');
+        $model ??= (string) config('ai.deepseek.model', 'deepseek-chat');
         $context = [...$context, 'method' => $method, 'model' => $model];
 
-        $maxTokens = (int) config('ai.deepseek.max_tokens', 1024);
+        $maxTokens ??= (int) config('ai.deepseek.max_tokens', 1024);
 
         Log::info('DeepSeek request started', [
             ...$context,

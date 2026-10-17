@@ -7,6 +7,8 @@ use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\Images\AiImageBrief;
+use App\Support\AI\Images\ImageBriefInput;
 
 /**
  * Contract for AI-assisted trend discovery and suggestions (Step 2.1), kept
@@ -36,4 +38,11 @@ interface AiProvider
      * @param  array<int, string>  $platforms
      */
     public function discoverTrends(Client $client, array $platforms): AiTrends;
+
+    /**
+     * Act as art director for the AI Image Studio (Step 16.5): turn an idea/post into a
+     * structured image brief grounded in the client's Brand Brain. Never generates pixels and
+     * never throws: implementations fall back to a deterministic, brand-derived brief.
+     */
+    public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief;
 }

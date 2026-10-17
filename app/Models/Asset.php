@@ -30,12 +30,15 @@ use Illuminate\Support\Carbon;
  * @property int|null $height
  * @property string|null $rights
  * @property string|null $variant_group_id
+ * @property int|null $ai_image_variant_id
+ * @property bool $is_ai_generated
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'uploaded_by', 'source', 'type', 'disk', 'path', 'url',
     'original_filename', 'mime_type', 'size', 'width', 'height', 'rights', 'variant_group_id',
+    'ai_image_variant_id', 'is_ai_generated',
 ])]
 class Asset extends Model
 {
@@ -50,6 +53,7 @@ class Asset extends Model
         return [
             'source' => AssetSource::class,
             'type' => AssetType::class,
+            'is_ai_generated' => 'boolean',
         ];
     }
 
@@ -83,6 +87,16 @@ class Asset extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * The Image Studio variant this asset was rendered for (Step 16.2), when AI generated.
+     *
+     * @return BelongsTo<AiImageVariant, $this>
+     */
+    public function aiImageVariant(): BelongsTo
+    {
+        return $this->belongsTo(AiImageVariant::class);
     }
 
     /**

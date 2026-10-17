@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { HashtagInput, normalizeTag } from '@/components/hashtag-input';
+import { ImageStudio } from '@/components/image-studio/image-studio';
+import type { ImageStudioData } from '@/components/image-studio/types';
 import InputError from '@/components/input-error';
 import type { MentionableUser } from '@/components/mention-textarea';
 import { Page, PageHeader, Panel } from '@/components/page';
@@ -224,6 +226,7 @@ export default function PostEdit({
     hashtagSuggestions,
     mentionableUsers,
     ai,
+    imageStudio,
 }: {
     post: PostData;
     client: { id: number; name: string };
@@ -238,6 +241,7 @@ export default function PostEdit({
     hashtagSuggestions: string[];
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
+    imageStudio?: ImageStudioData | null;
 }) {
     // The page remounts with fresh props after every successful save/transition, so this snapshot
     // is always "what's on the server" — the baseline for unsaved-changes tracking.
@@ -889,6 +893,15 @@ export default function PostEdit({
                         />
                     </aside>
                 </div>
+
+                {imageStudio && (
+                    <div
+                        id="image-studio"
+                        className="border-foreground scroll-mt-20 border-t pt-8"
+                    >
+                        <ImageStudio data={imageStudio} />
+                    </div>
+                )}
             </Page>
         </>
     );
