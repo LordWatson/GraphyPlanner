@@ -16,6 +16,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Organizations\RegistrationController;
 use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
@@ -28,6 +29,10 @@ use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationAcceptController;
 use App\Http\Controllers\StaffInvitationController;
+use App\Http\Controllers\SuperAdmin\AnalyticsController;
+use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
+use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
+use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,13 +66,28 @@ Route::get('social-accounts/callback', [SocialAccountController::class, 'callbac
 // verification (see `bootstrap/app.php`).
 Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle'])->name('webhooks.upload-post');
 
+// Step 15.2: the public organization signup — the first real "create an organization" path.
+// Fortify's own `/register` (which created org-less users) is replaced by it; the old URL
+// redirects here so existing links keep working.
+Route::middleware('guest')->group(function () {
+    Route::get('register-organization', [RegistrationController::class, 'create'])->name('organizations.register');
+    Route::post('register-organization', [RegistrationController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('organizations.register.store');
+});
+Route::redirect('register', '/register-organization')->name('register');
+
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Reachable by every logged-in role (including Role::ClientReviewer/portal users), unlike
-    // the internal-only routes below — the notification bell is shared across both layouts.
+    // Reachable by every logged-in role (including Role::ClientReviewer/portal users and super
+    // admins), unlike the internal-only routes below — the notification bell is in every layout.
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+});
 
+// The organization workspace. `org.member` (Step 15.1) sends org-less super admins to
+// `/super-admin` — everything in here is scoped by the user's `org_id`.
+Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Client portal contacts are sent to their `/portal/*` equivalents (see
     // `RedirectClientReviewersToPortal`) — the internal dashboard/calendar/home are staff-only UI.
     Route::middleware('portal.redirect')->group(function () {
@@ -250,7 +270,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // `/review/:token` and `/client-invite/:token` links above) — every route here is guarded by the
 // `portal` middleware, which requires a `Role::ClientReviewer` session and scopes any bound
 // `{post}`/`{invoice}` to that user's own `client_id`.
-Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'portal'])->group(function () {
+Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.member', 'portal'])->group(function () {
     Route::get('/', [PortalDashboardController::class, 'index'])->name('dashboard');
     Route::get('calendar', [PortalCalendarController::class, 'index'])->name('calendar');
     Route::get('company', [PortalClientController::class, 'show'])->name('company');
@@ -262,6 +282,27 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'porta
     Route::post('posts/{post}/comments', [PortalPostController::class, 'comment'])->name('posts.comments.store');
     Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
+});
+
+// Phase 15: the platform super admin console — org-less platform staff only (`super_admin`
+// middleware; every organization role gets a 403). Mirrors how the portal is grouped above.
+Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verified', 'super_admin'])->group(function () {
+    Route::get('/', SuperAdminDashboardController::class)->name('dashboard');
+
+    Route::get('organizations', [SuperAdminOrganizationController::class, 'index'])->name('organizations.index');
+    Route::get('organizations/create', [SuperAdminOrganizationController::class, 'create'])->name('organizations.create');
+    Route::post('organizations', [SuperAdminOrganizationController::class, 'store'])->name('organizations.store');
+    Route::get('organizations/{organization}', [SuperAdminOrganizationController::class, 'show'])->name('organizations.show');
+    Route::put('organizations/{organization}', [SuperAdminOrganizationController::class, 'update'])->name('organizations.update');
+    Route::post('organizations/{organization}/suspend', [SuperAdminOrganizationController::class, 'suspend'])->name('organizations.suspend');
+    Route::post('organizations/{organization}/reinstate', [SuperAdminOrganizationController::class, 'reinstate'])->name('organizations.reinstate');
+    Route::delete('organizations/{organization}', [SuperAdminOrganizationController::class, 'destroy'])->name('organizations.destroy');
+    Route::get('organizations/{organization}/analytics', [SuperAdminOrganizationController::class, 'analytics'])->name('organizations.analytics');
+
+    Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+
+    Route::resource('reports', ReportController::class);
+    Route::get('reports/{report}/export', [ReportController::class, 'export'])->name('reports.export');
 });
 
 // Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen

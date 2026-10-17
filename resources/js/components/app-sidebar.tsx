@@ -14,12 +14,16 @@ import {
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { Chapter } from '@/lib/chapters';
-import { chapters } from '@/lib/chapters';
+import { chapters, platformChapters } from '@/lib/chapters';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
+import { dashboard as superAdminDashboard } from '@/routes/super-admin';
+import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
+import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
+import { index as superAdminReports } from '@/routes/super-admin/reports';
 import type { Auth, NavItem } from '@/types';
 
 function navItem(
@@ -39,31 +43,46 @@ function navItem(
 export function AppSidebar() {
     const { auth } = usePage<{ auth: Auth }>().props;
     const { currentUrl } = useCurrentUrl();
+    const isSuperAdmin = auth.user.role === 'super_admin';
+    const onSettings = currentUrl
+        .replace(/^\/preview/, '')
+        .startsWith('/settings');
 
-    // Client portal contacts never render this shell (`AppLayout` swaps to `ClientPortalLayout`).
-    // Billing roles only — see `InvoicePolicy::viewLedger`.
-    const canViewLedger =
-        auth.user.role === 'owner' || auth.user.role === 'strategist';
-
-    const studioItems: NavItem[] = [
-        navItem(chapters.overview, dashboard()),
-        navItem(chapters.attention, needsAttention()),
-        navItem(chapters.calendar, calendar()),
-        navItem(chapters.clients, clientsIndex()),
-        ...(canViewLedger ? [navItem(chapters.invoices, invoicesIndex())] : []),
-    ];
-
-    const teamItems: NavItem[] = [
-        // Owner-only — see `StaffPolicy::viewAny`.
-        ...(auth.user.role === 'owner'
-            ? [navItem(chapters.staff, staffIndex())]
-            : []),
-        navItem(
-            chapters.settings,
-            editProfile(),
-            currentUrl.replace(/^\/preview/, '').startsWith('/settings'),
-        ),
-    ];
+    // Phase 15: platform super admins have no organization — they get the console's own book
+    // instead of the studio chapters (which `org.member` would redirect them away from anyway).
+    const groups: { label: string; items: NavItem[] }[] = isSuperAdmin
+        ? [
+              {
+                  label: 'Platform',
+                  items: [
+                      navItem(
+                          platformChapters.platformOverview,
+                          superAdminDashboard(),
+                          currentUrl === '/super-admin',
+                      ),
+                      navItem(
+                          platformChapters.organizations,
+                          superAdminOrganizations(),
+                      ),
+                      navItem(
+                          platformChapters.analytics,
+                          superAdminAnalytics(),
+                      ),
+                      navItem(platformChapters.reports, superAdminReports()),
+                  ],
+              },
+              {
+                  label: 'Account',
+                  items: [
+                      navItem(
+                          platformChapters.platformSettings,
+                          editProfile(),
+                          onSettings,
+                      ),
+                  ],
+              },
+          ]
+        : studioGroups(auth, onSettings);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -75,7 +94,14 @@ export function AppSidebar() {
                             asChild
                             className="hover:bg-transparent active:bg-transparent"
                         >
-                            <Link href={dashboard()} prefetch>
+                            <Link
+                                href={
+                                    isSuperAdmin
+                                        ? superAdminDashboard()
+                                        : dashboard()
+                                }
+                                prefetch
+                            >
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -84,8 +110,13 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent className="gap-3 overflow-x-hidden pt-1">
-                <NavMain items={studioItems} label="Studio" />
-                <NavMain items={teamItems} label="Team" />
+                {groups.map((group) => (
+                    <NavMain
+                        key={group.label}
+                        items={group.items}
+                        label={group.label}
+                    />
+                ))}
             </SidebarContent>
 
             <SidebarFooter className="gap-3 p-3">
@@ -103,4 +134,39 @@ export function AppSidebar() {
             </SidebarFooter>
         </Sidebar>
     );
+}
+
+function studioGroups(
+    auth: Auth,
+    onSettings: boolean,
+): { label: string; items: NavItem[] }[] {
+    // Client portal contacts never render this shell (`AppLayout` swaps to `ClientPortalLayout`).
+    // Billing roles only — see `InvoicePolicy::viewLedger`.
+    const canViewLedger =
+        auth.user.role === 'owner' || auth.user.role === 'strategist';
+
+    return [
+        {
+            label: 'Studio',
+            items: [
+                navItem(chapters.overview, dashboard()),
+                navItem(chapters.attention, needsAttention()),
+                navItem(chapters.calendar, calendar()),
+                navItem(chapters.clients, clientsIndex()),
+                ...(canViewLedger
+                    ? [navItem(chapters.invoices, invoicesIndex())]
+                    : []),
+            ],
+        },
+        {
+            label: 'Team',
+            items: [
+                // Owner-only — see `StaffPolicy::viewAny`.
+                ...(auth.user.role === 'owner'
+                    ? [navItem(chapters.staff, staffIndex())]
+                    : []),
+                navItem(chapters.settings, editProfile(), onSettings),
+            ],
+        },
+    ];
 }

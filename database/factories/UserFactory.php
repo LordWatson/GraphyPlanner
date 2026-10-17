@@ -54,6 +54,18 @@ class UserFactory extends Factory
     /**
      * Indicate that the model's email address should be unverified.
      */
+    /**
+     * Step 15.1: platform staff — org-less, `Role::SuperAdmin`.
+     */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'org_id' => null,
+            'role' => Role::SuperAdmin,
+            'client_id' => null,
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [

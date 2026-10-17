@@ -24,6 +24,12 @@ void createInertiaApp({
                 return null;
             case name.startsWith('staff-invite/'):
                 return null;
+            // Phase 15: the public org signup is an auth page; the "suspended" lock-out page
+            // stands alone (`PublicShell`) — a locked-out member gets no app chrome.
+            case name === 'organizations/register':
+                return AuthLayout;
+            case name === 'organizations/suspended':
+                return null;
             case name.startsWith('portal/'):
                 return ClientPortalLayout;
             case name.startsWith('auth/'):

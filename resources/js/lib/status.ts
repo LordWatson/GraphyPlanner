@@ -26,7 +26,8 @@ export type StatusKind =
     | 'approval'
     | 'invitation'
     | 'imageGeneration'
-    | 'imageVariant';
+    | 'imageVariant'
+    | 'organization';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -110,6 +111,12 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         generating: { tone: 'info', label: 'Drafting' },
         ready: { tone: 'success', label: 'Ready' },
         failed: { tone: 'danger', label: 'Failed' },
+    },
+    // Super admin console (Phase 15): an organization's platform status.
+    organization: {
+        active: { tone: 'success', label: 'Active' },
+        suspended: { tone: 'danger', label: 'Suspended' },
+        preview: { tone: 'muted', label: 'Preview fixture' },
     },
 };
 

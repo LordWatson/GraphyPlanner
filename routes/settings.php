@@ -27,6 +27,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
+});
+
+// Organization-level settings need an organization: `org.member` (Step 15.1) sends org-less
+// super admins to `/super-admin` (they keep profile/security/appearance above).
+Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('settings/organization', [OrganizationController::class, 'edit'])->name('organization.edit');
     Route::put('settings/organization', [OrganizationController::class, 'update'])->name('organization.update');
 

@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { useAppearance } from '@/hooks/use-appearance';
 import type { Chapter } from '@/lib/chapters';
-import { chapters } from '@/lib/chapters';
+import { chapters, platformChapters } from '@/lib/chapters';
 import { cn, toUrl } from '@/lib/utils';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import {
@@ -29,6 +29,16 @@ import {
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
+import { dashboard as superAdminDashboard } from '@/routes/super-admin';
+import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
+import {
+    create as createOrganization,
+    index as superAdminOrganizations,
+} from '@/routes/super-admin/organizations';
+import {
+    create as createReport,
+    index as superAdminReports,
+} from '@/routes/super-admin/reports';
 import type { Auth } from '@/types';
 
 type Command = {
@@ -114,7 +124,7 @@ function useCommands(close: () => void): Command[] {
             run: visit(href),
         });
 
-        const list: Command[] = [
+        const studioCommands: Command[] = [
             chapterCommand(chapters.overview, dashboard()),
             chapterCommand(chapters.attention, needsAttention()),
             chapterCommand(chapters.calendar, calendar()),
@@ -125,6 +135,51 @@ function useCommands(close: () => void): Command[] {
             ...(isOwner ? [chapterCommand(chapters.staff, staffIndex())] : []),
             chapterCommand(chapters.settings, editProfile()),
         ];
+
+        // Phase 15: super admins navigate the platform console, not the studio.
+        const list: Command[] =
+            auth.user.role === 'super_admin'
+                ? [
+                      chapterCommand(
+                          platformChapters.platformOverview,
+                          superAdminDashboard(),
+                      ),
+                      chapterCommand(
+                          platformChapters.organizations,
+                          superAdminOrganizations(),
+                      ),
+                      chapterCommand(
+                          platformChapters.analytics,
+                          superAdminAnalytics(),
+                      ),
+                      chapterCommand(
+                          platformChapters.reports,
+                          superAdminReports(),
+                      ),
+                      chapterCommand(
+                          platformChapters.platformSettings,
+                          editProfile(),
+                      ),
+                      {
+                          id: 'create-organization',
+                          group: 'Create',
+                          label: 'Onboard an organization',
+                          hint: 'Set up a workspace and invite its owner.',
+                          keywords: 'new organization org signup onboard',
+                          icon: Plus,
+                          run: visit(createOrganization()),
+                      },
+                      {
+                          id: 'create-report',
+                          group: 'Create',
+                          label: 'Build a report',
+                          hint: 'Save an analytics view to re-run later.',
+                          keywords: 'new report analytics saved',
+                          icon: Plus,
+                          run: visit(createReport()),
+                      },
+                  ]
+                : studioCommands;
 
         if (isBilling) {
             list.push({

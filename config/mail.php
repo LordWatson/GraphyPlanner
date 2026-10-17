@@ -115,4 +115,8 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    // Step 15.3: shown on the "organization suspended" page so locked-out members know who to
+    // contact. Falls back to the from address when unset.
+    'support_address' => env('MAIL_SUPPORT_ADDRESS'),
+
 ];

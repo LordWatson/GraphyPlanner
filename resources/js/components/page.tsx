@@ -65,10 +65,14 @@ export function Page({
 
 /** The chapter the current page belongs to, or null (portal, public pages). */
 export function useChapter(): Chapter | null {
-    const { url } = usePage();
+    const { url, props } = usePage<{ auth?: { user?: { role?: string } } }>();
     const shellPadded = useContext(ShellPaddedContext);
 
-    return shellPadded ? null : chapterForPath(url);
+    return shellPadded
+        ? null
+        : chapterForPath(url, {
+              platform: props.auth?.user?.role === 'super_admin',
+          });
 }
 
 /** The chapter's swatch square + mono number, e.g. `■ 04 — Clients`. */

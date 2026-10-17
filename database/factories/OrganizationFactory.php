@@ -26,4 +26,15 @@ class OrganizationFactory extends Factory
             'default_timezone' => 'UTC',
         ];
     }
+
+    /**
+     * Step 15.3: an organization a super admin has suspended.
+     */
+    public function suspended(?string $reason = 'Unpaid subscription'): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'suspended_at' => now(),
+            'suspension_reason' => $reason,
+        ]);
+    }
 }
