@@ -3,8 +3,12 @@ import {
     ArrowRight,
     BarChart3,
     CalendarClock,
+    Coins,
+    Command,
     FileCheck2,
+    ImagePlus,
     LayoutGrid,
+    Move,
     PlugZap,
     Receipt,
     ShieldCheck,
@@ -29,7 +33,7 @@ const pillars = [
         icon: CalendarClock,
         title: 'A shared content calendar',
         description:
-            'Draft, schedule and see every post across every client on one calendar the whole team can plan around.',
+            'Draft, schedule and see every post across every client on one calendar — then drag a post to a new day when plans change.',
     },
     {
         icon: FileCheck2,
@@ -47,7 +51,7 @@ const pillars = [
         icon: Sparkles,
         title: 'AI-assisted content',
         description:
-            'On-brand post ideas, caption suggestions and trend insights from each client’s BrandBrain — never start from a blank page.',
+            'Post ideas, captions with ready-to-use hashtags, trend insights and a daily brief — all grounded in each client’s Brand Brain and live campaigns.',
     },
     {
         icon: PlugZap,
@@ -59,13 +63,40 @@ const pillars = [
         icon: Receipt,
         title: 'Simple client billing',
         description:
-            'Generate, send and track invoices per client in the same tool you use to run their content.',
+            'Generate, send and track invoices per client — in their currency — from a ledger that sits beside their content.',
     },
     {
         icon: BarChart3,
         title: 'Client health at a glance',
         description:
             'A Red / Amber / Green signal keeps account owners ahead of at-risk clients before they become a problem.',
+    },
+];
+
+const recentlyShipped = [
+    {
+        icon: ImagePlus,
+        title: 'AI Image Studio',
+        description:
+            'Turn a post idea into a set of on-brand images, guided by art direction and Brand Brain references. Refine, pick a final and drop it straight into the post — AI drafts, a human always chooses.',
+    },
+    {
+        icon: Move,
+        title: 'Drag-to-reschedule',
+        description:
+            'Move a post to another day right on the month or week calendar. Every channel shifts together, and nothing moves until you confirm.',
+    },
+    {
+        icon: Coins,
+        title: 'Multi-currency invoicing',
+        description:
+            'Bill each client in their own currency, see totals per currency, and duplicate last month’s invoice in a click.',
+    },
+    {
+        icon: Command,
+        title: 'Command palette',
+        description:
+            'Press ⌘K (or Ctrl K) anywhere in the planner to jump to any part of the studio, add a client or switch themes without reaching for the mouse.',
     },
 ];
 
@@ -80,7 +111,7 @@ const workflow = [
         step: '02',
         title: 'Plan the work',
         description:
-            'Build campaigns, draft posts, and let AI suggest ideas and captions that fit the brand.',
+            'Build campaigns, draft posts, and let AI suggest ideas, captions and on-brand images that fit the brief.',
     },
     {
         step: '03',
@@ -185,6 +216,42 @@ export default function About() {
                                         <span className="bg-accent text-accent-foreground flex size-10 items-center justify-center rounded-full">
                                             <Icon className="size-5" />
                                         </span>
+                                        <h3 className="text-[15px] font-semibold">
+                                            {title}
+                                        </h3>
+                                        <p className="text-muted-foreground text-[13px] leading-relaxed">
+                                            {description}
+                                        </p>
+                                    </div>
+                                ),
+                            )}
+                        </div>
+                    </section>
+
+                    <section className="flex flex-col gap-10">
+                        <SectionTitle
+                            eyebrow="Recently shipped"
+                            title={
+                                <>
+                                    New tools, <em>same</em> calm workspace.
+                                </>
+                            }
+                        />
+                        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            {recentlyShipped.map(
+                                ({ icon: Icon, title, description }) => (
+                                    <div
+                                        key={title}
+                                        className="bg-card border-border/70 flex flex-col items-start gap-3 rounded-2xl border p-6 shadow-sm"
+                                    >
+                                        <div className="flex w-full items-center justify-between">
+                                            <span className="bg-accent text-accent-foreground flex size-10 items-center justify-center rounded-full">
+                                                <Icon className="size-5" />
+                                            </span>
+                                            <span className="text-primary font-mono text-xs font-medium">
+                                                New
+                                            </span>
+                                        </div>
                                         <h3 className="text-[15px] font-semibold">
                                             {title}
                                         </h3>
