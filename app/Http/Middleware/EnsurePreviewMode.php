@@ -38,7 +38,7 @@ class EnsurePreviewMode
             abort(403, 'Preview mode is read-only — no changes can be made here.');
         }
 
-        $organization = Organization::firstWhere('slug', 'preview-studio');
+        $organization = Organization::firstWhere('slug', Organization::PREVIEW_SLUG);
         $previewUser = $organization ? User::firstWhere(['org_id' => $organization->id, 'email' => 'preview@graphy.test']) : null;
 
         if (! $previewUser) {

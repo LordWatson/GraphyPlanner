@@ -61,6 +61,17 @@ class PublishPostJob implements ShouldQueue
             return;
         }
 
+        // Step 15.3: a suspended organization's content never goes out. The post stays
+        // `scheduled`, so nothing is lost if the org is reinstated.
+        if ($post->organization?->isSuspended()) {
+            Log::warning('PublishPostJob: organization is suspended, skipping', [
+                'post_id' => $post->id,
+                'org_id' => $post->org_id,
+            ]);
+
+            return;
+        }
+
         $post = $transition($post, PostStatus::Publishing, null);
 
         $accounts = $post->targets

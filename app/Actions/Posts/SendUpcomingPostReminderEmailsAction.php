@@ -32,6 +32,8 @@ class SendUpcomingPostReminderEmailsAction
             ->whereNotNull('scheduled_at_utc')
             ->whereBetween('scheduled_at_utc', [$now, $until])
             ->whereHas('post', fn ($q) => $q->where('status', PostStatus::Scheduled))
+            // Step 15.3: members of a suspended organization are locked out — don't email them.
+            ->whereHas('post.organization', fn ($q) => $q->whereNull('suspended_at'))
             ->with(['post.client:id,name', 'post.organization', 'socialAccount'])
             ->get();
 

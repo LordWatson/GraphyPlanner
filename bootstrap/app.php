@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Middleware\EnsureClientPortalAccess;
+use App\Http\Middleware\EnsureOrganizationNotSuspended;
 use App\Http\Middleware\EnsurePreviewMode;
+use App\Http\Middleware\EnsureUserHasOrganization;
+use App\Http\Middleware\EnsureUserIsSuperAdmin;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectClientReviewersToPortal;
@@ -29,12 +32,18 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            // Step 15.3: after HandleInertiaRequests so the "suspended" page gets the shared props.
+            EnsureOrganizationNotSuspended::class,
         ]);
 
         $middleware->alias([
             'preview' => EnsurePreviewMode::class,
             'portal' => EnsureClientPortalAccess::class,
             'portal.redirect' => RedirectClientReviewersToPortal::class,
+            // Step 15.1: the platform super admin console, and the org-workspace guard that
+            // sends org-less super admins there instead.
+            'super_admin' => EnsureUserIsSuperAdmin::class,
+            'org.member' => EnsureUserHasOrganization::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

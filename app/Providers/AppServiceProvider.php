@@ -19,6 +19,7 @@ use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
+use App\Models\SuperAdminReport;
 use App\Models\User;
 use App\Policies\AiImageGenerationPolicy;
 use App\Policies\AssetPolicy;
@@ -33,6 +34,7 @@ use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
+use App\Policies\SuperAdminReportPolicy;
 use App\Services\AI\DeepSeekProvider;
 use App\Services\AI\Images\GeminiImageProvider;
 use App\Services\AI\Images\NullImageProvider;
@@ -114,6 +116,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        // Step 15.1: platform super admins bypass every per-org policy. They never reach the org
+        // workspace itself (`org.member` sends them to `/super-admin`), so in practice this grants
+        // the platform-level abilities on `OrganizationPolicy`/`SuperAdminReportPolicy`.
+        Gate::before(fn (User $user): ?bool => $user->isSuperAdmin() ? true : null);
+
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(ClientInvitation::class, ClientInvitationPolicy::class);
         Gate::policy(BrandBrain::class, BrandBrainPolicy::class);
@@ -127,6 +134,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(StaffInvitation::class, StaffInvitationPolicy::class);
         Gate::policy(User::class, StaffPolicy::class);
+        Gate::policy(SuperAdminReport::class, SuperAdminReportPolicy::class);
     }
 
     /**

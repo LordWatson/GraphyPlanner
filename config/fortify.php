@@ -161,7 +161,9 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Step 15.2: no `Features::registration()` — Fortify's signup created users with no
+        // organization. Signing up now goes through `/register-organization`
+        // (`Organizations\RegistrationController`), which creates the org and its Owner together.
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

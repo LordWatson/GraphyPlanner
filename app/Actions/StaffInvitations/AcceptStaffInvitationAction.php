@@ -41,6 +41,11 @@ class AcceptStaffInvitationAction
                 ]);
             }
 
+            // The emailed invite link proved inbox ownership, so it doubles as email verification.
+            if (! $user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
+            }
+
             $invitation->update(['accepted_at' => now()]);
 
             StaffActivityLog::create([

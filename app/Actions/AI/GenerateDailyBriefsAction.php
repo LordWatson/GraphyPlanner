@@ -43,6 +43,8 @@ class GenerateDailyBriefsAction
 
         $clients = Client::query()
             ->where('status', ClientStatus::Active)
+            // Step 15.3: no AI spend (or emails) for a suspended organization.
+            ->whereHas('organization', fn ($q) => $q->whereNull('suspended_at'))
             ->with(['organization', 'campaigns' => fn ($q) => $q->where('status', CampaignStatus::Active)])
             ->get();
 
