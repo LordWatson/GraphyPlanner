@@ -1,7 +1,7 @@
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { Link, router } from '@inertiajs/react';
 import { CalendarX2, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { DragEvent, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,8 @@ export type CalendarPayload = {
         statuses: Option[];
         platforms: Option[];
     };
+    /** Posts the viewer may drag to another day — internal calendar only. */
+    reschedulablePostIds?: number[];
 };
 
 type ContentCalendarProps = CalendarPayload & {
@@ -72,6 +74,16 @@ type ContentCalendarProps = CalendarPayload & {
      * each chip with the client name; in portal mode chips lead with the caption instead.
      */
     multiClient?: boolean;
+    /** Whether an occurrence's chip can be dragged to another day (month/week views). */
+    canReschedule?: (occurrence: Occurrence) => boolean;
+    /**
+     * Called when a chip is dropped on a different, non-past day. `days` is the whole-day shift
+     * from the chip's displayed date; the caller confirms and persists the move.
+     */
+    onReschedule?: (
+        occurrence: Occurrence,
+        move: { from: string; to: string; days: number },
+    ) => void;
 };
 
 type View = 'month' | 'week' | 'day' | 'list';
@@ -84,6 +96,13 @@ function parseLocalDate(dateStr: string): Date {
 
 function toDateKey(date: Date): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function daysBetween(fromKey: string, toKey: string): number {
+    return Math.round(
+        (parseLocalDate(toKey).getTime() - parseLocalDate(fromKey).getTime()) /
+            86_400_000,
+    );
 }
 
 function startOfWeek(date: Date): Date {
@@ -131,6 +150,8 @@ export function ContentCalendar({
     baseUrl,
     postHref,
     multiClient = true,
+    canReschedule,
+    onReschedule,
 }: ContentCalendarProps) {
     // Phones open on the list view — the month grid needs ~760px and would scroll sideways.
     const [view, setView] = useState<View>(() =>
@@ -141,6 +162,8 @@ export function ContentCalendar({
     );
     const [tzMode, setTzMode] = useState<TimezoneMode>('account');
     const [anchor, setAnchor] = useState<Date>(new Date());
+    const [dragging, setDragging] = useState<Occurrence | null>(null);
+    const [dropKey, setDropKey] = useState<string | null>(null);
 
     const display = (occurrence: Occurrence): OccurrenceDisplay =>
         tzMode === 'account'
@@ -174,16 +197,92 @@ export function ContentCalendar({
 
     const today = toDateKey(new Date());
 
+    // Drag-to-reschedule: only the month/week grids have day cells to drop on, and a post can't
+    // be dropped on its own day or into the past (the server re-checks the exact time).
+    const dragEnabled =
+        onReschedule !== undefined && (view === 'month' || view === 'week');
+
+    const canDropOn = (key: string): boolean => {
+        const from = dragging ? display(dragging).date : null;
+
+        return from !== null && key !== from && key >= today;
+    };
+
+    const endDrag = () => {
+        setDragging(null);
+        setDropKey(null);
+    };
+
+    const dropZoneProps = (key: string) =>
+        dragEnabled
+            ? {
+                  onDragOver: (event: DragEvent<HTMLDivElement>) => {
+                      if (!canDropOn(key)) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'move';
+                      setDropKey(key);
+                  },
+                  onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+                      if (
+                          !event.currentTarget.contains(
+                              event.relatedTarget as Node | null,
+                          )
+                      ) {
+                          setDropKey((current) =>
+                              current === key ? null : current,
+                          );
+                      }
+                  },
+                  onDrop: (event: DragEvent<HTMLDivElement>) => {
+                      event.preventDefault();
+                      const occurrence = dragging;
+                      const from = occurrence ? display(occurrence).date : null;
+                      const allowed = canDropOn(key);
+                      endDrag();
+                      if (occurrence && from && allowed) {
+                          onReschedule?.(occurrence, {
+                              from,
+                              to: key,
+                              days: daysBetween(from, key),
+                          });
+                      }
+                  },
+              }
+            : {};
+
+    const dropZoneClass = (key: string) =>
+        dropKey === key && 'ring-primary bg-primary/5 ring-2 ring-inset';
+
     const renderOccurrenceChip = (occurrence: Occurrence) => {
         const time = display(occurrence).time?.slice(0, 5);
         const tone = resolveStatus('post', occurrence.status).tone;
+        const draggable = dragEnabled && (canReschedule?.(occurrence) ?? false);
 
         return (
             <Link
                 key={occurrence.target_id}
                 href={postHref(occurrence.post_id)}
-                title={`${occurrence.status_label} — ${(multiClient ? occurrence.client_name : occurrence.master_caption) ?? ''}`}
-                className="group/chip bg-card hover:border-foreground/20 relative flex min-w-0 flex-col gap-0.5 overflow-hidden rounded-lg border py-1.5 pr-2 pl-3 text-xs transition-colors"
+                title={`${occurrence.status_label} — ${(multiClient ? occurrence.client_name : occurrence.master_caption) ?? ''}${draggable ? ' · drag to move' : ''}`}
+                draggable={draggable}
+                onDragStart={
+                    draggable
+                        ? (event: DragEvent<HTMLAnchorElement>) => {
+                              event.dataTransfer.effectAllowed = 'move';
+                              event.dataTransfer.setData(
+                                  'text/plain',
+                                  String(occurrence.post_id),
+                              );
+                              setDragging(occurrence);
+                          }
+                        : undefined
+                }
+                onDragEnd={draggable ? endDrag : undefined}
+                className={cn(
+                    'group/chip bg-card hover:border-foreground/20 relative flex min-w-0 flex-col gap-0.5 overflow-hidden rounded-lg border py-1.5 pr-2 pl-3 text-xs transition-colors',
+                    draggable && 'cursor-grab active:cursor-grabbing',
+                    // Every target of the dragged post moves together, so dim them all.
+                    dragging?.post_id === occurrence.post_id && 'opacity-50',
+                )}
             >
                 <span
                     aria-hidden
@@ -317,14 +416,16 @@ export function ContentCalendar({
                                 return (
                                     <div
                                         key={key}
+                                        {...dropZoneProps(key)}
                                         className={cn(
-                                            'flex min-h-28 flex-col gap-1 p-1.5',
+                                            'flex min-h-28 flex-col gap-1 p-1.5 transition-colors',
                                             // Opaque canvas, not a tint: a /50 tint over the
                                             // hairline grid's border colour read heavier than
                                             // the real days.
                                             isCurrentMonth
                                                 ? 'bg-card'
                                                 : 'bg-background',
+                                            dropZoneClass(key),
                                         )}
                                     >
                                         {renderDayNumber(day, !isCurrentMonth)}
@@ -369,7 +470,11 @@ export function ContentCalendar({
                             return (
                                 <div
                                     key={key}
-                                    className="bg-card flex min-h-72 flex-col gap-1.5 p-2"
+                                    {...dropZoneProps(key)}
+                                    className={cn(
+                                        'bg-card flex min-h-72 flex-col gap-1.5 p-2 transition-colors',
+                                        dropZoneClass(key),
+                                    )}
                                 >
                                     <div className="flex items-center justify-between pb-1">
                                         <span className="eyebrow text-muted-foreground">
@@ -625,6 +730,14 @@ export function ContentCalendar({
                 {view === 'week' && renderWeekView()}
                 {view === 'day' && renderDayView()}
                 {view === 'list' && renderListView()}
+                {dragEnabled &&
+                    canReschedule &&
+                    occurrences.some(canReschedule) && (
+                        <p className="text-muted-foreground pt-3 text-xs">
+                            Drag a post to another day to move it — you’ll be
+                            asked to confirm first.
+                        </p>
+                    )}
             </div>
         </div>
     );

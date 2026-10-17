@@ -57,6 +57,11 @@ class CalendarController extends Controller
         return Inertia::render('calendar/index', [
             'occurrences' => $buildOccurrences($posts, $orgTimezone),
             'orgTimezone' => $orgTimezone,
+            // Posts the viewer may drag to another day. Preview mode is read-only, so none there.
+            'reschedulablePostIds' => $request->is('preview', 'preview/*') ? [] : $posts
+                ->filter(fn (Post $post) => $user->can('reschedule', $post))
+                ->pluck('id')
+                ->values(),
             'filters' => [
                 'client_id' => $request->integer('client_id') ?: null,
                 'campaign_id' => $request->integer('campaign_id') ?: null,

@@ -1,9 +1,16 @@
-import { Head } from '@inertiajs/react';
-import type { CalendarPayload } from '@/components/content-calendar';
+import { Head, router } from '@inertiajs/react';
+import { useMemo } from 'react';
+import { toast } from 'sonner';
+import { confirmDialog } from '@/components/confirm-dialog';
+import type {
+    CalendarPayload,
+    Occurrence,
+} from '@/components/content-calendar';
 import { ContentCalendar } from '@/components/content-calendar';
 import { Page, PageHeader } from '@/components/page';
+import { formatDate } from '@/lib/dates';
 import { calendar } from '@/routes';
-import { edit as editPost } from '@/routes/posts';
+import { edit as editPost, reschedule as reschedulePost } from '@/routes/posts';
 
 /**
  * The internal (staff) content calendar. Client portal contacts are redirected to
@@ -11,6 +18,47 @@ import { edit as editPost } from '@/routes/posts';
  */
 export default function Calendar(props: CalendarPayload) {
     const count = props.occurrences.length;
+    const reschedulable = useMemo(
+        () => new Set(props.reschedulablePostIds ?? []),
+        [props.reschedulablePostIds],
+    );
+
+    // A dropped chip only moves after an explicit confirm, so a slip of the mouse never
+    // reschedules anything. The whole post moves: every target shifts by the same days.
+    const handleReschedule = async (
+        occurrence: Occurrence,
+        move: { from: string; to: string; days: number },
+    ) => {
+        const channels = props.occurrences.filter(
+            (other) => other.post_id === occurrence.post_id,
+        ).length;
+        const name =
+            occurrence.client_name ?? occurrence.master_caption ?? 'This post';
+        const shift = `${Math.abs(move.days)} day${Math.abs(move.days) === 1 ? '' : 's'} ${move.days > 0 ? 'later' : 'earlier'}`;
+
+        const confirmed = await confirmDialog({
+            title: `Move this post to ${formatDate(move.to)}?`,
+            description: `${name} moves from ${formatDate(move.from)} to ${formatDate(move.to)} (${shift}). ${
+                channels > 1
+                    ? `All ${channels} channels move together and keep their scheduled times.`
+                    : 'It keeps its scheduled time.'
+            }`,
+            confirmLabel: 'Move post',
+        });
+
+        if (!confirmed) return;
+
+        router.post(
+            reschedulePost(occurrence.post_id).url,
+            { days: move.days },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: (errors) =>
+                    toast.error(errors.days ?? 'The post couldn’t be moved.'),
+            },
+        );
+    };
 
     return (
         <>
@@ -29,6 +77,10 @@ export default function Calendar(props: CalendarPayload) {
                     {...props}
                     baseUrl={calendar().url}
                     postHref={(postId) => editPost(postId)}
+                    canReschedule={(occurrence) =>
+                        reschedulable.has(occurrence.post_id)
+                    }
+                    onReschedule={handleReschedule}
                 />
             </Page>
         </>

@@ -6,6 +6,7 @@ use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Actions\Posts\PostStatusTransitionMap;
+use App\Actions\Posts\ReschedulePostAction;
 use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
@@ -14,6 +15,7 @@ use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
+use App\Http\Requests\ReschedulePostRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\TransitionPostRequest;
@@ -143,6 +145,19 @@ class PostController extends Controller
         ]);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Shift a post's targets by a number of days — the calendar's (confirmed) drag-and-drop move.
+     * Redirects back so the calendar keeps its filters.
+     */
+    public function reschedule(ReschedulePostRequest $request, Post $post, ReschedulePostAction $action): RedirectResponse
+    {
+        $action($post, $request->integer('days'), $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post moved.')]);
+
+        return back();
     }
 
     /**

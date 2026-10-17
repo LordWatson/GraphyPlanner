@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
 use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Post;
@@ -59,6 +60,26 @@ class PostPolicy
 
         return $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
+     * Determine whether the user can move a post to another day from the calendar.
+     *
+     * Same lock as `update` (a `scheduled` post already has its publish job queued for the old
+     * time, a `published` one is out), plus a post mid-publish or archived, and any post with a
+     * target that has already gone out — shifting a published target's date would rewrite history.
+     */
+    public function reschedule(User $user, Post $post): bool
+    {
+        if (in_array($post->status, [PostStatus::Publishing, PostStatus::Archived], true)) {
+            return false;
+        }
+
+        if ($post->targets->contains(fn ($target) => $target->status === PostTargetStatus::Published)) {
+            return false;
+        }
+
+        return $this->update($user, $post);
     }
 
     /**

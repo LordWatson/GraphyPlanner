@@ -176,6 +176,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('posts.update');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
+    Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])
+        ->name('posts.reschedule');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
@@ -331,6 +333,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('posts.update');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
+    Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])
+        ->name('posts.reschedule');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
