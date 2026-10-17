@@ -50,6 +50,11 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => fn (): array => [
                 'user' => $user(),
+                // Step 17.4: chapter gating for the sidebar and ⌘K palette (kept under `auth`, since
+                // many pages pass their own top-level `can` prop, which would replace a shared one).
+                'can' => [
+                    'viewAnalytics' => self::canViewAnalytics($user()),
+                ],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'preview' => $request->is('preview', 'preview/*'),
@@ -82,5 +87,12 @@ class HandleInertiaRequests extends Middleware
             // format currency fields consistently without re-fetching the organization.
             'currency' => fn (): string => $user()?->organization->default_currency ?? 'USD',
         ];
+    }
+
+    private static function canViewAnalytics(?User $user): bool
+    {
+        $organization = $user?->organization;
+
+        return $user !== null && $organization !== null && $user->can('viewAnalytics', $organization);
     }
 }

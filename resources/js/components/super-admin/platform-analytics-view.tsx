@@ -7,81 +7,37 @@ import {
     Sparkles,
     UsersRound,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
 import {
-    Area,
-    AreaChart,
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Legend,
-    Line,
-    LineChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+    FigureList,
+    MoneyRow,
+    ShareBars,
+} from '@/components/analytics/figures';
+import { integer, pad, primaryTotal } from '@/components/analytics/format';
+import {
+    AmountAreaChart,
+    CountBarChart,
+    PublishingChart,
+} from '@/components/analytics/series-charts';
 import { EmptyState, Panel, StatStrip } from '@/components/page';
 import type { StatStripItem } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
-import type { CurrencyTotal } from '@/lib/currency';
-import {
-    formatCurrency,
-    formatCurrencyCompact,
-    formatCurrencyTotals,
-} from '@/lib/currency';
+import { formatCurrency, formatCurrencyTotals } from '@/lib/currency';
 import { show as showOrganization } from '@/routes/super-admin/organizations';
 import type { MetricKey, PlatformSummary } from './types';
-
-// Chart styling per brand guidelines §3.5 (mirrors the studio dashboard's charts).
-const chartTooltipStyle = {
-    borderRadius: '1rem',
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-popover)',
-    color: 'var(--color-popover-foreground)',
-    fontSize: 12,
-    padding: '8px 12px',
-    boxShadow: 'var(--shadow-md)',
-};
-
-const axisTick = {
-    fontSize: 11,
-    fontFamily: 'var(--font-mono)',
-    fill: 'var(--color-muted-foreground)',
-};
-
-const integer = new Intl.NumberFormat('en-GB');
-
-function pad(value: number): string {
-    return value < 10 ? String(value).padStart(2, '0') : integer.format(value);
-}
-
-/** The headline money total in the range's primary currency (others listed in the caption). */
-function primaryTotal(
-    totals: CurrencyTotal[],
-    currency: string,
-): { headline: string; others: CurrencyTotal[] } {
-    const primary = totals.find((total) => total.currency === currency);
-
-    return {
-        headline: formatCurrencyCompact(primary?.total ?? 0, currency),
-        others: totals.filter((total) => total.currency !== currency),
-    };
-}
 
 /**
  * Step 15.4 — renders a `GetPlatformAnalyticsSummaryAction` result: the numeral spec row, then a
  * chart panel per selected section, the breakdowns, and the most active organizations. Shared by
- * the overview, the analytics page, the per-org drill-down and a saved report's run view, so they
- * always look identical. Sections the run didn't select are simply not drawn.
+ * the overview, the analytics page and a saved report's run view, so they always look identical.
+ * Sections the run didn't select are simply not drawn. Charts and figure rows come from the shared
+ * `components/analytics` layer (Step 17.4), the same one the studio's own analytics uses.
  */
 export function PlatformAnalyticsView({
     summary,
     scope = 'platform',
 }: {
     summary: PlatformSummary;
-    /** `organization` = a single org's drill-down: no org-level KPIs or leaderboard. */
+    /** `organization` = a report scoped to one org: no org-level KPIs or leaderboard. */
     scope?: 'platform' | 'organization';
 }) {
     const has = (metric: MetricKey) => summary.metrics.includes(metric);
@@ -144,9 +100,6 @@ export function PlatformAnalyticsView({
     );
     const hasSignups = series.some((bucket) => bucket.signups > 0);
     const hasInvoiced = series.some((bucket) => bucket.invoiced > 0);
-    const tickInterval = daily
-        ? Math.max(0, Math.ceil(series.length / 8) - 1)
-        : 0;
 
     return (
         <div className="flex flex-col gap-8">
@@ -167,83 +120,7 @@ export function PlatformAnalyticsView({
                         }
                     >
                         {hasActivity ? (
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart
-                                        data={series}
-                                        margin={{
-                                            top: 8,
-                                            right: 8,
-                                            left: 0,
-                                            bottom: 0,
-                                        }}
-                                    >
-                                        <CartesianGrid
-                                            vertical={false}
-                                            stroke="var(--color-border)"
-                                            strokeDasharray="2 4"
-                                        />
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={axisTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            interval={tickInterval}
-                                            dy={6}
-                                        />
-                                        <YAxis
-                                            tick={axisTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            allowDecimals={false}
-                                            width={36}
-                                        />
-                                        <Tooltip
-                                            contentStyle={chartTooltipStyle}
-                                            cursor={{
-                                                stroke: 'var(--color-foreground)',
-                                                strokeOpacity: 0.2,
-                                                strokeWidth: 1,
-                                            }}
-                                        />
-                                        <Legend
-                                            verticalAlign="top"
-                                            align="right"
-                                            height={28}
-                                            iconType="circle"
-                                            iconSize={8}
-                                            wrapperStyle={{ fontSize: 12 }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="published"
-                                            name="Published"
-                                            stroke="var(--color-success)"
-                                            strokeWidth={2}
-                                            dot={false}
-                                            activeDot={{
-                                                r: 4,
-                                                strokeWidth: 2,
-                                                stroke: 'var(--color-card)',
-                                            }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="failed"
-                                            name="Failed"
-                                            stroke="var(--color-destructive)"
-                                            strokeWidth={2}
-                                            strokeDasharray="5 4"
-                                            dot={false}
-                                            activeDot={{
-                                                r: 4,
-                                                strokeWidth: 2,
-                                                stroke: 'var(--color-card)',
-                                            }}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <PublishingChart series={series} daily={daily} />
                         ) : (
                             <EmptyState
                                 compact
@@ -263,54 +140,12 @@ export function PlatformAnalyticsView({
                         className={has('posts') ? '' : 'lg:col-span-2'}
                     >
                         {hasSignups ? (
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={series}
-                                        margin={{
-                                            top: 8,
-                                            right: 8,
-                                            left: 0,
-                                            bottom: 0,
-                                        }}
-                                    >
-                                        <CartesianGrid
-                                            vertical={false}
-                                            stroke="var(--color-border)"
-                                            strokeDasharray="2 4"
-                                        />
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={axisTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            interval={tickInterval}
-                                            dy={6}
-                                        />
-                                        <YAxis
-                                            tick={axisTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            allowDecimals={false}
-                                            width={36}
-                                        />
-                                        <Tooltip
-                                            contentStyle={chartTooltipStyle}
-                                            cursor={{
-                                                fill: 'var(--color-muted)',
-                                                opacity: 0.5,
-                                            }}
-                                        />
-                                        <Bar
-                                            dataKey="signups"
-                                            name="Signups"
-                                            fill="var(--color-chart-1)"
-                                            radius={[4, 4, 0, 0]}
-                                            maxBarSize={28}
-                                        />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <CountBarChart
+                                series={series}
+                                daily={daily}
+                                dataKey="signups"
+                                name="Signups"
+                            />
                         ) : (
                             <EmptyState
                                 compact
@@ -332,87 +167,14 @@ export function PlatformAnalyticsView({
                 >
                     <div className="grid gap-6 lg:grid-cols-[1.45fr_1fr]">
                         {hasInvoiced ? (
-                            <div className="h-60 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart
-                                        data={series}
-                                        margin={{
-                                            top: 8,
-                                            right: 8,
-                                            left: 0,
-                                            bottom: 0,
-                                        }}
-                                    >
-                                        <defs>
-                                            <linearGradient
-                                                id="platformInvoiced"
-                                                x1="0"
-                                                y1="0"
-                                                x2="0"
-                                                y2="1"
-                                            >
-                                                <stop
-                                                    offset="0%"
-                                                    stopColor="var(--color-chart-1)"
-                                                    stopOpacity={0.22}
-                                                />
-                                                <stop
-                                                    offset="100%"
-                                                    stopColor="var(--color-chart-1)"
-                                                    stopOpacity={0}
-                                                />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid
-                                            vertical={false}
-                                            stroke="var(--color-border)"
-                                            strokeDasharray="2 4"
-                                        />
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={axisTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            interval={tickInterval}
-                                            dy={6}
-                                        />
-                                        <YAxis
-                                            tick={axisTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            width={56}
-                                            tickFormatter={(amount: number) =>
-                                                formatCurrencyCompact(
-                                                    amount,
-                                                    currency,
-                                                )
-                                            }
-                                        />
-                                        <Tooltip
-                                            contentStyle={chartTooltipStyle}
-                                            formatter={(amount) =>
-                                                formatCurrency(
-                                                    Number(amount),
-                                                    currency,
-                                                )
-                                            }
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="invoiced"
-                                            name="Invoiced"
-                                            stroke="var(--color-chart-1)"
-                                            strokeWidth={2}
-                                            fill="url(#platformInvoiced)"
-                                            activeDot={{
-                                                r: 4,
-                                                strokeWidth: 2,
-                                                stroke: 'var(--color-card)',
-                                            }}
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <AmountAreaChart
+                                series={series}
+                                daily={daily}
+                                dataKey="invoiced"
+                                name="Invoiced"
+                                currency={currency}
+                                gradientId="platformInvoiced"
+                            />
                         ) : (
                             <EmptyState
                                 compact
@@ -457,9 +219,13 @@ export function PlatformAnalyticsView({
                             title="People by role"
                             icon={UsersRound}
                         >
-                            <RoleBars
-                                roles={users.by_role}
+                            <ShareBars
                                 total={users.total}
+                                rows={users.by_role.map((role) => ({
+                                    key: role.role,
+                                    label: role.label,
+                                    value: role.count,
+                                }))}
                             />
                         </Panel>
                     )}
@@ -545,86 +311,6 @@ export function PlatformAnalyticsView({
                 </Panel>
             )}
         </div>
-    );
-}
-
-function MoneyRow({
-    label,
-    totals,
-    currency,
-    hint,
-}: {
-    label: string;
-    totals: CurrencyTotal[];
-    currency: string;
-    hint?: string;
-}) {
-    return (
-        <div className="flex items-baseline justify-between gap-4 py-3 first:pt-0">
-            <dt className="flex flex-col">
-                <span className="eyebrow text-muted-foreground">{label}</span>
-                {hint && (
-                    <span className="text-muted-foreground text-xs">
-                        {hint}
-                    </span>
-                )}
-            </dt>
-            <dd className="font-display text-right text-lg font-bold tabular-nums">
-                {formatCurrencyTotals(totals, currency)}
-            </dd>
-        </div>
-    );
-}
-
-function FigureList({ rows }: { rows: [string, ReactNode][] }) {
-    return (
-        <dl className="divide-border/70 flex flex-col divide-y">
-            {rows.map(([label, value]) => (
-                <div
-                    key={label}
-                    className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
-                >
-                    <dt className="text-muted-foreground text-sm">{label}</dt>
-                    <dd className="font-mono text-sm tabular-nums">{value}</dd>
-                </div>
-            ))}
-        </dl>
-    );
-}
-
-function RoleBars({
-    roles,
-    total,
-}: {
-    roles: { role: string; label: string; count: number }[];
-    total: number;
-}) {
-    return (
-        <ul className="flex flex-col gap-3">
-            {roles.map((role) => {
-                const share = total > 0 ? (role.count / total) * 100 : 0;
-
-                return (
-                    <li key={role.role} className="flex flex-col gap-1.5">
-                        <div className="flex items-baseline justify-between gap-3 text-sm">
-                            <span>{role.label}</span>
-                            <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                                {integer.format(role.count)}
-                            </span>
-                        </div>
-                        <div
-                            className="bg-muted h-1.5 overflow-hidden rounded-full"
-                            role="presentation"
-                        >
-                            <div
-                                className="bg-chart-1 h-full rounded-full"
-                                style={{ width: `${share}%` }}
-                            />
-                        </div>
-                    </li>
-                );
-            })}
-        </ul>
     );
 }
 

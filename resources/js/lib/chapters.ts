@@ -24,6 +24,7 @@ export type ChapterKey =
     | 'calendar'
     | 'clients'
     | 'invoices'
+    | 'analytics'
     | 'staff'
     | 'settings';
 
@@ -102,9 +103,20 @@ export const chapters: Record<ChapterKey, Chapter> = {
         swatch: 'bg-ink dark:bg-cream',
         prefixes: ['/invoices'],
     },
+    // Phase 17: the studio's own analytics. Every staff role sees it (sections are gated inside).
+    analytics: {
+        key: 'analytics',
+        number: '06',
+        title: 'Analytics',
+        summary:
+            'How the studio is tracking — output, approvals, billing and AI.',
+        icon: LineChart,
+        swatch: 'bg-electric',
+        prefixes: ['/analytics'],
+    },
     staff: {
         key: 'staff',
-        number: '06',
+        number: '07',
         title: 'Staff',
         summary: 'The team, their roles and invitations.',
         icon: UsersRound,
@@ -113,7 +125,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     settings: {
         key: 'settings',
-        number: '07',
+        number: '08',
         title: 'Settings',
         summary: 'Profile, security, appearance and organization.',
         icon: Settings2,

@@ -1,5 +1,9 @@
+import type { RangeKey } from '@/components/analytics/format';
 import type { CurrencyTotal } from '@/lib/currency';
-import { formatDateRange } from '@/lib/dates';
+
+// Step 17.4: range presets and labels are shared with the studio's own analytics.
+export type { RangeKey } from '@/components/analytics/format';
+export { describeRange, rangeLabels } from '@/components/analytics/format';
 
 /** Mirrors `App\Support\SuperAdmin\AnalyticsFilters::METRICS`. */
 export type MetricKey =
@@ -9,9 +13,6 @@ export type MetricKey =
     | 'posts'
     | 'revenue'
     | 'ai';
-
-/** Mirrors `AnalyticsFilters::RANGES`. */
-export type RangeKey = '7d' | '30d' | '90d' | '12m' | 'ytd' | 'custom';
 
 export type ResolvedFilters = {
     range: RangeKey;
@@ -92,23 +93,3 @@ export const metricLabels: Record<MetricKey, string> = {
     revenue: 'Billing',
     ai: 'AI usage',
 };
-
-export const rangeLabels: Record<RangeKey, string> = {
-    '7d': '7 days',
-    '30d': '30 days',
-    '90d': '90 days',
-    '12m': '12 months',
-    ytd: 'Year to date',
-    custom: 'Custom',
-};
-
-/** "Last 30 days", "Year to date", or the pinned dates of a custom range. */
-export function describeRange(filters: ResolvedFilters): string {
-    if (filters.range === 'custom') {
-        return formatDateRange(filters.from, filters.to);
-    }
-
-    return filters.range === 'ytd'
-        ? rangeLabels.ytd
-        : `Last ${rangeLabels[filters.range]}`;
-}

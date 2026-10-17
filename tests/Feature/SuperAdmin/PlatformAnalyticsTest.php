@@ -158,23 +158,28 @@ class PlatformAnalyticsTest extends TestCase
 
     public function test_the_per_org_drill_down_is_scoped_to_one_organization(): void
     {
+        // Step 17.9: the drill-down runs the organization's own analytics, every section visible.
         $this->actingAs($this->superAdmin)
             ->get(route('super-admin.organizations.analytics', $this->northlight))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('super-admin/organizations/analytics')
                 ->where('organization.id', $this->northlight->id)
-                ->where('summary.filters.org_ids', [$this->northlight->id])
-                ->where('summary.organizations.total', 1)
-                ->where('summary.users.total', 2)
-                ->where('summary.clients', ['total' => 2, 'active' => 1, 'new' => 2])
+                ->where('summary.scope', 'organization')
+                ->where('summary.organization.name', 'Northlight Studio')
+                ->where('summary.metrics', ['clients', 'posts', 'approvals', 'team', 'revenue', 'ai'])
+                ->where('summary.clients.total', 2)
+                ->where('summary.clients.active', 1)
+                ->where('summary.clients.paused', 1)
+                ->where('summary.team.members', fn ($members) => count($members) === 2)
                 ->where('summary.posts.published', 3)
                 ->where('summary.posts.failed', 1)
                 ->where('summary.revenue.invoiced', [
                     ['currency' => 'USD', 'total' => 1500],
                     ['currency' => 'EUR', 'total' => 300],
                 ])
-                ->has('summary.top_organizations', 1));
+                ->whereNot('summary.ai.cost_estimate', null)
+                ->has('summary.top_clients', 2));
     }
 
     public function test_a_custom_range_and_org_filter_narrow_the_figures(): void

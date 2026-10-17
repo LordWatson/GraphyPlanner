@@ -16,6 +16,7 @@ use App\Models\ClientInvitation;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Organization;
+use App\Models\OrganizationReport;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
@@ -30,6 +31,7 @@ use App\Policies\ClientPolicy;
 use App\Policies\InvoiceItemPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\OrganizationPolicy;
+use App\Policies\OrganizationReportPolicy;
 use App\Policies\PostPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
@@ -135,6 +137,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(StaffInvitation::class, StaffInvitationPolicy::class);
         Gate::policy(User::class, StaffPolicy::class);
         Gate::policy(SuperAdminReport::class, SuperAdminReportPolicy::class);
+        Gate::policy(OrganizationReport::class, OrganizationReportPolicy::class);
     }
 
     /**

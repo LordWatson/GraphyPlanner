@@ -2,6 +2,8 @@
 
 namespace App\Support\SuperAdmin;
 
+use App\Support\Analytics\AnalyticsRange;
+use App\Support\Analytics\AnalyticsScope;
 use Carbon\CarbonImmutable;
 
 /**
@@ -9,34 +11,36 @@ use Carbon\CarbonImmutable;
  * per-org drill-down and saved reports (`super_admin_reports.filters`), so every surface resolves
  * a date range and metric selection the same way.
  *
- * Ranges are relative presets by default (`30d` = the 30 days ending today), so a saved report
- * stays current every time it's run; `custom` pins explicit `from`/`to` dates. The platform has
- * no single timezone, so dates are resolved in UTC.
+ * The date range itself is an `App\Support\Analytics\AnalyticsRange` (Step 17.1, shared with
+ * organization analytics). The platform has no single timezone, so it's always resolved in UTC.
  */
 final readonly class AnalyticsFilters
 {
-    public const RANGES = ['7d', '30d', '90d', '12m', 'ytd', 'custom'];
+    public const RANGES = AnalyticsRange::PRESETS;
 
     public const METRICS = ['organizations', 'users', 'clients', 'posts', 'revenue', 'ai'];
 
-    public const DEFAULT_RANGE = '30d';
+    public const DEFAULT_RANGE = AnalyticsRange::DEFAULT_PRESET;
 
-    /**
-     * Ranges up to this many days are charted per day; anything longer per month.
-     */
-    private const DAILY_SERIES_MAX_DAYS = 62;
+    public string $range;
+
+    public CarbonImmutable $from;
+
+    public CarbonImmutable $to;
 
     /**
      * @param  list<int>  $orgIds  empty = every organization
      * @param  list<string>  $metrics  empty = every metric section
      */
     public function __construct(
-        public string $range,
-        public CarbonImmutable $from,
-        public CarbonImmutable $to,
+        public AnalyticsRange $period,
         public array $orgIds = [],
         public array $metrics = [],
-    ) {}
+    ) {
+        $this->range = $period->preset;
+        $this->from = $period->from;
+        $this->to = $period->to;
+    }
 
     /**
      * Build from user input or a stored report's `filters` JSON. Unknown values fall back to safe
@@ -46,16 +50,6 @@ final readonly class AnalyticsFilters
      */
     public static function fromArray(array $input, ?CarbonImmutable $now = null): self
     {
-        $now = ($now ?? CarbonImmutable::now('UTC'))->setTimezone('UTC');
-        $range = in_array($input['range'] ?? null, self::RANGES, true) ? $input['range'] : self::DEFAULT_RANGE;
-
-        [$from, $to] = self::resolveDates($range, $input['from'] ?? null, $input['to'] ?? null, $now);
-
-        if ($from === null || $to === null) {
-            $range = self::DEFAULT_RANGE;
-            [$from, $to] = self::resolveDates($range, null, null, $now);
-        }
-
         $orgIds = array_values(array_unique(array_map('intval', array_filter(
             (array) ($input['org_ids'] ?? []),
             fn ($id) => is_numeric($id) && (int) $id > 0,
@@ -63,49 +57,7 @@ final readonly class AnalyticsFilters
 
         $metrics = array_values(array_intersect(self::METRICS, (array) ($input['metrics'] ?? [])));
 
-        /** @var CarbonImmutable $from */
-        /** @var CarbonImmutable $to */
-        return new self($range, $from, $to, $orgIds, $metrics);
-    }
-
-    /**
-     * @return array{0: CarbonImmutable|null, 1: CarbonImmutable|null}
-     */
-    private static function resolveDates(string $range, mixed $from, mixed $to, CarbonImmutable $now): array
-    {
-        $end = $now->endOfDay();
-
-        return match ($range) {
-            '7d' => [$end->subDays(6)->startOfDay(), $end],
-            '30d' => [$end->subDays(29)->startOfDay(), $end],
-            '90d' => [$end->subDays(89)->startOfDay(), $end],
-            '12m' => [$end->subMonths(11)->startOfMonth(), $end],
-            'ytd' => [$end->startOfYear(), $end],
-            default => self::customDates($from, $to),
-        };
-    }
-
-    /**
-     * @return array{0: CarbonImmutable|null, 1: CarbonImmutable|null}
-     */
-    private static function customDates(mixed $from, mixed $to): array
-    {
-        if (! is_string($from) || ! is_string($to) || $from === '' || $to === '') {
-            return [null, null];
-        }
-
-        try {
-            $start = CarbonImmutable::createFromFormat('Y-m-d', $from, 'UTC');
-            $end = CarbonImmutable::createFromFormat('Y-m-d', $to, 'UTC');
-        } catch (\Throwable) {
-            return [null, null];
-        }
-
-        if (! $start || ! $end || $start->greaterThan($end)) {
-            return [null, null];
-        }
-
-        return [$start->startOfDay(), $end->endOfDay()];
+        return new self(AnalyticsRange::fromArray($input, 'UTC', $now), $orgIds, $metrics);
     }
 
     /**
@@ -126,7 +78,17 @@ final readonly class AnalyticsFilters
 
     public function granularity(): string
     {
-        return $this->from->diffInDays($this->to) < self::DAILY_SERIES_MAX_DAYS ? 'day' : 'month';
+        return $this->period->granularity();
+    }
+
+    /**
+     * The shared-core scope for a resolved list of organization ids.
+     *
+     * @param  list<int>  $orgIds
+     */
+    public function scope(array $orgIds): AnalyticsScope
+    {
+        return AnalyticsScope::organizations($orgIds);
     }
 
     /**
@@ -134,7 +96,7 @@ final readonly class AnalyticsFilters
      */
     public function forOrganization(int $orgId): self
     {
-        return new self($this->range, $this->from, $this->to, [$orgId], $this->metrics);
+        return new self($this->period, [$orgId], $this->metrics);
     }
 
     /**
@@ -146,9 +108,7 @@ final readonly class AnalyticsFilters
     public function toStoredArray(): array
     {
         return [
-            'range' => $this->range,
-            'from' => $this->range === 'custom' ? $this->from->toDateString() : null,
-            'to' => $this->range === 'custom' ? $this->to->toDateString() : null,
+            ...$this->period->toStoredArray(),
             'org_ids' => $this->orgIds,
             'metrics' => $this->metrics,
         ];
