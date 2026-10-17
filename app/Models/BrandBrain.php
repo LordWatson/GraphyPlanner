@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -59,6 +60,16 @@ class BrandBrain extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Visual references (logo / style / product images) for the AI Image Studio (Step 16.4).
+     *
+     * @return HasMany<BrandBrainReferenceAsset, $this>
+     */
+    public function referenceAssets(): HasMany
+    {
+        return $this->hasMany(BrandBrainReferenceAsset::class)->orderBy('position');
     }
 
     /**

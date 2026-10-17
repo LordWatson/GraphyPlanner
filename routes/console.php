@@ -22,3 +22,7 @@ Schedule::command('social-accounts:check-health')->hourly();
 // Step 2.5: nightly AI "Daily Brief" per active client (trends + fresh post ideas), emailed to
 // Owners/Strategists — idempotent per client/day, see GenerateDailyBriefsAction.
 Schedule::command('ai:generate-daily-briefs')->dailyAt('06:00');
+
+// Step 16.13: deletes files of AI Image Studio variants discarded or never selected after
+// `ai.images.prune_after_days` (30 by default). Images attached to a post are always kept.
+Schedule::command('ai-images:prune')->dailyAt('03:30');

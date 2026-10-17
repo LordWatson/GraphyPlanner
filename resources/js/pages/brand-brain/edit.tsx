@@ -1,5 +1,7 @@
 import { Form, Head } from '@inertiajs/react';
 import { useState } from 'react';
+import { VisualReferences } from '@/components/brand-brain/visual-references';
+import type { ReferenceData } from '@/components/brand-brain/visual-references';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,13 +55,24 @@ const textareaClass =
 export default function BrandBrainEdit({
     client,
     brandBrain,
+    references,
+    referenceRoles,
+    maxReferences,
     can,
 }: {
     client: { id: number; name: string };
     brandBrain: BrandBrainData;
+    references: ReferenceData[];
+    referenceRoles: { value: string; label: string }[];
+    maxReferences: number;
     can: { update: boolean };
 }) {
-    const [activeTab, setActiveTab] = useState('voice');
+    // `#references` deep-links straight to the Visual references tab (from the Image Studio).
+    const [activeTab, setActiveTab] = useState(() =>
+        typeof window !== 'undefined' && window.location.hash === '#references'
+            ? 'references'
+            : 'voice',
+    );
 
     return (
         <>
@@ -81,6 +94,9 @@ export default function BrandBrainEdit({
                         <TabsTrigger value="audience">Audience</TabsTrigger>
                         <TabsTrigger value="offer">Offer</TabsTrigger>
                         <TabsTrigger value="visual">Visual</TabsTrigger>
+                        <TabsTrigger value="references">
+                            Visual references
+                        </TabsTrigger>
                         <TabsTrigger value="music">Music policy</TabsTrigger>
                         <TabsTrigger value="hashtags">
                             Hashtag policy
@@ -530,16 +546,28 @@ export default function BrandBrainEdit({
                                     </div>
                                 </TabsContent>
 
-                                {can.update && activeTab !== 'persona' && (
-                                    <div className="flex items-center gap-4">
-                                        <Button disabled={processing}>
-                                            Save brand brain
-                                        </Button>
-                                    </div>
-                                )}
+                                {can.update &&
+                                    activeTab !== 'persona' &&
+                                    activeTab !== 'references' && (
+                                        <div className="flex items-center gap-4">
+                                            <Button disabled={processing}>
+                                                Save brand brain
+                                            </Button>
+                                        </div>
+                                    )}
                             </>
                         )}
                     </Form>
+
+                    <TabsContent value="references" className="pt-4">
+                        <VisualReferences
+                            clientId={client.id}
+                            initial={references}
+                            roles={referenceRoles}
+                            max={maxReferences}
+                            canUpdate={can.update}
+                        />
+                    </TabsContent>
 
                     <TabsContent value="persona" className="space-y-4 pt-4">
                         {brandBrain.persona_url && (

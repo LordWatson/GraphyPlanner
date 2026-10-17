@@ -6,6 +6,7 @@ use App\Contracts\PublishAdapter;
 use App\Enums\AssetType;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
+use App\Enums\PlatformRolloutStage;
 use App\Models\Asset;
 use App\Models\Organization;
 use App\Models\Post;
@@ -14,7 +15,9 @@ use App\Models\SocialAccount;
 use App\Services\Publishing\UploadPostAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -247,8 +250,8 @@ class UploadPostAdapterTest extends TestCase
      */
     public function test_a_locally_stored_photo_asset_is_attached_as_a_file_instead_of_a_url(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('public');
-        \Illuminate\Support\Facades\Storage::disk('public')->put('assets/photo.jpg', 'fake-image-bytes');
+        Storage::fake('public');
+        Storage::disk('public')->put('assets/photo.jpg', 'fake-image-bytes');
 
         Http::fake([
             '*/upload_photos' => Http::response(['request_id' => 'up-local'], 200),
@@ -307,7 +310,7 @@ class UploadPostAdapterTest extends TestCase
                 && $data['location'] === 'Berlin';
         });
 
-        $this->assertContains('tiktok_is_ai_generated', $results->first()->skippedFields);
+        $this->assertContains('is_ai_generated', $results->first()->skippedFields);
     }
 
     public function test_connect_account_returns_the_vendor_access_url(): void
@@ -542,7 +545,7 @@ class UploadPostAdapterTest extends TestCase
     {
         Http::fake();
 
-        \Illuminate\Support\Facades\Config::set('publishing.rollout.'.\App\Enums\PlatformRolloutStage::TikTok->value, false);
+        Config::set('publishing.rollout.'.PlatformRolloutStage::TikTok->value, false);
 
         $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
         $account = SocialAccount::factory()->for($organization, 'organization')->create([
@@ -566,7 +569,7 @@ class UploadPostAdapterTest extends TestCase
             '*/upload_text' => Http::response(['request_id' => 'up-enabled'], 200),
         ]);
 
-        \Illuminate\Support\Facades\Config::set('publishing.rollout.'.\App\Enums\PlatformRolloutStage::TikTok->value, true);
+        Config::set('publishing.rollout.'.PlatformRolloutStage::TikTok->value, true);
 
         $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
         $account = SocialAccount::factory()->for($organization, 'organization')->create([

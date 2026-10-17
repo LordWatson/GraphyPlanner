@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\AiUsageController;
 use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -28,6 +29,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('settings/organization', [OrganizationController::class, 'edit'])->name('organization.edit');
     Route::put('settings/organization', [OrganizationController::class, 'update'])->name('organization.update');
+
+    // Step 16.11: Owner-only AI usage (images this month vs quota, estimated cost).
+    Route::get('settings/ai-usage', [AiUsageController::class, 'edit'])->name('ai-usage.edit');
+    Route::put('settings/ai-usage', [AiUsageController::class, 'update'])->name('ai-usage.update');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

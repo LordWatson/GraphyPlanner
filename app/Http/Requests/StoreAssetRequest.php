@@ -25,7 +25,8 @@ class StoreAssetRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'source' => ['required', new Enum(AssetSource::class)],
+            // AssetSource::Ai is system-only (the Image Studio creates those rows), never user-submitted.
+            'source' => ['required', (new Enum(AssetSource::class))->except([AssetSource::Ai])],
             'campaign_id' => ['nullable', 'integer', 'exists:campaigns,id'],
             'type' => ['nullable', new Enum(AssetType::class)],
             'file' => [

@@ -1,5 +1,7 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, CalendarClock, Lightbulb } from 'lucide-react';
+import { ImageStudio } from '@/components/image-studio/image-studio';
+import type { ImageStudioData } from '@/components/image-studio/types';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,14 +26,16 @@ type IdeaData = {
 export default function AiPostIdeaShow({
     client,
     idea,
+    imageStudio,
 }: {
     client: { id: number; name: string };
     idea: IdeaData;
+    imageStudio: ImageStudioData | null;
 }) {
     return (
         <>
             <Head title={`${idea.title} — Post idea`} />
-            <Page width="narrow">
+            <Page>
                 <Link
                     href={clientAiTabUrl(client.id)}
                     className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
@@ -70,34 +74,38 @@ export default function AiPostIdeaShow({
                     }
                 />
 
-                <Panel eyebrow="The idea" icon={Lightbulb} title="Concept">
-                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
-                        {idea.description || (
-                            <span className="text-muted-foreground">
-                                No description provided.
-                            </span>
-                        )}
-                    </p>
-                </Panel>
-
-                {(idea.suggestedCaption || idea.suggestedPostAt) && (
-                    <Panel eyebrow="Draft copy" title="Suggested caption">
-                        <div className="flex flex-col gap-4">
-                            {idea.suggestedCaption && (
-                                <p className="border-primary border-l-2 pl-4 text-[15px] leading-relaxed whitespace-pre-wrap">
-                                    {idea.suggestedCaption}
-                                </p>
+                <div className="grid gap-5 lg:grid-cols-[1.45fr_1fr]">
+                    <Panel eyebrow="The idea" icon={Lightbulb} title="Concept">
+                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                            {idea.description || (
+                                <span className="text-muted-foreground">
+                                    No description provided.
+                                </span>
                             )}
-                            {idea.suggestedPostAt && (
-                                <p className="text-muted-foreground inline-flex items-center gap-1.5 font-mono text-xs">
-                                    <CalendarClock className="size-3.5" />
-                                    Suggested posting time:{' '}
-                                    {idea.suggestedPostAt}
-                                </p>
-                            )}
-                        </div>
+                        </p>
                     </Panel>
-                )}
+
+                    {(idea.suggestedCaption || idea.suggestedPostAt) && (
+                        <Panel eyebrow="Draft copy" title="Suggested caption">
+                            <div className="flex flex-col gap-4">
+                                {idea.suggestedCaption && (
+                                    <p className="border-primary border-l-2 pl-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                                        {idea.suggestedCaption}
+                                    </p>
+                                )}
+                                {idea.suggestedPostAt && (
+                                    <p className="text-muted-foreground inline-flex items-center gap-1.5 font-mono text-xs">
+                                        <CalendarClock className="size-3.5" />
+                                        Suggested posting time:{' '}
+                                        {idea.suggestedPostAt}
+                                    </p>
+                                )}
+                            </div>
+                        </Panel>
+                    )}
+                </div>
+
+                {imageStudio && <ImageStudio data={imageStudio} />}
             </Page>
         </>
     );

@@ -3,6 +3,7 @@ import type { PropsWithChildren } from 'react';
 import { Page, PageHeader } from '@/components/page';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
+import { edit as editAiUsage } from '@/routes/ai-usage';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editOrganization } from '@/routes/organization';
 import { edit } from '@/routes/profile';
@@ -38,6 +39,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                   {
                       title: 'Organization',
                       href: editOrganization(),
+                      icon: null,
+                  },
+                  {
+                      title: 'AI usage',
+                      href: editAiUsage(),
                       icon: null,
                   },
               ]

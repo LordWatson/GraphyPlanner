@@ -52,16 +52,25 @@ export function AssetLibraryDialog({
     clientId,
     selected,
     onConfirm,
+    imagesOnly = false,
+    title = 'Asset library',
+    description = 'Pick the media for this post. The number shows the order it will appear in.',
+    confirmLabel = 'Attach',
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     clientId: number;
     selected: AssetData[];
     onConfirm: (assets: AssetData[]) => void;
+    /** Lock the library to images (e.g. Brand Brain visual references, Step 16.4). */
+    imagesOnly?: boolean;
+    title?: string;
+    description?: string;
+    confirmLabel?: string;
 }) {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [type, setType] = useState('all');
+    const [type, setType] = useState(imagesOnly ? 'image' : 'all');
     const [page, setPage] = useState(1);
     const [result, setResult] = useState<LibraryPage | null>(null);
     const [loading, setLoading] = useState(false);
@@ -150,11 +159,8 @@ export function AssetLibraryDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="flex max-h-[90vh] flex-col gap-4 sm:max-w-4xl">
                 <DialogHeader>
-                    <DialogTitle>Asset library</DialogTitle>
-                    <DialogDescription>
-                        Pick the media for this post. The number shows the order
-                        it will appear in.
-                    </DialogDescription>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -170,29 +176,31 @@ export function AssetLibraryDialog({
                             autoFocus
                         />
                     </div>
-                    <ToggleGroup
-                        type="single"
-                        variant="outline"
-                        size="sm"
-                        value={type}
-                        onValueChange={(value) => {
-                            if (value) {
-                                setType(value);
-                                setPage(1);
-                            }
-                        }}
-                        aria-label="Filter by type"
-                    >
-                        {typeFilters.map((filter) => (
-                            <ToggleGroupItem
-                                key={filter.value}
-                                value={filter.value}
-                                className="px-3"
-                            >
-                                {filter.label}
-                            </ToggleGroupItem>
-                        ))}
-                    </ToggleGroup>
+                    {!imagesOnly && (
+                        <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            value={type}
+                            onValueChange={(value) => {
+                                if (value) {
+                                    setType(value);
+                                    setPage(1);
+                                }
+                            }}
+                            aria-label="Filter by type"
+                        >
+                            {typeFilters.map((filter) => (
+                                <ToggleGroupItem
+                                    key={filter.value}
+                                    value={filter.value}
+                                    className="px-3"
+                                >
+                                    {filter.label}
+                                </ToggleGroupItem>
+                            ))}
+                        </ToggleGroup>
+                    )}
                 </div>
 
                 <div className="-mx-1 min-h-[18rem] flex-1 overflow-y-auto px-1 py-1">
@@ -376,8 +384,8 @@ export function AssetLibraryDialog({
                             }}
                         >
                             {draft.length === 0
-                                ? 'Attach none'
-                                : `Attach ${draft.length}`}
+                                ? `${confirmLabel} none`
+                                : `${confirmLabel} ${draft.length}`}
                         </Button>
                     </span>
                 </DialogFooter>

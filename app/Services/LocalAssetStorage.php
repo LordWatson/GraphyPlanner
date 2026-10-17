@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\AssetStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Stores Asset uploads on a Laravel filesystem disk (config('assets.disk'), the
@@ -30,6 +31,30 @@ class LocalAssetStorage implements AssetStorage
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize() ?: 0,
         ];
+    }
+
+    /**
+     * @return array{disk: string, path: string, url: string, mime_type: string|null, size: int}
+     */
+    public function storeContents(string $contents, string $mimeType, string $directory, string $extension): array
+    {
+        $disk = config('assets.disk', 'public');
+        $path = trim($directory, '/').'/'.Str::uuid().'.'.ltrim($extension, '.');
+
+        Storage::disk($disk)->put($path, $contents);
+
+        return [
+            'disk' => $disk,
+            'path' => $path,
+            'url' => $this->url($disk, $path),
+            'mime_type' => $mimeType,
+            'size' => strlen($contents),
+        ];
+    }
+
+    public function contents(string $disk, string $path): ?string
+    {
+        return Storage::disk($disk)->exists($path) ? Storage::disk($disk)->get($path) : null;
     }
 
     public function url(string $disk, string $path): string

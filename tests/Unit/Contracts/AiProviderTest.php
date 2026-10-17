@@ -10,6 +10,8 @@ use App\Services\AI\NullAiProvider;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\Images\AiImageBrief;
+use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
@@ -32,6 +34,11 @@ class AiProviderTest extends TestCase
             public function discoverTrends(Client $client, array $platforms): AiTrends
             {
                 return new AiTrends;
+            }
+
+            public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
+            {
+                return new AiImageBrief(subject: $input->title);
             }
         };
 

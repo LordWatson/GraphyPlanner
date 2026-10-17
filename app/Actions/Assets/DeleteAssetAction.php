@@ -18,7 +18,7 @@ class DeleteAssetAction
     public function __invoke(Asset $asset): void
     {
         DB::transaction(function () use ($asset) {
-            if ($asset->source === AssetSource::Upload && $asset->disk && $asset->path) {
+            if (in_array($asset->source, [AssetSource::Upload, AssetSource::Ai], true) && $asset->disk && $asset->path) {
                 $this->storage->delete($asset->disk, $asset->path);
             }
 

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { AssetLibraryDialog } from '@/components/post-editor/asset-library-dialog';
 import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
 import type { AssetData } from '@/components/post-editor/types';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const tileClass =
@@ -45,6 +46,15 @@ export function MediaPicker({
                         <span className="bg-primary text-primary-foreground absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-full font-mono text-[11px]">
                             {index + 1}
                         </span>
+                        {asset.is_ai_generated && (
+                            <Badge
+                                variant="lilac"
+                                className="absolute bottom-1.5 left-1.5"
+                                title="Made in the AI Image Studio"
+                            >
+                                AI
+                            </Badge>
+                        )}
                         <button
                             type="button"
                             onClick={() =>

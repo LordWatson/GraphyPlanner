@@ -22,10 +22,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
  * @property string|null $xai_key
+ * @property int|null $ai_monthly_image_quota
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
+#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -44,6 +45,7 @@ class Organization extends Model
             'upload_post_webhook_secret' => 'encrypted',
             'xai_key' => 'encrypted',
             'invoice_payment_terms_days' => 'integer',
+            'ai_monthly_image_quota' => 'integer',
         ];
     }
 

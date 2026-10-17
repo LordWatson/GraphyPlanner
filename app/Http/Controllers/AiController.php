@@ -13,6 +13,7 @@ use App\Models\Client;
 use App\Models\Post;
 use App\Services\AI\AiGuardrailService;
 use App\Support\AI\AiPostIdea as AiPostIdeaDto;
+use App\Support\AI\Images\ImageStudioPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -119,11 +120,12 @@ class AiController extends Controller
      * Detail page for a single persisted idea, with a "Turn into draft post" action
      * (`RecommendPostsAction::persist()`) only ever triggered by this explicit, confirmed click.
      */
-    public function showIdea(Request $request, AiPostIdea $aiPostIdea): Response
+    public function showIdea(Request $request, AiPostIdea $aiPostIdea, ImageStudioPresenter $studio): Response
     {
         abort_unless((bool) config('ai.enabled', false), 404);
         $this->authorize('view', $aiPostIdea->client);
         $this->authorizeAiUse($request, $aiPostIdea->org_id);
+        $user = $request->user();
 
         return Inertia::render('clients/ai-post-idea', [
             'client' => ['id' => $aiPostIdea->client->id, 'name' => $aiPostIdea->client->name],
@@ -137,6 +139,9 @@ class AiController extends Controller
                 'post_id' => $aiPostIdea->post_id,
                 'created_at' => $aiPostIdea->created_at?->toDateTimeString(),
             ],
+            // Phase 16: the AI Image Studio lives on the idea page. A closure so the studio's
+            // partial reloads (`only: ['imageStudio']`) stay cheap.
+            'imageStudio' => fn () => $studio->forIdea($aiPostIdea, $user),
         ]);
     }
 

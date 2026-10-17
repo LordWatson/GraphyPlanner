@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\BrandBrains\SyncBrandReferenceAssetsAction;
 use App\Actions\BrandBrains\UpdateBrandBrainAction;
 use App\Actions\BrandBrains\UploadBrandPersonaAction;
+use App\Enums\ReferenceImageRole;
 use App\Http\Requests\UpdateBrandBrainRequest;
+use App\Http\Requests\UpdateBrandReferencesRequest;
 use App\Http\Requests\UploadBrandPersonaRequest;
 use App\Models\BrandBrain;
 use App\Models\Client;
@@ -43,6 +46,22 @@ class BrandBrainController extends Controller
                 'persona_url' => $brandBrain->persona_url,
                 'persona_original_filename' => $brandBrain->persona_original_filename,
             ],
+            // Step 16.4: visual references for the AI Image Studio.
+            'references' => $brandBrain->exists
+                ? $brandBrain->referenceAssets()->with('asset')->get()
+                    ->filter(fn ($reference) => $reference->asset !== null)
+                    ->map(fn ($reference) => [
+                        'asset_id' => $reference->asset_id,
+                        'role' => $reference->role->value,
+                        'url' => $reference->asset?->url,
+                        'original_filename' => $reference->asset?->original_filename,
+                    ])->values()
+                : [],
+            'referenceRoles' => array_map(fn (ReferenceImageRole $role) => [
+                'value' => $role->value,
+                'label' => $role->label(),
+            ], ReferenceImageRole::brandRoles()),
+            'maxReferences' => (int) config('ai.images.max_references', 8),
             'can' => [
                 'update' => $policy->update($request->user(), $client),
             ],
@@ -65,6 +84,18 @@ class BrandBrainController extends Controller
     public function uploadPersona(UploadBrandPersonaRequest $request, Client $client, UploadBrandPersonaAction $action): RedirectResponse
     {
         $action($client, $request->file('persona'));
+
+        return to_route('clients.brand-brain.edit', $client);
+    }
+
+    /**
+     * Save the client's visual references (Step 16.4): ordered, role-tagged client images.
+     */
+    public function updateReferences(UpdateBrandReferencesRequest $request, Client $client, SyncBrandReferenceAssetsAction $action): RedirectResponse
+    {
+        $action($client, $request->user(), $request->validated('references'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Visual references saved.')]);
 
         return to_route('clients.brand-brain.edit', $client);
     }

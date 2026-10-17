@@ -24,7 +24,9 @@ export type StatusKind =
     | 'connection'
     | 'role'
     | 'approval'
-    | 'invitation';
+    | 'invitation'
+    | 'imageGeneration'
+    | 'imageVariant';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -94,6 +96,20 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         accepted: { tone: 'success', label: 'Accepted' },
         revoked: { tone: 'muted', label: 'Revoked' },
         expired: { tone: 'neutral', label: 'Expired' },
+    },
+    // AI Image Studio (Phase 16): a set, and one tile within it.
+    imageGeneration: {
+        queued: { tone: 'neutral', label: 'Queued' },
+        generating: { tone: 'info', label: 'Generating' },
+        ready: { tone: 'success', label: 'Ready' },
+        partially_failed: { tone: 'warning', label: 'Partly ready' },
+        failed: { tone: 'danger', label: 'Failed' },
+    },
+    imageVariant: {
+        queued: { tone: 'neutral', label: 'Queued' },
+        generating: { tone: 'info', label: 'Drafting' },
+        ready: { tone: 'success', label: 'Ready' },
+        failed: { tone: 'danger', label: 'Failed' },
     },
 };
 
