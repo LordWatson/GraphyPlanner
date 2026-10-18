@@ -1,14 +1,13 @@
-import { Form, router } from '@inertiajs/react';
-import { Pencil, Send, Share2 } from 'lucide-react';
-import { useState } from 'react';
-import InputError from '@/components/input-error';
+import { Link, router } from '@inertiajs/react';
+import { Pencil, Plus, Send, Share2 } from 'lucide-react';
+import type { PostTargetAccount } from '@/components/posts/new-post-dialog';
+import { NewPostDialog } from '@/components/posts/new-post-dialog';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { formatSchedule } from '@/lib/dates';
+import { calendar } from '@/routes';
 import { index } from '@/routes/clients';
-import { store as storePost } from '@/routes/clients/posts';
+import { index as postsIndex } from '@/routes/clients/posts';
 import { edit as editPost } from '@/routes/posts';
 import type { ClientPageProps } from '@/components/clients/client-layout';
 import {
@@ -16,7 +15,14 @@ import {
     TabHeading,
     TabPanel,
     platformIcon,
+    platformOptions,
 } from '@/components/clients/client-layout';
+import type { TabFilterOption } from '@/components/clients/tab-filters';
+import {
+    TabSearchFilter,
+    TabSelectFilter,
+    visitClientTab,
+} from '@/components/clients/tab-filters';
 import type { Paginated } from '@/components/pagination';
 import { Pagination } from '@/components/pagination';
 
@@ -43,215 +49,131 @@ type PostData = {
     can: { update: boolean; delete: boolean };
 };
 
-type TargetAccountData = {
-    id: number;
-    platform: string;
-    handle: string;
-    timezone: string;
+type PostFilters = {
+    search: string | null;
+    status: string | null;
+    campaign: number | null;
+    platform: string | null;
 };
 
 /**
- * Step I-2.4 — Posts tab (`clients.posts.index`), paginated newest first.
+ * Step I-2.4 — Posts tab (`clients.posts.index`), paginated newest first and filtered server-side
+ * by caption search, status, campaign and channel.
  */
 export default function ClientPostsTab({
     posts: postPage,
+    filters,
+    filterOptions,
     targetAccounts,
     ...page
 }: ClientPageProps & {
     posts: Paginated<PostData>;
-    targetAccounts: TargetAccountData[];
+    filters: PostFilters;
+    filterOptions: {
+        statuses: TabFilterOption[];
+        campaigns: TabFilterOption[];
+    };
+    targetAccounts: PostTargetAccount[];
 }) {
     const { client, can } = page;
     const posts = postPage.data;
-    const [selectedTargetAccounts, setSelectedTargetAccounts] = useState<
-        number[]
-    >([]);
-
-    const toggleTargetAccount = (id: number) => {
-        setSelectedTargetAccounts((current) =>
-            current.includes(id)
-                ? current.filter((accountId) => accountId !== id)
-                : [...current, id],
-        );
-    };
-
+    const filtered =
+        filters.search !== null ||
+        filters.status !== null ||
+        filters.campaign !== null ||
+        filters.platform !== null;
+    const visit = (changes: Partial<PostFilters> & { page?: number }) =>
+        visitClientTab(postsIndex(client.id).url, filters, changes, [
+            'posts',
+            'filters',
+        ]);
     return (
         <ClientLayout {...page}>
             <TabPanel>
-                <TabHeading
-                    icon={Send}
-                    title="Posts"
-                    description="Scheduled content across social accounts"
-                />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <TabHeading
+                        icon={Send}
+                        title="Posts"
+                        description="Scheduled content across social accounts"
+                    />
+                    <div className="flex items-center gap-2">
+                        <Button size="sm" variant="ghost" asChild>
+                            <Link
+                                href={calendar({
+                                    query: { client_id: client.id },
+                                })}
+                            >
+                                View calendar
+                            </Link>
+                        </Button>
+                        {can.createPost && (
+                            <NewPostDialog
+                                clientId={client.id}
+                                targetAccounts={targetAccounts}
+                                campaigns={filterOptions.campaigns}
+                                trigger={
+                                    <Button size="sm">
+                                        <Plus />
+                                        New post
+                                    </Button>
+                                }
+                            />
+                        )}
+                    </div>
+                </div>
 
                 <>
                     <>
-                        {can.createPost && (
-                            <Form
-                                {...storePost.form(client.id)}
-                                resetOnSuccess
-                                onSuccess={() => setSelectedTargetAccounts([])}
-                                className="border-border bg-card/50 grid grid-cols-2 gap-3 rounded-2xl border border-dashed p-4 shadow-sm sm:grid-cols-4"
-                            >
-                                {({ processing, errors }) => (
-                                    <>
-                                        <div className="col-span-full grid gap-1">
-                                            <Label htmlFor="master_caption">
-                                                Caption
-                                            </Label>
-                                            <textarea
-                                                id="master_caption"
-                                                name="master_caption"
-                                                rows={3}
-                                                className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-                                            />
-                                            <InputError
-                                                message={errors.master_caption}
-                                            />
-                                        </div>
-                                        <div className="col-span-full grid gap-1">
-                                            <Label>Target accounts</Label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {targetAccounts.length ===
-                                                    0 && (
-                                                    <p className="text-muted-foreground text-sm">
-                                                        Add a social account
-                                                        before creating posts.
-                                                    </p>
-                                                )}
-                                                {targetAccounts.map(
-                                                    (account) => {
-                                                        const AccountIcon =
-                                                            platformIcon[
-                                                                account.platform
-                                                            ] ?? Share2;
-                                                        const selected =
-                                                            selectedTargetAccounts.includes(
-                                                                account.id,
-                                                            );
-                                                        return (
-                                                            <button
-                                                                key={account.id}
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    toggleTargetAccount(
-                                                                        account.id,
-                                                                    )
-                                                                }
-                                                                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                                                                    selected
-                                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                                        : 'border-border bg-muted/50 text-foreground'
-                                                                }`}
-                                                            >
-                                                                <AccountIcon className="size-3.5" />
-                                                                {account.handle}{' '}
-                                                                ·{' '}
-                                                                {
-                                                                    account.timezone
-                                                                }
-                                                            </button>
-                                                        );
-                                                    },
-                                                )}
-                                            </div>
-                                            {selectedTargetAccounts.map(
-                                                (accountId, i) => (
-                                                    <input
-                                                        key={accountId}
-                                                        type="hidden"
-                                                        name={`targets[${i}][social_account_id]`}
-                                                        value={accountId}
-                                                    />
-                                                ),
-                                            )}
-                                        </div>
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="scheduled_local_date">
-                                                Scheduled date
-                                            </Label>
-                                            <Input
-                                                id="scheduled_local_date"
-                                                type="date"
-                                                onChange={(e) => {
-                                                    document
-                                                        .querySelectorAll<HTMLInputElement>(
-                                                            'input[name$="[scheduled_local_date]"]',
-                                                        )
-                                                        .forEach(
-                                                            (input) =>
-                                                                (input.value =
-                                                                    e.target.value),
-                                                        );
-                                                }}
-                                            />
-                                            {selectedTargetAccounts.map(
-                                                (accountId, i) => (
-                                                    <input
-                                                        key={accountId}
-                                                        type="hidden"
-                                                        name={`targets[${i}][scheduled_local_date]`}
-                                                    />
-                                                ),
-                                            )}
-                                        </div>
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="scheduled_local_time">
-                                                Scheduled time (local)
-                                            </Label>
-                                            <Input
-                                                id="scheduled_local_time"
-                                                type="time"
-                                                onChange={(e) => {
-                                                    document
-                                                        .querySelectorAll<HTMLInputElement>(
-                                                            'input[name$="[scheduled_local_time]"]',
-                                                        )
-                                                        .forEach(
-                                                            (input) =>
-                                                                (input.value =
-                                                                    e.target.value),
-                                                        );
-                                                }}
-                                            />
-                                            {selectedTargetAccounts.map(
-                                                (accountId, i) => (
-                                                    <input
-                                                        key={accountId}
-                                                        type="hidden"
-                                                        name={`targets[${i}][scheduled_local_time]`}
-                                                    />
-                                                ),
-                                            )}
-                                        </div>
-                                        <InputError
-                                            message={
-                                                errors[
-                                                    'targets.0.social_account_id'
-                                                ]
-                                            }
-                                        />
-                                        <div className="col-span-full">
-                                            <Button
-                                                type="submit"
-                                                size="sm"
-                                                disabled={
-                                                    processing ||
-                                                    selectedTargetAccounts.length ===
-                                                        0
-                                                }
-                                            >
-                                                Create post
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                            </Form>
-                        )}
+                        <div className="flex flex-wrap gap-3">
+                            <TabSearchFilter
+                                id="posts-search"
+                                label="Search captions"
+                                placeholder="Search captions"
+                                value={filters.search}
+                                onSearch={(search) => visit({ search })}
+                            />
+                            <TabSelectFilter
+                                id="posts-status-filter"
+                                label="Filter by status"
+                                allLabel="All statuses"
+                                value={filters.status}
+                                options={filterOptions.statuses}
+                                onChange={(status) => visit({ status })}
+                            />
+                            <TabSelectFilter
+                                id="posts-campaign-filter"
+                                label="Filter by campaign"
+                                allLabel="All campaigns"
+                                value={
+                                    filters.campaign === null
+                                        ? null
+                                        : String(filters.campaign)
+                                }
+                                options={filterOptions.campaigns}
+                                onChange={(campaign) =>
+                                    visit({
+                                        campaign:
+                                            campaign === null
+                                                ? null
+                                                : Number(campaign),
+                                    })
+                                }
+                            />
+                            <TabSelectFilter
+                                id="posts-platform-filter"
+                                label="Filter by channel"
+                                allLabel="All channels"
+                                value={filters.platform}
+                                options={platformOptions}
+                                onChange={(platform) => visit({ platform })}
+                            />
+                        </div>
 
                         {posts.length === 0 ? (
                             <p className="text-muted-foreground text-sm">
-                                No posts yet.
+                                {filtered
+                                    ? 'No posts match the current filters.'
+                                    : 'No posts yet.'}
                             </p>
                         ) : (
                             <div className="grid gap-3">
@@ -327,16 +249,16 @@ export default function ClientPostsTab({
                                 ))}
                             </div>
                         )}
+
+                        <Pagination
+                            className="pt-2"
+                            page={postPage}
+                            label="posts"
+                            onPageChange={(page) => visit({ page })}
+                        />
                     </>
                 </>
             </TabPanel>
-            <Pagination
-                page={postPage}
-                label="posts"
-                onPageChange={(page) =>
-                    router.reload({ data: { page }, only: ['posts'] })
-                }
-            />
         </ClientLayout>
     );
 }

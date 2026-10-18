@@ -1,4 +1,4 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Plus, Receipt } from 'lucide-react';
 import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,14 @@ import type {
     InvoiceAbilities,
     InvoiceRow,
 } from '@/components/invoices/types';
-import { index } from '@/routes/clients';
+import { billing, index } from '@/routes/clients';
 import { index as invoicesIndex } from '@/routes/invoices';
 import type { ClientPageProps } from '@/components/clients/client-layout';
+import {
+    TabSearchFilter,
+    TabSegmentedFilter,
+    visitClientTab,
+} from '@/components/clients/tab-filters';
 import {
     ClientLayout,
     TabHeading,
@@ -26,19 +31,43 @@ import { Pagination } from '@/components/pagination';
 
 type InvoiceData = InvoiceRow & { can: InvoiceAbilities };
 
+type BillingFilters = {
+    search: string | null;
+    status: string | null;
+};
+
+// The org ledger's status filters (`InvoiceLedgerService::STATUS_FILTERS`), in workflow order.
+const statusFilters = [
+    { value: null, label: 'All' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'outstanding', label: 'Outstanding' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'paid', label: 'Paid' },
+    { value: 'void', label: 'Void' },
+];
+
 /**
- * Step I-2.4 — Billing tab (`clients.billing`), paginated by issue date.
+ * Step I-2.4 — Billing tab (`clients.billing`), paginated by issue date and filtered server-side
+ * by status and invoice number/description search.
  */
 export default function ClientBillingTab({
     invoices: invoicePage,
+    filters,
     currencies,
     ...page
 }: ClientPageProps & {
     invoices: Paginated<InvoiceData>;
+    filters: BillingFilters;
     currencies: CurrencyOption[];
 }) {
     const { client, can } = page;
     const invoices = invoicePage.data;
+    const filtered = filters.search !== null || filters.status !== null;
+    const visit = (changes: Partial<BillingFilters> & { page?: number }) =>
+        visitClientTab(billing(client.id).url, filters, changes, [
+            'invoices',
+            'filters',
+        ]);
     const { currency } = usePage<{ currency: string }>().props;
 
     return (
@@ -82,13 +111,35 @@ export default function ClientBillingTab({
                     </div>
                 </div>
 
-                {invoices.length === 0 ? (
-                    <EmptyState
-                        compact
-                        icon={Receipt}
-                        title="Nothing billed yet."
-                        description="Start a draft, add what you delivered, and send it when it's ready."
+                <div className="flex flex-wrap gap-3">
+                    <TabSegmentedFilter
+                        label="Filter by status"
+                        value={filters.status}
+                        options={statusFilters}
+                        onChange={(status) => visit({ status })}
                     />
+                    <TabSearchFilter
+                        id="invoices-search"
+                        label="Search invoices"
+                        placeholder="Number or description"
+                        value={filters.search}
+                        onSearch={(search) => visit({ search })}
+                    />
+                </div>
+
+                {invoices.length === 0 ? (
+                    filtered ? (
+                        <p className="text-muted-foreground text-sm">
+                            No invoices match the current filters.
+                        </p>
+                    ) : (
+                        <EmptyState
+                            compact
+                            icon={Receipt}
+                            title="Nothing billed yet."
+                            description="Start a draft, add what you delivered, and send it when it's ready."
+                        />
+                    )
                 ) : (
                     <InvoiceLedgerList
                         invoices={invoices}
@@ -122,14 +173,14 @@ export default function ClientBillingTab({
                         }}
                     />
                 )}
+
+                <Pagination
+                    className="pt-2"
+                    page={invoicePage}
+                    label="invoices"
+                    onPageChange={(page) => visit({ page })}
+                />
             </TabPanel>
-            <Pagination
-                page={invoicePage}
-                label="invoices"
-                onPageChange={(page) =>
-                    router.reload({ data: { page }, only: ['invoices'] })
-                }
-            />
         </ClientLayout>
     );
 }

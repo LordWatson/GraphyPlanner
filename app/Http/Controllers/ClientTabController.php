@@ -3,12 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Clients\BuildClientPageHeaderAction;
+use App\Actions\Posts\ListClientPostsAction;
+use App\Enums\PostStatus;
+use App\Http\Requests\ClientBillingTabRequest;
+use App\Http\Requests\ClientPostsTabRequest;
 use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\ClientInvitation;
+use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
+use App\Services\InvoiceLedgerService;
 use App\Support\Clients\ClientTabPresenter;
 use App\Support\Options\CurrencyOptions;
 use Illuminate\Http\Request;
@@ -24,21 +30,30 @@ class ClientTabController extends Controller
 {
     public const PER_PAGE = 25;
 
+    public const INVOICES_PER_PAGE = 8;
+
     public function __construct(private readonly BuildClientPageHeaderAction $header) {}
 
-    public function posts(Request $request, Client $client): Response
+    /**
+     * Posts are filtered (caption search, status, campaign, channel) and paged in SQL.
+     */
+    public function posts(ClientPostsTabRequest $request, Client $client, ListClientPostsAction $listPosts): Response
     {
-        $this->authorize('viewAny', [Post::class, $client]);
         $user = $request->user();
+        $filters = $request->filters();
 
         return Inertia::render('clients/tabs/posts', [
             ...($this->header)($client, $user, 'posts'),
-            'posts' => $client->posts()
-                ->with(['targets.socialAccount', 'campaign'])
-                ->latest()
-                ->latest('id')
-                ->paginate(self::PER_PAGE)
+            'posts' => $listPosts($client, $filters)
                 ->through(fn (Post $post) => ClientTabPresenter::post($post, $user)),
+            'filters' => $filters,
+            'filterOptions' => [
+                'statuses' => array_map(fn (PostStatus $status) => ['value' => $status->value, 'label' => $status->label()], PostStatus::cases()),
+                'campaigns' => $client->campaigns()
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn (Campaign $campaign) => ['value' => (string) $campaign->id, 'label' => $campaign->name]),
+            ],
             'targetAccounts' => $client->socialAccounts()
                 ->latest()
                 ->get()
@@ -74,19 +89,23 @@ class ClientTabController extends Controller
         ]);
     }
 
-    public function billing(Request $request, Client $client): Response
+    /**
+     * Invoices go through the org ledger's query (scoped to this client), so the tab's status
+     * filters — including the derived `overdue` / `outstanding` — mean the same as on the ledger.
+     */
+    public function billing(ClientBillingTabRequest $request, Client $client, InvoiceLedgerService $ledger): Response
     {
-        $this->authorize('viewBilling', $client);
         $user = $request->user();
+        $filters = $request->filters();
 
         return Inertia::render('clients/tabs/billing', [
             ...($this->header)($client, $user, 'billing'),
-            'invoices' => $client->invoices()
-                ->with(['items', 'client'])
-                ->latest('issue_date')
-                ->latest('id')
-                ->paginate(self::PER_PAGE)
-                ->through(fn ($invoice) => ClientTabPresenter::invoice($invoice, $user)),
+            'invoices' => $ledger->query($client->org_id, [...$filters, 'client_id' => $client->id])
+                ->with('items')
+                ->paginate(self::INVOICES_PER_PAGE)
+                ->withQueryString()
+                ->through(fn (Invoice $invoice) => ClientTabPresenter::invoice($invoice, $user)),
+            'filters' => $filters,
             // Billing currencies offered by the "New invoice" dialog.
             'currencies' => CurrencyOptions::options(),
         ]);

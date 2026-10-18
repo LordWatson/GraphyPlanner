@@ -3,6 +3,8 @@
 namespace Tests\Feature\Clients;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\Platform;
+use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\AiTrend;
 use App\Models\Asset;
@@ -12,6 +14,7 @@ use App\Models\ClientInvitation;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,7 +82,7 @@ class ClientTabsTest extends TestCase
         ClientInvitation::factory()->for($this->client)->create();
 
         $tabs = [
-            ['clients.posts.index', 'clients/tabs/posts', 'posts', 25, 30],
+            ['clients.posts.index', 'clients/tabs/posts', 'posts', 8, 30],
             ['clients.campaigns.index', 'clients/tabs/campaigns', 'campaigns', 2, 2],
             ['clients.billing', 'clients/tabs/billing', 'invoices', 2, 2],
             ['clients.portal-access', 'clients/tabs/portal-access', 'invitations', 1, 1],
@@ -99,7 +102,104 @@ class ClientTabsTest extends TestCase
 
         $this->actingAs($this->owner)
             ->get(route('clients.posts.index', [$this->client, 'page' => 2]))
-            ->assertInertia(fn ($page) => $page->has('posts.data', 5)->has('targetAccounts'));
+            ->assertInertia(fn ($page) => $page->has('posts.data', 8)->where('posts.current_page', 2)->has('targetAccounts'));
+    }
+
+    public function test_the_posts_tab_filters_by_search_status_campaign_and_channel(): void
+    {
+        $campaign = Campaign::factory()->for($this->client)->create(['org_id' => $this->org->id, 'name' => 'Summer']);
+        $instagram = SocialAccount::factory()->for($this->client)->create(['org_id' => $this->org->id, 'platform' => Platform::Instagram]);
+        $tiktok = SocialAccount::factory()->for($this->client)->create(['org_id' => $this->org->id, 'platform' => Platform::TikTok]);
+
+        $launch = Post::factory()->for($this->client)->create(['org_id' => $this->org->id, 'master_caption' => 'Big LAUNCH day', 'status' => PostStatus::Draft, 'campaign_id' => $campaign->id]);
+        $scheduled = Post::factory()->for($this->client)->create(['org_id' => $this->org->id, 'master_caption' => 'Behind the scenes', 'status' => PostStatus::Scheduled]);
+        $percent = Post::factory()->for($this->client)->create(['org_id' => $this->org->id, 'master_caption' => '50% off', 'status' => PostStatus::Draft]);
+        PostTarget::factory()->create(['post_id' => $launch->id, 'social_account_id' => $instagram->id]);
+        PostTarget::factory()->create(['post_id' => $scheduled->id, 'social_account_id' => $tiktok->id]);
+
+        $ids = fn (array $query) => $this->listedIds('clients.posts.index', 'posts', $query);
+
+        $this->assertSame([$launch->id], $ids(['search' => 'launch']));
+        // `%` is matched literally, not as a wildcard.
+        $this->assertSame([$percent->id], $ids(['search' => '%']));
+        $this->assertSame([$scheduled->id], $ids(['status' => 'scheduled']));
+        $this->assertSame([$launch->id], $ids(['campaign' => $campaign->id]));
+        $this->assertSame([$scheduled->id], $ids(['platform' => 'tiktok']));
+        $this->assertSame([$launch->id, $percent->id], $ids(['status' => 'draft']));
+        $this->assertSame([], $ids(['status' => 'draft', 'platform' => 'tiktok']));
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.posts.index', [$this->client, 'status' => 'scheduled', 'search' => ' scenes ']))
+            ->assertInertia(fn ($page) => $page
+                ->where('filters', ['search' => 'scenes', 'status' => 'scheduled', 'campaign' => null, 'platform' => null])
+                ->where('filterOptions.campaigns', [['value' => (string) $campaign->id, 'label' => 'Summer']])
+                ->has('filterOptions.statuses', count(PostStatus::cases())));
+    }
+
+    public function test_the_posts_tab_never_lists_another_clients_posts(): void
+    {
+        $other = Client::factory()->for($this->org, 'organization')->create();
+        $otherCampaign = Campaign::factory()->for($other)->create(['org_id' => $this->org->id]);
+        Post::factory()->for($other)->create(['org_id' => $this->org->id, 'campaign_id' => $otherCampaign->id]);
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.posts.index', [$this->client, 'campaign' => $otherCampaign->id]))
+            ->assertInertia(fn ($page) => $page->has('posts.data', 0)->has('filterOptions.campaigns', 0));
+    }
+
+    public function test_the_posts_tab_rejects_unknown_filter_values(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('clients.posts.index', [$this->client, 'status' => 'bogus', 'platform' => 'myspace']))
+            ->assertSessionHasErrors(['status', 'platform']);
+    }
+
+    public function test_the_billing_tab_pages_by_eight_and_filters_by_status_and_search(): void
+    {
+        Invoice::factory()->for($this->client)->count(9)->create(['org_id' => $this->org->id]);
+        $overdue = Invoice::factory()->for($this->client)->create(['org_id' => $this->org->id, 'status' => InvoiceStatus::Sent, 'due_date' => now()->subWeek(), 'invoice_number' => 'INV-OVERDUE']);
+        $sent = Invoice::factory()->for($this->client)->create(['org_id' => $this->org->id, 'status' => InvoiceStatus::Sent, 'due_date' => now()->addWeek(), 'description' => 'Retainer for October']);
+        $paid = Invoice::factory()->for($this->client)->create(['org_id' => $this->org->id, 'status' => InvoiceStatus::Paid, 'paid_at' => now()]);
+        // Another client's invoice must never leak into this tab.
+        Invoice::factory()->for(Client::factory()->for($this->org, 'organization'))->create(['org_id' => $this->org->id, 'status' => InvoiceStatus::Paid]);
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.billing', $this->client))
+            ->assertInertia(fn ($page) => $page
+                ->has('invoices.data', 8)
+                ->where('invoices.total', 12)
+                ->where('filters', ['search' => null, 'status' => null]));
+
+        $ids = fn (array $query) => $this->listedIds('clients.billing', 'invoices', $query);
+
+        $this->assertSame([$overdue->id], $ids(['status' => 'overdue']));
+        $this->assertSame([$overdue->id, $sent->id], $ids(['status' => 'outstanding']));
+        $this->assertSame([$paid->id], $ids(['status' => 'paid']));
+        $this->assertSame([$overdue->id], $ids(['search' => 'inv-overdue']));
+        $this->assertSame([$sent->id], $ids(['search' => 'october', 'status' => 'sent']));
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.billing', [$this->client, 'status' => 'bogus']))
+            ->assertSessionHasErrors('status');
+    }
+
+    /**
+     * The sorted ids of the rows a tab lists for the given query string.
+     *
+     * @param  array<string, mixed>  $query
+     * @return list<int>
+     */
+    private function listedIds(string $route, string $prop, array $query): array
+    {
+        $rows = $this->actingAs($this->owner)
+            ->get(route($route, [$this->client, ...$query]))
+            ->assertOk()
+            ->viewData('page')['props'][$prop]['data'];
+
+        $ids = array_column($rows, 'id');
+        sort($ids);
+
+        return $ids;
     }
 
     /**
@@ -185,7 +285,7 @@ class ClientTabsTest extends TestCase
         $this->assertLessThan(100_000, strlen((string) json_encode($overview->viewData('page')['props'])));
 
         $posts = $this->actingAs($this->owner)->get(route('clients.posts.index', $this->client));
-        $posts->assertInertia(fn ($page) => $page->has('posts.data', 25)->where('posts.total', 2000));
+        $posts->assertInertia(fn ($page) => $page->has('posts.data', 8)->where('posts.total', 2000));
         $this->assertLessThan(100_000, strlen((string) json_encode($posts->viewData('page')['props'])));
     }
 }
