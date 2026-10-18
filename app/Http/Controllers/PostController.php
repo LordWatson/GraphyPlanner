@@ -27,6 +27,7 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Services\ClientHashtagService;
 use App\Services\PostNotificationService;
 use App\Support\AI\Images\ImageStudioPresenter;
 use Illuminate\Http\JsonResponse;
@@ -45,7 +46,7 @@ class PostController extends Controller
     {
         $action($client, $request->validated());
 
-        return to_route('clients.show', $client);
+        return to_route('clients.posts.index', $client);
     }
 
     /**
@@ -59,11 +60,14 @@ class PostController extends Controller
         EvaluatePostChecklistAction $evaluateChecklist,
         PostNotificationService $notifications,
         ImageStudioPresenter $studio,
+        ClientHashtagService $hashtags,
     ): Response {
         $this->authorize('view', $post);
 
         $user = $request->user();
         $post->load([
+            // Step I-2.6: the editor reads the client and its brand brain (hashtag policy).
+            'client.brandBrain',
             'targets.socialAccount',
             'assets',
             'campaign',
@@ -79,7 +83,7 @@ class PostController extends Controller
             fn (PostStatus $to) => $user->can('transition', [$post, $to]),
         ));
 
-        $hashtagSuggestions = $this->hashtagSuggestions($client);
+        $hashtagSuggestions = $this->hashtagSuggestions($client, $hashtags);
         $mentionableUsers = $notifications->mentionableRecipients($post, exclude: $user);
 
         return Inertia::render('posts/edit', [
@@ -185,7 +189,7 @@ class PostController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Post deleted.')]);
 
-        return to_route('clients.show', $clientId);
+        return to_route('clients.posts.index', $clientId);
     }
 
     /**
@@ -287,21 +291,16 @@ class PostController extends Controller
 
     /**
      * Build the hashtag autocomplete list (Instagram-style tag picker) shown in the editor: the
-     * client's `BrandBrain` `hashtag_policy.always_use` list plus every hashtag already used
-     * across the client's other posts, deduped and capped so the suggestion list stays useful.
+     * client's `BrandBrain` `hashtag_policy.always_use` list, then (Step I-2.6) the client's
+     * top tags by usage and recency from `client_hashtags`, deduped and capped at 50.
      *
      * @return array<int, string>
      */
-    private function hashtagSuggestions(Client $client): array
+    private function hashtagSuggestions(Client $client, ClientHashtagService $hashtags): array
     {
         $fromBrandBrain = collect($client->brandBrain?->hashtag_policy['always_use'] ?? []);
 
-        $fromPosts = $client->posts()
-            ->whereNotNull('hashtags')
-            ->pluck('hashtags')
-            ->flatten();
-
-        return $fromBrandBrain->merge($fromPosts)
+        return $fromBrandBrain->merge($hashtags->suggestions($client))
             ->map(fn ($tag) => ltrim(trim((string) $tag), '#'))
             ->filter(fn ($tag) => $tag !== '')
             ->unique()

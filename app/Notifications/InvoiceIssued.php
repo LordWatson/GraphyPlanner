@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Invoice;
 use App\Support\MoneyFormatter;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -21,6 +22,16 @@ class InvoiceIssued extends Notification implements ShouldQueue
         private readonly Invoice $invoice,
         private readonly bool $isReminder = false,
     ) {}
+
+    /**
+     * Step I-2.8: bell notifications and mail each run on their own queue.
+     *
+     * @return array<string, string>
+     */
+    public function viaQueues(): array
+    {
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+    }
 
     /**
      * @return array<int, string>

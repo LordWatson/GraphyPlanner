@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\SharedPropsCache;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -48,6 +49,7 @@ class NotificationController extends Controller
 
         if (! $model->read_at) {
             $model->markAsRead();
+            SharedPropsCache::forgetUnreadNotifications($request->user()->id);
         }
 
         return redirect($model->data['url'] ?? route('dashboard'));
@@ -59,6 +61,7 @@ class NotificationController extends Controller
     public function readAll(Request $request): RedirectResponse
     {
         $request->user()->unreadNotifications()->update(['read_at' => now()]);
+        SharedPropsCache::forgetUnreadNotifications($request->user()->id);
 
         return back();
     }

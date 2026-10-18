@@ -256,7 +256,7 @@ class InvoiceLifecycleTest extends TestCase
 
         $this->actingAs($this->owner)->delete(route('invoices.destroy', $sent))->assertSessionHasErrors('status');
         $this->actingAs($this->owner)->delete(route('invoices.destroy', $paid))->assertSessionHasErrors('status');
-        $this->actingAs($this->owner)->delete(route('invoices.destroy', $void))->assertRedirect(route('clients.show', $this->client));
+        $this->actingAs($this->owner)->delete(route('invoices.destroy', $void))->assertRedirect(route('clients.billing', $this->client));
 
         $this->assertModelExists($sent);
         $this->assertModelExists($paid);

@@ -65,7 +65,7 @@ class ClientArchiveTest extends TestCase
 
         // …and the client is gone from the roster and its pages.
         $this->actingAs($this->owner)->get(route('clients.index'))
-            ->assertInertia(fn ($page) => $page->has('clients', 0)->where('archivedCount', 1));
+            ->assertInertia(fn ($page) => $page->has('clients.data', 0)->where('archivedCount', 1));
         $this->actingAs($this->owner)->get(route('clients.show', $this->client))->assertNotFound();
     }
 
@@ -76,8 +76,8 @@ class ClientArchiveTest extends TestCase
         $this->actingAs($this->owner)->get(route('clients.index', ['archived' => 1]))
             ->assertInertia(fn ($page) => $page
                 ->where('filters.archived', true)
-                ->has('clients', 1)
-                ->where('clients.0.id', $this->client->id));
+                ->has('clients.data', 1)
+                ->where('clients.data.0.id', $this->client->id));
 
         $this->actingAs($this->owner)
             ->post(route('clients.restore', $this->client))

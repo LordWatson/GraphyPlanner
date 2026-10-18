@@ -3,13 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\ConnectionStatus;
+use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class HomeControllerTest extends TestCase
@@ -58,8 +62,8 @@ class HomeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('items.failedPublishes', 1)
-            ->where('items.failedPublishes.0.post_id', $post->id)
+            ->has('items.failedPublishes.items', 1)
+            ->where('items.failedPublishes.items.0.post_id', $post->id)
         );
     }
 
@@ -90,9 +94,9 @@ class HomeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('items.internalReviews', 1)
-            ->where('items.internalReviews.0.post_id', $post->id)
-            ->where('items.internalReviews.0.reason', 'Waiting on internal review')
+            ->has('items.internalReviews.items', 1)
+            ->where('items.internalReviews.items.0.post_id', $post->id)
+            ->where('items.internalReviews.items.0.reason', 'Waiting on internal review')
         );
     }
 
@@ -111,8 +115,8 @@ class HomeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('items.waitingApprovals', 1)
-            ->where('items.waitingApprovals.0.post_id', $post->id)
+            ->has('items.waitingApprovals.items', 1)
+            ->where('items.waitingApprovals.items.0.post_id', $post->id)
         );
     }
 
@@ -137,8 +141,8 @@ class HomeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('items.missingMedia', 1)
-            ->where('items.missingMedia.0.post_id', $post->id)
+            ->has('items.missingMedia.items', 1)
+            ->where('items.missingMedia.items.0.post_id', $post->id)
         );
     }
 
@@ -163,8 +167,8 @@ class HomeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('items.disconnectedAccounts', 1)
-            ->where('items.disconnectedAccounts.0.account_id', $account->id)
+            ->has('items.disconnectedAccounts.items', 1)
+            ->where('items.disconnectedAccounts.items.0.account_id', $account->id)
         );
     }
 
@@ -186,5 +190,79 @@ class HomeControllerTest extends TestCase
         $response = $this->get(route('needs-attention'));
         $response->assertRedirect(route('portal.dashboard'));
         $this->assertFalse($reviewer->can('viewHome', Post::class));
+    }
+
+    public function test_missing_media_follows_the_checklist_text_only_rule(): void
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+        $linkedIn = SocialAccount::factory()->for($client)->create(['org_id' => $user->org_id, 'platform' => Platform::LinkedIn]);
+        $instagram = SocialAccount::factory()->for($client)->create(['org_id' => $user->org_id, 'platform' => Platform::Instagram]);
+
+        $textOnly = Post::factory()->for($client)->create(['org_id' => $user->org_id, 'status' => PostStatus::Draft]);
+        PostTarget::factory()->create(['post_id' => $textOnly->id, 'social_account_id' => $linkedIn->id]);
+
+        $mixed = Post::factory()->for($client)->create(['org_id' => $user->org_id, 'status' => PostStatus::Draft]);
+        PostTarget::factory()->create(['post_id' => $mixed->id, 'social_account_id' => $linkedIn->id]);
+        PostTarget::factory()->create(['post_id' => $mixed->id, 'social_account_id' => $instagram->id]);
+
+        $withMedia = Post::factory()->for($client)->create(['org_id' => $user->org_id, 'status' => PostStatus::Draft]);
+        PostTarget::factory()->create(['post_id' => $withMedia->id, 'social_account_id' => $instagram->id]);
+        $withMedia->assets()->attach(Asset::factory()->for($client)->create(['org_id' => $user->org_id]));
+
+        $this->actingAs($user)
+            ->get(route('needs-attention'))
+            ->assertInertia(fn ($page) => $page
+                ->where('items.missingMedia.total', 1)
+                ->where('items.missingMedia.items.0.post_id', $mixed->id)
+            );
+    }
+
+    public function test_each_bucket_is_capped_but_reports_its_full_total(): void
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+        Post::factory()->for($client)->count(23)->create(['org_id' => $user->org_id, 'status' => PostStatus::Failed]);
+        Post::factory()->for($client)->count(2)->create(['org_id' => $user->org_id, 'status' => PostStatus::PartiallyPublished]);
+
+        $this->actingAs($user)
+            ->get(route('needs-attention'))
+            ->assertInertia(fn ($page) => $page
+                ->has('items.failedPublishes.items', 20)
+                ->where('items.failedPublishes.total', 25)
+            );
+    }
+
+    public function test_home_runs_a_fixed_number_of_queries_regardless_of_post_count(): void
+    {
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['org_id' => $user->org_id]);
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $user->org_id, 'platform' => Platform::Instagram]);
+
+        $seed = function (int $perStatus) use ($user, $client, $account): void {
+            foreach ([PostStatus::Failed, PostStatus::InternalReview, PostStatus::WaitingClient, PostStatus::Draft, PostStatus::Published] as $status) {
+                Post::factory()->for($client)->count($perStatus)->create(['org_id' => $user->org_id, 'status' => $status])
+                    ->each(fn (Post $post) => PostTarget::factory()->create(['post_id' => $post->id, 'social_account_id' => $account->id]));
+            }
+        };
+
+        $queriesFor = function () use ($user): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($user)->get(route('needs-attention'))->assertOk();
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $seed(2);
+        $queriesFor(); // warm the acting user's relations
+        $small = $queriesFor();
+
+        $seed(30);
+        $large = $queriesFor();
+
+        $this->assertSame($small, $large);
     }
 }

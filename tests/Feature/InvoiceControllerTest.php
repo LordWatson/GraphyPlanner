@@ -237,10 +237,12 @@ class InvoiceControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
+        $this->actingAs($reviewer)->get(route('clients.billing', $client))->assertForbidden();
+
         $response = $this->actingAs($reviewer)->get(route('clients.show', $client));
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->where('invoices', []));
+        $response->assertInertia(fn ($page) => $page->where('stats.billing', null)->missing('invoices'));
     }
 
     public function test_paid_invoice_does_not_expose_send_or_mark_paid_actions(): void
@@ -255,13 +257,13 @@ class InvoiceControllerTest extends TestCase
             'paid_at' => now(),
         ]);
 
-        $response = $this->actingAs($owner)->get(route('clients.show', $client));
+        $response = $this->actingAs($owner)->get(route('clients.billing', $client));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->where('invoices.0.id', $invoice->id)
-            ->where('invoices.0.can.send', false)
-            ->where('invoices.0.can.mark_paid', false)
+            ->where('invoices.data.0.id', $invoice->id)
+            ->where('invoices.data.0.can.send', false)
+            ->where('invoices.data.0.can.mark_paid', false)
         );
     }
 
@@ -419,7 +421,7 @@ class InvoiceControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->delete(route('invoices.destroy', $invoice));
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.billing', $client));
         $this->assertSoftDeleted($invoice);
     }
 

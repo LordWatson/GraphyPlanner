@@ -15,7 +15,13 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    // Step I-2.8: Redis in production (see .junie/modules/ops.md).
+    'default' => env('CACHE_STORE', 'redis'),
+
+    /*
+     * Step I-2.8: the store rate limiters (`throttle:*`) count in. Null = the default store.
+     */
+    'limiter' => env('CACHE_LIMITER'),
 
     /*
     |--------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 const MIRRORED_PATHS: RegExp[] = [
     /^\/(dashboard|calendar|home)$/,
     /^\/clients(\/create)?$/,
-    /^\/clients\/\d+(\/(edit|brand-brain|assets|analytics))?$/,
+    /^\/clients\/\d+(\/(edit|brand-brain|assets|analytics|posts|media|campaigns|billing|portal-access|ai|briefs))?$/,
     /^\/invoices(\/export)?$/,
     /^\/invoices\/\d+(\/edit)?$/,
     /^\/campaigns\/\d+(\/edit)?$/,

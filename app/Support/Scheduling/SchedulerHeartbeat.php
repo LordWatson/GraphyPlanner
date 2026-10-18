@@ -27,6 +27,7 @@ final class SchedulerHeartbeat
         'social-accounts:check-health' => ['label' => 'Social account health check', 'interval_minutes' => 60],
         'ai:generate-daily-briefs' => ['label' => 'Daily AI briefs', 'interval_minutes' => 1440],
         'ai-images:prune' => ['label' => 'AI image prune', 'interval_minutes' => 1440],
+        'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 1440],
         'analytics:send-scheduled-reports' => ['label' => 'Scheduled reports', 'interval_minutes' => 1440],
     ];
 

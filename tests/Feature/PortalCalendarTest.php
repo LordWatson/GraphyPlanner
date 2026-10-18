@@ -29,6 +29,10 @@ class PortalCalendarTest extends TestCase
     {
         parent::setUp();
 
+        // Step I-2.3: the calendar serves the current month's grid by default; pin "now" so the
+        // October 2026 fixtures below stay inside it.
+        $this->travelTo(now()->setDate(2026, 10, 15)->setTime(12, 0));
+
         $this->org = Organization::factory()->create(['default_timezone' => 'UTC']);
         $this->client = Client::factory()->for($this->org, 'organization')->create();
         $this->reviewer = User::factory()

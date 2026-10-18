@@ -12,12 +12,15 @@ use App\Models\Asset;
 use App\Models\Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class AssetController extends Controller
 {
     /**
      * A page of the client's asset library as JSON, filtered by filename search and type — the
-     * post editor's "Browse library" dialog pages through this instead of preloading every asset.
+     * post editor's "Browse library" dialog and the client Assets tab page through this instead of
+     * preloading every asset. `can.delete` lets the Assets tab offer removal per asset.
      */
     public function index(SearchAssetsRequest $request, Client $client, SearchClientAssetsAction $action): JsonResponse
     {
@@ -39,6 +42,9 @@ class AssetController extends Controller
                 'is_ai_generated' => $asset->is_ai_generated,
                 'campaign_name' => $asset->campaign?->name,
                 'created_at' => $asset->created_at?->toIso8601String(),
+                'can' => [
+                    'delete' => $request->user()->can('delete', $asset),
+                ],
             ])->values(),
             'meta' => [
                 'current_page' => $assets->currentPage(),
@@ -55,7 +61,7 @@ class AssetController extends Controller
      * Callers that want to stay on their current page (e.g. the post editor's inline "upload
      * asset" widget, added so users don't have to flick over to the client's Assets tab) send
      * `Accept: application/json` and get the created asset back as JSON instead of being
-     * redirected to `clients.show`.
+     * redirected to `clients.media`.
      */
     public function store(StoreAssetRequest $request, Client $client, CreateAssetAction $action): RedirectResponse|JsonResponse
     {
@@ -72,13 +78,14 @@ class AssetController extends Controller
             ], 201);
         }
 
-        return to_route('clients.show', $client);
+        return to_route('clients.media', $client);
     }
 
     /**
-     * Delete an asset (removing its stored file, if any).
+     * Delete an asset (removing its stored file, if any). JSON callers (the Assets tab's library
+     * dialog) get a 204 so the dialog can refresh in place instead of following a redirect.
      */
-    public function destroy(Asset $asset, DeleteAssetAction $action): RedirectResponse
+    public function destroy(Request $request, Asset $asset, DeleteAssetAction $action): RedirectResponse|Response
     {
         $this->authorize('delete', $asset);
 
@@ -86,6 +93,10 @@ class AssetController extends Controller
 
         $action($asset);
 
-        return to_route('clients.show', $clientId);
+        if ($request->wantsJson()) {
+            return response()->noContent();
+        }
+
+        return to_route('clients.media', $clientId);
     }
 }

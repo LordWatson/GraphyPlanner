@@ -182,8 +182,14 @@ class ClientControllerTest extends TestCase
             ->where('client.retainer_amount', null)
             ->where('can.viewBilling', false)
             ->where('can.viewInvitations', false)
-            ->where('invoices', [])
-            ->where('invitations', []));
+            ->where('stats.billing', null)
+            ->where('stats.portalAccess', null)
+            ->missing('invoices')
+            ->missing('invitations'));
+
+        // Step I-2.4: the tabs themselves are refused, not just hidden.
+        $this->actingAs($designer)->get(route('clients.billing', $client))->assertForbidden();
+        $this->actingAs($designer)->get(route('clients.portal-access', $client))->assertForbidden();
     }
 
     public function test_client_reviewer_cannot_view_another_clients_page(): void

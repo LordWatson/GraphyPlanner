@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Contracts\PublishAdapter;
+use App\Enums\BillingCycle;
 use App\Enums\ClientHealth;
 use App\Enums\ConnectionStatus;
 use App\Models\Client;
@@ -30,7 +31,7 @@ class SocialAccountHealthAcceptanceTest extends TestCase
             'org_id' => $user->org_id,
             'owner_user_id' => $user->id,
             'retainer_amount' => 1000,
-            'billing_cycle' => \App\Enums\BillingCycle::Monthly,
+            'billing_cycle' => BillingCycle::Monthly,
             'start_date' => now()->subMonth(),
         ]);
         $account = SocialAccount::factory()->for($client)->create([
@@ -51,8 +52,8 @@ class SocialAccountHealthAcceptanceTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('items.disconnectedAccounts', 1)
-            ->where('items.disconnectedAccounts.0.account_id', $account->id)
+            ->has('items.disconnectedAccounts.items', 1)
+            ->where('items.disconnectedAccounts.items.0.account_id', $account->id)
         );
     }
 }

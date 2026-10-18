@@ -45,3 +45,7 @@ $safely(Schedule::command('ai-images:prune')->dailyAt('03:30'), 'ai-images:prune
 // at most once per period per report, skipping suspended orgs — see
 // SendScheduledOrganizationReportsAction.
 $safely(Schedule::command('analytics:send-scheduled-reports')->dailyAt('07:00'), 'analytics:send-scheduled-reports');
+
+// Step I-2.5: nightly sweep behind the event-driven health recompute, so stored client health
+// can never drift for long if a write path is missed.
+$safely(Schedule::command('clients:recompute-health')->dailyAt('02:30'), 'clients:recompute-health');

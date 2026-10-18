@@ -8,6 +8,9 @@ import type {
 } from '@/components/content-calendar';
 import { ContentCalendar } from '@/components/content-calendar';
 import { Page, PageHeader } from '@/components/page';
+import type { Paginated } from '@/components/pagination';
+import type { UnscheduledPost } from '@/components/unscheduled-posts-sheet';
+import { UnscheduledPostsSheet } from '@/components/unscheduled-posts-sheet';
 import { formatDate } from '@/lib/dates';
 import { calendar } from '@/routes';
 import { edit as editPost, reschedule as reschedulePost } from '@/routes/posts';
@@ -16,7 +19,16 @@ import { edit as editPost, reschedule as reschedulePost } from '@/routes/posts';
  * The internal (staff) content calendar. Client portal contacts are redirected to
  * `portal/calendar` by `RedirectClientReviewersToPortal`, so this always renders multi-client.
  */
-export default function Calendar(props: CalendarPayload) {
+type CalendarPageProps = CalendarPayload & {
+    unscheduledCount: number;
+    unscheduled?: Paginated<UnscheduledPost>;
+};
+
+export default function Calendar({
+    unscheduledCount,
+    unscheduled,
+    ...props
+}: CalendarPageProps) {
     const count = props.occurrences.length;
     const reschedulable = useMemo(
         () => new Set(props.reschedulablePostIds ?? []),
@@ -72,6 +84,12 @@ export default function Calendar(props: CalendarPayload) {
                         </>
                     }
                     description="Every scheduled target across every client — by month, week, day, or as a running list."
+                    actions={
+                        <UnscheduledPostsSheet
+                            count={unscheduledCount}
+                            page={unscheduled}
+                        />
+                    }
                 />
                 <ContentCalendar
                     {...props}

@@ -81,7 +81,6 @@ class PollPendingPublishStatusesActionTest extends TestCase
             'social_account_id' => $account->id,
             'status' => PostTargetStatus::Pending,
             'external_post_id' => 'up-123',
-            'updated_at' => now(),
         ]);
 
         $adapter = Mockery::mock(PublishAdapter::class);

@@ -2,7 +2,7 @@ import type { InertiaLinkProps } from '@inertiajs/react';
 import { Link, router } from '@inertiajs/react';
 import { CalendarX2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DragEvent, ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { resolveStatus, toneBgClass, toneTextClass } from '@/lib/status';
@@ -49,9 +49,13 @@ export type CalendarFilters = {
     platform: string | null;
 };
 
+/** Step I-2.3: the date range (inclusive, `Y-m-d`) the server loaded occurrences for. */
+export type CalendarWindow = { from: string; to: string };
+
 /** The server payload shared by `CalendarController` and `PortalCalendarController`. */
 export type CalendarPayload = {
     occurrences: Occurrence[];
+    window: CalendarWindow;
     orgTimezone: string;
     filters: CalendarFilters;
     filterOptions: {
@@ -117,6 +121,22 @@ function addDays(date: Date, days: number): Date {
     return result;
 }
 
+/**
+ * The 6-week, Sunday-first month grid containing `date` — the same window
+ * `App\Support\Calendar\CalendarWindow::monthGrid()` serves. It also contains every week and day
+ * view anchored in that month, so only a month change needs new data.
+ */
+function gridWindow(date: Date): CalendarWindow {
+    const gridStart = startOfWeek(
+        new Date(date.getFullYear(), date.getMonth(), 1),
+    );
+
+    return {
+        from: toDateKey(gridStart),
+        to: toDateKey(addDays(gridStart, 41)),
+    };
+}
+
 const dateHeaderFormatter = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'long',
@@ -144,6 +164,7 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
  */
 export function ContentCalendar({
     occurrences,
+    window: loadedWindow,
     orgTimezone,
     filters,
     filterOptions,
@@ -161,7 +182,12 @@ export function ContentCalendar({
             : 'month',
     );
     const [tzMode, setTzMode] = useState<TimezoneMode>('account');
-    const [anchor, setAnchor] = useState<Date>(new Date());
+    // Start inside the month the server loaded (its grid begins at most 6 days before the 1st).
+    const [anchor, setAnchor] = useState<Date>(() =>
+        addDays(parseLocalDate(loadedWindow.from), 15),
+    );
+    const [loadingWindow, setLoadingWindow] = useState(false);
+    const visibleWindow = gridWindow(anchor);
     const [dragging, setDragging] = useState<Occurrence | null>(null);
     const [dropKey, setDropKey] = useState<string | null>(null);
 
@@ -190,10 +216,36 @@ export function ContentCalendar({
     const applyFilter = (key: keyof CalendarFilters, value: string | null) => {
         router.get(
             baseUrl,
-            { ...filters, [key]: value },
+            { ...filters, ...visibleWindow, [key]: value },
             { preserveState: true, preserveScroll: true, replace: true },
         );
     };
+
+    // Step I-2.3: moving into another month fetches just that month's grid — a partial reload
+    // that keeps the filters and the rest of the page as they are.
+    useEffect(() => {
+        if (
+            visibleWindow.from === loadedWindow.from &&
+            visibleWindow.to === loadedWindow.to
+        ) {
+            return;
+        }
+
+        router.get(
+            baseUrl,
+            { ...filters, ...visibleWindow },
+            {
+                only: ['occurrences', 'window', 'reschedulablePostIds'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onStart: () => setLoadingWindow(true),
+                onFinish: () => setLoadingWindow(false),
+            },
+        );
+        // Re-run only when the visible month changes, not on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleWindow.from, visibleWindow.to]);
 
     const today = toDateKey(new Date());
 
@@ -524,16 +576,30 @@ export function ContentCalendar({
     };
 
     const renderListView = () => {
-        const sortedDates = Array.from(occurrencesByDate.keys()).sort();
+        // Step I-2.3: the list pages by month, like the grid, instead of listing all history.
+        const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+        const monthPrefix = toDateKey(monthStart).slice(0, 7);
+        const sortedDates = Array.from(occurrencesByDate.keys())
+            .filter((key) => key.startsWith(monthPrefix))
+            .sort();
 
         return (
             <div className="flex flex-col">
+                {renderNav(
+                    <>
+                        {monthTitleFormatter.format(monthStart)}{' '}
+                        <em>{monthStart.getFullYear()}</em>
+                    </>,
+                    () => setAnchor(addDays(monthStart, -1)),
+                    () => setAnchor(addDays(monthStart, 32)),
+                    'month',
+                )}
                 {sortedDates.length === 0 && (
                     <EmptyState
                         compact
                         icon={CalendarX2}
-                        title="No posts found."
-                        description="Nothing matches the current filters."
+                        title="No posts this month."
+                        description="Nothing matches the current filters in this month."
                     />
                 )}
                 {sortedDates.map((dateKey) => {
@@ -725,7 +791,13 @@ export function ContentCalendar({
                 </Select>
             </div>
 
-            <div className="bg-card animate-rise rounded-2xl border p-4 sm:p-5">
+            <div
+                aria-busy={loadingWindow}
+                className={cn(
+                    'bg-card animate-rise rounded-2xl border p-4 transition-opacity sm:p-5',
+                    loadingWindow && 'opacity-60',
+                )}
+            >
                 {view === 'month' && renderMonthView()}
                 {view === 'week' && renderWeekView()}
                 {view === 'day' && renderDayView()}

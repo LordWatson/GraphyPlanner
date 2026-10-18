@@ -16,10 +16,16 @@ class GetClientHealthSummaryAction
      */
     public function __invoke(int $orgId, int $limit = 8): array
     {
+        // Step I-2.5: health is materialized, so the ranking and the limit happen in SQL.
         $clients = Client::query()
             ->where('org_id', $orgId)
             ->withCount('posts')
-            ->with('socialAccounts')
+            ->orderByRaw(
+                'CASE health_status WHEN ? THEN 0 WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END',
+                [ClientHealth::Red->value, ClientHealth::Amber->value, ClientHealth::Green->value],
+            )
+            ->orderBy('id')
+            ->limit($limit)
             ->get();
 
         $rows = $clients->map(function (Client $client) {

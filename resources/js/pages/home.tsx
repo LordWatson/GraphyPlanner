@@ -38,12 +38,15 @@ type DisconnectedAccountRow = {
     connection_status_label: string;
 };
 
+/** Step I-2.2: each lane carries a bounded page of rows plus the lane's full count. */
+type Bucket<Row> = { items: Row[]; total: number };
+
 type NeedsAttentionItems = {
-    failedPublishes: PostRow[];
-    internalReviews: PostRow[];
-    waitingApprovals: PostRow[];
-    missingMedia: PostRow[];
-    disconnectedAccounts: DisconnectedAccountRow[];
+    failedPublishes: Bucket<PostRow>;
+    internalReviews: Bucket<PostRow>;
+    waitingApprovals: Bucket<PostRow>;
+    missingMedia: Bucket<PostRow>;
+    disconnectedAccounts: Bucket<DisconnectedAccountRow>;
 };
 
 type HomeProps = {
@@ -57,6 +60,7 @@ function Lane({
     title,
     description,
     count,
+    shown,
     accentClassName,
     emptyLabel,
     children,
@@ -67,6 +71,8 @@ function Lane({
     title: string;
     description: string;
     count: number;
+    /** How many of `count` rows are rendered (the server caps each lane). */
+    shown: number;
     accentClassName: string;
     emptyLabel: string;
     children: React.ReactNode;
@@ -112,9 +118,16 @@ function Lane({
                 </div>
             </header>
             {count > 0 ? (
-                <ul className="border-border/80 bg-card divide-border/70 flex flex-col divide-y overflow-hidden rounded-2xl border shadow-sm">
-                    {children}
-                </ul>
+                <div className="flex flex-col gap-2">
+                    <ul className="border-border/80 bg-card divide-border/70 flex flex-col divide-y overflow-hidden rounded-2xl border shadow-sm">
+                        {children}
+                    </ul>
+                    {shown < count && (
+                        <p className="text-muted-foreground px-1 text-xs">
+                            Showing the oldest {shown} of {count}.
+                        </p>
+                    )}
+                </div>
             ) : (
                 <p className="text-muted-foreground flex items-center gap-2 self-center text-sm">
                     <CheckCircle2 className="text-success size-4 shrink-0" />
@@ -161,42 +174,42 @@ function PostRowItem({ row }: { row: PostRow }) {
 
 export default function Home({ items }: HomeProps) {
     const total =
-        items.failedPublishes.length +
-        items.internalReviews.length +
-        items.waitingApprovals.length +
-        items.missingMedia.length +
-        items.disconnectedAccounts.length;
+        items.failedPublishes.total +
+        items.internalReviews.total +
+        items.waitingApprovals.total +
+        items.missingMedia.total +
+        items.disconnectedAccounts.total;
 
     const lanes = [
         {
             id: 'lane-failed',
             label: '01 Failed',
             caption: 'Publishes rejected',
-            count: items.failedPublishes.length,
+            count: items.failedPublishes.total,
         },
         {
             id: 'lane-accounts',
             label: '02 Accounts',
             caption: 'Need reconnecting',
-            count: items.disconnectedAccounts.length,
+            count: items.disconnectedAccounts.total,
         },
         {
             id: 'lane-review',
             label: '03 Review',
             caption: 'Studio sign-off',
-            count: items.internalReviews.length,
+            count: items.internalReviews.total,
         },
         {
             id: 'lane-approvals',
             label: '04 Approvals',
             caption: 'With the client',
-            count: items.waitingApprovals.length,
+            count: items.waitingApprovals.total,
         },
         {
             id: 'lane-media',
             label: '05 Assets',
             caption: 'Missing media',
-            count: items.missingMedia.length,
+            count: items.missingMedia.total,
         },
     ];
 
@@ -254,11 +267,12 @@ export default function Home({ items }: HomeProps) {
                         icon={AlertTriangle}
                         title="Failed publishes"
                         description="Posts the platform rejected"
-                        count={items.failedPublishes.length}
+                        count={items.failedPublishes.total}
+                        shown={items.failedPublishes.items.length}
                         accentClassName="bg-destructive/10 text-destructive"
                         emptyLabel="No failed publishes."
                     >
-                        {items.failedPublishes.map((row) => (
+                        {items.failedPublishes.items.map((row) => (
                             <PostRowItem key={row.post_id} row={row} />
                         ))}
                     </Lane>
@@ -268,11 +282,12 @@ export default function Home({ items }: HomeProps) {
                         icon={WifiOff}
                         title="Disconnected accounts"
                         description="Social accounts needing reconnection"
-                        count={items.disconnectedAccounts.length}
+                        count={items.disconnectedAccounts.total}
+                        shown={items.disconnectedAccounts.items.length}
                         accentClassName="bg-warning/12 text-warning"
                         emptyLabel="All accounts are connected."
                     >
-                        {items.disconnectedAccounts.map((account) => (
+                        {items.disconnectedAccounts.items.map((account) => (
                             <li key={account.account_id}>
                                 <Link
                                     href={showClient(account.client_id)}
@@ -303,11 +318,12 @@ export default function Home({ items }: HomeProps) {
                         icon={ClipboardCheck}
                         title="Internal review"
                         description="Posts waiting for the studio to sign off"
-                        count={items.internalReviews.length}
+                        count={items.internalReviews.total}
+                        shown={items.internalReviews.items.length}
                         accentClassName="bg-primary/10 text-primary"
                         emptyLabel="Nothing waiting on internal review."
                     >
-                        {items.internalReviews.map((row) => (
+                        {items.internalReviews.items.map((row) => (
                             <PostRowItem key={row.post_id} row={row} />
                         ))}
                     </Lane>
@@ -317,11 +333,12 @@ export default function Home({ items }: HomeProps) {
                         icon={Clock}
                         title="Waiting on the client"
                         description="Posts sitting in client review"
-                        count={items.waitingApprovals.length}
+                        count={items.waitingApprovals.total}
+                        shown={items.waitingApprovals.items.length}
                         accentClassName="bg-info/10 text-info"
                         emptyLabel="Nothing waiting on a client."
                     >
-                        {items.waitingApprovals.map((row) => (
+                        {items.waitingApprovals.items.map((row) => (
                             <PostRowItem key={row.post_id} row={row} />
                         ))}
                     </Lane>
@@ -331,11 +348,12 @@ export default function Home({ items }: HomeProps) {
                         icon={ImageOff}
                         title="Missing media"
                         description="Posts that still need media attached"
-                        count={items.missingMedia.length}
+                        count={items.missingMedia.total}
+                        shown={items.missingMedia.items.length}
                         accentClassName="bg-muted text-foreground/60"
                         emptyLabel="Every active post has its required media."
                     >
-                        {items.missingMedia.map((row) => (
+                        {items.missingMedia.items.map((row) => (
                             <PostRowItem key={row.post_id} row={row} />
                         ))}
                     </Lane>

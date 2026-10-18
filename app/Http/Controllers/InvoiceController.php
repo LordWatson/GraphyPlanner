@@ -166,7 +166,7 @@ class InvoiceController extends Controller
 
         $this->toast("{$invoice->invoice_number} deleted.");
 
-        return to_route('clients.show', $clientId);
+        return to_route('clients.billing', $clientId);
     }
 
     /**

@@ -43,7 +43,7 @@ class PostDeleteTest extends TestCase
 
             $this->actingAs($this->user($role))
                 ->delete(route('posts.destroy', $post))
-                ->assertRedirect(route('clients.show', $this->client));
+                ->assertRedirect(route('clients.posts.index', $this->client));
 
             $this->assertSoftDeleted($post);
         }

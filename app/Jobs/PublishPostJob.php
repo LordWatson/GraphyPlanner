@@ -8,6 +8,7 @@ use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -57,6 +58,8 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
     public function __construct(public readonly int $postId, ?string $dispatchId = null)
     {
         $this->dispatchId = $dispatchId;
+        // Step I-2.8: publishing has its own queue and workers.
+        $this->onQueue(Queues::PUBLISHING);
     }
 
     /**

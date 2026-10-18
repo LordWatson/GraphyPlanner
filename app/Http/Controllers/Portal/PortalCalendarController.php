@@ -7,8 +7,8 @@ use App\Actions\Posts\BuildCalendarOccurrencesAction;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CalendarRequest;
 use App\Models\Campaign;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,23 +21,23 @@ use Inertia\Response;
 class PortalCalendarController extends Controller
 {
     public function index(
-        Request $request,
+        CalendarRequest $request,
         GetPortalCalendarPostsAction $getPosts,
         BuildCalendarOccurrencesAction $buildOccurrences,
     ): Response {
         $user = $request->user();
         $orgTimezone = $user->organization?->default_timezone ?? 'UTC';
+        $window = $request->window($orgTimezone);
 
         $status = PostStatus::tryFrom($request->string('status')->toString());
         $status = $status?->isClientVisible() ? $status : null;
         $platform = Platform::tryFrom($request->string('platform')->toString());
         $campaignId = $request->integer('campaign_id') ?: null;
 
-        $posts = $getPosts($user, $status, $campaignId, $platform);
-
         return Inertia::render('portal/calendar', [
             'client' => ['name' => $user->client->name],
-            'occurrences' => $buildOccurrences($posts, $orgTimezone),
+            'occurrences' => fn () => $buildOccurrences($getPosts($user, $window, $status, $campaignId, $platform), $orgTimezone),
+            'window' => $window->toArray(),
             'orgTimezone' => $orgTimezone,
             'filters' => [
                 'client_id' => null,

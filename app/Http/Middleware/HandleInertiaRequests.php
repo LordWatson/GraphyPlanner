@@ -2,10 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\PostStatus;
 use App\Enums\Role;
-use App\Models\Post;
 use App\Models\User;
+use App\Services\SharedPropsCache;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -44,12 +43,13 @@ class HandleInertiaRequests extends Middleware
         // `preview` middleware logs the visitor in, and a cold first `/preview/*` request used to
         // share `auth.user = null`. Inertia resolves closures when the response is built.
         $user = fn (): ?User => $request->user();
+        $cache = app(SharedPropsCache::class);
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => fn (): array => [
-                'user' => $user(),
+                'user' => self::sharedUser($user()),
                 // Step 17.4: chapter gating for the sidebar and ⌘K palette (kept under `auth`, since
                 // many pages pass their own top-level `can` prop, which would replace a shared one).
                 'can' => [
@@ -67,25 +67,46 @@ class HandleInertiaRequests extends Middleware
             },
             // Client portal chrome: the "Approvals" nav badge. A separate key (not part of `client`)
             // because several portal pages pass their own `client` page prop, which would replace it.
-            'portal' => function () use ($user): ?array {
+            'portal' => function () use ($user, $cache): ?array {
                 $current = $user();
 
                 return $current && $current->role === Role::ClientReviewer && $current->client_id
-                    ? [
-                        'pendingApprovals' => Post::query()
-                            ->where('client_id', $current->client_id)
-                            ->where('status', PostStatus::WaitingClient)
-                            ->count(),
-                    ]
+                    ? ['pendingApprovals' => $cache->pendingApprovals($current->client_id)]
                     : null;
             },
             // Shared on every Inertia response so the notification bell's unread badge is always
             // up to date without a dedicated round-trip; the dropdown's own list is lazy-loaded
             // from `notifications.index` only once opened.
-            'unreadNotificationsCount' => fn (): int => $user()?->unreadNotifications()->count() ?? 0,
+            // Step I-2.6: cached per user and busted on notify/read (see SharedPropsCache).
+            'unreadNotificationsCount' => fn (): int => ($current = $user()) ? $cache->unreadNotifications($current) : 0,
             // The organization's default currency (ISO 4217 code), shared so every page can
             // format currency fields consistently without re-fetching the organization.
             'currency' => fn (): string => $user()?->organization->default_currency ?? 'USD',
+        ];
+    }
+
+    /**
+     * Step I-2.6: an explicit whitelist, so a new `users` column never reaches every page's props
+     * just because it exists.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function sharedUser(?User $user): ?array
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => null,
+            'role' => $user->role?->value,
+            'org_id' => $user->org_id,
+            'client_id' => $user->client_id,
+            'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+            'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
         ];
     }
 

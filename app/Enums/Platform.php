@@ -31,6 +31,20 @@ enum Platform: string
     }
 
     /**
+     * Step I-2.2: the stored values of every text-only-capable platform, for SQL filters (Home's
+     * "missing media" bucket) that must agree with `isTextOnlyCapable()` and the §6 checklist.
+     *
+     * @return list<string>
+     */
+    public static function textOnlyCapableValues(): array
+    {
+        return array_values(array_map(
+            fn (self $platform) => $platform->value,
+            array_filter(self::cases(), fn (self $platform) => $platform->isTextOnlyCapable()),
+        ));
+    }
+
+    /**
      * Interim caption character limit used for the editor's per-target character count and the
      * §6 checklist. The exact spec §6/§9 numbers weren't available in this repo — these mirror the
      * platforms' commonly documented public limits at the time of writing.
