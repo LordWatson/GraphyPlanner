@@ -26,7 +26,8 @@ export type ActivityLogData = {
     from_status: string | null;
     to_status: string;
     note: string | null;
-    review_url: string | null;
+    /** A review-portal link was emailed with this move (the link itself is never stored). */
+    review_link_sent: boolean;
     created_at: string | null;
 };
 

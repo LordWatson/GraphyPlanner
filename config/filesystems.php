@@ -30,9 +30,13 @@ return [
 
     'disks' => [
 
+        // Step I-1.6: private by default for assets, invoice/persona PDFs and AI images. `serve`
+        // exposes files only through signed, expiring URLs (`temporaryUrl()`) under `/files/*`
+        // — a guessed path without a valid signature gets a 403.
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
+            'url' => rtrim((string) env('APP_URL', 'http://localhost'), '/').'/files',
             'serve' => true,
             'throw' => false,
             'report' => false,

@@ -22,6 +22,7 @@ class GetUnapprovedDraftsAction
         $statuses = [PostStatus::Draft, PostStatus::InternalReview, PostStatus::ChangesRequested];
 
         $query = Post::query()
+            ->forActiveClients()
             ->where('org_id', $user->org_id)
             ->whereIn('status', $statuses)
             ->with('client:id,name')

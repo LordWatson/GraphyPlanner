@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\ImageAspectRatio;
 use App\Enums\ImageGenerationStatus;
 use App\Enums\ImageQualityTier;
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use App\Support\AI\Images\AiImageBrief;
 use Database\Factories\AiImageGenerationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -48,7 +50,7 @@ use Illuminate\Support\Carbon;
 class AiImageGeneration extends Model
 {
     /** @use HasFactory<AiImageGenerationFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory;
 
     /**
      * @return array<string, string>
@@ -84,7 +86,8 @@ class AiImageGeneration extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -92,7 +95,7 @@ class AiImageGeneration extends Model
      */
     public function idea(): BelongsTo
     {
-        return $this->belongsTo(AiPostIdea::class, 'ai_post_idea_id');
+        return $this->belongsTo(AiPostIdea::class, 'ai_post_idea_id')->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -100,7 +103,7 @@ class AiImageGeneration extends Model
      */
     public function post(): BelongsTo
     {
-        return $this->belongsTo(Post::class);
+        return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

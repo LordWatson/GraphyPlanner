@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\ConnectStateStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -65,7 +66,7 @@ class FacebookInstagramConnectControllerTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->actingAs($owner)->get(route('social-accounts.facebook.callback', [$client, $account]).'?code=auth-code');
+        $response = $this->actingAs($owner)->get(route('social-accounts.facebook.callback', [$client, $account]).'?code=auth-code&state='.$this->metaState($account, $owner));
 
         $response->assertRedirect(route('clients.show', $client));
 
@@ -104,7 +105,7 @@ class FacebookInstagramConnectControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($owner)->get(
-            route('auth.meta.callback').'?code=auth-code&state='.$account->id
+            route('auth.meta.callback').'?code=auth-code&state='.$this->metaState($account, $owner)
         );
 
         $response->assertRedirect(route('clients.show', $client));
@@ -130,7 +131,7 @@ class FacebookInstagramConnectControllerTest extends TestCase
             'platform' => Platform::Instagram,
         ]);
 
-        $response = $this->actingAs($owner)->get(route('social-accounts.facebook.callback', [$client, $account]).'?code=auth-code');
+        $response = $this->actingAs($owner)->get(route('social-accounts.facebook.callback', [$client, $account]).'?code=auth-code&state='.$this->metaState($account, $owner));
 
         $response->assertRedirect(route('clients.show', $client));
         $response->assertSessionHas('error');
@@ -153,5 +154,38 @@ class FacebookInstagramConnectControllerTest extends TestCase
         $response = $this->actingAs($designer)->get(route('social-accounts.facebook.connect', [$client, $account]));
 
         $response->assertForbidden();
+    }
+
+    public function test_a_callback_with_a_forged_or_reused_state_is_rejected(): void
+    {
+        config(['services.facebook.client_id' => 'app-id', 'services.facebook.client_secret' => 'app-secret']);
+        Http::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]);
+
+        // The old, guessable state (the raw account id) no longer works on either callback.
+        $this->actingAs($owner)
+            ->get(route('auth.meta.callback').'?code=auth-code&state='.$account->id)
+            ->assertRedirect(route('dashboard'));
+        $this->actingAs($owner)
+            ->get(route('social-accounts.facebook.callback', [$client, $account]).'?code=auth-code&state=forged')
+            ->assertSessionHas('error');
+
+        // A state issued to someone else is rejected too.
+        $teammate = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $this->actingAs($owner)
+            ->get(route('auth.meta.callback').'?code=auth-code&state='.$this->metaState($account, $teammate))
+            ->assertRedirect(route('dashboard'));
+
+        Http::assertNothingSent();
+        $this->assertNull($account->fresh()->meta_access_token);
+    }
+
+    private function metaState(SocialAccount $account, User $user): string
+    {
+        return app(ConnectStateStore::class)->issue($account, $user, 'meta');
     }
 }

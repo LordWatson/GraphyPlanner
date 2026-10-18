@@ -32,15 +32,16 @@ class ReviewControllerTest extends TestCase
             'to' => PostStatus::WaitingClient->value,
         ])->assertRedirect(route('posts.edit', $post));
 
-        Mail::assertSent(ClientReviewRequestedMail::class, function (ClientReviewRequestedMail $mail) use ($post) {
+        Mail::assertQueued(ClientReviewRequestedMail::class, function (ClientReviewRequestedMail $mail) use ($post) {
             return $mail->hasTo('client@example.com') && $mail->post->id === $post->id;
         });
 
         $this->assertSame(1, $post->reviewTokens()->count());
 
+        // Step I-1.6: only the token's id is recorded — never the plain link.
         $activityLog = $post->activityLogs()->latest('id')->first();
-        $this->assertNotNull($activityLog->review_url);
-        $this->assertStringContainsString('/review/', $activityLog->review_url);
+        $this->assertSame($post->reviewTokens()->sole()->id, $activityLog->review_token_id);
+        $this->assertArrayNotHasKey('review_url', $activityLog->getAttributes());
     }
 
     public function test_no_email_is_sent_when_the_client_has_no_approval_email_on_file(): void
@@ -56,10 +57,10 @@ class ReviewControllerTest extends TestCase
             'to' => PostStatus::WaitingClient->value,
         ])->assertRedirect(route('posts.edit', $post));
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
 
         $activityLog = $post->activityLogs()->latest('id')->first();
-        $this->assertNull($activityLog->review_url);
+        $this->assertNull($activityLog->review_token_id);
     }
 
     public function test_org_user_can_resend_the_client_review_email_from_the_activity_log(): void
@@ -76,6 +77,7 @@ class ReviewControllerTest extends TestCase
         ])->assertRedirect(route('posts.edit', $post));
 
         $activityLog = $post->activityLogs()->latest('id')->first();
+        $originalToken = $post->reviewTokens()->sole();
 
         Mail::fake();
 
@@ -83,11 +85,67 @@ class ReviewControllerTest extends TestCase
             ->post(route('posts.activity-logs.resend-review-email', [$post, $activityLog]))
             ->assertRedirect(route('posts.edit', $post));
 
-        Mail::assertSent(ClientReviewRequestedMail::class, function (ClientReviewRequestedMail $mail) use ($post, $activityLog) {
+        // Step I-1.6: a resend mints a fresh token and revokes the old one, rather than
+        // replaying a stored link.
+        $freshToken = $post->reviewTokens()->latest('id')->firstOrFail();
+        $this->assertNotSame($originalToken->id, $freshToken->id);
+        $this->assertNotNull($originalToken->refresh()->revoked_at);
+        $this->assertNull($freshToken->revoked_at);
+
+        Mail::assertQueued(ClientReviewRequestedMail::class, function (ClientReviewRequestedMail $mail) use ($post, $freshToken) {
+            $plain = str($mail->reviewUrl)->afterLast('/review/')->toString();
+
             return $mail->hasTo('client@example.com')
                 && $mail->post->id === $post->id
-                && $mail->reviewUrl === $activityLog->review_url;
+                && hash('sha256', $plain) === $freshToken->token_hash;
         });
+    }
+
+    public function test_the_old_review_link_stops_working_once_a_fresh_one_is_sent(): void
+    {
+        Mail::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['approval_email' => 'client@example.com']);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::InternalReview]);
+
+        $this->actingAs($owner)->post(route('posts.transition', $post), ['to' => PostStatus::WaitingClient->value]);
+
+        $firstUrl = null;
+        Mail::assertQueued(ClientReviewRequestedMail::class, function (ClientReviewRequestedMail $mail) use (&$firstUrl) {
+            $firstUrl = $mail->reviewUrl;
+
+            return true;
+        });
+
+        $activityLog = $post->activityLogs()->latest('id')->first();
+        $this->actingAs($owner)->post(route('posts.activity-logs.resend-review-email', [$post, $activityLog]));
+        auth()->logout();
+
+        $this->get(parse_url((string) $firstUrl, PHP_URL_PATH))->assertNotFound();
+    }
+
+    public function test_a_review_link_cannot_be_resent_once_the_client_has_decided(): void
+    {
+        Mail::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['approval_email' => 'client@example.com']);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::InternalReview]);
+
+        $this->actingAs($owner)->post(route('posts.transition', $post), ['to' => PostStatus::WaitingClient->value]);
+        $activityLog = $post->activityLogs()->latest('id')->first();
+        $post->update(['status' => PostStatus::Approved]);
+
+        Mail::fake();
+
+        $this->actingAs($owner)
+            ->post(route('posts.activity-logs.resend-review-email', [$post, $activityLog]))
+            ->assertSessionHasErrors('review');
+
+        Mail::assertNothingOutgoing();
     }
 
     public function test_a_designer_from_another_org_cannot_resend_the_client_review_email(): void
@@ -114,7 +172,7 @@ class ReviewControllerTest extends TestCase
             ->post(route('posts.activity-logs.resend-review-email', [$post, $activityLog]))
             ->assertForbidden();
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_a_valid_token_can_view_and_approve_the_waiting_post(): void

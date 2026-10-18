@@ -46,7 +46,8 @@ class GenerateDailyBriefsAction
             // Step 15.3: no AI spend (or emails) for a suspended organization.
             ->whereHas('organization', fn ($q) => $q->whereNull('suspended_at'))
             ->with(['organization', 'campaigns' => fn ($q) => $q->where('status', CampaignStatus::Active)])
-            ->get();
+            // Step I-1.8: chunked, so a large roster isn't loaded all at once.
+            ->lazyById(100);
 
         foreach ($clients as $client) {
             // Idempotent: a re-run of the command for the same day never duplicates a brief.

@@ -76,7 +76,7 @@ class UploadPostAdapterTest extends TestCase
         PostTarget::factory()->create([
             'post_id' => $post->id,
             'social_account_id' => $account->id,
-            'scheduled_at_utc' => '2026-10-01 12:00:00',
+            'scheduled_at_utc' => '2030-10-01 12:00:00',
         ]);
         $post->load('targets', 'assets');
 
@@ -97,7 +97,7 @@ class UploadPostAdapterTest extends TestCase
                 && $fields['platform[]'] === [Platform::LinkedIn->value]
                 && $fields['photos[]'] === ['https://cdn.test/media.jpg']
                 && $fields['hashtags[]'] === ['graphy']
-                && $fields['scheduled_date'] === ['2026-10-01T12:00:00+00:00']
+                && $fields['scheduled_date'] === ['2030-10-01T12:00:00+00:00']
                 && ! array_key_exists('location_id', $fields)
                 && ! array_key_exists('tiktok_music_id', $fields);
         });

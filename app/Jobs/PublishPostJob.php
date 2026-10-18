@@ -3,19 +3,23 @@
 namespace App\Jobs;
 
 use App\Actions\Posts\TransitionPostStatusAction;
-use App\Contracts\PublishAdapter;
+use App\Actions\Publishing\ResolvePostPublishOutcomeAction;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
-use App\Notifications\PostPublishFailed;
-use App\Services\PostNotificationService;
+use App\Models\PostTarget;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Step 1.4 — the queued job dispatched once a post is transitioned to `scheduled` (see
@@ -23,31 +27,170 @@ use Illuminate\Support\Facades\Log;
  * only runs once the §6 checklist has already passed (enforced server-side by
  * `TransitionPostRequest` before the `scheduled` transition is even allowed).
  *
- * Moves the post to `publishing`, calls `PublishAdapter::publish()` for every target's
- * `SocialAccount`, and records each target's `TargetResult` (external id or raw vendor error).
- * A `TargetResult::ok` only means the vendor *accepted* the request — it may still be queued or
- * scheduled for later delivery on their end — so accepted targets stay `pending` and the post
- * stays `publishing` until `SyncPublishStatusAction` (via the Upload-Post webhook, or the
- * `PollPendingPublishStatusesAction` fallback) confirms actual delivery and moves the post to
- * `published`. Any target rejected outright here still moves the post straight to `failed`.
+ * Step I-1.2: the job carries the post's `publish_dispatch_id` from when it was dispatched. If
+ * the post has since left `scheduled` (or been rescheduled, which mints a new id), the ids no
+ * longer match and the job no-ops — a stale delayed job can never publish early.
+ *
+ * Step I-1.3: the post row is locked while it moves `scheduled → publishing`, so two workers
+ * can't both pass the status check. Every unsent target then gets a fresh `publish_attempt_id`
+ * and its own `PublishPostTargetJob` in one `Bus::batch()`; the post is finalized by
+ * `ResolvePostPublishOutcomeAction` as the targets report back. Retries/backoff/timeout are set
+ * here, the job is unique per post + dispatch id, and `failed()` makes sure a crash never
+ * leaves the post stuck in `publishing`.
  */
-class PublishPostJob implements ShouldQueue
+class PublishPostJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public readonly int $postId) {}
+    public int $tries = 3;
 
-    public function handle(
-        PublishAdapter $adapter,
-        TransitionPostStatusAction $transition,
-        PostNotificationService $notifications = new PostNotificationService,
-    ): void {
-        $post = Post::with('targets.socialAccount', 'assets')->find($this->postId);
+    public int $maxExceptions = 2;
+
+    public int $timeout = 60;
+
+    /**
+     * Declared (not promoted) with a default, so jobs serialized before Step I-1.2 — which had
+     * no dispatch id — still unserialize. They match posts whose id is also null.
+     */
+    public ?string $dispatchId = null;
+
+    public function __construct(public readonly int $postId, ?string $dispatchId = null)
+    {
+        $this->dispatchId = $dispatchId;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function backoff(): array
+    {
+        return [30, 120, 600];
+    }
+
+    /**
+     * Unique per schedule, not per post: a reschedule dispatches a new job (new dispatch id)
+     * while the stale one may still be queued holding its own lock.
+     */
+    public function uniqueId(): string
+    {
+        return $this->postId.':'.($this->dispatchId ?? 'none');
+    }
+
+    public function handle(TransitionPostStatusAction $transition, ResolvePostPublishOutcomeAction $resolve): void
+    {
+        $claimed = DB::transaction(fn (): ?Post => $this->claim($transition));
+
+        if ($claimed === null) {
+            return;
+        }
+
+        /** @var Collection<int, PostTarget> $targets */
+        $targets = $claimed->targets()
+            ->where('status', PostTargetStatus::Pending)
+            ->whereNull('external_post_id')
+            ->get();
+
+        Log::info('PublishPostJob: publishing post', [
+            'post_id' => $claimed->id,
+            'org_id' => $claimed->org_id,
+            'target_count' => $targets->count(),
+        ]);
+
+        if ($targets->isEmpty()) {
+            // Nothing to send (no targets) — resolve straight away so the post doesn't hang.
+            $resolve($claimed);
+
+            return;
+        }
+
+        self::dispatchTargets($claimed, $targets);
+    }
+
+    /**
+     * Fan out one `PublishPostTargetJob` per target in a single batch (also used by
+     * `RetryFailedPostTargetsAction`). Targets must already carry their `publish_attempt_id`.
+     *
+     * @param  Collection<int, PostTarget>  $targets
+     */
+    public static function dispatchTargets(Post $post, Collection $targets): void
+    {
+        Bus::batch(
+            $targets->map(fn (PostTarget $target) => new PublishPostTargetJob($target->id, (string) $target->publish_attempt_id))->all(),
+        )
+            ->name("publish-post-{$post->id}")
+            ->allowFailures()
+            ->dispatch();
+    }
+
+    /**
+     * Crashed past every retry. Whatever state the post was left in (`scheduled` with this
+     * dispatch id, or `publishing` with targets never sent), fail the unsent targets and resolve
+     * the post — it ends up `failed` (with the error on the activity log, and the org notified)
+     * instead of stuck.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        $error = 'Publishing crashed before it reached the platform: '.($exception?->getMessage() ?? 'unknown error');
+
+        Log::error('PublishPostJob failed', [
+            'post_id' => $this->postId,
+            'publish_dispatch_id' => $this->dispatchId,
+            'error' => $exception?->getMessage(),
+        ]);
+
+        $post = DB::transaction(function () use ($error): ?Post {
+            /** @var Post|null $post */
+            $post = Post::query()->whereKey($this->postId)->lockForUpdate()->first();
+
+            if (! $post) {
+                return null;
+            }
+
+            if ($post->status === PostStatus::Scheduled && $post->publish_dispatch_id === $this->dispatchId) {
+                $post = app(TransitionPostStatusAction::class)($post, PostStatus::Publishing, null, $error);
+            }
+
+            if ($post->status !== PostStatus::Publishing) {
+                return null;
+            }
+
+            $post->targets()
+                ->where('status', PostTargetStatus::Pending)
+                ->whereNull('external_post_id')
+                ->whereNull('publish_requested_at')
+                ->update(['status' => PostTargetStatus::Failed, 'error' => $error]);
+
+            return $post;
+        });
+
+        if ($post) {
+            app(ResolvePostPublishOutcomeAction::class)($post);
+        }
+    }
+
+    /**
+     * Inside a transaction: lock the post, make sure this job still owns its schedule, move it to
+     * `publishing` and give every not-yet-published target a fresh attempt id.
+     */
+    private function claim(TransitionPostStatusAction $transition): ?Post
+    {
+        /** @var Post|null $post */
+        $post = Post::query()->whereKey($this->postId)->lockForUpdate()->first();
 
         if (! $post) {
             Log::warning('PublishPostJob: post not found', ['post_id' => $this->postId]);
 
-            return;
+            return null;
+        }
+
+        if ($post->publish_dispatch_id !== $this->dispatchId) {
+            Log::info('PublishPostJob: stale dispatch, skipping', [
+                'post_id' => $post->id,
+                'job_dispatch_id' => $this->dispatchId,
+                'post_dispatch_id' => $post->publish_dispatch_id,
+            ]);
+
+            return null;
         }
 
         // The post may have moved on (e.g. manually reverted to draft) since this job was
@@ -58,85 +201,44 @@ class PublishPostJob implements ShouldQueue
                 'status' => $post->status->value,
             ]);
 
-            return;
+            return null;
+        }
+
+        // Step I-1.5: an archived client (or a deleted organization) pauses publishing; the post
+        // stays `scheduled`, so restoring the client picks it back up.
+        if ($post->organization === null || $post->client?->trashed()) {
+            Log::warning('PublishPostJob: client archived or organization deleted, skipping', [
+                'post_id' => $post->id,
+                'org_id' => $post->org_id,
+                'client_id' => $post->client_id,
+            ]);
+
+            return null;
         }
 
         // Step 15.3: a suspended organization's content never goes out. The post stays
         // `scheduled`, so nothing is lost if the org is reinstated.
-        if ($post->organization?->isSuspended()) {
+        if ($post->organization->isSuspended()) {
             Log::warning('PublishPostJob: organization is suspended, skipping', [
                 'post_id' => $post->id,
                 'org_id' => $post->org_id,
             ]);
 
-            return;
+            return null;
         }
 
         $post = $transition($post, PostStatus::Publishing, null);
 
-        $accounts = $post->targets
-            ->map(fn ($target) => $target->socialAccount)
-            ->filter()
-            ->values();
-
-        Log::info('PublishPostJob: publishing post', [
-            'post_id' => $post->id,
-            'target_count' => $accounts->count(),
-        ]);
-
-        $results = $adapter->publish($post, $accounts);
-
-        DB::transaction(function () use ($post, $results) {
-            foreach ($results as $result) {
-                // A successful result here only means the vendor *accepted* the request (it may
-                // still be queued/scheduled on their side, especially for a future-dated post) —
-                // the target stays `pending` until the webhook (or `PollPendingPublishStatusesAction`
-                // fallback) confirms the vendor actually delivered it, via `SyncPublishStatusAction`.
-                $post->targets->firstWhere('social_account_id', $result->accountId)?->update([
-                    'status' => $result->ok ? PostTargetStatus::Pending : PostTargetStatus::Failed,
-                    'external_post_id' => $result->externalPostId,
-                    'error' => $result->error,
-                ]);
-            }
-        });
-
-        $allOk = $results->isNotEmpty() && $results->every(fn ($result) => $result->ok);
-
-        if ($allOk) {
-            // The post stays `publishing` — it isn't `published` until the vendor confirms
-            // actual delivery (see `SyncPublishStatusAction`), which can happen well after the
-            // vendor accepted the request (e.g. a scheduled post it hasn't posted yet).
-            Log::info('PublishPostJob: post accepted by vendor, awaiting delivery confirmation', [
-                'post_id' => $post->id,
+        foreach ($post->targets()->where('status', '!=', PostTargetStatus::Published)->get() as $target) {
+            $target->update([
+                'status' => PostTargetStatus::Pending,
+                'external_post_id' => null,
+                'error' => null,
+                'publish_attempt_id' => (string) Str::uuid(),
+                'publish_requested_at' => null,
             ]);
-
-            return;
         }
 
-        $failures = $results->reject(fn ($result) => $result->ok)->values();
-
-        // Surface the vendor error(s) on the activity log entry (rather than only next to the
-        // relevant target/social account) so it's visible in one place alongside every other
-        // status change, and so it's still there even after the target rows are reset on retry.
-        $errorNote = $failures
-            ->map(function ($result) use ($post) {
-                $account = $post->targets->firstWhere('social_account_id', $result->accountId)?->socialAccount;
-                $label = $account ? "{$account->platform->value} ({$account->handle})" : "account #{$result->accountId}";
-
-                return "{$label}: {$result->error}";
-            })
-            ->implode("\n");
-
-        $transition($post, PostStatus::Failed, null, $errorNote ?: null);
-
-        $notifications->send($notifications->orgRecipients($post), new PostPublishFailed($post));
-
-        Log::error('PublishPostJob: post publish failed for one or more targets', [
-            'post_id' => $post->id,
-            'errors' => $failures
-                ->map(fn ($result) => ['account_id' => $result->accountId, 'error' => $result->error])
-                ->values()
-                ->all(),
-        ]);
+        return $post;
     }
 }

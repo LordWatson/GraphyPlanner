@@ -66,7 +66,8 @@ final class InvoicePresenter
             'payment_reference' => $invoice->payment_reference,
             'voided_at' => $invoice->voided_at?->toIso8601String(),
             'void_reason' => $invoice->void_reason,
-            'pdf_url' => $invoice->pdf_url,
+            // Step I-1.6: an authorized route, never a direct storage URL.
+            'pdf_url' => $invoice->hasPdf() ? route('invoices.pdf.show', $invoice) : null,
             'pdf_original_filename' => $invoice->pdf_original_filename,
             'pdf_is_generated' => $invoice->hasPdf() && $invoice->pdf_original_filename === $invoice->generatedPdfFilename(),
             'items' => $invoice->items->map(fn (InvoiceItem $item) => [
@@ -142,7 +143,8 @@ final class InvoicePresenter
             'is_unpaid' => $invoice->status === InvoiceStatus::Sent,
             'is_overdue' => $invoice->isOverdue(),
             'days_overdue' => $invoice->daysOverdue(),
-            'pdf_url' => $invoice->pdf_url,
+            // Step I-1.6: served through the portal's own authorized route.
+            'pdf_url' => $invoice->hasPdf() ? route('portal.invoices.pdf', $invoice) : null,
             'pdf_original_filename' => $invoice->pdf_original_filename,
             'items' => $invoice->items
                 ->map(fn (InvoiceItem $item) => [

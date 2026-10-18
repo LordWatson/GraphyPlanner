@@ -43,20 +43,23 @@ Route::inertia('about', 'about')->name('about');
 
 // Step 0.13: the client review portal is unauthenticated — access is granted purely by
 // possession of a valid `ReviewToken`, never a logged-in session (spec §10/§12).
-Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
-Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
+// Step I-1.7: every public token link is throttled per IP + token (`throttle:public-token`).
+Route::middleware('throttle:public-token')->group(function () {
+    Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
+    Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
 
-// Step 6.2: accepting a client portal invitation is unauthenticated — access is granted purely
-// by possession of a valid, unexpired, unrevoked, unaccepted `ClientInvitation` token, mirroring
-// the review portal above.
-Route::get('client-invite/{token}', [ClientInvitationAcceptController::class, 'show'])->name('client-invite.show');
-Route::post('client-invite/{token}', [ClientInvitationAcceptController::class, 'store'])->name('client-invite.store');
+    // Step 6.2: accepting a client portal invitation is unauthenticated — access is granted purely
+    // by possession of a valid, unexpired, unrevoked, unaccepted `ClientInvitation` token, mirroring
+    // the review portal above.
+    Route::get('client-invite/{token}', [ClientInvitationAcceptController::class, 'show'])->name('client-invite.show');
+    Route::post('client-invite/{token}', [ClientInvitationAcceptController::class, 'store'])->name('client-invite.store');
 
-// Accepting a staff invitation is unauthenticated — access is granted purely by possession of a
-// valid, unexpired, unrevoked, unaccepted `StaffInvitation` token, mirroring the client portal
-// invitation flow above.
-Route::get('staff-invite/{token}', [StaffInvitationAcceptController::class, 'show'])->name('staff-invite.show');
-Route::post('staff-invite/{token}', [StaffInvitationAcceptController::class, 'store'])->name('staff-invite.store');
+    // Accepting a staff invitation is unauthenticated — access is granted purely by possession of a
+    // valid, unexpired, unrevoked, unaccepted `StaffInvitation` token, mirroring the client portal
+    // invitation flow above.
+    Route::get('staff-invite/{token}', [StaffInvitationAcceptController::class, 'show'])->name('staff-invite.show');
+    Route::post('staff-invite/{token}', [StaffInvitationAcceptController::class, 'store'])->name('staff-invite.store');
+});
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
 // connect flow, so this must be reachable without a session, just like the review portal above.
@@ -66,7 +69,9 @@ Route::get('social-accounts/callback', [SocialAccountController::class, 'callbac
 // available from a server-to-server vendor call, so this is public (verified instead via the
 // `X-Upload-Post-Signature` header, see `UploadPostWebhookController`) and excluded from CSRF
 // verification (see `bootstrap/app.php`).
-Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle'])->name('webhooks.upload-post');
+Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.upload-post');
 
 // Step 15.2: the public organization signup — the first real "create an organization" path.
 // Fortify's own `/register` (which created org-less users) is replaced by it; the old URL
@@ -101,6 +106,13 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     });
 
     Route::resource('clients', ClientController::class);
+    // Step I-1.5: "delete" (above) archives; these act on archived (soft-deleted) clients.
+    Route::post('clients/{client}/restore', [ClientController::class, 'restore'])
+        ->withTrashed()
+        ->name('clients.restore');
+    Route::delete('clients/{client}/purge', [ClientController::class, 'purge'])
+        ->withTrashed()
+        ->name('clients.purge');
 
     Route::get('clients/{client}/brand-brain', [BrandBrainController::class, 'edit'])
         ->name('clients.brand-brain.edit');
@@ -117,6 +129,7 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index');
     Route::get('invoices/export', [InvoiceController::class, 'export'])
+        ->middleware('throttle:exports')
         ->name('invoices.export');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
@@ -126,9 +139,13 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('invoices.update');
     Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
         ->name('invoices.destroy');
+    // Step I-1.6: invoice PDFs are private — streamed only through this authorized route.
+    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'showPdf'])
+        ->name('invoices.pdf.show');
     Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
         ->name('invoices.pdf.store');
     Route::post('invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+        ->middleware('throttle:exports')
         ->name('invoices.generate-pdf');
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
         ->name('invoices.send');
@@ -200,25 +217,36 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('posts.edit');
     Route::put('posts/{post}', [PostController::class, 'update'])
         ->name('posts.update');
+    // Step I-1.5: soft delete for posts that never went out (published ones are archived).
+    Route::delete('posts/{post}', [PostController::class, 'destroy'])
+        ->name('posts.destroy');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
     Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])
         ->name('posts.reschedule');
+    // Step I-1.3: resend only the failed targets of a failed/partially published post.
+    Route::post('posts/{post}/retry-failed-targets', [PostController::class, 'retryFailedTargets'])
+        ->name('posts.retry-failed-targets');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
     Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
+        ->middleware('throttle:music-search')
         ->name('posts.music-search');
 
     // Step 2.4: AI-assisted trends/ideas (client dashboard) and caption suggestions (post
     // editor) — see AiController, gated behind config('ai.enabled') and Owner/Strategist.
-    Route::get('clients/{client}/ai/trends', [AiController::class, 'trends'])
-        ->name('clients.ai.trends');
-    Route::get('clients/{client}/ai/ideas', [AiController::class, 'ideas'])
-        ->name('clients.ai.ideas');
-    Route::get('posts/{post}/ai/captions', [AiController::class, 'captions'])
-        ->name('posts.ai.captions');
+    // Step I-1.7: POST (they call a paid vendor and write rows — a GET can be prefetched, crawled
+    // or replayed) and throttled per user + per org.
+    Route::middleware('throttle:ai')->group(function () {
+        Route::post('clients/{client}/ai/trends', [AiController::class, 'trends'])
+            ->name('clients.ai.trends');
+        Route::post('clients/{client}/ai/ideas', [AiController::class, 'ideas'])
+            ->name('clients.ai.ideas');
+        Route::post('posts/{post}/ai/captions', [AiController::class, 'captions'])
+            ->name('posts.ai.captions');
+    });
 
     // Trends & Ideas now persist (Step 2.4 follow-up) so each discovered trend/idea gets its
     // own detail page, the same list → detail pattern as the rest of the app.
@@ -232,16 +260,20 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Phase 16: AI Image Studio — see AiImageController, gated behind config('ai.enabled') and
     // AiImageGenerationPolicy (Owner/Strategist write, Designer read-only, clients never).
     Route::post('ai-post-ideas/{aiPostIdea}/images', [AiImageController::class, 'generateForIdea'])
+        ->middleware('throttle:ai-images')
         ->name('ai-post-ideas.images.store');
     Route::post('clients/{client}/ai/images', [AiImageController::class, 'generate'])
+        ->middleware('throttle:ai-images')
         ->name('clients.ai.images.store');
     Route::get('ai-image-generations/{generation}', [AiImageController::class, 'show'])
         ->name('ai-image-generations.show');
     Route::post('ai-image-generations/{generation}/use', [AiImageController::class, 'useInPost'])
         ->name('ai-image-generations.use');
     Route::post('ai-image-variants/{variant}/refine', [AiImageController::class, 'refine'])
+        ->middleware('throttle:ai-images')
         ->name('ai-image-variants.refine');
     Route::post('ai-image-variants/{variant}/regenerate', [AiImageController::class, 'regenerate'])
+        ->middleware('throttle:ai-images')
         ->name('ai-image-variants.regenerate');
     Route::post('ai-image-variants/{variant}/finalize', [AiImageController::class, 'finalize'])
         ->name('ai-image-variants.finalize');
@@ -264,14 +296,14 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Phase 17: chapter 06 Analytics — every staff role (sections gated per role inside, see
     // `AnalyticsAccess`); client reviewers get a 403 from `OrganizationAnalyticsFilterRequest`.
     Route::get('analytics', [OrganizationAnalyticsController::class, 'index'])->name('analytics.index');
-    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->name('analytics.export');
-    Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->name('analytics.pdf');
+    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware('throttle:exports')->name('analytics.export');
+    Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.pdf');
     Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
     Route::resource('analytics/reports', OrganizationReportController::class)
         ->names('analytics.reports')
         ->parameters(['reports' => 'report']);
-    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->name('analytics.reports.export');
-    Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->name('analytics.reports.pdf');
+    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->middleware('throttle:exports')->name('analytics.reports.export');
+    Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.reports.pdf');
 
     // The Staff module (Owner-only, see StaffPolicy): a real CRUD resource over the org's
     // `User` records, alongside the invitation flow that creates them.
@@ -296,6 +328,7 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::post('posts/{post}/comments', [PortalPostController::class, 'comment'])->name('posts.comments.store');
     Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('invoices/{invoice}/pdf', [PortalInvoiceController::class, 'pdf'])->name('invoices.pdf');
 });
 
 // Phase 15: the platform super admin console — org-less platform staff only (`super_admin`
@@ -316,7 +349,7 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
 
     Route::resource('reports', ReportController::class);
-    Route::get('reports/{report}/export', [ReportController::class, 'export'])->name('reports.export');
+    Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware('throttle:exports')->name('reports.export');
 });
 
 // Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen
@@ -345,6 +378,7 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
     Route::get('invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index');
     Route::get('invoices/export', [InvoiceController::class, 'export'])
+        ->middleware('throttle:exports')
         ->name('invoices.export');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
@@ -357,6 +391,7 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
     Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
         ->name('invoices.pdf.store');
     Route::post('invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+        ->middleware('throttle:exports')
         ->name('invoices.generate-pdf');
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
         ->name('invoices.send');
@@ -420,6 +455,7 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
     Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
+        ->middleware('throttle:music-search')
         ->name('posts.music-search');
 
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
@@ -428,13 +464,13 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('invitations.destroy');
     // Phase 17: read-only analytics mirror (exports included — they're GETs).
     Route::get('analytics', [OrganizationAnalyticsController::class, 'index'])->name('analytics.index');
-    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->name('analytics.export');
-    Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->name('analytics.pdf');
+    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware('throttle:exports')->name('analytics.export');
+    Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.pdf');
     Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
     Route::get('analytics/reports', [OrganizationReportController::class, 'index'])->name('analytics.reports.index');
     Route::get('analytics/reports/{report}', [OrganizationReportController::class, 'show'])->name('analytics.reports.show');
-    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->name('analytics.reports.export');
-    Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->name('analytics.reports.pdf');
+    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->middleware('throttle:exports')->name('analytics.reports.export');
+    Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.reports.pdf');
 });
 
 require __DIR__.'/settings.php';

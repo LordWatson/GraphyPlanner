@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Clients\ArchiveClientAction;
 use App\Actions\Clients\CreateClientAction;
+use App\Actions\Clients\PurgeClientAction;
+use App\Actions\Clients\RestoreClientAction;
 use App\Actions\Clients\UpdateClientAction;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
@@ -36,18 +39,28 @@ class ClientController extends Controller
         $this->authorize('viewAny', Client::class);
 
         $user = $request->user();
+        // Step I-1.5: archived (soft-deleted) clients live behind the "Archived" filter.
+        $archived = $request->boolean('archived');
 
         $clients = Client::query()
             ->where('org_id', $user->org_id)
+            ->when($archived, fn ($query) => $query->onlyTrashed())
             ->with('socialAccounts')
             ->orderBy('name')
             ->get()
-            ->map(fn (Client $client) => $this->transform($client, $user->can('viewBilling', $client)));
+            ->map(fn (Client $client) => [
+                ...$this->transform($client, $user->can('viewBilling', $client)),
+                'archived_at' => $client->deleted_at?->toIso8601String(),
+                'has_invoices' => $archived ? $client->invoices()->withTrashed()->exists() : null,
+            ]);
 
         return Inertia::render('clients/index', [
             'clients' => $clients,
+            'filters' => ['archived' => $archived],
+            'archivedCount' => Client::onlyTrashed()->where('org_id', $user->org_id)->count(),
             'can' => [
                 'create' => $user->can('create', Client::class),
+                'manageArchive' => $user->role === Role::Owner,
             ],
         ]);
     }
@@ -222,13 +235,44 @@ class ClientController extends Controller
     /**
      * Remove the specified client.
      */
-    public function destroy(Client $client): RedirectResponse
+    public function destroy(Request $request, Client $client, ArchiveClientAction $archive): RedirectResponse
     {
         $this->authorize('delete', $client);
 
-        $client->delete();
+        $archive($client, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __(':name archived. Restore it any time from Archived.', ['name' => $client->name])]);
 
         return to_route('clients.index');
+    }
+
+    /**
+     * Step I-1.5 — restore an archived client.
+     */
+    public function restore(Request $request, Client $client, RestoreClientAction $restore): RedirectResponse
+    {
+        $this->authorize('restore', $client);
+
+        $restore($client, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __(':name is back.', ['name' => $client->name])]);
+
+        return to_route('clients.show', $client);
+    }
+
+    /**
+     * Step I-1.5 — permanently purge an archived client (blocked while it has invoices).
+     */
+    public function purge(Request $request, Client $client, PurgeClientAction $purge): RedirectResponse
+    {
+        $this->authorize('forceDelete', $client);
+
+        $name = $client->name;
+        $purge($client, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __(':name was permanently deleted.', ['name' => $name])]);
+
+        return to_route('clients.index', ['archived' => 1]);
     }
 
     /**

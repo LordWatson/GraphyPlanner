@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ReportSchedule;
+use App\Models\Concerns\BelongsToOrganization;
 use Database\Factories\OrganizationReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,7 +39,7 @@ use Illuminate\Support\Carbon;
 class OrganizationReport extends Model
 {
     /** @use HasFactory<OrganizationReportFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory;
 
     /**
      * @return array<string, string>

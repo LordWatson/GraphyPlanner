@@ -4,7 +4,6 @@ namespace Tests\Feature\SuperAdmin;
 
 use App\Actions\AI\GenerateDailyBriefsAction;
 use App\Actions\Posts\SendUpcomingPostReminderEmailsAction;
-use App\Actions\Posts\TransitionPostStatusAction;
 use App\Contracts\PublishAdapter;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -41,7 +40,8 @@ class OrganizationSuspensionTest extends TestCase
         $adapter = Mockery::mock(PublishAdapter::class);
         $adapter->shouldNotReceive('publish');
 
-        (new PublishPostJob($post->id))->handle($adapter, app(TransitionPostStatusAction::class));
+        $this->app->instance(PublishAdapter::class, $adapter);
+        $this->app->call([new PublishPostJob($post->id), 'handle']);
 
         // Left `scheduled`, so nothing is lost if the organization is reinstated.
         $this->assertSame(PostStatus::Scheduled, $post->fresh()->status);
@@ -58,7 +58,7 @@ class OrganizationSuspensionTest extends TestCase
         $post->targets()->create(['social_account_id' => $account->id, 'scheduled_at_utc' => now()->addDay()]);
 
         $this->assertSame(0, app(SendUpcomingPostReminderEmailsAction::class)());
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
         Mail::assertNothingQueued();
     }
 

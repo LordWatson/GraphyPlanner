@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\SocialAccounts\ConnectSocialAccountAction;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Enums\Role;
@@ -9,6 +10,7 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\ConnectStateStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -131,7 +133,7 @@ class SocialAccountControllerTest extends TestCase
         $response = $this->actingAs($owner)->delete(route('social-accounts.destroy', $account));
 
         $response->assertRedirect(route('clients.show', $client));
-        $this->assertDatabaseMissing('social_accounts', ['id' => $account->id]);
+        $this->assertSoftDeleted($account);
     }
 
     public function test_owner_can_start_the_connect_flow_and_receives_the_vendor_url_as_json(): void
@@ -190,9 +192,12 @@ class SocialAccountControllerTest extends TestCase
             'connection_status' => ConnectionStatus::NotConnected,
         ]);
 
+        $state = app(ConnectStateStore::class)->issue($account, null, ConnectSocialAccountAction::STATE_FLOW);
+
         $response = $this->get(route('social-accounts.callback', [
             'social_account_id' => $account->id,
             'profile' => 'vendor-profile-123',
+            'state' => $state,
         ]));
 
         $response->assertOk();
@@ -201,6 +206,40 @@ class SocialAccountControllerTest extends TestCase
         $this->assertSame('vendor-profile-123', $account->fresh()->external_profile_id);
         $this->assertSame(ConnectionStatus::Connected, $account->fresh()->connection_status);
         $this->assertNotNull($account->fresh()->connected_at);
+    }
+
+    /**
+     * Step I-1.6: the unauthenticated connect callback must carry the signed, single-use state
+     * issued for that very account.
+     */
+    public function test_a_vendor_callback_without_a_valid_state_is_rejected(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $account = SocialAccount::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'connection_status' => ConnectionStatus::NotConnected,
+        ]);
+        $other = SocialAccount::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->get(route('social-accounts.callback', ['social_account_id' => $account->id, 'profile' => 'evil']))
+            ->assertForbidden();
+        $this->get(route('social-accounts.callback', ['social_account_id' => $account->id, 'profile' => 'evil', 'state' => 'forged']))
+            ->assertForbidden();
+
+        // A state minted for another account can't be used for this one.
+        $otherState = app(ConnectStateStore::class)->issue($other, null, ConnectSocialAccountAction::STATE_FLOW);
+        $this->get(route('social-accounts.callback', ['social_account_id' => $account->id, 'profile' => 'evil', 'state' => $otherState]))
+            ->assertForbidden();
+
+        // A valid state works once, and only once.
+        $state = app(ConnectStateStore::class)->issue($account, null, ConnectSocialAccountAction::STATE_FLOW);
+        $this->get(route('social-accounts.callback', ['social_account_id' => $account->id, 'profile' => 'real', 'state' => $state]))
+            ->assertOk();
+        $this->get(route('social-accounts.callback', ['social_account_id' => $account->id, 'profile' => 'replayed', 'state' => $state]))
+            ->assertForbidden();
+
+        $this->assertSame('real', $account->fresh()->external_profile_id);
     }
 
     public function test_client_reviewer_sees_social_accounts_scoped_to_their_client(): void

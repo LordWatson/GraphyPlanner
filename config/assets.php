@@ -8,16 +8,31 @@ return [
     |--------------------------------------------------------------------------
     |
     | The filesystem disk (see config/filesystems.php) used to store uploaded
-    | Asset files. Uses Laravel's local "public" disk for now (spec §10 calls
-    | for S3-compatible storage via signed URLs, but that vendor isn't wired
-    | up yet). The "s3" disk is already defined in config/filesystems.php —
-    | switching to it later should only require setting ASSETS_DISK=s3 (plus
-    | the AWS_* env vars) once Phase 1/2 needs signed-upload URLs; no
-    | Action/Controller code should need to change.
+    | Asset files. Step I-1.6: the private `local` disk by default, served only
+    | through signed URLs (spec §10). Files already stored on the old `public`
+    | disk keep working (each row remembers its disk). Switching to S3 is
+    | ASSETS_DISK=s3 plus the AWS_* env vars and the flysystem S3 package; no
+    | Action/Controller code needs to change.
     |
     */
 
-    'disk' => env('ASSETS_DISK', 'public'),
+    'disk' => env('ASSETS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Signed URL lifetimes (Step I-1.6)
+    |--------------------------------------------------------------------------
+    |
+    | Files on a non-public disk (the private `local` disk by default, or `s3` — which also needs
+    | `composer require league/flysystem-aws-s3-v3`) are only reachable through signed, expiring
+    | URLs. `url_ttl_minutes` covers in-app viewing; `vendor_url_ttl_minutes` covers a publishing
+    | vendor fetching media by URL, which can happen well after the request was made.
+    |
+    */
+
+    'url_ttl_minutes' => (int) env('ASSETS_URL_TTL_MINUTES', 60),
+
+    'vendor_url_ttl_minutes' => (int) env('ASSETS_VENDOR_URL_TTL_MINUTES', 1440),
 
     /*
     |--------------------------------------------------------------------------

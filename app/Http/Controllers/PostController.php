@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
+use App\Actions\Posts\DeletePostAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Actions\Posts\PostStatusTransitionMap;
 use App\Actions\Posts\ReschedulePostAction;
 use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
+use App\Actions\Publishing\RetryFailedPostTargetsAction;
 use App\Actions\Publishing\SearchMusicAction;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -104,6 +106,8 @@ class PostController extends Controller
                 'update' => $user->can('update', $post),
                 'comment' => $user->can('comment', $post),
                 'resend_review_email' => $user->can('resendReviewEmail', $post),
+                'retry_failed_targets' => $user->can('retryFailedTargets', $post),
+                'delete' => $user->can('delete', $post),
                 'create_asset' => $user->can('create', [Asset::class, $client]),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
@@ -166,6 +170,36 @@ class PostController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Post moved.')]);
 
         return back();
+    }
+
+    /**
+     * Step I-1.5 — delete (soft) a post that never went out. Published posts can only be
+     * archived, through the regular `archived` transition.
+     */
+    public function destroy(Request $request, Post $post, DeletePostAction $action): RedirectResponse
+    {
+        $this->authorize('delete', $post);
+
+        $clientId = $post->client_id;
+        $action($post, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post deleted.')]);
+
+        return to_route('clients.show', $clientId);
+    }
+
+    /**
+     * Step I-1.3 — resend only the failed targets of a `failed`/`partially_published` post.
+     */
+    public function retryFailedTargets(Request $request, Post $post, RetryFailedPostTargetsAction $action): RedirectResponse
+    {
+        $this->authorize('retryFailedTargets', $post);
+
+        $action($post, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Retrying the failed channels.')]);
+
+        return to_route('posts.edit', $post);
     }
 
     /**
@@ -325,7 +359,8 @@ class PostController extends Controller
                 'from_status' => $log->from_status?->value,
                 'to_status' => $log->to_status->value,
                 'note' => $log->note,
-                'review_url' => $log->review_url,
+                // Step I-1.6: the link itself is never stored — only whether one was sent.
+                'review_link_sent' => $log->review_token_id !== null,
                 'created_at' => $log->created_at?->toIso8601String(),
             ])->values(),
             'approvals' => $post->approvals->sortByDesc('created_at')->map(fn ($approval) => [

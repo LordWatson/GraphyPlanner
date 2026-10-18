@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Enums\PostStatus;
 use App\Http\Requests\ReviewDecisionRequest;
+use App\Models\Post;
 use App\Models\ReviewToken;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -89,13 +90,14 @@ class ReviewController extends Controller
      * Resolve the post scoped strictly to a valid token's `client_id` (and `post_id`, when the
      * token was issued for a single post) — never any other client's data (spec §12).
      */
-    private function resolvePost(string $token): \App\Models\Post
+    private function resolvePost(string $token): Post
     {
         $reviewToken = ReviewToken::query()
             ->where('token_hash', hash('sha256', $token))
             ->first();
 
-        if (! $reviewToken || ! $reviewToken->isValid()) {
+        // Step I-1.5: links for an archived client stop working until it's restored.
+        if (! $reviewToken || ! $reviewToken->isValid() || $reviewToken->client?->trashed() !== false) {
             throw new NotFoundHttpException;
         }
 

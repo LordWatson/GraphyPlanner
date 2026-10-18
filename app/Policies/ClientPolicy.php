@@ -51,11 +51,28 @@ class ClientPolicy
     }
 
     /**
-     * Determine whether the user can delete a client.
+     * Determine whether the user can archive ("delete") a client — Step I-1.5: a soft delete.
      */
     public function delete(User $user, Client $client): bool
     {
         return $user->org_id === $client->org_id && $user->role === Role::Owner;
+    }
+
+    /**
+     * Step I-1.5: bring an archived client back.
+     */
+    public function restore(User $user, Client $client): bool
+    {
+        return $client->trashed() && $this->delete($user, $client);
+    }
+
+    /**
+     * Step I-1.5: permanently purge an archived client (blocked while it has invoices, see
+     * `PurgeClientAction`). Only an already-archived client can be purged.
+     */
+    public function forceDelete(User $user, Client $client): bool
+    {
+        return $client->trashed() && $this->delete($user, $client);
     }
 
     /**

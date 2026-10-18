@@ -4,12 +4,16 @@ namespace App\Models;
 
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\SocialAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -35,6 +39,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $connected_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 #[Fillable([
     'org_id', 'client_id', 'platform', 'handle', 'display_name', 'timezone',
@@ -42,10 +47,13 @@ use Illuminate\Support\Carbon;
     'connection_status', 'provider', 'external_profile_id', 'external_account_id', 'connected_at',
     'meta_access_token', 'meta_access_token_expires_at', 'meta_instagram_user_id',
 ])]
+// Step I-1.6: never serialized — a `toArray()`/Inertia prop of an account can't leak the Meta
+// token or the vendor profile id.
+#[Hidden(['meta_access_token', 'external_profile_id'])]
 class SocialAccount extends Model
 {
     /** @use HasFactory<SocialAccountFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory, SoftDeletes;
 
     /**
      * @return array<string, string>
@@ -77,7 +85,8 @@ class SocialAccount extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

@@ -10,10 +10,11 @@ use App\Http\Requests\StoreSocialAccountRequest;
 use App\Http\Requests\UpdateSocialAccountRequest;
 use App\Models\Client;
 use App\Models\SocialAccount;
+use App\Services\ConnectStateStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -59,12 +60,12 @@ class SocialAccountController extends Controller
      * window there) so the frontend can open it in a separate tab/popup, keeping Graphy itself
      * available and letting it poll for the connection status once that tab is closed.
      */
-    public function connect(SocialAccount $socialAccount, ConnectSocialAccountAction $action): JsonResponse
+    public function connect(Request $request, SocialAccount $socialAccount, ConnectSocialAccountAction $action): JsonResponse
     {
         $this->authorize('update', $socialAccount);
 
         try {
-            $url = $action($socialAccount);
+            $url = $action($socialAccount, $request->user());
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -79,13 +80,29 @@ class SocialAccountController extends Controller
      * since this callback is opened by `connect()` in a separate tab/popup rather than the user's
      * main Graphy tab.
      */
-    public function callback(Request $request, PublishAdapter $adapter): View
+    public function callback(Request $request, PublishAdapter $adapter, ConnectStateStore $states): Response
     {
+        // Step I-1.6: the callback is unauthenticated, so it must carry the signed, single-use
+        // state issued by `ConnectSocialAccountAction` for this very account.
+        $payload = $states->consume($request->query('state'), ConnectSocialAccountAction::STATE_FLOW);
+
+        if ($payload === null || (string) $payload['social_account_id'] !== (string) $request->query('social_account_id')) {
+            Log::warning('Rejected Upload-Post connect callback: missing, invalid or reused state', [
+                'social_account_id' => $request->query('social_account_id'),
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->view('social-accounts.connected', [
+                'connected' => false,
+                'clientUrl' => route('dashboard'),
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $adapter->handleCallback($request->query());
 
-        $socialAccount = SocialAccount::find($request->query('social_account_id'));
+        $socialAccount = SocialAccount::find($payload['social_account_id']);
 
-        return view('social-accounts.connected', [
+        return response()->view('social-accounts.connected', [
             'connected' => (bool) $socialAccount,
             'clientUrl' => $socialAccount ? route('clients.show', $socialAccount->client_id) : route('dashboard'),
         ]);

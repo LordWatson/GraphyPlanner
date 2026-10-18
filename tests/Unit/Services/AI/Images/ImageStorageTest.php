@@ -24,17 +24,18 @@ class ImageStorageTest extends TestCase
     public function test_store_contents_writes_under_the_directory_and_returns_the_store_shape(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $stored = (new LocalAssetStorage)->storeContents('bytes', 'image/png', 'ai-images/1/2', 'png');
 
-        $this->assertSame('public', $stored['disk']);
+        $this->assertSame('local', $stored['disk']);
         $this->assertMatchesRegularExpression('#^ai-images/1/2/[0-9a-f-]{36}\.png$#', $stored['path']);
         $this->assertSame('image/png', $stored['mime_type']);
         $this->assertSame(5, $stored['size']);
         $this->assertNotEmpty($stored['url']);
-        Storage::disk('public')->assertExists($stored['path']);
-        $this->assertSame('bytes', (new LocalAssetStorage)->contents('public', $stored['path']));
-        $this->assertNull((new LocalAssetStorage)->contents('public', 'missing.png'));
+        Storage::disk('local')->assertExists($stored['path']);
+        $this->assertSame('bytes', (new LocalAssetStorage)->contents('local', $stored['path']));
+        $this->assertNull((new LocalAssetStorage)->contents('local', 'missing.png'));
     }
 
     public function test_reference_normalisation_caps_the_long_edge_and_encodes_webp(): void

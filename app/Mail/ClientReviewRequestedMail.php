@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\Post;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Sent to a client's `approval_email` (via Resend) when a post moves into `waiting_client`,
  * containing the Step 0.13 review-portal link (a fresh, single-use-scoped `ReviewToken`).
  */
-class ClientReviewRequestedMail extends Mailable
+class ClientReviewRequestedMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

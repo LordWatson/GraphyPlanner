@@ -46,6 +46,7 @@ use App\Services\LocalAssetStorage;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Support\RateLimits;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -117,6 +118,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Step I-1.7: named rate limiters (`throttle:ai`, `throttle:exports`, …) — see RateLimits.
+        RateLimits::register();
 
         // Step 15.1: platform super admins bypass every per-org policy. They never reach the org
         // workspace itself (`org.member` sends them to `/super-admin`), so in practice this grants

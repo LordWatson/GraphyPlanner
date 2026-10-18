@@ -2,6 +2,7 @@
 
 namespace App\Contracts;
 
+use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Support\Publishing\TargetResult;
@@ -18,8 +19,11 @@ interface PublishAdapter
      * Start (or return) the connect/OAuth URL for linking a SocialAccount to
      * this vendor. Does not itself flip connectionStatus — that happens once
      * handleCallback() completes the flow.
+     *
+     * Step I-1.6: `$state` is a signed, single-use value (`ConnectStateStore`) the adapter must
+     * round-trip on the callback URL, so the callback can reject forged or replayed requests.
      */
-    public function connectAccount(SocialAccount $account): string;
+    public function connectAccount(SocialAccount $account, ?string $state = null): string;
 
     /**
      * Handle the vendor's OAuth/connect callback query, persisting whatever
@@ -52,6 +56,12 @@ interface PublishAdapter
      * vendor (e.g. to detect an expired token).
      */
     public function health(SocialAccount $account): bool;
+
+    /**
+     * Step I-1.6: whether the vendor accepts this organization's stored credentials ("Test
+     * connection" in organization settings). Never publishes anything.
+     */
+    public function verifyCredentials(Organization $organization): bool;
 
     /**
      * Poll the vendor for the final outcome of a previously accepted publish

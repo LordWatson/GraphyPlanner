@@ -2,15 +2,18 @@
 
 namespace App\Services\Publishing;
 
+use App\Contracts\AssetStorage;
 use App\Contracts\PublishAdapter;
 use App\Enums\AssetType;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Models\Asset;
+use App\Models\Organization;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Support\Publishing\TargetResult;
+use App\Support\Publishing\VendorHttp;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -41,7 +44,7 @@ class UploadPostAdapter implements PublishAdapter
      * The link's `redirect_url` carries the account id so `handleCallback()` can identify which
      * SocialAccount to update once the user finishes linking on Upload-Post's side.
      */
-    public function connectAccount(SocialAccount $account): string
+    public function connectAccount(SocialAccount $account, ?string $state = null): string
     {
         $username = $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id;
 
@@ -52,7 +55,10 @@ class UploadPostAdapter implements PublishAdapter
         try {
             $response = $this->client($account)->post('/uploadposts/users/generate-jwt', [
                 'username' => $username,
-                'redirect_url' => route('social-accounts.callback', ['social_account_id' => $account->id]),
+                'redirect_url' => route('social-accounts.callback', array_filter([
+                    'social_account_id' => $account->id,
+                    'state' => $state,
+                ])),
             ]);
         } catch (Throwable $e) {
             Log::error('Upload-Post connect request failed', [
@@ -185,6 +191,25 @@ class UploadPostAdapter implements PublishAdapter
     }
 
     /**
+     * Step I-1.6: a read-only call authenticated with the organization's key — any 2xx means the
+     * key is accepted.
+     */
+    public function verifyCredentials(Organization $organization): bool
+    {
+        try {
+            return VendorHttp::forReads(
+                Http::baseUrl($this->baseUrl())
+                    ->withHeaders(['Authorization' => 'Apikey '.($organization->upload_post_key ?? '')])
+                    ->acceptJson(),
+            )->get('/uploadposts/users')->successful();
+        } catch (Throwable $e) {
+            Log::warning('Upload-Post credential check failed', ['org_id' => $organization->id, 'error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /**
      * Step 1.5 poll fallback: asks Upload-Post for the current outcome of a previously accepted
      * publish, in case the webhook never arrives. Per the real "Upload Status" endpoint
      * (`GET /uploadposts/status?request_id=...|job_id=...`, see
@@ -284,6 +309,7 @@ class UploadPostAdapter implements PublishAdapter
 
         [$fields, $sent, $skipped] = $this->buildFields($post, $account);
         $endpoint = $this->resolveUploadEndpoint($post);
+        $attemptId = $post->targets->firstWhere('social_account_id', $account->id)?->publish_attempt_id;
 
         Log::info('Publishing post via Upload-Post', [
             'post_id' => $post->id,
@@ -299,9 +325,9 @@ class UploadPostAdapter implements PublishAdapter
             // replies with a generic "Username required in form data" error. upload_text has no
             // file-ish fields and is documented as JSON, so it's left untouched.
             if ($endpoint === '/upload_text') {
-                $response = $this->client($account)->post($endpoint, $fields);
+                $response = $this->publishClient($account, $attemptId)->post($endpoint, $fields);
             } else {
-                $request = $this->client($account)->asMultipart();
+                $request = $this->publishClient($account, $attemptId)->asMultipart();
 
                 // Assets stored on a disk we control are attached as real multipart files rather
                 // than sent as a `video`/`photos[]` URL — the app's own APP_URL can be a
@@ -420,6 +446,23 @@ class UploadPostAdapter implements PublishAdapter
         }
     }
 
+    /**
+     * Step I-1.6: a private file's URL is signed for long enough (`assets.vendor_url_ttl_minutes`)
+     * for the vendor to fetch it later; public disks and external links keep their URL.
+     */
+    private function vendorUrl(Asset $asset): ?string
+    {
+        if (blank($asset->disk) || blank($asset->path)) {
+            return $asset->url;
+        }
+
+        return app(AssetStorage::class)->signedUrl(
+            (string) $asset->disk,
+            (string) $asset->path,
+            (int) config('assets.vendor_url_ttl_minutes', 1440),
+        );
+    }
+
     private function hasLocalFile(Asset $asset): bool
     {
         return filled($asset->disk) && filled($asset->path) && Storage::disk($asset->disk)->exists($asset->path);
@@ -478,15 +521,20 @@ class UploadPostAdapter implements PublishAdapter
         /** @var PostTarget|null $target */
         $target = $post->targets->firstWhere('social_account_id', $account->id);
 
-        if ($target?->scheduled_at_utc) {
+        // Step I-1.3: only a future time is a schedule — a retried or past-due target is sent for
+        // immediate publishing instead of with a `scheduled_date` the vendor would reject.
+        if ($target?->scheduled_at_utc && $target->scheduled_at_utc->isAfter(now()->addMinute())) {
             $fields['scheduled_date'] = $target->scheduled_at_utc->toIso8601String();
             $sent[] = 'scheduled_date';
         } else {
             $skipped[] = 'scheduled_date';
         }
 
-        $videoUrl = $post->assets->firstWhere('type', AssetType::Video)?->url;
-        $imageUrls = $post->assets->where('type', AssetType::Image)->pluck('url')->filter()->values()->all();
+        $videoAsset = $post->assets->firstWhere('type', AssetType::Video);
+        $videoUrl = $videoAsset ? $this->vendorUrl($videoAsset) : null;
+        $imageUrls = $post->assets->where('type', AssetType::Image)
+            ->map(fn (Asset $asset) => $this->vendorUrl($asset))
+            ->filter()->values()->all();
 
         if ($videoUrl) {
             $fields['video'] = $videoUrl;
@@ -664,7 +712,23 @@ class UploadPostAdapter implements PublishAdapter
         }
     }
 
+    /**
+     * Repeatable calls (status, health, connect) — retried on 429/5xx/connection errors.
+     */
     private function client(SocialAccount $account): PendingRequest
+    {
+        return VendorHttp::forReads($this->baseRequest($account));
+    }
+
+    /**
+     * The upload POST — retried on 429 only, with the target's attempt id as idempotency key.
+     */
+    private function publishClient(SocialAccount $account, ?string $attemptId): PendingRequest
+    {
+        return VendorHttp::forPublish($this->baseRequest($account), $attemptId);
+    }
+
+    private function baseRequest(SocialAccount $account): PendingRequest
     {
         $apiKey = $account->organization?->upload_post_key ?? '';
 

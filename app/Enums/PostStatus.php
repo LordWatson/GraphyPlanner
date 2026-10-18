@@ -13,6 +13,9 @@ enum PostStatus: string
     case Scheduled = 'scheduled';
     case Publishing = 'publishing';
     case Published = 'published';
+    // Step I-1.3: some targets went out, at least one failed — "Retry failed targets" resends
+    // only the failed ones.
+    case PartiallyPublished = 'partially_published';
     case Failed = 'failed';
     case Archived = 'archived';
 
@@ -32,6 +35,7 @@ enum PostStatus: string
             self::Scheduled,
             self::Publishing,
             self::Published,
+            self::PartiallyPublished,
             self::Failed,
             self::Archived,
         ];
@@ -54,6 +58,7 @@ enum PostStatus: string
             self::Scheduled => 'Scheduled',
             self::Publishing => 'Publishing',
             self::Published => 'Published',
+            self::PartiallyPublished => 'Partially published',
             self::Failed => 'Failed',
             self::Archived => 'Archived',
         };

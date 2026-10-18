@@ -103,6 +103,16 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Step I-1.6 — the invoice PDF, inline, for anyone allowed to view the invoice.
+     */
+    public function showPdf(Invoice $invoice): StreamedResponse
+    {
+        $this->authorize('view', $invoice);
+
+        return $invoice->pdfResponse();
+    }
+
+    /**
      * Display the specified invoice.
      */
     public function show(Request $request, Invoice $invoice): Response

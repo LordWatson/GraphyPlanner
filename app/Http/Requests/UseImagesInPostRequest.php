@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AiImageGeneration;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -9,9 +10,14 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class UseImagesInPostRequest extends FormRequest
 {
+    /**
+     * Step I-1.9: authorize before validating (see `GenerateImagesRequest`).
+     */
     public function authorize(): bool
     {
-        return true;
+        $generation = $this->route('generation');
+
+        return $generation instanceof AiImageGeneration && $this->user()->can('manage', $generation);
     }
 
     /**

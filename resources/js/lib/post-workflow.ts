@@ -45,7 +45,7 @@ export const workflowStages: WorkflowStage[] = [
     {
         key: 'live',
         label: 'Live',
-        statuses: ['publishing', 'published', 'failed'],
+        statuses: ['publishing', 'published', 'partially_published', 'failed'],
     },
 ];
 
@@ -296,6 +296,11 @@ export function statusGuidance(
             return {
                 headline: 'Live.',
                 hint: 'Published to every channel.',
+            };
+        case 'partially_published':
+            return {
+                headline: 'Partly published.',
+                hint: 'Some channels went out, others failed. Retry just the failed channels — the live ones are left alone.',
             };
         case 'failed':
             return {

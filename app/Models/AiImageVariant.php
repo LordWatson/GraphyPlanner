@@ -6,6 +6,8 @@ use App\Enums\ImageErrorCode;
 use App\Enums\ImageQualityTier;
 use App\Enums\ImageVariantKind;
 use App\Enums\ImageVariantStatus;
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\AiImageVariantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -50,7 +52,7 @@ use Illuminate\Support\Carbon;
 class AiImageVariant extends Model
 {
     /** @use HasFactory<AiImageVariantFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory;
 
     /**
      * @return array<string, string>
@@ -75,7 +77,7 @@ class AiImageVariant extends Model
      */
     public function generation(): BelongsTo
     {
-        return $this->belongsTo(AiImageGeneration::class, 'generation_id');
+        return $this->belongsTo(AiImageGeneration::class, 'generation_id')->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -83,7 +85,7 @@ class AiImageVariant extends Model
      */
     public function asset(): BelongsTo
     {
-        return $this->belongsTo(Asset::class);
+        return $this->belongsTo(Asset::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

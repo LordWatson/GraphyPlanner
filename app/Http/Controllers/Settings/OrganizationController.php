@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Actions\Organizations\TestUploadPostConnectionAction;
 use App\Actions\Organizations\UpdateOrganizationSettingsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\OrganizationSettingsUpdateRequest;
@@ -33,9 +34,36 @@ class OrganizationController extends Controller
                 'has_upload_post_key' => filled($organization->upload_post_key),
                 'has_upload_post_webhook_secret' => filled($organization->upload_post_webhook_secret),
                 'has_xai_key' => filled($organization->xai_key),
+                // Step I-1.6: enough to recognise which key is stored, never the key itself.
+                'upload_post_key_last4' => self::lastFour($organization->upload_post_key),
+                'upload_post_webhook_secret_last4' => self::lastFour($organization->upload_post_webhook_secret),
+                'xai_key_last4' => self::lastFour($organization->xai_key),
             ],
             'currencies' => CurrencyOptions::options(),
         ]);
+    }
+
+    /**
+     * Step I-1.6 — "Test connection": does Upload-Post accept the stored key?
+     */
+    public function testUploadPost(Request $request, TestUploadPostConnectionAction $action): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+
+        $this->authorize('update', $organization);
+
+        $ok = $action($organization, $request->user());
+
+        Inertia::flash('toast', $ok
+            ? ['type' => 'success', 'message' => __('Upload-Post accepted your key. You’re connected.')]
+            : ['type' => 'error', 'message' => __('Upload-Post didn’t accept the key. Check it and try again.')]);
+
+        return to_route('organization.edit');
+    }
+
+    private static function lastFour(?string $secret): ?string
+    {
+        return filled($secret) && mb_strlen((string) $secret) > 8 ? mb_substr((string) $secret, -4) : null;
     }
 
     /**

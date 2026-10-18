@@ -33,9 +33,16 @@ interface AssetStorage
     public function contents(string $disk, string $path): ?string;
 
     /**
-     * Resolve a publicly reachable URL for a stored file.
+     * Resolve a reachable URL for a stored file. Step I-1.6: for a private disk this is a signed
+     * URL that expires after `assets.url_ttl_minutes`.
      */
     public function url(string $disk, string $path): string;
+
+    /**
+     * Like `url()`, with an explicit lifetime in minutes — e.g. long enough for a publishing
+     * vendor to fetch the file (`assets.vendor_url_ttl_minutes`). Public disks ignore it.
+     */
+    public function signedUrl(string $disk, string $path, int $minutes): string;
 
     /**
      * Remove a stored file.

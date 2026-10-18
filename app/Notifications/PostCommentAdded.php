@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Post;
 use App\Models\PostComment;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -13,7 +14,7 @@ use Illuminate\Notifications\Notification;
  * reviewer) or client-portal users (when the commenter is an org user and the comment isn't
  * `internal_only`) — never to the commenter themselves.
  */
-class PostCommentAdded extends Notification
+class PostCommentAdded extends Notification implements ShouldQueue
 {
     use Queueable;
 

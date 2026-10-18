@@ -9,6 +9,7 @@ use App\Support\Invoices\InvoicePresenter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Step 6.6 — the client portal's read-only invoices list/detail: reuses `InvoicePolicy`'s
@@ -34,6 +35,17 @@ class PortalInvoiceController extends Controller
         return Inertia::render('portal/invoices/index', [
             'invoices' => $invoices,
         ]);
+    }
+
+    /**
+     * Step I-1.6 — the invoice PDF for the portal contact's own client (the `portal` middleware
+     * has already checked the invoice belongs to them). Drafts are never shown.
+     */
+    public function pdf(Invoice $invoice): StreamedResponse
+    {
+        abort_if($invoice->status === InvoiceStatus::Draft, 404);
+
+        return $invoice->pdfResponse();
     }
 
     public function show(Request $request, Invoice $invoice): Response

@@ -67,7 +67,8 @@ class PostActivityMetrics
     public function publishOutcomes(AnalyticsScope $scope, AnalyticsRange $range): array
     {
         $published = $this->transitionsInRange($scope, $range, PostStatus::Published)->count();
-        $failed = $this->transitionsInRange($scope, $range, PostStatus::Failed)->count();
+        // Step I-1.3: a partial publish isn't a clean success, so it counts against the rate.
+        $failed = $this->transitionsInRange($scope, $range, [PostStatus::Failed, PostStatus::PartiallyPublished])->count();
 
         return [
             'published' => $published,

@@ -1,5 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ArrowRight,
     Building2,
     FileBarChart,
@@ -37,12 +38,80 @@ type OrganizationRow = {
     users_count: number;
 };
 
+type SchedulerRow = {
+    command: string;
+    label: string;
+    interval_minutes: number;
+    last_ran_at: string | null;
+    stale: boolean;
+};
+
 type Props = {
     summary: PlatformSummary;
     recentOrganizations: OrganizationRow[];
     suspendedOrganizations: OrganizationRow[];
     reports: { id: number; name: string; last_run_at: string | null }[];
+    health: {
+        schedulers: SchedulerRow[];
+        queue: { pending: number | null; failed: number };
+    };
 };
+
+/**
+ * Step I-1.8 — scheduler heartbeats (stale when a command hasn't run within two of its intervals)
+ * and the queue backlog, so a stopped cron or worker is visible before customers notice.
+ */
+function SystemHealthPanel({ health }: { health: Props['health'] }) {
+    const staleCount = health.schedulers.filter((row) => row.stale).length;
+
+    return (
+        <Panel
+            eyebrow={
+                staleCount === 0
+                    ? 'All schedulers running'
+                    : `${staleCount} stale`
+            }
+            title="System health"
+            icon={Activity}
+            bodyClassName="p-0 sm:p-0"
+        >
+            <ul className="divide-border/70 divide-y">
+                {health.schedulers.map((row) => (
+                    <li
+                        key={row.command}
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3"
+                    >
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">
+                                {row.label}
+                            </span>
+                            <span className="text-muted-foreground font-mono text-xs">
+                                {row.last_ran_at
+                                    ? `Last ran ${formatDateTime(row.last_ran_at)}`
+                                    : 'No run recorded yet'}
+                            </span>
+                        </span>
+                        <StatusPill
+                            kind="scheduler"
+                            value={row.stale ? 'stale' : 'ok'}
+                        />
+                    </li>
+                ))}
+                <li className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
+                    <span className="min-w-0 flex-1 text-sm font-medium">
+                        Queue
+                    </span>
+                    <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                        {health.queue.pending === null
+                            ? 'pending: n/a'
+                            : `${health.queue.pending} pending`}{' '}
+                        · {health.queue.failed} failed
+                    </span>
+                </li>
+            </ul>
+        </Panel>
+    );
+}
 
 function greeting(): string {
     const hour = new Date().getHours();
@@ -63,6 +132,7 @@ export default function SuperAdminDashboard({
     recentOrganizations,
     suspendedOrganizations,
     reports,
+    health,
 }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const firstName = auth.user.name.split(' ')[0];
@@ -114,6 +184,8 @@ export default function SuperAdminDashboard({
                 />
 
                 <PlatformAnalyticsView summary={summary} />
+
+                <SystemHealthPanel health={health} />
 
                 <div className="grid gap-5 lg:grid-cols-[1.45fr_1fr]">
                     <Panel

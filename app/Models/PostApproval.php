@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ApprovalDecision;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\PostApprovalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,7 +41,7 @@ class PostApproval extends Model
      */
     public function post(): BelongsTo
     {
-        return $this->belongsTo(Post::class);
+        return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

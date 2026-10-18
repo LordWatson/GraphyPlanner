@@ -2,6 +2,7 @@
 
 namespace App\Actions\SuperAdmin;
 
+use App\Jobs\PurgeOrganizationJob;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,10 @@ use Illuminate\Validation\ValidationException;
  * `organizations` (`cascadeOnDelete()`), but `users.org_id` is `nullOnDelete()` — left alone,
  * the org's members would survive as org-less accounts that can still sign in. So members are
  * deleted explicitly first (with their notifications and sessions), all in one transaction.
+ *
+ * Step I-1.5: the organization itself is soft-deleted here (it disappears everywhere at once) and
+ * `PurgeOrganizationJob` — dispatched after commit — removes its stored files and then hard-deletes
+ * it, so a deleted org no longer leaves orphaned files in storage.
  */
 class DeleteOrganizationAction
 {
@@ -39,6 +44,8 @@ class DeleteOrganizationAction
             User::query()->whereIn('id', $memberIds)->delete();
 
             $organization->delete();
+
+            DB::afterCommit(fn () => PurgeOrganizationJob::dispatch($organization->id));
 
             return $memberIds->count();
         });

@@ -39,7 +39,7 @@ class PreviewSeeder extends Seeder
         );
 
         $owner = User::updateOrCreate(
-            ['email' => 'preview@graphy.test'],
+            ['email' => User::PREVIEW_EMAIL],
             [
                 'name' => 'Percy Preview',
                 'password' => Hash::make(str()->random(40)),

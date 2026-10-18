@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Enums\ApprovalDecision;
 use App\Models\Post;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -13,7 +14,7 @@ use Illuminate\Notifications\Notification;
  * and the acting user is a `Role::ClientReviewer` (or the unauthenticated review portal, which
  * passes a null user).
  */
-class PostApprovalDecided extends Notification
+class PostApprovalDecided extends Notification implements ShouldQueue
 {
     use Queueable;
 

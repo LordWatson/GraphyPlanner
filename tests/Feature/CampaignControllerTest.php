@@ -105,7 +105,7 @@ class CampaignControllerTest extends TestCase
         $response = $this->actingAs($owner)->delete(route('campaigns.destroy', $campaign));
 
         $response->assertRedirect(route('clients.show', $client));
-        $this->assertDatabaseMissing('campaigns', ['id' => $campaign->id]);
+        $this->assertSoftDeleted($campaign);
     }
 
     public function test_client_reviewer_sees_campaigns_scoped_to_their_client(): void

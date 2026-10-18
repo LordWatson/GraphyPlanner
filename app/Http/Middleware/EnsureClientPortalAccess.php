@@ -29,6 +29,11 @@ class EnsureClientPortalAccess
             abort(403, 'This area is only available to client portal contacts.');
         }
 
+        // Step I-1.5: an archived (soft-deleted) client's portal is closed until it's restored.
+        if ($user->client === null) {
+            abort(403, 'This client account has been archived.');
+        }
+
         foreach (['post', 'invoice', 'campaign'] as $parameter) {
             $model = $request->route($parameter);
 

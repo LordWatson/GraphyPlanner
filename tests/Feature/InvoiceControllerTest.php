@@ -26,6 +26,7 @@ class InvoiceControllerTest extends TestCase
         // Lifecycle actions (send / mark paid / void) now (re)generate the branded PDF and email
         // the client — keep both off the real disk and mailer.
         Storage::fake('public');
+        Storage::fake('local');
         Mail::fake();
     }
 
@@ -153,7 +154,7 @@ class InvoiceControllerTest extends TestCase
             'org_id' => $org->id,
             'invoice_number' => 'INV-000004',
         ]);
-        $this->assertDatabaseCount('invoices', 3);
+        $this->assertSame(3, Invoice::count());
     }
 
     public function test_designer_cannot_create_an_invoice(): void
@@ -419,7 +420,7 @@ class InvoiceControllerTest extends TestCase
         $response = $this->actingAs($owner)->delete(route('invoices.destroy', $invoice));
 
         $response->assertRedirect(route('clients.show', $client));
-        $this->assertDatabaseMissing('invoices', ['id' => $invoice->id]);
+        $this->assertSoftDeleted($invoice);
     }
 
     public function test_designer_cannot_delete_an_invoice(): void
@@ -438,6 +439,7 @@ class InvoiceControllerTest extends TestCase
     public function test_owner_can_upload_an_invoice_pdf(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -452,12 +454,13 @@ class InvoiceControllerTest extends TestCase
         $invoice->refresh();
         $this->assertSame('invoice.pdf', $invoice->pdf_original_filename);
         $this->assertNotNull($invoice->pdf_path);
-        Storage::disk('public')->assertExists($invoice->pdf_path);
+        Storage::disk('local')->assertExists($invoice->pdf_path);
     }
 
     public function test_uploading_a_new_invoice_pdf_replaces_the_old_file(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -468,19 +471,20 @@ class InvoiceControllerTest extends TestCase
             'pdf' => UploadedFile::fake()->create('first.pdf', 100, 'application/pdf'),
         ]);
         $oldPath = $invoice->fresh()->pdf_path;
-        Storage::disk('public')->assertExists($oldPath);
+        Storage::disk('local')->assertExists($oldPath);
 
         $this->actingAs($owner)->post(route('invoices.pdf.store', $invoice), [
             'pdf' => UploadedFile::fake()->create('second.pdf', 100, 'application/pdf'),
         ]);
 
-        Storage::disk('public')->assertMissing($oldPath);
+        Storage::disk('local')->assertMissing($oldPath);
         $this->assertSame('second.pdf', $invoice->fresh()->pdf_original_filename);
     }
 
     public function test_invoice_pdf_upload_rejects_non_pdf_files(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -497,6 +501,7 @@ class InvoiceControllerTest extends TestCase
     public function test_designer_cannot_upload_an_invoice_pdf(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
@@ -667,6 +672,7 @@ class InvoiceControllerTest extends TestCase
     public function test_owner_can_generate_a_branded_pdf_for_a_finalized_invoice(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -680,12 +686,13 @@ class InvoiceControllerTest extends TestCase
         $invoice->refresh();
         $this->assertNotNull($invoice->pdf_path);
         $this->assertSame('application/pdf', $invoice->pdf_mime_type);
-        Storage::disk('public')->assertExists($invoice->pdf_path);
+        Storage::disk('local')->assertExists($invoice->pdf_path);
     }
 
     public function test_generating_a_pdf_for_an_itemised_invoice_that_is_not_finalized_is_rejected(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -702,6 +709,7 @@ class InvoiceControllerTest extends TestCase
     public function test_designer_cannot_generate_an_invoice_pdf(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();

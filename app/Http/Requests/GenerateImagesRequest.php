@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Enums\ImageAspectRatio;
+use App\Models\AiImageGeneration;
 use App\Models\AiPostIdea;
+use App\Models\Client;
 use App\Models\Post;
 use App\Support\AI\Images\GenerateImageSetData;
 use Illuminate\Foundation\Http\FormRequest;
@@ -15,9 +17,16 @@ use Illuminate\Validation\Rule;
  */
 class GenerateImagesRequest extends FormRequest
 {
+    /**
+     * Step I-1.9: authorize before validating, so another organization's request is refused
+     * (403) instead of being told which fields are missing. The controller checks again.
+     */
     public function authorize(): bool
     {
-        return true;
+        $idea = $this->route('aiPostIdea');
+        $client = $this->route('client') ?? ($idea instanceof AiPostIdea ? $idea->client : null);
+
+        return $client instanceof Client && $this->user()->can('generate', [AiImageGeneration::class, $client]);
     }
 
     /**

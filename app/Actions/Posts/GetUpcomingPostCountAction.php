@@ -19,6 +19,7 @@ class GetUpcomingPostCountAction
         $now = Carbon::now();
 
         $query = Post::query()
+            ->forActiveClients()
             ->where('org_id', $user->org_id)
             ->whereHas('targets', function ($q) use ($now, $days) {
                 $q->whereBetween('scheduled_at_utc', [$now, $now->clone()->addDays($days)]);

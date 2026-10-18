@@ -5,13 +5,17 @@ namespace App\Models;
 use App\Enums\ApprovalMode;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $campaign_id
  * @property int|null $created_by
  * @property PostStatus $status
+ * @property string|null $publish_dispatch_id
  * @property ApprovalMode $approval_mode
  * @property string|null $master_caption
  * @property string|null $review_message
@@ -30,15 +35,16 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $checklist_snapshot
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 #[Fillable([
-    'org_id', 'client_id', 'campaign_id', 'created_by', 'status', 'approval_mode',
+    'org_id', 'client_id', 'campaign_id', 'created_by', 'status', 'publish_dispatch_id', 'approval_mode',
     'master_caption', 'review_message', 'hashtags', 'music', 'location', 'checklist_snapshot',
 ])]
 class Post extends Model
 {
     /** @use HasFactory<PostFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory, SoftDeletes;
 
     /**
      * @return array<string, string>
@@ -53,6 +59,17 @@ class Post extends Model
             'location' => 'array',
             'checklist_snapshot' => 'array',
         ];
+    }
+
+    /**
+     * Step I-1.5: only posts whose client isn't archived. Working lists (Home, calendar,
+     * dashboard, reminders) hide an archived client's posts; history (analytics) keeps them.
+     *
+     * @param  Builder<Post>  $query
+     */
+    public function scopeForActiveClients(Builder $query): void
+    {
+        $query->whereIn('client_id', Client::query()->select('id'));
     }
 
     protected static function booted(): void
@@ -88,7 +105,8 @@ class Post extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -96,7 +114,7 @@ class Post extends Model
      */
     public function campaign(): BelongsTo
     {
-        return $this->belongsTo(Campaign::class);
+        return $this->belongsTo(Campaign::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

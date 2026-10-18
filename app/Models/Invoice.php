@@ -3,15 +3,22 @@
 namespace App\Models;
 
 use App\Enums\InvoiceStatus;
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
+use App\Support\StoredFileUrl;
 use Database\Factories\InvoiceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * @property int $id
@@ -43,6 +50,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $pdf_size
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 #[Fillable([
     'org_id', 'client_id', 'invoice_number', 'status', 'amount', 'is_finalized', 'retainer_amount_snapshot',
@@ -53,7 +61,18 @@ use Illuminate\Support\Carbon;
 class Invoice extends Model
 {
     /** @use HasFactory<InvoiceFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory, SoftDeletes;
+
+    /**
+     * Step I-1.6: a private file's URL is signed and short-lived, so it's minted on every read
+     * instead of trusting the URL stored at upload time.
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function pdfUrl(): Attribute
+    {
+        return Attribute::make(get: fn (?string $value): ?string => StoredFileUrl::resolve($this->pdf_disk, $this->pdf_path, $value));
+    }
 
     /**
      * @return array<string, string>
@@ -89,7 +108,8 @@ class Invoice extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -230,6 +250,22 @@ class Invoice extends Model
     public function hasPdf(): bool
     {
         return $this->pdf_disk !== null && $this->pdf_path !== null;
+    }
+
+    /**
+     * Step I-1.6: invoice PDFs live on a private disk and are only ever served through an
+     * authorized route (`invoices.pdf.show` / `portal.invoices.pdf`), inline.
+     */
+    public function pdfResponse(): StreamedResponse
+    {
+        abort_unless($this->hasPdf() && Storage::disk((string) $this->pdf_disk)->exists((string) $this->pdf_path), 404);
+
+        return Storage::disk((string) $this->pdf_disk)->response(
+            (string) $this->pdf_path,
+            $this->pdf_original_filename ?: "{$this->invoice_number}.pdf",
+            ['Content-Type' => 'application/pdf', 'Cache-Control' => 'private, no-store'],
+            'inline',
+        );
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Enums\Role;
+use App\Exceptions\Posts\InvalidPostTransitionException;
 use App\Jobs\PublishPostJob;
 use App\Models\Post;
 use App\Models\User;
@@ -13,8 +14,10 @@ use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
 use App\Services\PostNotificationService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TransitionPostStatusAction
 {
@@ -29,6 +32,15 @@ class TransitionPostStatusAction
      * `$user` is nullable to support the unauthenticated Step 0.13 review portal (a client reviewer
      * acting via a `ReviewToken` rather than a logged-in session) — the resulting activity log/
      * approval rows simply record a null `user_id` in that case.
+     *
+     * Step I-1.4: the post row is locked and the move re-checked against the *locked* status, so
+     * two simultaneous decisions (review link + portal) can't both pass — the loser gets an
+     * `InvalidPostTransitionException` (409). Every side effect (client email, notifications, the
+     * publish job) runs only after the outermost transaction commits.
+     *
+     * Step I-1.2: entering `scheduled` writes a fresh `publish_dispatch_id` and hands it to the
+     * publish job; leaving `scheduled` clears it, so any job still queued for an older schedule
+     * no-ops when it fires.
      */
     public function __invoke(
         Post $post,
@@ -40,19 +52,37 @@ class TransitionPostStatusAction
         PostNotificationService $notifications = new PostNotificationService,
     ): Post {
         if (! PostStatusTransitionMap::isAllowed($post->status, $to)) {
-            throw new \InvalidArgumentException(
-                "Cannot transition post {$post->id} from {$post->status->value} to {$to->value}."
-            );
+            throw new InvalidPostTransitionException($post->id, $post->status, $to);
         }
 
-        $post = DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist, $sendClientReviewRequestedEmail) {
-            $from = $post->status;
+        $locked = DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist, $sendClientReviewRequestedEmail, $notifications) {
+            /** @var Post $locked */
+            $locked = Post::query()->whereKey($post->id)->lockForUpdate()->firstOrFail();
+            $from = $locked->status;
+
+            if (! PostStatusTransitionMap::isAllowed($from, $to)) {
+                Log::warning('Post transition rejected: status changed concurrently', [
+                    'post_id' => $locked->id,
+                    'user_id' => $user?->id,
+                    'from_status' => $from->value,
+                    'to_status' => $to->value,
+                ]);
+
+                throw new InvalidPostTransitionException($locked->id, $from, $to);
+            }
+
+            $dispatchId = match (true) {
+                $to === PostStatus::Scheduled => (string) Str::uuid(),
+                $from === PostStatus::Scheduled => null,
+                default => $locked->publish_dispatch_id,
+            };
 
             // Keep the §6 checklist snapshot fresh on every transition, so the editor UI can
             // always render the last-evaluated state without a separate round-trip.
-            $post->update([
+            $locked->update([
                 'status' => $to,
-                'checklist_snapshot' => $evaluateChecklist($post),
+                'publish_dispatch_id' => $dispatchId,
+                'checklist_snapshot' => $evaluateChecklist($locked),
             ]);
 
             // Re-queuing a previously `failed` post must give every target a clean slate —
@@ -60,15 +90,17 @@ class TransitionPostStatusAction
             // even though a fresh publish attempt is about to run (the error itself is preserved
             // on the activity log entry created below instead).
             if ($from === PostStatus::Failed && $to === PostStatus::Scheduled) {
-                $post->targets()->update([
+                $locked->targets()->update([
                     'status' => PostTargetStatus::Pending,
                     'external_post_id' => null,
                     'error' => null,
+                    'publish_attempt_id' => null,
+                    'publish_requested_at' => null,
                 ]);
             }
 
             if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
-                $post->approvals()->create([
+                $locked->approvals()->create([
                     'user_id' => $user?->id,
                     'decision' => $to === PostStatus::Approved
                         ? ApprovalDecision::Approved
@@ -78,39 +110,46 @@ class TransitionPostStatusAction
             }
 
             Log::info('Post status transitioned', [
-                'post_id' => $post->id,
+                'post_id' => $locked->id,
+                'org_id' => $locked->org_id,
                 'user_id' => $user?->id,
                 'from_status' => $from->value,
                 'to_status' => $to->value,
             ]);
 
-            // Step 0.13: notify the client by email (via Resend) with the review-portal link
-            // whenever a post lands in `waiting_client`, so they always have a fresh, valid token.
-            // The resulting signed URL is recorded on the activity log below so an org user can
-            // see it and re-send the email later without needing to re-check the client's inbox.
-            $reviewUrl = $to === PostStatus::WaitingClient
-                ? $sendClientReviewRequestedEmail($post)
+            // Step 0.13: email the client the review-portal link whenever a post lands in
+            // `waiting_client`, so they always have a fresh, valid token. Only the token's id is
+            // recorded (Step I-1.6); the email itself is queued after commit.
+            $reviewToken = $to === PostStatus::WaitingClient
+                ? $sendClientReviewRequestedEmail($locked)
                 : null;
 
-            $post->activityLogs()->create([
+            $locked->activityLogs()->create([
                 'user_id' => $user?->id,
                 'from_status' => $from,
                 'to_status' => $to,
                 'note' => $comment,
-                'review_url' => $reviewUrl,
+                'review_token_id' => $reviewToken?->id,
             ]);
 
-            return $post->refresh();
+            $locked->refresh();
+
+            DB::afterCommit(function () use ($locked, $to, $user, $notifications) {
+                // Step 1.4: nothing calls the vendor until this point — the §6 checklist is
+                // already re-validated server-side before `scheduled` is even a legal
+                // destination (see `TransitionPostRequest`).
+                if ($to === PostStatus::Scheduled) {
+                    $this->dispatchPublishJob($locked);
+                }
+
+                $this->notify($locked, $to, $user, $notifications);
+            });
+
+            return $locked;
         });
 
-        // Step 1.4: nothing calls the vendor until this point — the §6 checklist is already
-        // re-validated server-side before `scheduled` is even a legal destination (see
-        // `TransitionPostRequest`), so it's safe to enqueue the publish job right here.
-        if ($to === PostStatus::Scheduled) {
-            $this->dispatchPublishJob($post);
-        }
-
-        $this->notify($post, $to, $user, $notifications);
+        // Keep the caller's instance in step with the row (callers and tests hold on to it).
+        $post->setRawAttributes($locked->getAttributes(), true);
 
         return $post;
     }
@@ -168,21 +207,30 @@ class TransitionPostStatusAction
     }
 
     /**
-     * Enqueue `PublishPostJob`, delayed until the earliest target's `scheduled_at_utc` if that
-     * instant is still in the future (immediate dispatch otherwise, e.g. a past-due reschedule).
+     * Enqueue `PublishPostJob` for this schedule (its `publish_dispatch_id`), delayed until the
+     * earliest target's `scheduled_at_utc` if that instant is still in the future (immediate
+     * dispatch otherwise, e.g. a past-due reschedule). Also used by `ReschedulePostAction` and
+     * `UpdatePostAction` after they move a `scheduled` post's times.
      */
-    private function dispatchPublishJob(Post $post): void
+    public function dispatchPublishJob(Post $post): void
     {
+        if ($post->publish_dispatch_id === null) {
+            Log::warning('Publish job not enqueued: post has no publish_dispatch_id', ['post_id' => $post->id]);
+
+            return;
+        }
+
         $publishAt = $post->targets()->whereNotNull('scheduled_at_utc')->min('scheduled_at_utc');
 
-        $job = PublishPostJob::dispatch($post->id);
+        $job = PublishPostJob::dispatch($post->id, $post->publish_dispatch_id);
 
         if ($publishAt && now()->lessThan($publishAt)) {
-            $job->delay($publishAt);
+            $job->delay(Carbon::parse($publishAt));
         }
 
         Log::info('Publish job enqueued for scheduled post', [
             'post_id' => $post->id,
+            'publish_dispatch_id' => $post->publish_dispatch_id,
             'publish_at' => $publishAt,
         ]);
     }

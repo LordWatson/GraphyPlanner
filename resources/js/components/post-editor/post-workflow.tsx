@@ -1,11 +1,11 @@
-import { Form } from '@inertiajs/react';
+import { Form, router } from '@inertiajs/react';
 import {
     ArrowRight,
     Check,
-    Copy,
     Ellipsis,
-    Link2,
     Mail,
+    RefreshCw,
+    Trash2,
     TriangleAlert,
     XCircle,
 } from 'lucide-react';
@@ -15,6 +15,7 @@ import InputError from '@/components/input-error';
 import type {
     ActivityLogData,
     Checklist,
+    TargetData,
     TransitionOption,
 } from '@/components/post-editor/types';
 import { StatusPill } from '@/components/status-pill';
@@ -36,7 +37,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { useClipboard } from '@/hooks/use-clipboard';
 import type { TransitionAction } from '@/lib/post-workflow';
 import {
     describeTransition,
@@ -47,7 +47,12 @@ import {
 } from '@/lib/post-workflow';
 import { resolveStatus, toneBgClass, toneTextClass } from '@/lib/status';
 import { cn } from '@/lib/utils';
-import { transition as transitionPost } from '@/routes/posts';
+import { confirmDialog } from '@/components/confirm-dialog';
+import {
+    destroy as destroyPost,
+    retryFailedTargets,
+    transition as transitionPost,
+} from '@/routes/posts';
 import postActivityLogs from '@/routes/posts/activity-logs';
 
 const textareaClass =
@@ -163,28 +168,13 @@ function ReviewLinkRow({
     log: ActivityLogData;
     canResend: boolean;
 }) {
-    const [, copy] = useClipboard();
-    const url = log.review_url as string;
-
     return (
         <div className="border-border bg-muted/40 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
-            <Link2 className="text-muted-foreground size-4 shrink-0" />
-            <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
-                {url}
+            <Mail className="text-muted-foreground size-4 shrink-0" />
+            <span className="text-muted-foreground min-w-0 flex-1 text-xs">
+                Review link emailed to the client. Re-sending issues a fresh
+                link and turns off the old one.
             </span>
-            <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                    if (await copy(url)) {
-                        toast.success('Review link copied.');
-                    }
-                }}
-            >
-                <Copy />
-                Copy
-            </Button>
             {canResend && (
                 <Form
                     {...postActivityLogs.resendReviewEmail.form([
@@ -192,7 +182,7 @@ function ReviewLinkRow({
                         log.id,
                     ])}
                     options={{ preserveScroll: true, preserveState: true }}
-                    onSuccess={() => toast.success('Review email re-sent.')}
+                    onSuccess={() => toast.success('Fresh review link sent.')}
                 >
                     {({ processing }) => (
                         <Button
@@ -353,6 +343,54 @@ function TransitionDialog({
 }
 
 /**
+ * Step I-1.3 — shown on a `failed`/`partially_published` post: which channels failed, and one
+ * button that resends only those (channels that already went out are never touched).
+ */
+function RetryFailedTargetsRow({
+    postId,
+    failedTargets,
+}: {
+    postId: number;
+    failedTargets: TargetData[];
+}) {
+    return (
+        <div className="border-destructive/30 bg-destructive/5 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
+            <TriangleAlert className="text-destructive size-4 shrink-0" />
+            <span className="min-w-0 flex-1 text-xs">
+                {failedTargets.length === 1
+                    ? '1 channel failed: '
+                    : `${failedTargets.length} channels failed: `}
+                <span className="text-muted-foreground">
+                    {failedTargets
+                        .map((target) =>
+                            [target.platform, target.handle]
+                                .filter(Boolean)
+                                .join(' · '),
+                        )
+                        .join(', ')}
+                </span>
+            </span>
+            <Form
+                {...retryFailedTargets.form(postId)}
+                options={{ preserveScroll: true }}
+            >
+                {({ processing }) => (
+                    <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        disabled={processing}
+                    >
+                        <RefreshCw />
+                        {processing ? 'Retrying…' : 'Retry failed channels'}
+                    </Button>
+                )}
+            </Form>
+        </div>
+    );
+}
+
+/**
  * The status workflow, front and centre at the top of the editor: where the post is in its
  * lifecycle, what that means, the one recommended next step, and every other legal move one
  * click away. Each move confirms in a dialog that can attach a note to the activity log.
@@ -363,6 +401,8 @@ export function PostWorkflow({
     allowedTransitions,
     isDirty,
     canResendReviewEmail,
+    canRetryFailedTargets = false,
+    canDelete = false,
 }: {
     post: {
         id: number;
@@ -370,11 +410,14 @@ export function PostWorkflow({
         approval_mode: string;
         checklist: Checklist;
         activity_logs: ActivityLogData[];
+        targets?: TargetData[];
     };
     clientName: string;
     allowedTransitions: TransitionOption[];
     isDirty: boolean;
     canResendReviewEmail: boolean;
+    canRetryFailedTargets?: boolean;
+    canDelete?: boolean;
 }) {
     const [pending, setPending] = useState<TransitionAction | null>(null);
 
@@ -392,17 +435,38 @@ export function PostWorkflow({
         (action) => action.intent === 'forward' && action.to !== primaryTo,
     );
     const overflow = actions.filter((action) => action.intent !== 'forward');
+
+    // Step I-1.5: only posts that never went out can be deleted (soft); the rest are archived.
+    const deletePost = async () => {
+        const confirmed = await confirmDialog({
+            title: 'Delete this post?',
+            description:
+                'It disappears from the calendar and every list. Posts that went live can only be archived.',
+            confirmLabel: 'Delete post',
+            tone: 'destructive',
+        });
+
+        if (confirmed) {
+            router.delete(destroyPost.url(post.id));
+        }
+    };
     const guidance = statusGuidance(post.status, clientName);
 
     const reviewLog =
         post.status === 'waiting_client'
             ? post.activity_logs.find(
-                  (log) => log.to_status === 'waiting_client' && log.review_url,
+                  (log) =>
+                      log.to_status === 'waiting_client' &&
+                      log.review_link_sent,
               )
             : undefined;
 
     const scheduleBlocked =
         primary?.to === 'scheduled' && !post.checklist.passed;
+
+    const failedTargets = canRetryFailedTargets
+        ? (post.targets ?? []).filter((target) => target.status === 'failed')
+        : [];
 
     return (
         <section className="animate-rise border-border bg-card flex flex-col rounded-2xl border [animation-delay:80ms]">
@@ -424,7 +488,7 @@ export function PostWorkflow({
 
                 {actions.length > 0 && (
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        {overflow.length > 0 && (
+                        {(overflow.length > 0 || canDelete) && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button
@@ -471,6 +535,20 @@ export function PostWorkflow({
                                             </div>
                                         );
                                     })}
+                                    {canDelete && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onSelect={() =>
+                                                    void deletePost()
+                                                }
+                                            >
+                                                <Trash2 />
+                                                Delete post
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
@@ -502,6 +580,15 @@ export function PostWorkflow({
                     </div>
                 )}
             </div>
+
+            {failedTargets.length > 0 && (
+                <div className="px-5 pb-4">
+                    <RetryFailedTargetsRow
+                        postId={post.id}
+                        failedTargets={failedTargets}
+                    />
+                </div>
+            )}
 
             {reviewLog && (
                 <div className="px-5 pb-4">

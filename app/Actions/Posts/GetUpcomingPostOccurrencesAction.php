@@ -22,6 +22,7 @@ class GetUpcomingPostOccurrencesAction
         $now = Carbon::now();
 
         $query = Post::query()
+            ->forActiveClients()
             ->where('org_id', $user->org_id)
             ->with(['client:id,name', 'targets' => fn ($q) => $q->orderBy('scheduled_at_utc'), 'targets.socialAccount']);
 

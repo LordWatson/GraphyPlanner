@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PostStatus;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\PostActivityLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,11 +18,11 @@ use Illuminate\Support\Carbon;
  * @property PostStatus|null $from_status
  * @property PostStatus $to_status
  * @property string|null $note
- * @property string|null $review_url
+ * @property int|null $review_token_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['post_id', 'user_id', 'from_status', 'to_status', 'note', 'review_url'])]
+#[Fillable(['post_id', 'user_id', 'from_status', 'to_status', 'note', 'review_token_id'])]
 class PostActivityLog extends Model
 {
     /** @use HasFactory<PostActivityLogFactory> */
@@ -43,7 +44,7 @@ class PostActivityLog extends Model
      */
     public function post(): BelongsTo
     {
-        return $this->belongsTo(Post::class);
+        return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -52,5 +53,16 @@ class PostActivityLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The review-portal token minted when this entry moved the post to `waiting_client`
+     * (Step I-1.6 — only the id is stored, never the plain token or link).
+     *
+     * @return BelongsTo<ReviewToken, $this>
+     */
+    public function reviewToken(): BelongsTo
+    {
+        return $this->belongsTo(ReviewToken::class);
     }
 }

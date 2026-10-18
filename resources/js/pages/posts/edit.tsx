@@ -243,6 +243,8 @@ export default function PostEdit({
         update: boolean;
         comment: boolean;
         resend_review_email: boolean;
+        retry_failed_targets: boolean;
+        delete: boolean;
         create_asset: boolean;
     };
     hashtagSuggestions: string[];
@@ -333,11 +335,14 @@ export default function PostEdit({
         setAiLoading(true);
 
         try {
+            // Step I-1.7: POST — this calls a paid vendor.
             const response = await fetch(aiPosts.captions.url(post.id), {
+                method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
                 },
             });
             const data = await response.json();
@@ -585,6 +590,8 @@ export default function PostEdit({
                     allowedTransitions={allowedTransitions}
                     isDirty={isDirty}
                     canResendReviewEmail={can.resend_review_email}
+                    canRetryFailedTargets={can.retry_failed_targets}
+                    canDelete={can.delete}
                 />
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">

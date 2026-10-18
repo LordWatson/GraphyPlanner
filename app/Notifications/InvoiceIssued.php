@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Invoice;
 use App\Support\MoneyFormatter;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
  * has been issued (or that a payment reminder was sent) — dispatched from `SendInvoiceAction` /
  * `SendInvoiceReminderAction` alongside the `InvoiceSentMail` email.
  */
-class InvoiceIssued extends Notification
+class InvoiceIssued extends Notification implements ShouldQueue
 {
     use Queueable;
 
