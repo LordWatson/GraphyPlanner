@@ -31,7 +31,9 @@ class ClientInvitationPolicy
      */
     public function delete(User $user, ClientInvitation $invitation): bool
     {
-        return $user->org_id === $invitation->client->org_id
+        // Explicit `loadMissing` (not a bare `->client` access) so this never trips the
+        // app-wide lazy-loading guard regardless of whether the caller eager-loaded `client`.
+        return $user->org_id === $invitation->loadMissing('client')->client->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist], true);
     }
 }

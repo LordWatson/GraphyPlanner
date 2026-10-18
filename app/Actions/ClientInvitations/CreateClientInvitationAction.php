@@ -31,7 +31,7 @@ class CreateClientInvitationAction
                 'invited_by_user_id' => $invitedBy->id,
                 'token_hash' => hash('sha256', $plainToken),
                 'expires_at' => now()->addDays(7),
-            ])->setAttribute('plain_token', $plainToken);
+            ])->setRelation('client', $client)->setAttribute('plain_token', $plainToken);
         });
 
         $acceptUrl = URL::to("/client-invite/{$invitation->getAttribute('plain_token')}");

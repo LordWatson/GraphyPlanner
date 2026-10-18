@@ -153,6 +153,7 @@ class ClientTabController extends Controller
         return Inertia::render('clients/tabs/portal-access', [
             ...($this->header)($client, $user, 'portal-access'),
             'invitations' => $client->invitations()
+                ->with('client:id,org_id')
                 ->latest()
                 ->latest('id')
                 ->paginate(self::PER_PAGE)
