@@ -128,7 +128,10 @@ function ReadOnlyContent({ post }: { post: PostData }) {
             <Panel eyebrow="01" title="Content">
                 <div className="grid gap-5">
                     <ReadOnlyField label="Caption">
-                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                        <p
+                            dir="auto"
+                            className="text-[15px] leading-relaxed whitespace-pre-wrap"
+                        >
                             {post.master_caption || (
                                 <span className="text-muted-foreground">
                                     No caption yet.
@@ -140,7 +143,11 @@ function ReadOnlyContent({ post }: { post: PostData }) {
                         <ReadOnlyField label="Hashtags">
                             <div className="flex flex-wrap gap-1.5">
                                 {post.hashtags.map((tag) => (
-                                    <Badge key={tag} variant="secondary">
+                                    <Badge
+                                        key={tag}
+                                        variant="secondary"
+                                        dir="auto"
+                                    >
                                         #{tag}
                                     </Badge>
                                 ))}
@@ -631,6 +638,7 @@ export default function PostEdit({
                                                     id="master_caption"
                                                     name="master_caption"
                                                     rows={6}
+                                                    dir="auto"
                                                     value={caption}
                                                     onChange={(e) =>
                                                         setCaption(
@@ -786,6 +794,7 @@ export default function PostEdit({
                                                 <Input
                                                     id="location_name"
                                                     name="location[name]"
+                                                    dir="auto"
                                                     value={locationName}
                                                     onChange={(e) =>
                                                         setLocationName(

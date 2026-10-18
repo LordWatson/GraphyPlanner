@@ -108,7 +108,12 @@ export function HashtagInput({
         <div className="relative">
             <div className="border-input focus-within:border-ring focus-within:ring-ring/50 dark:bg-input/30 flex flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5 focus-within:ring-[3px]">
                 {value.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+                    <Badge
+                        key={tag}
+                        variant="secondary"
+                        dir="auto"
+                        className="gap-1 pr-1"
+                    >
                         <Hash className="size-3" />
                         {tag}
                         <button
@@ -128,6 +133,7 @@ export function HashtagInput({
                         setInputValue(e.target.value);
                         setHighlighted(0);
                     }}
+                    dir="auto"
                     onKeyDown={handleKeyDown}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => {

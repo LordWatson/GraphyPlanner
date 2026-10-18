@@ -161,7 +161,10 @@ export default function ReviewShow({
                                 className="w-full max-w-md"
                             />
                         ) : (
-                            <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                            <p
+                                dir="auto"
+                                className="text-[15px] leading-relaxed whitespace-pre-wrap"
+                            >
                                 {post.master_caption}
                             </p>
                         )}

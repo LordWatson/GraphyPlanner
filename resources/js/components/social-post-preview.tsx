@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { textDirection } from '@/lib/text-direction';
 import type { PreviewAsset } from '@/components/asset-preview-carousel';
 
 export type PreviewTarget = {
@@ -84,6 +85,11 @@ function PreviewMedia({
             className={cn('h-full w-full object-cover', className)}
         />
     );
+}
+
+/** Platforms lay the caption block out in the caption's own direction (handle included). */
+function captionDir(caption: string, hashtags: string[]): 'ltr' | 'rtl' {
+    return textDirection(caption || hashtags.join(' '));
 }
 
 function CaptionWithHashtags({
@@ -205,8 +211,11 @@ function InstagramPreview({
                 <Bookmark className="size-5" />
             </div>
 
-            <div className="px-2.5 py-2 leading-snug">
-                <span className="mr-1 font-semibold">
+            <div
+                dir={captionDir(caption, hashtags)}
+                className="px-2.5 py-2 leading-snug"
+            >
+                <span className="me-1 font-semibold">
                     {handle || 'your_handle'}
                 </span>
                 <CaptionWithHashtags caption={caption} hashtags={hashtags} />
@@ -269,7 +278,10 @@ function TikTokPreview({
                 <span className="font-semibold">
                     @{handle || 'your_handle'}
                 </span>
-                <p className="line-clamp-3 leading-snug">
+                <p
+                    dir={captionDir(caption, hashtags)}
+                    className="line-clamp-3 leading-snug"
+                >
                     <CaptionWithHashtags
                         caption={caption}
                         hashtags={hashtags}
@@ -317,7 +329,10 @@ function FeedStylePreview({
                 </div>
             </div>
 
-            <div className="px-2.5 pb-2 leading-snug">
+            <div
+                dir={captionDir(caption, hashtags)}
+                className="px-2.5 pb-2 leading-snug"
+            >
                 <CaptionWithHashtags caption={caption} hashtags={hashtags} />
             </div>
 

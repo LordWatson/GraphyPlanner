@@ -118,6 +118,39 @@ class PostEditorControllerTest extends TestCase
     }
 
     /**
+     * The editor supports right-to-left captions: Arabic text (including mixed Arabic/English,
+     * emoji and line breaks) and Arabic hashtags must round-trip byte-for-byte, and come back
+     * unchanged in the editor payload.
+     */
+    public function test_update_preserves_arabic_rtl_caption_and_hashtags(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'master_caption' => null]);
+
+        $caption = "عرض خاص لفترة محدودة 🎉\nاحجز الآن عبر Graphy — خصم ٢٠٪!";
+        $hashtags = ['رمضان_كريم', 'دبي', 'sale'];
+
+        $response = $this->actingAs($owner)->put(route('posts.update', $post), [
+            'master_caption' => $caption,
+            'hashtags' => $hashtags,
+        ]);
+
+        $response->assertRedirect(route('posts.edit', $post));
+
+        $post->refresh();
+        $this->assertSame($caption, $post->master_caption);
+        $this->assertSame($hashtags, $post->hashtags);
+
+        $this->actingAs($owner)->get(route('posts.edit', $post))
+            ->assertInertia(fn ($page) => $page
+                ->where('post.master_caption', $caption)
+                ->where('post.hashtags', $hashtags)
+            );
+    }
+
+    /**
      * Step 1.8.4 — the editor's music search field calls PostController::musicSearch, which
      * delegates to SearchMusicAction/MusicProvider and returns the matched tracks as JSON.
      */

@@ -54,7 +54,10 @@ export function AiCaptionSuggestions({
             </button>
 
             {!expanded && appliedIndex !== null && (
-                <p className="text-muted-foreground truncate text-xs">
+                <p
+                    dir="auto"
+                    className="text-muted-foreground truncate text-xs"
+                >
                     Using: {suggestions[appliedIndex]?.caption}
                 </p>
             )}
@@ -72,25 +75,38 @@ export function AiCaptionSuggestions({
                                 applied ? 'border-primary' : 'border-border',
                             )}
                         >
-                            <p className="text-sm whitespace-pre-wrap">
+                            <p
+                                dir="auto"
+                                className="text-sm whitespace-pre-wrap"
+                            >
                                 {suggestion.caption}
                             </p>
                             {suggestion.hashtags.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                     {suggestion.hashtags.map((tag, ti) => (
-                                        <Badge key={ti} variant="outline">
+                                        <Badge
+                                            key={ti}
+                                            variant="outline"
+                                            dir="auto"
+                                        >
                                             #{tag.replace(/^#+/, '')}
                                         </Badge>
                                     ))}
                                 </div>
                             )}
                             {suggestion.altText && (
-                                <p className="text-muted-foreground text-xs">
+                                <p
+                                    dir="auto"
+                                    className="text-muted-foreground text-xs"
+                                >
                                     Alt text: {suggestion.altText}
                                 </p>
                             )}
                             {suggestion.firstComment && (
-                                <p className="text-muted-foreground text-xs">
+                                <p
+                                    dir="auto"
+                                    className="text-muted-foreground text-xs"
+                                >
                                     First comment: {suggestion.firstComment}
                                 </p>
                             )}
