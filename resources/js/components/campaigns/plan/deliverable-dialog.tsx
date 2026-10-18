@@ -221,7 +221,28 @@ export function DeliverableDialog({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {plan.platformOptions.map((option) => (
+                                        {[
+                                            ...plan.platformOptions,
+                                            ...(deliverable &&
+                                            !plan.platformOptions.some(
+                                                (option) =>
+                                                    option.value ===
+                                                    deliverable.platform,
+                                            )
+                                                ? [
+                                                      {
+                                                          value: deliverable.platform,
+                                                          label:
+                                                              plan
+                                                                  .platformLabels[
+                                                                  deliverable
+                                                                      .platform
+                                                              ] ??
+                                                              deliverable.platform,
+                                                      },
+                                                  ]
+                                                : []),
+                                        ].map((option) => (
                                             <SelectItem
                                                 key={option.value}
                                                 value={option.value}

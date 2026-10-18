@@ -8,6 +8,7 @@ use App\Models\CampaignDeliverable;
 use App\Models\CampaignPhase;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\Campaigns\CampaignPlatforms;
 use App\Support\Campaigns\CampaignClock;
 use App\Support\Campaigns\DeliverableDueDate;
 use App\Support\Campaigns\SuggestedPhases;
@@ -21,6 +22,8 @@ use Carbon\CarbonImmutable;
  */
 class GetCampaignPlanAction
 {
+    public function __construct(private readonly CampaignPlatforms $platforms) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -60,7 +63,13 @@ class GetCampaignPlanAction
                 ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
                 ->all(),
             'pillars' => array_values($campaign->client->brandBrain->content_pillars ?? []),
-            'platformOptions' => array_map(fn (Platform $platform) => ['value' => $platform->value, 'label' => $platform->label()], Platform::cases()),
+            // Only the client's channels can be planned; every platform's label is sent so slots
+            // on a channel that's since gone still have a column.
+            'platformOptions' => array_map(fn (Platform $platform) => ['value' => $platform->value, 'label' => $platform->label()], $this->platforms->plannable($campaign)),
+            'platformLabels' => array_combine(
+                array_map(fn (Platform $platform) => $platform->value, Platform::cases()),
+                array_map(fn (Platform $platform) => $platform->label(), Platform::cases()),
+            ),
             'suggestedPhases' => $phases->isEmpty() && $campaign->start_date && $campaign->end_date
                 ? SuggestedPhases::between(CarbonImmutable::parse($campaign->start_date->toDateString()), CarbonImmutable::parse($campaign->end_date->toDateString()))
                 : [],

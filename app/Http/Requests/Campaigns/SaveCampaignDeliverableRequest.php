@@ -2,12 +2,11 @@
 
 namespace App\Http\Requests\Campaigns;
 
-use App\Enums\Platform;
 use App\Models\Campaign;
 use App\Models\CampaignDeliverable;
+use App\Services\Campaigns\CampaignPlatforms;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 
 /**
  * Step C-3.2 — one planned deliverable. Its phase must belong to this campaign and its assignee
@@ -41,7 +40,11 @@ class SaveCampaignDeliverableRequest extends FormRequest
 
         return [
             'title' => [$required, 'string', 'max:255'],
-            'platform' => [$required, new Enum(Platform::class)],
+            // Only platforms the client has an account on; an existing slot may keep its own.
+            'platform' => [$required, Rule::in(array_values(array_unique([
+                ...app(CampaignPlatforms::class)->plannableValues($campaign),
+                ...($this->route('deliverable') instanceof CampaignDeliverable ? [$this->route('deliverable')->platform->value] : []),
+            ])))],
             'campaign_phase_id' => ['nullable', 'integer', Rule::exists('campaign_phases', 'id')->where('campaign_id', $campaign->id)],
             'format' => ['nullable', 'string', 'max:50'],
             'pillar' => ['nullable', 'string', 'max:100'],

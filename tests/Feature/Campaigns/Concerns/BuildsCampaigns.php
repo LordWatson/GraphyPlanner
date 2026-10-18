@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Campaigns\Concerns;
 
+use App\Enums\ConnectionStatus;
+use App\Enums\Platform;
 use App\Enums\Role;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Organization;
+use App\Models\SocialAccount;
 use App\Models\User;
 
 /**
@@ -68,6 +71,20 @@ trait BuildsCampaigns
             'org_id' => $this->org->id,
             ...$attributes,
         ]);
+    }
+
+    /**
+     * Give the client a connected account on each platform, so the campaign can plan for it.
+     */
+    protected function connect(Platform ...$platforms): void
+    {
+        foreach ($platforms as $platform) {
+            SocialAccount::factory()->for($this->client)->create([
+                'org_id' => $this->org->id,
+                'platform' => $platform,
+                'connection_status' => ConnectionStatus::Connected,
+            ]);
+        }
     }
 
     protected function foreignOwner(): User

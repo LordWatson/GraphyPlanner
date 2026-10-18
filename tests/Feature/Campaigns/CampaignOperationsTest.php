@@ -92,6 +92,7 @@ class CampaignOperationsTest extends TestCase
     {
         config(['ai.enabled' => true, 'publishing.rollout.tiktok' => false]);
         BrandBrain::factory()->for($this->client)->create(['voice' => ['do_nots' => ['cheap']]]);
+        $this->connect(Platform::Instagram, Platform::TikTok);
         $campaign = $this->makeCampaign(['platforms' => ['instagram', 'tiktok'], 'start_date' => '2026-11-02', 'end_date' => '2026-11-29']);
 
         $this->app->instance(CampaignAiProvider::class, $this->fakeAi([

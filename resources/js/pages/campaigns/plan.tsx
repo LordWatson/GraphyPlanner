@@ -1,5 +1,12 @@
 import { Link } from '@inertiajs/react';
-import { ClipboardList, LayoutGrid, List, Plus, Rows3 } from 'lucide-react';
+import {
+    ClipboardList,
+    LayoutGrid,
+    Link2,
+    List,
+    Plus,
+    Rows3,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CampaignSwatch } from '@/components/campaigns/campaign-chip';
 import { CampaignLayout } from '@/components/campaigns/campaign-layout';
@@ -24,6 +31,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatDate, formatSchedule } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { index as campaignsIndex } from '@/routes/campaigns';
+import { show as showClient } from '@/routes/clients';
 import { edit as editPost } from '@/routes/posts';
 
 type View = 'matrix' | 'list';
@@ -56,14 +64,26 @@ export default function CampaignPlan(props: CampaignWorkspaceProps & PlanData) {
     }>({ open: false, deliverable: null });
     const [bulkOpen, setBulkOpen] = useState(false);
 
+    // Columns are the client's channels, plus any channel an existing slot is still on.
     const platforms = useMemo(() => {
-        const used = new Set<string>([
-            ...campaign.platforms,
-            ...plan.deliverables.map((deliverable) => deliverable.platform),
-        ]);
+        const columns = [...plan.platformOptions];
 
-        return plan.platformOptions.filter((option) => used.has(option.value));
-    }, [campaign.platforms, plan.deliverables, plan.platformOptions]);
+        for (const deliverable of plan.deliverables) {
+            if (
+                !columns.some((option) => option.value === deliverable.platform)
+            ) {
+                columns.push({
+                    value: deliverable.platform,
+                    label:
+                        plan.platformLabels[deliverable.platform] ??
+                        deliverable.platform,
+                });
+            }
+        }
+
+        return columns;
+    }, [plan.deliverables, plan.platformOptions, plan.platformLabels]);
+    const canPlan = can.update && plan.platformOptions.length > 0;
 
     const rows = useMemo(
         () => [
@@ -168,13 +188,13 @@ export default function CampaignPlan(props: CampaignWorkspaceProps & PlanData) {
                                 <List />
                             </ToggleGroupItem>
                         </ToggleGroup>
-                        {can.aiPlanner && (
+                        {can.aiPlanner && canPlan && (
                             <AiPlanner
                                 campaignId={campaign.id}
                                 phases={plan.phases}
                             />
                         )}
-                        {can.update && (
+                        {canPlan && (
                             <>
                                 <Button
                                     variant="outline"
@@ -195,6 +215,30 @@ export default function CampaignPlan(props: CampaignWorkspaceProps & PlanData) {
                         )}
                     </div>
                 </div>
+
+                {can.update && plan.platformOptions.length === 0 && (
+                    <div className="border-border/70 bg-muted/40 flex flex-col gap-3 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="flex flex-col gap-0.5">
+                            <span className="text-sm font-semibold">
+                                No social accounts to plan for.
+                            </span>
+                            <span className="text-muted-foreground text-sm">
+                                Connect {campaign.client.name ?? 'the client'}’s
+                                accounts and their channels show up here.
+                            </span>
+                        </span>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="self-start sm:self-auto"
+                        >
+                            <Link href={showClient(campaign.client.id)}>
+                                <Link2 />
+                                Connect accounts
+                            </Link>
+                        </Button>
+                    </div>
+                )}
 
                 {plan.deliverables.length === 0 ? (
                     <EmptyState
@@ -254,6 +298,9 @@ export default function CampaignPlan(props: CampaignWorkspaceProps & PlanData) {
                                                   openNew(row.id, platform)
                                             : undefined
                                     }
+                                    addablePlatforms={plan.platformOptions.map(
+                                        (option) => option.value,
+                                    )}
                                 />
                             ))}
                         </div>
@@ -381,11 +428,16 @@ export default function CampaignPlan(props: CampaignWorkspaceProps & PlanData) {
                 <BulkAddDialog
                     campaignId={campaign.id}
                     plan={plan}
-                    defaultPlatforms={
-                        campaign.platforms.length > 0
-                            ? campaign.platforms
-                            : platforms.map((platform) => platform.value)
-                    }
+                    defaultPlatforms={(() => {
+                        const available = plan.platformOptions.map(
+                            (option) => option.value,
+                        );
+                        const intended = campaign.platforms.filter((platform) =>
+                            available.includes(platform),
+                        );
+
+                        return intended.length > 0 ? intended : available;
+                    })()}
                     open={bulkOpen}
                     onOpenChange={setBulkOpen}
                 />
@@ -400,12 +452,15 @@ function MatrixRow({
     deliverables,
     renderCard,
     onAdd,
+    addablePlatforms,
 }: {
     row: { id: number | null; name: string; colour: string | null };
     platforms: string[];
     deliverables: Deliverable[];
     renderCard: (deliverable: Deliverable) => React.ReactNode;
     onAdd?: (platform: string) => void;
+    /** Only the client's current channels take new slots. */
+    addablePlatforms: string[];
 }) {
     return (
         <>
@@ -426,16 +481,18 @@ function MatrixRow({
                         className="bg-card flex flex-col gap-2 p-2.5"
                     >
                         {cell.map(renderCard)}
-                        {onAdd && platform !== '' && (
-                            <button
-                                type="button"
-                                onClick={() => onAdd(platform)}
-                                className="text-muted-foreground hover:border-primary/40 hover:text-foreground border-border flex h-9 items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs transition-colors"
-                            >
-                                <Plus className="size-3.5" />
-                                Add
-                            </button>
-                        )}
+                        {onAdd &&
+                            platform !== '' &&
+                            addablePlatforms.includes(platform) && (
+                                <button
+                                    type="button"
+                                    onClick={() => onAdd(platform)}
+                                    className="text-muted-foreground hover:border-primary/40 hover:text-foreground border-border flex h-9 items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs transition-colors"
+                                >
+                                    <Plus className="size-3.5" />
+                                    Add
+                                </button>
+                            )}
                     </div>
                 );
             })}

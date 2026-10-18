@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Campaigns;
 use App\Actions\Campaigns\ListCampaignsAction;
 use App\Contracts\CampaignFeatures;
 use App\Enums\CampaignFeature;
-use App\Enums\CampaignObjective;
 use App\Enums\CampaignStatus;
 use App\Enums\Role;
 use App\Http\Controllers\CampaignController;
@@ -13,7 +12,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Campaigns\CampaignHubRequest;
 use App\Models\Campaign;
 use App\Models\Client;
-use App\Models\User;
 use App\Support\Campaigns\CampaignClock;
 use App\Support\Campaigns\CampaignPresenter;
 use Inertia\Inertia;
@@ -38,12 +36,7 @@ class CampaignIndexController extends Controller
             'stats' => Inertia::defer(fn () => $list->stats($organization)),
             'filterOptions' => [
                 'clients' => Client::query()->orderBy('name')->get(['id', 'name'])->map(fn (Client $client) => ['value' => (string) $client->id, 'label' => $client->name]),
-                'owners' => User::query()->where('org_id', $organization->id)
-                    ->whereIn('role', [Role::Owner, Role::Strategist, Role::Designer, Role::Viewer])
-                    ->orderBy('name')->get(['id', 'name'])
-                    ->map(fn (User $owner) => ['value' => (string) $owner->id, 'label' => $owner->name]),
                 'statuses' => array_map(fn (CampaignStatus $status) => ['value' => $status->value, 'label' => $status->label()], CampaignStatus::cases()),
-                'objectives' => array_map(fn (CampaignObjective $objective) => ['value' => $objective->value, 'label' => $objective->label()], CampaignObjective::cases()),
             ],
             'can' => [
                 'create' => in_array($user->role, [Role::Owner, Role::Strategist], true),

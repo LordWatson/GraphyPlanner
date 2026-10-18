@@ -14,7 +14,10 @@ export type PlanData = {
     accounts: PlanAccount[];
     team: { id: number; name: string }[];
     pillars: string[];
+    /** Only the client's channels (accounts on file, publishing switched on). */
     platformOptions: Option[];
+    /** Every platform's label, for columns of slots on a channel that's since gone. */
+    platformLabels: Record<string, string>;
     suggestedPhases: {
         name: string;
         starts_on: string;

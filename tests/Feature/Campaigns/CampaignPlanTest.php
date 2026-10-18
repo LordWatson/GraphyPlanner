@@ -201,6 +201,7 @@ class CampaignPlanTest extends TestCase
 
     public function test_bulk_add_spreads_slots_across_the_phase(): void
     {
+        $this->connect(Platform::Instagram, Platform::LinkedIn);
         $phase = CampaignPhase::factory()->create(['campaign_id' => $this->campaign->id, 'name' => 'Launch', 'starts_on' => '2026-11-02', 'ends_on' => '2026-11-15']);
 
         $this->actingAs($this->owner())->post(route('campaigns.deliverables.bulk', $this->campaign), [
@@ -220,6 +221,7 @@ class CampaignPlanTest extends TestCase
 
     public function test_assignment_notifies_only_the_assignee(): void
     {
+        $this->connect(Platform::Instagram);
         Notification::fake();
 
         $this->actingAs($this->owner())->post(route('campaigns.deliverables.store', $this->campaign), [

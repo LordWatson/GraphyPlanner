@@ -46,11 +46,6 @@ type Filters = {
     search: string | null;
     client_id: number | null;
     status: string | null;
-    timeline: string | null;
-    owner_id: number | null;
-    objective: string | null;
-    health: string | null;
-    sort: string;
 };
 
 type HubProps = {
@@ -64,9 +59,7 @@ type HubProps = {
     };
     filterOptions: {
         clients: Option[];
-        owners: Option[];
         statuses: Option[];
-        objectives: Option[];
     };
     formOptions: CampaignFormOptions;
     can: { create: boolean; templates: boolean };
@@ -98,11 +91,6 @@ export default function CampaignsHub({
         search: filters.search,
         client: filters.client_id,
         status: filters.status,
-        timeline: filters.timeline,
-        owner: filters.owner_id,
-        objective: filters.objective,
-        health: filters.health,
-        sort: filters.sort === 'start_asc' ? null : filters.sort,
     };
     const visit = (changes: Record<string, TabFilterValue>) =>
         visitClientTab(campaignsIndex.url(), query, changes, [
@@ -159,55 +147,16 @@ export default function CampaignsHub({
                             label: 'Live now',
                             value: pad(stats?.live ?? 0),
                             caption: 'Running today',
-                            render: (cell) => (
-                                <button
-                                    type="button"
-                                    className="w-full text-left"
-                                    onClick={() =>
-                                        visit({
-                                            timeline: 'live',
-                                            health: null,
-                                        })
-                                    }
-                                >
-                                    {cell}
-                                </button>
-                            ),
                         },
                         {
                             label: 'Launching',
                             value: pad(stats?.launching ?? 0),
                             caption: 'In the next 14 days',
-                            render: (cell) => (
-                                <button
-                                    type="button"
-                                    className="w-full text-left"
-                                    onClick={() =>
-                                        visit({
-                                            timeline: 'upcoming',
-                                            health: null,
-                                        })
-                                    }
-                                >
-                                    {cell}
-                                </button>
-                            ),
                         },
                         {
                             label: 'At risk',
                             value: pad(stats?.at_risk ?? 0),
                             caption: 'Red health',
-                            render: (cell) => (
-                                <button
-                                    type="button"
-                                    className="w-full text-left"
-                                    onClick={() =>
-                                        visit({ health: 'red', timeline: null })
-                                    }
-                                >
-                                    {cell}
-                                </button>
-                            ),
                         },
                         {
                             label: 'Wrapped',
@@ -246,68 +195,6 @@ export default function CampaignsHub({
                                 value={filters.status}
                                 options={filterOptions.statuses}
                                 onChange={(status) => visit({ status })}
-                            />
-                            <TabSelectFilter
-                                id="hub-timeline"
-                                label="Timing"
-                                allLabel="Any time"
-                                value={filters.timeline}
-                                options={[
-                                    { value: 'live', label: 'Live' },
-                                    { value: 'upcoming', label: 'Upcoming' },
-                                    { value: 'ended', label: 'Ended' },
-                                    { value: 'undated', label: 'No dates' },
-                                ]}
-                                onChange={(value) => visit({ timeline: value })}
-                            />
-                            <TabSelectFilter
-                                id="hub-health"
-                                label="Health"
-                                allLabel="Any health"
-                                value={filters.health}
-                                options={[
-                                    { value: 'red', label: 'Red' },
-                                    { value: 'amber', label: 'Amber' },
-                                    { value: 'green', label: 'Green' },
-                                ]}
-                                onChange={(health) => visit({ health })}
-                            />
-                            <TabSelectFilter
-                                id="hub-owner"
-                                label="Owner"
-                                allLabel="Anyone"
-                                value={
-                                    filters.owner_id
-                                        ? String(filters.owner_id)
-                                        : null
-                                }
-                                options={filterOptions.owners}
-                                onChange={(owner) => visit({ owner })}
-                            />
-                            <TabSelectFilter
-                                id="hub-objective"
-                                label="Objective"
-                                allLabel="Any objective"
-                                value={filters.objective}
-                                options={filterOptions.objectives}
-                                onChange={(objective) => visit({ objective })}
-                            />
-                            <TabSelectFilter
-                                id="hub-sort"
-                                label="Order"
-                                allLabel="Starting soonest"
-                                value={
-                                    filters.sort === 'start_desc'
-                                        ? 'start_desc'
-                                        : null
-                                }
-                                options={[
-                                    {
-                                        value: 'start_desc',
-                                        label: 'Starting latest',
-                                    },
-                                ]}
-                                onChange={(sort) => visit({ sort })}
                             />
                         </>
                     )}

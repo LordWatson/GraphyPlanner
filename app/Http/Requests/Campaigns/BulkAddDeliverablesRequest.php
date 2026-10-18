@@ -5,9 +5,9 @@ namespace App\Http\Requests\Campaigns;
 use App\Enums\Platform;
 use App\Models\Campaign;
 use App\Models\CampaignPhase;
+use App\Services\Campaigns\CampaignPlatforms;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 
 /**
  * Step C-3.2 — "Add N per week on {platforms} through {phase}".
@@ -27,7 +27,7 @@ class BulkAddDeliverablesRequest extends FormRequest
         return [
             'per_week' => ['required', 'integer', 'min:1', 'max:14'],
             'platforms' => ['required', 'array', 'min:1'],
-            'platforms.*' => ['distinct', new Enum(Platform::class)],
+            'platforms.*' => ['distinct', Rule::in(app(CampaignPlatforms::class)->plannableValues($this->campaign()))],
             'campaign_phase_id' => ['nullable', 'integer', Rule::exists('campaign_phases', 'id')->where('campaign_id', $this->campaign()->id)],
             'planned_time' => ['nullable', 'date_format:H:i'],
             'title_prefix' => ['nullable', 'string', 'max:100'],

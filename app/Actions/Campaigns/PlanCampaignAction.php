@@ -9,7 +9,7 @@ use App\Models\CampaignPhase;
 use App\Models\User;
 use App\Services\AI\AiGuardrailService;
 use App\Services\Campaigns\CampaignAiUsage;
-use App\Services\Publishing\PlatformRolloutGate;
+use App\Services\Campaigns\CampaignPlatforms;
 use App\Support\AI\Campaigns\AiDeliverableSuggestion;
 use App\Support\Campaigns\CampaignClock;
 use Carbon\CarbonImmutable;
@@ -22,8 +22,9 @@ use Illuminate\Validation\ValidationException;
  * dates and Brand Brain pillars; returns them for a review drawer and writes nothing (accepting is
  * `AcceptCampaignPlanAction`).
  *
- * - Platforms are limited to the campaign's intended ones that the org can publish to (rollout
- *   gating) — a suggestion for any other platform is dropped, whatever the model says.
+ * - Platforms are limited to the campaign's intended ones that the client has an account on and
+ *   the org can publish to (`CampaignPlatforms::forAi`) — a suggestion for any other platform is
+ *   dropped, whatever the model says.
  * - Dates outside the campaign are dropped.
  * - Cadence: a day that already has posts or planned slots for that platform gets a warning.
  * - Banned phrases are flagged on the suggestion.
@@ -36,7 +37,7 @@ class PlanCampaignAction
         private readonly CampaignAiProvider $ai,
         private readonly AiGuardrailService $guardrail,
         private readonly CampaignAiUsage $usage,
-        private readonly PlatformRolloutGate $rollout,
+        private readonly CampaignPlatforms $platforms,
     ) {}
 
     /**
@@ -47,7 +48,7 @@ class PlanCampaignAction
         $platforms = $this->allowedPlatforms($campaign);
 
         if ($platforms === []) {
-            throw ValidationException::withMessages(['platforms' => 'None of this campaign’s platforms can be published to yet, so there’s nothing to plan.']);
+            throw ValidationException::withMessages(['platforms' => 'This client has no connected accounts on this campaign’s platforms. Connect one, then plan.']);
         }
 
         $today = CampaignClock::today($campaign);
@@ -106,12 +107,7 @@ class PlanCampaignAction
      */
     public function allowedPlatforms(Campaign $campaign): array
     {
-        $intended = $campaign->platforms ?: array_map(fn (Platform $platform) => $platform->value, Platform::cases());
-
-        return array_values(array_filter(
-            $intended,
-            fn (string $value) => ($platform = Platform::tryFrom($value)) !== null && $this->rollout->platformEnabled($platform),
-        ));
+        return $this->platforms->forAi($campaign);
     }
 
     /**
