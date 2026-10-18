@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\CampaignColour;
+use App\Enums\CampaignObjective;
 use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Models\Client;
@@ -19,7 +21,7 @@ class CampaignFactory extends Factory
     {
         return $this->afterMaking(function (Campaign $campaign) {
             if (! $campaign->org_id && $campaign->client_id) {
-                $campaign->org_id = Client::find($campaign->client_id)?->org_id;
+                $campaign->org_id = Client::query()->withoutOrgScope()->find($campaign->client_id)?->org_id;
             }
         });
     }
@@ -40,5 +42,61 @@ class CampaignFactory extends Factory
             'goal' => fake()->sentence(),
             'notes' => null,
         ];
+    }
+
+    public function status(CampaignStatus $status): static
+    {
+        return $this->state(['status' => $status]);
+    }
+
+    public function planning(): static
+    {
+        return $this->status(CampaignStatus::Planning);
+    }
+
+    public function active(): static
+    {
+        return $this->status(CampaignStatus::Active);
+    }
+
+    public function paused(): static
+    {
+        return $this->status(CampaignStatus::Paused);
+    }
+
+    public function completed(): static
+    {
+        return $this->status(CampaignStatus::Completed);
+    }
+
+    public function archived(): static
+    {
+        return $this->status(CampaignStatus::Archived);
+    }
+
+    public function objective(CampaignObjective $objective): static
+    {
+        return $this->state(['objective' => $objective]);
+    }
+
+    public function colour(CampaignColour $colour): static
+    {
+        return $this->state(['colour' => $colour]);
+    }
+
+    /**
+     * Dates relative to today: `dated(-3, 10)` started 3 days ago and ends in 10 days.
+     */
+    public function dated(int $startOffsetDays, ?int $endOffsetDays = null): static
+    {
+        return $this->state([
+            'start_date' => now()->addDays($startOffsetDays)->toDateString(),
+            'end_date' => $endOffsetDays === null ? null : now()->addDays($endOffsetDays)->toDateString(),
+        ]);
+    }
+
+    public function undated(): static
+    {
+        return $this->state(['start_date' => null, 'end_date' => null]);
     }
 }

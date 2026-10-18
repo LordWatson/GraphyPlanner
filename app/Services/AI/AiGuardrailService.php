@@ -240,6 +240,21 @@ class AiGuardrailService
     }
 
     /**
+     * Step C-2.2: every banned phrase found in a piece of AI-drafted text. Campaign drafts (briefs,
+     * plans, wrap commentary) are flagged rather than dropped — a person reviews each section
+     * before accepting it, so they need to see *why* a line was flagged.
+     *
+     * @return list<string>
+     */
+    public function bannedPhrasesIn(?BrandBrain $brandBrain, string $text): array
+    {
+        return array_values(array_filter(
+            $this->bannedPhrases($brandBrain),
+            fn (string $phrase) => mb_stripos($text, $phrase) !== false,
+        ));
+    }
+
+    /**
      * @return array<int, string>
      */
     private function bannedPhrases(?BrandBrain $brandBrain): array

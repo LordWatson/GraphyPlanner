@@ -31,6 +31,8 @@ class AssetController extends Controller
             $request->validated('search'),
             $type !== null ? AssetType::from($type) : null,
             (int) ($request->validated('page') ?? 1),
+            // Step C-4.1: narrow to one campaign's kit.
+            $request->validated('campaign') !== null ? (int) $request->validated('campaign') : null,
         );
 
         return response()->json([

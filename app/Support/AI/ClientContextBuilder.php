@@ -114,6 +114,46 @@ class ClientContextBuilder
     }
 
     /**
+     * Step C-2.1 — the campaign's brief as a briefing block for prompts about one of its posts,
+     * so captions and ideas follow it. Empty when there's no campaign or no brief. Scrubbed like
+     * the rest of the context.
+     */
+    public function describeCampaignBrief(?Campaign $campaign): string
+    {
+        $brief = $campaign?->brief;
+
+        if ($brief === null || $brief->isEmpty()) {
+            return '';
+        }
+
+        $labels = [
+            'background' => 'Background',
+            'objective_detail' => 'Objective',
+            'audience' => 'Audience',
+            'key_messages' => 'Key messages',
+            'offer' => 'Offer',
+            'call_to_action' => 'Call to action',
+            'mandatories' => 'Must include',
+            'avoid' => 'Avoid',
+            'success_measures' => 'Success looks like',
+        ];
+
+        $lines = ['# Campaign brief ('.$campaign->name.')'];
+
+        foreach ($labels as $field => $label) {
+            $value = $brief->{$field};
+
+            if (is_array($value) ? $value === [] : blank($value)) {
+                continue;
+            }
+
+            $lines[] = '- '.$label.': '.(is_array($value) ? implode('; ', $value) : trim((string) $value));
+        }
+
+        return $this->guardrail->scrub(implode("\n", $lines));
+    }
+
+    /**
      * One-line campaign summary, shared with DeepSeekProvider's per-post caption prompt.
      */
     public function describeCampaign(Campaign $campaign): string

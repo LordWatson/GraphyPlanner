@@ -3,7 +3,9 @@
 namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
+use App\Contracts\CampaignAiProvider;
 use App\Enums\Platform;
+use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestion;
@@ -12,6 +14,9 @@ use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\Campaigns\AiCampaignBriefDraft;
+use App\Support\AI\Campaigns\AiCampaignWrapDraft;
+use App\Support\AI\Campaigns\AiDeliverableSuggestion;
 use App\Support\AI\ClientContextBuilder;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\BrandImageBriefFactory;
@@ -30,7 +35,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider
+class DeepSeekProvider implements AiProvider, CampaignAiProvider
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -176,6 +181,160 @@ class DeepSeekProvider implements AiProvider
         return $this->briefs->finalize($client, $brief->with(['subject' => $this->briefs->stripHashtags($brief->subject)]), $input);
     }
 
+    /**
+     * Step C-2.2: a suggested campaign brief from the campaign's name, goal, objective and dates,
+     * grounded in the client's Brand Brain (system prompt). Suggestion only.
+     */
+    public function draftCampaignBrief(Campaign $campaign): AiCampaignBriefDraft
+    {
+        $payload = $this->requestStructured(
+            method: 'draftCampaignBrief',
+            systemPrompt: $this->buildSystemPrompt($campaign->client),
+            userPrompt: $this->buildCampaignBriefUserPrompt($campaign),
+            validator: fn (array $data): ?string => is_string($data['background'] ?? null) ? null : 'background must be a string',
+            context: ['org_id' => $campaign->org_id, 'client_id' => $campaign->client_id, 'campaign_id' => $campaign->id],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        return $payload === null ? new AiCampaignBriefDraft : AiCampaignBriefDraft::fromArray($payload);
+    }
+
+    /**
+     * Step C-3.3: suggested deliverables across the campaign, one per item, each tied to a phase,
+     * a platform from the allowed list, a pillar and a date inside the campaign.
+     */
+    public function planCampaign(Campaign $campaign, array $input): array
+    {
+        $payload = $this->requestStructured(
+            method: 'planCampaign',
+            systemPrompt: $this->buildSystemPrompt($campaign->client),
+            userPrompt: $this->buildPlanCampaignUserPrompt($campaign, $input),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'deliverables', ['title', 'platform', 'date']),
+            context: ['org_id' => $campaign->org_id, 'client_id' => $campaign->client_id, 'campaign_id' => $campaign->id],
+            maxTokens: max(4000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $phaseIds = array_column($input['phases'], 'id');
+
+        return array_values(array_map(fn (array $item) => new AiDeliverableSuggestion(
+            title: mb_substr(trim((string) $item['title']), 0, 255),
+            platform: strtolower(trim((string) $item['platform'])),
+            format: isset($item['format']) && is_string($item['format']) ? mb_substr($item['format'], 0, 50) : null,
+            pillar: isset($item['pillar']) && is_string($item['pillar']) ? mb_substr($item['pillar'], 0, 100) : null,
+            phaseId: isset($item['phase_id']) && in_array((int) $item['phase_id'], $phaseIds, true) ? (int) $item['phase_id'] : null,
+            date: (string) $item['date'],
+            time: isset($item['time']) && is_string($item['time']) && preg_match('/^\d{2}:\d{2}$/', $item['time']) ? $item['time'] : null,
+            angle: isset($item['angle']) && is_string($item['angle']) ? $item['angle'] : null,
+        ), array_slice($payload['deliverables'], 0, $input['max'])));
+    }
+
+    /**
+     * Step C-7.3: wrap report commentary from the KPI snapshot, the brief's success measures and
+     * the top posts. Honest about misses ("We missed the target. Here's the fix.").
+     */
+    public function draftCampaignWrap(Campaign $campaign, array $facts): AiCampaignWrapDraft
+    {
+        $payload = $this->requestStructured(
+            method: 'draftCampaignWrap',
+            systemPrompt: $this->buildSystemPrompt($campaign->client),
+            userPrompt: $this->buildCampaignWrapUserPrompt($campaign, $facts),
+            validator: fn (array $data): ?string => is_string($data['summary'] ?? null) ? null : 'summary must be a string',
+            context: ['org_id' => $campaign->org_id, 'client_id' => $campaign->client_id, 'campaign_id' => $campaign->id],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        return $payload === null ? new AiCampaignWrapDraft : AiCampaignWrapDraft::fromArray($payload);
+    }
+
+    private function buildCampaignBriefUserPrompt(Campaign $campaign): string
+    {
+        $lines = [
+            'Draft a campaign brief for the studio to review with its client.',
+            'Be specific to this brand and campaign; short sentences; no jargon; British English.',
+            'Campaign: '.$this->guardrail->scrub($this->context->describeCampaign($campaign)),
+        ];
+
+        if ($campaign->objective !== null) {
+            $lines[] = 'Objective: '.$campaign->objective->label();
+        }
+
+        if (! empty($campaign->platforms)) {
+            $lines[] = 'Intended platforms: '.implode(', ', $campaign->platforms);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"background": string, "objective_detail": string, "audience": string, "key_messages": string[] (3-5), "offer": string, "call_to_action": string (max 8 words), "mandatories": string[], "avoid": string[], "deliverables_summary": string, "success_measures": string}';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array{platforms: list<string>, phases: list<array{id: int, name: string, starts_on: string|null, ends_on: string|null}>, pillars: list<string>, start: string, end: string, max: int}  $input
+     */
+    private function buildPlanCampaignUserPrompt(Campaign $campaign, array $input): string
+    {
+        $lines = [
+            "Plan up to {$input['max']} social media deliverables for this campaign, spread sensibly across its phases.",
+            "Every date must be between {$input['start']} and {$input['end']} (YYYY-MM-DD). Never on a platform outside this list: ".implode(', ', $input['platforms']).'.',
+            'Campaign: '.$this->guardrail->scrub($this->context->describeCampaign($campaign)),
+        ];
+
+        if (($brief = $this->context->describeCampaignBrief($campaign)) !== '') {
+            $lines[] = $brief;
+        }
+
+        if ($input['phases'] !== []) {
+            $lines[] = 'Phases (use phase_id):';
+
+            foreach ($input['phases'] as $phase) {
+                $lines[] = "- {$phase['id']}: {$phase['name']} ".($phase['starts_on'] ?? '?').' → '.($phase['ends_on'] ?? '?');
+            }
+        }
+
+        if ($input['pillars'] !== []) {
+            $lines[] = 'Content pillars: '.implode(', ', $input['pillars']);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"deliverables": [{"title": string (short working title), "platform": string, "format": string|null (e.g. reel, carousel, story, static), "pillar": string|null, "phase_id": number|null, "date": "YYYY-MM-DD", "time": "HH:MM"|null, "angle": string (one line)}]}';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array{kpis: list<array<string, mixed>>, top_posts: list<array<string, mixed>>, published: int, success_measures: string|null}  $facts
+     */
+    private function buildCampaignWrapUserPrompt(Campaign $campaign, array $facts): string
+    {
+        $lines = [
+            'Write the commentary for this campaign’s wrap report, for the client.',
+            'Lead with what worked. Be honest about misses and say what we will change. Short sentences. No jargon.',
+            'Campaign: '.$this->guardrail->scrub($this->context->describeCampaign($campaign)),
+            "Posts published: {$facts['published']}",
+        ];
+
+        if (filled($facts['success_measures'])) {
+            $lines[] = 'Success measures agreed in the brief: '.$this->guardrail->scrub((string) $facts['success_measures']);
+        }
+
+        foreach ($facts['kpis'] as $kpi) {
+            $lines[] = '- KPI '.($kpi['label'] ?? '').': target '.($kpi['target'] ?? '?').', actual '.($kpi['available'] ?? false ? ($kpi['actual'] ?? 'n/a') : 'not tracked yet');
+        }
+
+        foreach ($facts['top_posts'] as $post) {
+            $lines[] = '- Top post: '.$this->guardrail->scrub((string) ($post['caption'] ?? ''));
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"summary": string (2-3 sentences), "highlights": string[] (3-5), "learnings": string, "next_steps": string}';
+
+        return implode("\n", $lines);
+    }
+
     private function buildImageBriefUserPrompt(ImageBriefInput $input): string
     {
         $lines = [
@@ -279,6 +438,12 @@ class DeepSeekProvider implements AiProvider
 
         if ($post->campaign !== null) {
             $lines[] = 'Campaign this post belongs to: '.$this->guardrail->scrub($this->context->describeCampaign($post->campaign));
+
+            // Step C-2.1: a campaign post follows its brief.
+            if (($brief = $this->context->describeCampaignBrief($post->campaign)) !== '') {
+                $lines[] = 'Follow this campaign brief:';
+                $lines[] = $brief;
+            }
         }
 
         if (! empty($post->hashtags)) {

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { BrandMark } from '@/components/brand-mark';
+import { CampaignsSection } from '@/components/marketing/campaigns-section';
 import { Peek } from '@/components/brand-poster';
 import { Eyebrow } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
@@ -208,6 +209,8 @@ export default function Welcome() {
                             ),
                         )}
                     </section>
+
+                    <CampaignsSection />
                 </main>
 
                 <footer className="bg-ink text-cream relative">

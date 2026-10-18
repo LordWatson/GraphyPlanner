@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Support\Analytics\AnalyticsRange;
 use App\Support\Analytics\AnalyticsScope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Step 17.1 — billing figures from `invoices`, shared by the platform console and organization
@@ -146,6 +147,37 @@ class RevenueMetrics
             ->where('currency', $currency)
             ->get(['amount', 'issue_date'])
             ->map(fn (Invoice $invoice) => [$invoice->issue_date, (float) $invoice->amount])
+            ->all());
+    }
+
+    /**
+     * Campaigns enhancement C-8.3 — billed invoice lines tagged with a campaign, issued in the
+     * range, per campaign and currency, largest first. One grouped query.
+     *
+     * @return list<array{campaign_id: int, name: string, code: string|null, colour: string|null, currency: string, total: float}>
+     */
+    public function byCampaign(AnalyticsScope $scope, AnalyticsRange $range, int $limit = 10): array
+    {
+        return array_values(DB::table('invoice_items')
+            ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+            ->join('campaigns', 'campaigns.id', '=', 'invoice_items.campaign_id')
+            ->whereIn('invoice_items.invoice_id', $this->issued($scope, $range)->select('invoices.id'))
+            ->groupBy('campaigns.id', 'campaigns.name', 'campaigns.code', 'campaigns.colour', 'invoices.currency')
+            ->orderByDesc('total')
+            ->orderBy('campaigns.name')
+            ->limit($limit)
+            ->get([
+                'campaigns.id as campaign_id', 'campaigns.name', 'campaigns.code', 'campaigns.colour', 'invoices.currency',
+                DB::raw('SUM(invoice_items.price * invoice_items.quantity) as total'),
+            ])
+            ->map(fn (object $row) => [
+                'campaign_id' => (int) $row->campaign_id,
+                'name' => (string) $row->name,
+                'code' => $row->code === null ? null : (string) $row->code,
+                'colour' => $row->colour === null ? null : (string) $row->colour,
+                'currency' => (string) $row->currency,
+                'total' => round((float) $row->total, 2),
+            ])
             ->all());
     }
 }

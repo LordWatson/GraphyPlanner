@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Deferred, Head, Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -33,8 +33,11 @@ import {
     Panel,
     StatStrip,
 } from '@/components/page';
+import type { LiveCampaign } from '@/components/campaigns/live-campaigns-panel';
+import { LiveCampaignsPanel } from '@/components/campaigns/live-campaigns-panel';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as clientsIndex, show as showClient } from '@/routes/clients';
@@ -123,6 +126,7 @@ type DashboardProps = {
     clientHealth: ClientHealthRow[];
     unapprovedDraftsList: UnapprovedDraftRow[];
     publishReliability: PublishReliability;
+    liveCampaigns?: { items: LiveCampaign[]; total: number };
 };
 
 const dayFormatter = new Intl.DateTimeFormat('en-US', { day: '2-digit' });
@@ -183,6 +187,7 @@ export default function Dashboard({
     clientHealth,
     unapprovedDraftsList,
     publishReliability,
+    liveCampaigns,
 }: DashboardProps) {
     const { currency, auth } = usePage<{ currency: string; auth: Auth }>()
         .props;
@@ -431,6 +436,18 @@ export default function Dashboard({
                         )}
                     </Panel>
                 </div>
+
+                {auth.user.role !== 'client_reviewer' && (
+                    <Deferred
+                        data="liveCampaigns"
+                        fallback={<Skeleton className="h-40 rounded-2xl" />}
+                    >
+                        <LiveCampaignsPanel
+                            items={liveCampaigns?.items ?? []}
+                            total={liveCampaigns?.total ?? 0}
+                        />
+                    </Deferred>
+                )}
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_1fr]">
                     {invoiceTotals.length > 0 && (

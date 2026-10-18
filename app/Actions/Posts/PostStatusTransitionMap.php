@@ -45,6 +45,9 @@ class PostStatusTransitionMap
         ],
         PostStatus::Scheduled->value => [
             PostStatus::Publishing->value,
+            // Campaigns enhancement C-6.1: "Unschedule" keeps the approval (pausing a campaign
+            // uses it). Leaving `scheduled` clears the dispatch id, so the queued job no-ops.
+            PostStatus::Approved->value,
             PostStatus::Draft->value,
             PostStatus::Archived->value,
         ],

@@ -33,6 +33,9 @@ return [
         'base_url' => env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
         'timeout' => (int) env('DEEPSEEK_TIMEOUT', 30),
         'max_tokens' => (int) env('DEEPSEEK_MAX_TOKENS', 1024),
+        // Campaigns enhancement C-8.3: an estimated cost per successful campaign AI call (USD),
+        // recorded on `ai_usage_logs.cost_estimate` so campaign profitability can show AI spend.
+        'estimated_cost_per_call' => (float) env('DEEPSEEK_ESTIMATED_COST_PER_CALL', 0.002),
     ],
 
     /*

@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Actions\Campaigns;
+
+use App\Actions\Posts\TransitionPostStatusAction;
+use App\Enums\PostStatus;
+use App\Enums\Role;
+use App\Exceptions\Posts\InvalidPostTransitionException;
+use App\Models\Campaign;
+use App\Models\Post;
+use App\Models\User;
+use App\Notifications\CampaignReviewSubmitted;
+use App\Services\PostNotificationService;
+use Carbon\CarbonImmutable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Step C-5.2 — the client's "Review this campaign" flow, submitted in one go. Each decision goes
+ * through the existing approval path (`TransitionPostStatusAction`, so approvals/activity rows and
+ * the state machine are the same as approving one post — and, once I-8.2 lands, its approval
+ * steps). Seam: swap the transition call for I-8.2's step-aware approval here.
+ *
+ * - A decision only lands on the revision the client saw: if the post changed since (its
+ *   `updated_at` moved on) or isn't waiting on the client any more, it's skipped and reported.
+ * - Per-post staff notifications are held back; the studio gets **one** summary for the batch.
+ */
+class BatchReviewCampaignPostsAction
+{
+    public function __construct(private readonly TransitionPostStatusAction $transition) {}
+
+    /**
+     * @param  list<array{post_id: int, decision: string, comment?: string|null, seen_at: string}>  $decisions
+     * @return array{approved: list<int>, changes_requested: list<int>, stale: list<array{id: int, reason: string}>}
+     */
+    public function __invoke(Campaign $campaign, User $user, array $decisions, ?string $note = null): array
+    {
+        $posts = $campaign->posts()->whereIn('id', array_column($decisions, 'post_id'))->get()->keyBy('id');
+        $quiet = new class extends PostNotificationService
+        {
+            public function send(Collection $recipients, Notification $notification): void {}
+        };
+
+        $result = ['approved' => [], 'changes_requested' => [], 'stale' => []];
+
+        foreach ($decisions as $decision) {
+            /** @var Post|null $post */
+            $post = $posts->get($decision['post_id']);
+            $to = PostStatus::from($decision['decision']);
+
+            if ($post === null || $post->status !== PostStatus::WaitingClient) {
+                $result['stale'][] = ['id' => $decision['post_id'], 'reason' => 'It’s no longer waiting on you.'];
+
+                continue;
+            }
+
+            if (! $post->updated_at?->equalTo(CarbonImmutable::parse($decision['seen_at']))) {
+                $result['stale'][] = ['id' => $post->id, 'reason' => 'The studio changed it after you opened it. Take another look.'];
+
+                continue;
+            }
+
+            try {
+                ($this->transition)($post, $to, $user, $decision['comment'] ?? $note, notifications: $quiet);
+            } catch (InvalidPostTransitionException) {
+                $result['stale'][] = ['id' => $post->id, 'reason' => 'It changed while you were reviewing.'];
+
+                continue;
+            }
+
+            $result[$to === PostStatus::Approved ? 'approved' : 'changes_requested'][] = $post->id;
+        }
+
+        if ($result['approved'] !== [] || $result['changes_requested'] !== []) {
+            $campaign->recordActivity('posts.reviewed', $user, meta: [
+                'approved' => $result['approved'],
+                'changes_requested' => $result['changes_requested'],
+                'stale' => array_column($result['stale'], 'id'),
+            ]);
+
+            $this->notifyStudio($campaign, $user, count($result['approved']), count($result['changes_requested']));
+        }
+
+        Log::info('Campaign batch review submitted', [
+            'campaign_id' => $campaign->id,
+            'user_id' => $user->id,
+            'approved' => count($result['approved']),
+            'changes_requested' => count($result['changes_requested']),
+            'stale' => count($result['stale']),
+        ]);
+
+        return $result;
+    }
+
+    private function notifyStudio(Campaign $campaign, User $user, int $approved, int $changes): void
+    {
+        $recipients = User::query()
+            ->where('org_id', $campaign->org_id)
+            ->whereIn('role', [Role::Owner, Role::Strategist])
+            ->when($campaign->owner_id, fn ($query, $ownerId) => $query->orWhere('id', $ownerId))
+            ->get();
+
+        foreach ($recipients as $recipient) {
+            $recipient->notify(new CampaignReviewSubmitted($campaign, $user, $approved, $changes));
+        }
+    }
+}

@@ -1,6 +1,14 @@
+import type { CampaignChipData } from '@/components/campaigns/types';
+
 /** Prop shapes sent by `PostController::edit` to the `posts/edit` page. */
 
-export type ChecklistItem = { key: string; label: string; passed: boolean };
+export type ChecklistItem = {
+    key: string;
+    label: string;
+    passed: boolean;
+    /** Campaigns enhancement C-4.2: a warning, never a blocker. */
+    soft?: boolean;
+};
 
 export type Checklist = { items: ChecklistItem[]; passed: boolean };
 
@@ -62,6 +70,7 @@ export type PostData = {
     client_id: number;
     campaign_id: number | null;
     campaign_name: string | null;
+    campaign: CampaignChipData | null;
     status: string;
     status_label: string;
     approval_mode: string;

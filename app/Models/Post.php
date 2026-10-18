@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -174,6 +175,16 @@ class Post extends Model
     public function targets(): HasMany
     {
         return $this->hasMany(PostTarget::class);
+    }
+
+    /**
+     * Step C-3.2: the campaign deliverable this post was started from, if any.
+     *
+     * @return HasOne<CampaignDeliverable, $this>
+     */
+    public function deliverable(): HasOne
+    {
+        return $this->hasOne(CampaignDeliverable::class);
     }
 
     /**

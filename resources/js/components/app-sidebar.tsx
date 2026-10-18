@@ -17,6 +17,7 @@ import type { Chapter } from '@/lib/chapters';
 import { chapters, platformChapters } from '@/lib/chapters';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
+import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
@@ -153,7 +154,11 @@ function studioGroups(
                 navItem(chapters.overview, dashboard()),
                 navItem(chapters.attention, needsAttention()),
                 navItem(chapters.calendar, calendar()),
-                navItem(chapters.clients, clientsIndex()),
+                {
+                    ...navItem(chapters.clients, clientsIndex()),
+                    // Campaigns enhancement C-1.1: the hub is a section of 04 Clients (no renumber).
+                    subItems: [{ title: 'Campaigns', href: campaignsIndex() }],
+                },
                 ...(canViewLedger
                     ? [navItem(chapters.invoices, invoicesIndex())]
                     : []),

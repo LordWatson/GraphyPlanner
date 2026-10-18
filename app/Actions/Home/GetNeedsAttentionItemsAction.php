@@ -2,14 +2,22 @@
 
 namespace App\Actions\Home;
 
+use App\Enums\CampaignStatus;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Models\Campaign;
+use App\Models\Client;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\Campaigns\Health\LaunchingWithUnapprovedWorkRule;
+use App\Support\Campaigns\CampaignClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 class GetNeedsAttentionItemsAction
 {
@@ -48,6 +56,7 @@ class GetNeedsAttentionItemsAction
      *     internalReviews: array{items: list<array<string, mixed>>, total: int},
      *     waitingApprovals: array{items: list<array<string, mixed>>, total: int},
      *     missingMedia: array{items: list<array<string, mixed>>, total: int},
+     *     campaigns: array{items: list<array<string, mixed>>, total: int},
      *     disconnectedAccounts: array{items: list<array<string, mixed>>, total: int},
      * }
      */
@@ -91,6 +100,11 @@ class GetNeedsAttentionItemsAction
                 'items' => $this->rows(clone $missingMediaQuery, $limit, fn () => 'Missing required media'),
                 'total' => $missingMediaQuery->count(),
             ],
+            // Campaigns enhancement C-1.4 — campaigns in trouble, found in SQL (a fixed number of
+            // queries however many campaigns there are).
+            'campaigns' => $user->role === Role::ClientReviewer
+                ? ['items' => [], 'total' => 0]
+                : $this->campaigns($user, $limit),
             'disconnectedAccounts' => [
                 'items' => array_values((clone $accountsQuery)
                     ->with('client:id,name')
@@ -111,6 +125,115 @@ class GetNeedsAttentionItemsAction
                 'total' => $accountsQuery->count(),
             ],
         ];
+    }
+
+    /**
+     * Step C-1.4 — open campaigns that need a hand, each with the reason in words:
+     *
+     * - still Active/Paused after its end date ("Ended 3 days ago, still Active.");
+     * - launching within 3 days (org timezone) with work not yet approved;
+     * - a scheduled post going to an account whose token expired.
+     *
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    private function campaigns(User $user, int $limit): array
+    {
+        $today = CampaignClock::today($user->organization);
+        $date = $today->toDateString();
+        $soon = $today->addDays(LaunchingWithUnapprovedWorkRule::DAYS)->toDateString();
+
+        $unapprovedPosts = fn ($query) => $query->select(DB::raw(1))
+            ->from('posts')
+            ->whereColumn('posts.campaign_id', 'campaigns.id')
+            ->whereNull('posts.deleted_at')
+            ->whereIn('posts.status', array_map(fn (PostStatus $status) => $status->value, PostStatus::preApproval()));
+
+        $unstarted = fn ($query) => $query->select(DB::raw(1))
+            ->from('campaign_deliverables')
+            ->whereColumn('campaign_deliverables.campaign_id', 'campaigns.id')
+            ->whereNull('campaign_deliverables.post_id');
+
+        $expired = fn ($query) => $query->select(DB::raw(1))
+            ->from('posts')
+            ->join('post_targets', 'post_targets.post_id', '=', 'posts.id')
+            ->join('social_accounts', 'social_accounts.id', '=', 'post_targets.social_account_id')
+            ->whereColumn('posts.campaign_id', 'campaigns.id')
+            ->whereNull('posts.deleted_at')
+            ->where('posts.status', PostStatus::Scheduled->value)
+            ->where('social_accounts.connection_status', ConnectionStatus::TokenExpired->value);
+
+        $query = Campaign::query()
+            ->where('campaigns.org_id', $user->org_id)
+            ->whereIn('campaigns.client_id', Client::query()->select('id'))
+            ->whereIn('campaigns.status', [CampaignStatus::Planning, CampaignStatus::Active, CampaignStatus::Paused])
+            ->where(fn (Builder $where) => $where
+                ->where(fn (Builder $ended) => $ended->whereIn('campaigns.status', [CampaignStatus::Active, CampaignStatus::Paused])->where('campaigns.end_date', '<', $date))
+                ->orWhere(fn (Builder $launch) => $launch->whereIn('campaigns.status', [CampaignStatus::Planning, CampaignStatus::Active])
+                    ->whereBetween('campaigns.start_date', [$date, $soon])
+                    ->where(fn (Builder $work) => $work->whereExists($unapprovedPosts)->orWhereExists($unstarted)))
+                ->orWhereExists($expired));
+
+        $total = (clone $query)->count();
+
+        $rows = $query
+            ->with('client:id,name')
+            ->select('campaigns.*')
+            ->addSelect(['has_expired_account' => $this->subquery($expired)->limit(1)])
+            ->orderBy('campaigns.start_date')
+            ->limit($limit)
+            ->get();
+
+        return [
+            'items' => array_values($rows->map(function (Campaign $campaign) use ($today) {
+                $reason = match (true) {
+                    (bool) $campaign->getAttribute('has_expired_account') => 'A scheduled post goes to an account that needs reconnecting.',
+                    $campaign->end_date !== null && $campaign->end_date->toDateString() < $today->toDateString() => 'Ended '.$this->ago($campaign, $today).', still '.$campaign->status->label().'.',
+                    default => 'Launches '.$this->when($campaign, $today).' with work not yet approved.',
+                };
+
+                return [
+                    'campaign_id' => $campaign->id,
+                    'name' => $campaign->name,
+                    'code' => $campaign->code,
+                    'colour' => $campaign->colour?->value,
+                    'client_id' => $campaign->client_id,
+                    'client_name' => $campaign->client?->name,
+                    'status' => $campaign->status->value,
+                    'status_label' => $campaign->status->label(),
+                    'reason' => $reason,
+                ];
+            })->all()),
+            'total' => $total,
+        ];
+    }
+
+    private function ago(Campaign $campaign, CarbonImmutable $today): string
+    {
+        $days = (int) CarbonImmutable::parse((string) $campaign->end_date?->toDateString())->diffInDays($today);
+
+        return $days === 1 ? '1 day ago' : "{$days} days ago";
+    }
+
+    private function when(Campaign $campaign, CarbonImmutable $today): string
+    {
+        $days = (int) $today->diffInDays(CarbonImmutable::parse((string) $campaign->start_date?->toDateString()));
+
+        return match ($days) {
+            0 => 'today',
+            1 => 'tomorrow',
+            default => "in {$days} days",
+        };
+    }
+
+    /**
+     * @param  callable(QueryBuilder): mixed  $subquery
+     */
+    private function subquery(callable $subquery): QueryBuilder
+    {
+        $query = DB::query();
+        $subquery($query);
+
+        return $query;
     }
 
     /**

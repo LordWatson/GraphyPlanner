@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $org_id
  * @property int|null $client_id
+ * @property int|null $campaign_id
  * @property int|null $user_id
  * @property string $provider
  * @property string $model
@@ -28,7 +29,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'org_id', 'client_id', 'user_id', 'provider', 'model', 'method', 'succeeded', 'error_code', 'quality_tier',
+    'org_id', 'client_id', 'campaign_id', 'user_id', 'provider', 'model', 'method', 'succeeded', 'error_code', 'quality_tier',
     'cost_estimate', 'duration_ms', 'ai_image_variant_id',
 ])]
 class AiUsageLog extends Model

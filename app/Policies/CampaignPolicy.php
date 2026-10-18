@@ -7,6 +7,10 @@ use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\User;
 
+/**
+ * Campaign abilities, following the role table in `.junie/plans/campaigns-enhancement.md` §1.4
+ * (recorded in `.junie/modules/campaigns.md`).
+ */
 class CampaignPolicy
 {
     /**
@@ -18,12 +22,15 @@ class CampaignPolicy
             return $user->client_id === $client->id;
         }
 
-        return $user->org_id === $client->org_id && in_array($user->role, [
-            Role::Owner,
-            Role::Strategist,
-            Role::Designer,
-            Role::Viewer,
-        ], true);
+        return $user->org_id === $client->org_id && $this->isStaff($user);
+    }
+
+    /**
+     * Step C-1.1: the org-wide campaigns hub (staff only; client contacts use the portal).
+     */
+    public function viewHub(User $user): bool
+    {
+        return $user->org_id !== null && $this->isStaff($user);
     }
 
     /**
@@ -39,17 +46,23 @@ class CampaignPolicy
      */
     public function create(User $user, Client $client): bool
     {
-        return $user->org_id === $client->org_id
-            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+        return $user->org_id === $client->org_id && $this->isPlanner($user);
     }
 
     /**
-     * Determine whether the user can update a campaign.
+     * Edit the campaign, its brief, phases and plan.
      */
     public function update(User $user, Campaign $campaign): bool
     {
-        return $user->org_id === $campaign->org_id
-            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+        return $user->org_id === $campaign->org_id && $this->isPlanner($user);
+    }
+
+    /**
+     * Step C-0.3: change status (launch, pause, complete, archive…).
+     */
+    public function transition(User $user, Campaign $campaign): bool
+    {
+        return $this->update($user, $campaign);
     }
 
     /**
@@ -57,7 +70,35 @@ class CampaignPolicy
      */
     public function delete(User $user, Campaign $campaign): bool
     {
+        return $user->org_id === $campaign->org_id && $this->isPlanner($user);
+    }
+
+    /**
+     * Step C-3.2: start a post from a planned deliverable; Step C-4.1: manage the asset kit.
+     * Designers produce, so they can do both.
+     */
+    public function produce(User $user, Campaign $campaign): bool
+    {
         return $user->org_id === $campaign->org_id
-            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
+     * Step C-8.1: fee, budget, invoices and profitability — Phase 17's revenue rule. Never a
+     * client contact, never a Designer or Viewer.
+     */
+    public function viewBilling(User $user, Campaign $campaign): bool
+    {
+        return $user->org_id === $campaign->org_id && $this->isPlanner($user);
+    }
+
+    private function isStaff(User $user): bool
+    {
+        return in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer, Role::Viewer], true);
+    }
+
+    private function isPlanner(User $user): bool
+    {
+        return in_array($user->role, [Role::Owner, Role::Strategist], true);
     }
 }

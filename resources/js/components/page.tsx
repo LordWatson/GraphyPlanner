@@ -318,7 +318,10 @@ export function Panel({
     children,
     className,
     bodyClassName,
+    id,
 }: {
+    /** Anchor target for deep links (e.g. `#results`). */
+    id?: string;
     title?: ReactNode;
     eyebrow?: ReactNode;
     description?: ReactNode;
@@ -332,8 +335,9 @@ export function Panel({
 
     return (
         <section
+            id={id}
             className={cn(
-                'border-border/80 bg-card text-card-foreground flex flex-col rounded-2xl border shadow-sm',
+                'border-border/80 bg-card text-card-foreground flex scroll-mt-24 flex-col rounded-2xl border shadow-sm',
                 className,
             )}
         >

@@ -5,6 +5,9 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
@@ -60,6 +63,29 @@ export function NavMain({
                                 <span>{item.title}</span>
                             </Link>
                         </SidebarMenuButton>
+                        {item.subItems && item.subItems.length > 0 && (
+                            <SidebarMenuSub className="border-sidebar-foreground/20 mt-0.5">
+                                {item.subItems.map((sub) => {
+                                    const active =
+                                        sub.isActive ??
+                                        isCurrentOrParentUrl(sub.href);
+
+                                    return (
+                                        <SidebarMenuSubItem key={sub.title}>
+                                            <SidebarMenuSubButton
+                                                asChild
+                                                isActive={active}
+                                                className="text-sidebar-foreground/80 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground h-8 rounded-full px-3 data-[active=true]:font-medium"
+                                            >
+                                                <Link href={sub.href} prefetch>
+                                                    <span>{sub.title}</span>
+                                                </Link>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                    );
+                                })}
+                            </SidebarMenuSub>
+                        )}
                     </SidebarMenuItem>
                 ))}
             </SidebarMenu>

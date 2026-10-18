@@ -6,11 +6,14 @@ import {
     ClipboardCheck,
     Clock,
     ImageOff,
+    Megaphone,
     WifiOff,
 } from 'lucide-react';
+import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { Page, PageHeader, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { needsAttention } from '@/routes';
+import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
 import { edit as editPost } from '@/routes/posts';
 import { cn } from '@/lib/utils';
@@ -47,6 +50,20 @@ type NeedsAttentionItems = {
     waitingApprovals: Bucket<PostRow>;
     missingMedia: Bucket<PostRow>;
     disconnectedAccounts: Bucket<DisconnectedAccountRow>;
+    campaigns: Bucket<CampaignRow>;
+};
+
+/** Campaigns enhancement C-1.4: an open campaign in trouble, with the reason in words. */
+type CampaignRow = {
+    campaign_id: number;
+    name: string;
+    code: string | null;
+    colour: string | null;
+    client_id: number;
+    client_name: string | null;
+    status: string;
+    status_label: string;
+    reason: string;
 };
 
 type HomeProps = {
@@ -178,7 +195,8 @@ export default function Home({ items }: HomeProps) {
         items.internalReviews.total +
         items.waitingApprovals.total +
         items.missingMedia.total +
-        items.disconnectedAccounts.total;
+        items.disconnectedAccounts.total +
+        items.campaigns.total;
 
     const lanes = [
         {
@@ -210,6 +228,12 @@ export default function Home({ items }: HomeProps) {
             label: '05 Assets',
             caption: 'Missing media',
             count: items.missingMedia.total,
+        },
+        {
+            id: 'lane-campaigns',
+            label: '06 Campaigns',
+            caption: 'At risk',
+            count: items.campaigns.total,
         },
     ];
 
@@ -355,6 +379,51 @@ export default function Home({ items }: HomeProps) {
                     >
                         {items.missingMedia.items.map((row) => (
                             <PostRowItem key={row.post_id} row={row} />
+                        ))}
+                    </Lane>
+                    <Lane
+                        id="lane-campaigns"
+                        index="06 — Campaigns"
+                        icon={Megaphone}
+                        title="Campaigns at risk"
+                        description="Launching with work unapproved, past their end date, or posting to a broken account"
+                        count={items.campaigns.total}
+                        shown={items.campaigns.items.length}
+                        accentClassName="bg-warning/12 text-warning"
+                        emptyLabel="Every campaign is on track."
+                    >
+                        {items.campaigns.items.map((row) => (
+                            <li key={row.campaign_id}>
+                                <Link
+                                    href={showCampaign(row.campaign_id)}
+                                    className="group hover:bg-muted/50 flex items-center justify-between gap-3 px-5 py-3.5 transition-colors"
+                                >
+                                    <span className="flex min-w-0 flex-col gap-1">
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <CampaignChip
+                                                campaign={{
+                                                    id: row.campaign_id,
+                                                    name: row.name,
+                                                    code: row.code,
+                                                    colour: row.colour,
+                                                }}
+                                                compact
+                                            />
+                                            <span className="group-hover:text-primary truncate text-sm font-medium">
+                                                {row.name}
+                                            </span>
+                                        </span>
+                                        <span className="text-muted-foreground truncate text-xs">
+                                            {row.client_name} · {row.reason}
+                                        </span>
+                                    </span>
+                                    <StatusPill
+                                        kind="campaign"
+                                        value={row.status}
+                                        label={row.status_label}
+                                    />
+                                </Link>
+                            </li>
                         ))}
                     </Lane>
                 </div>

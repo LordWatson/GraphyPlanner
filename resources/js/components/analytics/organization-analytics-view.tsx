@@ -14,6 +14,7 @@ import {
     Workflow,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { campaignSwatch } from '@/components/campaigns/campaign-chip';
 import { EmptyState, Panel, StatStrip } from '@/components/page';
 import type { StatStripItem } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
@@ -25,6 +26,7 @@ import {
     analytics as clientAnalytics,
     show as showClient,
 } from '@/routes/clients';
+import { show as showCampaign } from '@/routes/campaigns';
 import { edit as editPost } from '@/routes/posts';
 import { FigureList, MoneyRow, ShareBars } from './figures';
 import {
@@ -415,6 +417,9 @@ export function OrganizationAnalyticsView({
                                     ],
                                 ]}
                             />
+                            {revenue.by_campaign.length > 0 && (
+                                <RevenueByCampaign rows={revenue.by_campaign} />
+                            )}
                         </div>
 
                         <dl className="divide-border/70 flex flex-col divide-y">
@@ -1030,5 +1035,47 @@ function Index({ value }: { value: number }) {
         <span className="text-muted-foreground w-5 shrink-0 font-mono text-[11px] tabular-nums">
             {String(value + 1).padStart(2, '0')}
         </span>
+    );
+}
+
+/** Campaigns enhancement C-8.3 — billed revenue per campaign in the range, largest first. */
+function RevenueByCampaign({
+    rows,
+}: {
+    rows: NonNullable<OrgSummary['revenue']>['by_campaign'];
+}) {
+    return (
+        <div className="border-border/70 flex flex-col gap-2 border-t pt-4">
+            <span className="eyebrow text-muted-foreground">By campaign</span>
+            <ol className="divide-border/70 flex flex-col divide-y">
+                {rows.map((row) => (
+                    <li key={`${row.campaign_id}-${row.currency}`}>
+                        <Link
+                            href={showCampaign(row.campaign_id)}
+                            className="hover:text-primary flex items-center justify-between gap-3 py-2 text-sm"
+                        >
+                            <span className="flex min-w-0 items-center gap-2">
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        'size-2.5 shrink-0 rounded-full',
+                                        campaignSwatch(row.colour),
+                                    )}
+                                />
+                                <span className="truncate">{row.name}</span>
+                                {row.code && (
+                                    <span className="text-muted-foreground font-mono text-[11px]">
+                                        {row.code}
+                                    </span>
+                                )}
+                            </span>
+                            <span className="font-medium tabular-nums">
+                                {formatCurrency(row.total, row.currency)}
+                            </span>
+                        </Link>
+                    </li>
+                ))}
+            </ol>
+        </div>
     );
 }

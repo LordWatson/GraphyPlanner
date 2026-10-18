@@ -352,6 +352,8 @@ class GetOrganizationAnalyticsSummaryAction
             'overdue_count' => $overdue->count(),
             'average_days_to_pay' => $averageDays === null ? null : (int) round((float) $averageDays),
             'retainers' => $this->retainers($scope, $organization),
+            // Campaigns enhancement C-8.3: revenue by campaign (same Owner/Strategist rule).
+            'by_campaign' => $this->revenueMetrics->byCampaign($scope, $range),
         ];
     }
 

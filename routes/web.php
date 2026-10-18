@@ -9,6 +9,21 @@ use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\Campaigns\CampaignAiController;
+use App\Http\Controllers\Campaigns\CampaignAssetKitController;
+use App\Http\Controllers\Campaigns\CampaignBoardController;
+use App\Http\Controllers\Campaigns\CampaignBriefController;
+use App\Http\Controllers\Campaigns\CampaignCommentController;
+use App\Http\Controllers\Campaigns\CampaignCompareController;
+use App\Http\Controllers\Campaigns\CampaignIndexController;
+use App\Http\Controllers\Campaigns\CampaignInvoiceController;
+use App\Http\Controllers\Campaigns\CampaignPlanController;
+use App\Http\Controllers\Campaigns\CampaignPostBulkController;
+use App\Http\Controllers\Campaigns\CampaignResultsController;
+use App\Http\Controllers\Campaigns\CampaignRunController;
+use App\Http\Controllers\Campaigns\CampaignShareLinkController;
+use App\Http\Controllers\Campaigns\CampaignTemplateController;
+use App\Http\Controllers\Campaigns\CampaignWorkspaceController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
@@ -48,6 +63,9 @@ Route::inertia('about', 'about')->name('about');
 Route::middleware('throttle:public-token')->group(function () {
     Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
     Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
+
+    // Campaigns enhancement C-5.4: a read-only campaign preview for stakeholders without portal access.
+    Route::get('share/campaigns/{token}', [CampaignShareLinkController::class, 'show'])->name('campaign-share.show');
 
     // Step 6.2: accepting a client portal invitation is unauthenticated — access is granted purely
     // by possession of a valid, unexpired, unrevoked, unaccepted `ClientInvitation` token, mirroring
@@ -203,14 +221,88 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
-    Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])
+
+    // `.junie/plans/campaigns-enhancement.md` — the campaigns hub (C-1.1) and the workspace, one
+    // route per tab (C-1.2). Client contacts are sent to their portal pages.
+    Route::get('campaigns', CampaignIndexController::class)
+        ->middleware('portal.redirect')
+        ->name('campaigns.index');
+    // C-7.4: before `campaigns/{campaign}` so "compare" never binds as a campaign.
+    Route::get('campaigns/compare', CampaignCompareController::class)
+        ->middleware('portal.redirect')
+        ->name('campaigns.compare');
+    // C-3.4: campaign templates.
+    Route::get('campaign-templates', [CampaignTemplateController::class, 'index'])->middleware('campaign.feature:templates')->name('campaign-templates.index');
+    Route::put('campaign-templates/{template}', [CampaignTemplateController::class, 'update'])->middleware('campaign.feature:templates')->name('campaign-templates.update');
+    Route::delete('campaign-templates/{template}', [CampaignTemplateController::class, 'destroy'])->middleware('campaign.feature:templates')->name('campaign-templates.destroy');
+    Route::post('campaign-templates/{template}/use', [CampaignTemplateController::class, 'use'])->middleware('campaign.feature:templates')->name('campaign-templates.use');
+    Route::post('campaigns/{campaign}/template', [CampaignTemplateController::class, 'storeFromCampaign'])->middleware('campaign.feature:templates')->name('campaigns.template.store');
+    Route::get('campaigns/{campaign}', [CampaignWorkspaceController::class, 'show'])
+        ->middleware('portal.redirect')
         ->name('campaigns.show');
+    Route::get('campaigns/{campaign}/brief', [CampaignWorkspaceController::class, 'brief'])->name('campaigns.brief');
+    Route::get('campaigns/{campaign}/plan', [CampaignWorkspaceController::class, 'plan'])->name('campaigns.plan');
+    Route::get('campaigns/{campaign}/board', [CampaignWorkspaceController::class, 'board'])->name('campaigns.board');
+    Route::get('campaigns/{campaign}/assets', [CampaignWorkspaceController::class, 'assets'])->name('campaigns.assets');
+    Route::get('campaigns/{campaign}/approvals', [CampaignWorkspaceController::class, 'approvals'])->name('campaigns.approvals');
+    Route::get('campaigns/{campaign}/results', [CampaignWorkspaceController::class, 'results'])->name('campaigns.results');
+    Route::get('campaigns/{campaign}/activity', [CampaignWorkspaceController::class, 'activity'])->name('campaigns.activity');
     Route::get('campaigns/{campaign}/edit', [CampaignController::class, 'edit'])
         ->name('campaigns.edit');
     Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])
         ->name('campaigns.update');
     Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
         ->name('campaigns.destroy');
+    Route::post('campaigns/{campaign}/transition', [CampaignController::class, 'transition'])
+        ->name('campaigns.transition');
+    // C-6.1 / C-6.2: steer a live campaign.
+    Route::post('campaigns/{campaign}/pause', [CampaignRunController::class, 'pause'])->name('campaigns.pause');
+    Route::post('campaigns/{campaign}/resume', [CampaignRunController::class, 'resume'])->name('campaigns.resume');
+    Route::get('campaigns/{campaign}/shift', [CampaignRunController::class, 'previewShift'])->name('campaigns.shift.preview');
+    Route::post('campaigns/{campaign}/shift', [CampaignRunController::class, 'shift'])->name('campaigns.shift');
+
+    Route::put('campaigns/{campaign}/brief', [CampaignBriefController::class, 'update'])->name('campaigns.brief.update');
+    Route::post('campaigns/{campaign}/brief/send', [CampaignBriefController::class, 'send'])->name('campaigns.brief.send');
+    Route::get('campaigns/{campaign}/brief/pdf', [CampaignBriefController::class, 'pdf'])
+        ->middleware('throttle:exports')
+        ->name('campaigns.brief.pdf');
+
+    Route::scopeBindings()->group(function () {
+        Route::post('campaigns/{campaign}/phases', [CampaignPlanController::class, 'storePhase'])->name('campaigns.phases.store');
+        Route::post('campaigns/{campaign}/phases/reorder', [CampaignPlanController::class, 'reorderPhases'])->name('campaigns.phases.reorder');
+        Route::post('campaigns/{campaign}/phases/suggested', [CampaignPlanController::class, 'suggestedPhases'])->name('campaigns.phases.suggested');
+        Route::put('campaigns/{campaign}/phases/{phase}', [CampaignPlanController::class, 'updatePhase'])->name('campaigns.phases.update');
+        Route::delete('campaigns/{campaign}/phases/{phase}', [CampaignPlanController::class, 'destroyPhase'])->name('campaigns.phases.destroy');
+
+        Route::post('campaigns/{campaign}/deliverables', [CampaignPlanController::class, 'storeDeliverable'])->name('campaigns.deliverables.store');
+        Route::post('campaigns/{campaign}/deliverables/bulk', [CampaignPlanController::class, 'bulkDeliverables'])->name('campaigns.deliverables.bulk');
+        Route::match(['put', 'patch'], 'campaigns/{campaign}/deliverables/{deliverable}', [CampaignPlanController::class, 'updateDeliverable'])->name('campaigns.deliverables.update');
+        Route::delete('campaigns/{campaign}/deliverables/{deliverable}', [CampaignPlanController::class, 'destroyDeliverable'])->name('campaigns.deliverables.destroy');
+        Route::post('campaigns/{campaign}/deliverables/{deliverable}/start', [CampaignPlanController::class, 'startDeliverable'])->name('campaigns.deliverables.start');
+
+        Route::post('campaigns/{campaign}/board/posts/{post}', [CampaignBoardController::class, 'move'])->name('campaigns.board.move');
+
+        Route::post('campaigns/{campaign}/kit', [CampaignAssetKitController::class, 'store'])->name('campaigns.kit.store');
+        Route::delete('campaigns/{campaign}/kit/{asset}', [CampaignAssetKitController::class, 'destroy'])->name('campaigns.kit.destroy');
+    });
+
+    Route::put('campaigns/{campaign}/kpis', [CampaignResultsController::class, 'updateKpis'])->name('campaigns.kpis.update');
+    Route::put('campaigns/{campaign}/report', [CampaignResultsController::class, 'updateReport'])->middleware('campaign.feature:wrap_reports')->name('campaigns.report.update');
+    Route::post('campaigns/{campaign}/report/share', [CampaignResultsController::class, 'shareReport'])->middleware('campaign.feature:wrap_reports')->name('campaigns.report.share');
+    Route::get('campaigns/{campaign}/report/pdf', [CampaignResultsController::class, 'reportPdf'])->middleware(['throttle:exports', 'campaign.feature:wrap_reports'])->name('campaigns.report.pdf');
+    Route::post('campaigns/{campaign}/comments', [CampaignCommentController::class, 'store'])->name('campaigns.comments.store');
+
+    // C-2.2 / C-3.3 / C-7.3: AI suggestions (never saved by themselves).
+    Route::middleware('throttle:ai')->group(function () {
+        Route::post('campaigns/{campaign}/ai/brief', [CampaignAiController::class, 'draftBrief'])->name('campaigns.ai.brief');
+        Route::post('campaigns/{campaign}/ai/plan', [CampaignAiController::class, 'suggestPlan'])->middleware('campaign.feature:ai_planner')->name('campaigns.ai.plan');
+        Route::post('campaigns/{campaign}/ai/wrap', [CampaignAiController::class, 'draftWrap'])->middleware('campaign.feature:wrap_reports')->name('campaigns.ai.wrap');
+    });
+    Route::post('campaigns/{campaign}/plan/accept', [CampaignAiController::class, 'acceptPlan'])->middleware('campaign.feature:ai_planner')->name('campaigns.plan.accept');
+    Route::post('campaigns/{campaign}/posts/bulk', CampaignPostBulkController::class)->name('campaigns.posts.bulk');
+    Route::post('campaigns/{campaign}/share-links', [CampaignShareLinkController::class, 'store'])->name('campaigns.share-links.store');
+    Route::delete('campaigns/{campaign}/share-links/{shareLink}', [CampaignShareLinkController::class, 'destroy'])->scopeBindings()->name('campaigns.share-links.destroy');
+    Route::post('campaigns/{campaign}/invoice', CampaignInvoiceController::class)->middleware('campaign.feature:invoicing')->name('campaigns.invoice');
 
     Route::get('clients/{client}/assets', [AssetController::class, 'index'])
         ->name('clients.assets.index');
@@ -331,6 +423,12 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::get('company', [PortalClientController::class, 'show'])->name('company');
     Route::get('campaigns', [PortalCampaignController::class, 'index'])->name('campaigns.index');
     Route::get('campaigns/{campaign}', [PortalCampaignController::class, 'show'])->name('campaigns.show');
+    Route::post('campaigns/{campaign}/brief/decide', [PortalCampaignController::class, 'decideBrief'])->name('campaigns.brief.decide');
+    Route::get('campaigns/{campaign}/report/pdf', [CampaignResultsController::class, 'portalReportPdf'])->middleware('throttle:exports')->name('campaigns.report.pdf');
+    Route::get('campaigns/{campaign}/review', [PortalCampaignController::class, 'review'])->name('campaigns.review');
+    Route::post('campaigns/{campaign}/review', [PortalCampaignController::class, 'submitReview'])->name('campaigns.review.submit');
+    Route::get('campaigns/{campaign}/brief/pdf', [PortalCampaignController::class, 'briefPdf'])->middleware('throttle:exports')->name('campaigns.brief.pdf');
+    Route::post('campaigns/{campaign}/comments', [CampaignCommentController::class, 'store'])->name('campaigns.comments.store');
     Route::get('posts', [PortalPostController::class, 'index'])->name('posts.index');
     Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
     Route::post('posts/{post}/decide', [PortalPostController::class, 'decide'])->name('posts.decide');
@@ -441,14 +539,24 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
 
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
         ->name('clients.campaigns.store');
-    Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])
-        ->name('campaigns.show');
+    // Campaigns enhancement: the hub and every workspace tab, read-only like the rest of preview.
+    Route::get('campaigns', CampaignIndexController::class)->name('campaigns.index');
+    Route::get('campaigns/{campaign}', [CampaignWorkspaceController::class, 'show'])->name('campaigns.show');
+    Route::get('campaigns/{campaign}/brief', [CampaignWorkspaceController::class, 'brief'])->name('campaigns.brief');
+    Route::get('campaigns/{campaign}/plan', [CampaignWorkspaceController::class, 'plan'])->name('campaigns.plan');
+    Route::get('campaigns/{campaign}/board', [CampaignWorkspaceController::class, 'board'])->name('campaigns.board');
+    Route::get('campaigns/{campaign}/assets', [CampaignWorkspaceController::class, 'assets'])->name('campaigns.assets');
+    Route::get('campaigns/{campaign}/approvals', [CampaignWorkspaceController::class, 'approvals'])->name('campaigns.approvals');
+    Route::get('campaigns/{campaign}/results', [CampaignWorkspaceController::class, 'results'])->name('campaigns.results');
+    Route::get('campaigns/{campaign}/activity', [CampaignWorkspaceController::class, 'activity'])->name('campaigns.activity');
     Route::get('campaigns/{campaign}/edit', [CampaignController::class, 'edit'])
         ->name('campaigns.edit');
     Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])
         ->name('campaigns.update');
     Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])
         ->name('campaigns.destroy');
+    Route::post('campaigns/{campaign}/transition', [CampaignController::class, 'transition'])
+        ->name('campaigns.transition');
 
     Route::get('clients/{client}/assets', [AssetController::class, 'index'])
         ->name('clients.assets.index');

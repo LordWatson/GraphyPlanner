@@ -49,3 +49,6 @@ $safely(Schedule::command('analytics:send-scheduled-reports')->dailyAt('07:00'),
 // Step I-2.5: nightly sweep behind the event-driven health recompute, so stored client health
 // can never drift for long if a write path is missed.
 $safely(Schedule::command('clients:recompute-health')->dailyAt('02:30'), 'clients:recompute-health');
+
+// Campaigns enhancement C-4.4: assignees hear about deliverables due tomorrow or just overdue.
+$safely(Schedule::command('campaigns:send-due-reminders')->dailyAt('08:15'), 'campaigns:send-due-reminders');

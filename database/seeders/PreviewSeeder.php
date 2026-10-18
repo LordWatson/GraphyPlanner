@@ -17,6 +17,7 @@ use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Database\Seeders\Concerns\SeedsCampaignShowcase;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -28,6 +29,8 @@ use Illuminate\Support\Facades\Hash;
  */
 class PreviewSeeder extends Seeder
 {
+    use SeedsCampaignShowcase;
+
     public function run(): void
     {
         $organization = Organization::updateOrCreate(
@@ -116,5 +119,8 @@ class PreviewSeeder extends Seeder
                 'scheduled_at_utc' => now()->addDays(3)->setTime(13, 0),
             ]
         );
+
+        // Campaigns enhancement C-9.1: every campaign tab has something real to show in preview.
+        $this->seedCampaignShowcase($client, $owner, collect([$socialAccount]), 'Fixture');
     }
 }

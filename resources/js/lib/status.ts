@@ -28,7 +28,10 @@ export type StatusKind =
     | 'imageGeneration'
     | 'imageVariant'
     | 'organization'
-    | 'scheduler';
+    | 'scheduler'
+    | 'brief'
+    | 'deliverable'
+    | 'timeline';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -66,8 +69,35 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
     campaign: {
         planning: { tone: 'neutral', label: 'Planning' },
         active: { tone: 'success', label: 'Active' },
+        paused: { tone: 'warning', label: 'Paused' },
         completed: { tone: 'info', label: 'Completed' },
         archived: { tone: 'muted', label: 'Archived' },
+    },
+    // Campaigns enhancement C-2.1: a brief's sign-off.
+    brief: {
+        draft: { tone: 'neutral', label: 'Draft' },
+        sent: { tone: 'info', label: 'With the client' },
+        approved: { tone: 'success', label: 'Approved' },
+        changes_requested: { tone: 'warning', label: 'Changes requested' },
+        updating: { tone: 'neutral', label: 'Being updated' },
+    },
+    // C-3.2: a planned deliverable's state, derived from its post.
+    deliverable: {
+        not_started: { tone: 'muted', label: 'Not started' },
+        in_production: { tone: 'neutral', label: 'In production' },
+        in_review: { tone: 'info', label: 'In review' },
+        approved: { tone: 'success', label: 'Approved' },
+        scheduled: { tone: 'brand', label: 'Scheduled' },
+        published: { tone: 'success', label: 'Published' },
+        failed: { tone: 'danger', label: 'Failed' },
+        dropped: { tone: 'muted', label: 'Dropped' },
+    },
+    // C-0.4: where a campaign sits in time (from its dates, never its status).
+    timeline: {
+        upcoming: { tone: 'info', label: 'Upcoming' },
+        live: { tone: 'success', label: 'Live' },
+        ended: { tone: 'muted', label: 'Ended' },
+        undated: { tone: 'neutral', label: 'No dates' },
     },
     invoice: {
         draft: { tone: 'neutral', label: 'Draft' },

@@ -26,6 +26,7 @@ class SearchAssetsRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', new Enum(AssetType::class)],
             'page' => ['nullable', 'integer', 'min:1'],
+            'campaign' => ['nullable', 'integer'],
         ];
     }
 }

@@ -27,7 +27,8 @@ class CampaignControllerTest extends TestCase
             'start_date' => now()->toDateString(),
         ]);
 
-        $response->assertRedirect(route('clients.campaigns.index', $client));
+        $campaign = Campaign::query()->where('client_id', $client->id)->firstOrFail();
+        $response->assertRedirect(route('campaigns.show', $campaign));
         $this->assertDatabaseHas('campaigns', [
             'client_id' => $client->id,
             'org_id' => $org->id,
@@ -84,6 +85,7 @@ class CampaignControllerTest extends TestCase
         $client = Client::factory()->for($org, 'organization')->create();
         $campaign = Campaign::factory()->for($client)->create(['org_id' => $org->id]);
 
+        // Step C-0.3: status is ignored here — it only changes through `campaigns.transition`.
         $response = $this->actingAs($owner)->put(route('campaigns.update', $campaign), [
             'name' => 'Updated name',
             'status' => CampaignStatus::Active->value,
@@ -92,7 +94,8 @@ class CampaignControllerTest extends TestCase
         $response->assertRedirect(route('campaigns.show', $campaign));
         $campaign->refresh();
         $this->assertSame('Updated name', $campaign->name);
-        $this->assertSame(CampaignStatus::Active, $campaign->status);
+        $this->assertSame(CampaignStatus::Planning, $campaign->status);
+        $this->assertDatabaseHas('campaign_activity_logs', ['campaign_id' => $campaign->id, 'event' => 'campaign.updated']);
     }
 
     public function test_owner_can_delete_a_campaign(): void
@@ -133,11 +136,12 @@ class CampaignControllerTest extends TestCase
 
         $response = $this->actingAs($viewer)->get(route('campaigns.show', $campaign));
 
+        // Step C-1.2: the show page is the workspace's Overview tab; the posts live on the board.
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
+            ->component('campaigns/overview')
             ->where('campaign.id', $campaign->id)
-            ->has('posts', 1)
-            ->where('posts.0.id', $post->id)
+            ->where('counts.posts', 1)
             ->where('can.update', false)
         );
     }
@@ -177,8 +181,11 @@ class CampaignControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
+        // Step C-1.2: client contacts are sent to the portal, which only lists their own client's
+        // campaigns — never another client's.
         $response = $this->actingAs($reviewer)->get(route('campaigns.show', $campaign));
 
-        $response->assertForbidden();
+        $response->assertRedirect(route('portal.campaigns.index'));
+        $this->actingAs($reviewer)->get(route('portal.campaigns.show', $campaign))->assertNotFound();
     }
 }

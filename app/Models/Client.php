@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property ClientHealth|null $health_status
  * @property string|null $health_reason
  * @property Carbon|null $health_computed_at
+ * @property int $approval_lead_days
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -48,6 +49,7 @@ use Illuminate\Support\Carbon;
     'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
+    'approval_lead_days',
 ])]
 class Client extends Model
 {

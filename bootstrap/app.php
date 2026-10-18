@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureCampaignFeature;
 use App\Http\Middleware\EnsureClientPortalAccess;
 use App\Http\Middleware\EnsureOrganizationNotSuspended;
 use App\Http\Middleware\EnsurePreviewMode;
@@ -47,6 +48,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // sends org-less super admins there instead.
             'super_admin' => EnsureUserIsSuperAdmin::class,
             'org.member' => EnsureUserHasOrganization::class,
+            // Campaigns enhancement C-9.4: gated campaign features.
+            'campaign.feature' => EnsureCampaignFeature::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

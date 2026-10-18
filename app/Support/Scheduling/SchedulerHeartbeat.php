@@ -29,6 +29,7 @@ final class SchedulerHeartbeat
         'ai-images:prune' => ['label' => 'AI image prune', 'interval_minutes' => 1440],
         'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 1440],
         'analytics:send-scheduled-reports' => ['label' => 'Scheduled reports', 'interval_minutes' => 1440],
+        'campaigns:send-due-reminders' => ['label' => 'Campaign due reminders', 'interval_minutes' => 1440],
     ];
 
     public static function record(string $command): void

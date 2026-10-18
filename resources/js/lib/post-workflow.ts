@@ -132,6 +132,18 @@ export function describeTransition(
                 notePlaceholder: 'Internal note for the activity log…',
             };
         case 'approved':
+            if (from === 'scheduled') {
+                return {
+                    to,
+                    label: 'Unschedule',
+                    description:
+                        'Takes it off the schedule but keeps the approval. Schedule it again when you’re ready.',
+                    intent: 'back',
+                    icon: Undo2,
+                    notePlaceholder: 'Why is it coming off the schedule?',
+                };
+            }
+
             return from === 'waiting_client'
                 ? {
                       to,

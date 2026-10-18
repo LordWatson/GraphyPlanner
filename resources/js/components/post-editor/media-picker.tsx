@@ -107,8 +107,11 @@ export function MediaPicker({
     canUpload,
     uploading,
     onUpload,
+    campaignId,
 }: {
     clientId: number;
+    /** Step C-4.1: the library opens on this campaign's kit first. */
+    campaignId?: number;
     selected: AssetData[];
     onChange: (assets: AssetData[]) => void;
     canUpload: boolean;
@@ -184,6 +187,7 @@ export function MediaPicker({
                 open={browsing}
                 onOpenChange={setBrowsing}
                 clientId={clientId}
+                campaignId={campaignId}
                 selected={selected}
                 onConfirm={onChange}
             />

@@ -3,11 +3,15 @@
 namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
+use App\Contracts\CampaignAiProvider;
+use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\Campaigns\AiCampaignBriefDraft;
+use App\Support\AI\Campaigns\AiCampaignWrapDraft;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\BrandImageBriefFactory;
 use App\Support\AI\Images\ImageBriefInput;
@@ -19,7 +23,7 @@ use Illuminate\Support\Facades\Log;
  * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
-class NullAiProvider implements AiProvider
+class NullAiProvider implements AiProvider, CampaignAiProvider
 {
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
@@ -51,6 +55,27 @@ class NullAiProvider implements AiProvider
         $this->logDisabled('draftImageBrief', ['client_id' => $client->id, 'org_id' => $client->org_id]);
 
         return (new BrandImageBriefFactory)->defaults($client, $input);
+    }
+
+    public function draftCampaignBrief(Campaign $campaign): AiCampaignBriefDraft
+    {
+        $this->logDisabled('draftCampaignBrief', ['campaign_id' => $campaign->id, 'org_id' => $campaign->org_id]);
+
+        return new AiCampaignBriefDraft;
+    }
+
+    public function planCampaign(Campaign $campaign, array $input): array
+    {
+        $this->logDisabled('planCampaign', ['campaign_id' => $campaign->id, 'org_id' => $campaign->org_id]);
+
+        return [];
+    }
+
+    public function draftCampaignWrap(Campaign $campaign, array $facts): AiCampaignWrapDraft
+    {
+        $this->logDisabled('draftCampaignWrap', ['campaign_id' => $campaign->id, 'org_id' => $campaign->org_id]);
+
+        return new AiCampaignWrapDraft;
     }
 
     /**
