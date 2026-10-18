@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Clients\RecomputeClientHealthAction;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Models\Concerns\BelongsToOrganization;
@@ -70,6 +71,26 @@ class SocialAccount extends Model
             'meta_access_token' => 'encrypted',
             'meta_access_token_expires_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Step I-2.5: an account's connection status feeds its client's stored health.
+        $recompute = function (self $account): void {
+            $client = Client::query()->withoutGlobalScopes()->find($account->client_id);
+
+            if ($client !== null) {
+                app(RecomputeClientHealthAction::class)($client);
+            }
+        };
+
+        static::saved(function (self $account) use ($recompute) {
+            if ($account->wasChanged('connection_status') || $account->wasChanged('client_id') || ($account->wasRecentlyCreated && ! $account->wasChanged())) {
+                $recompute($account);
+            }
+        });
+        static::deleted($recompute);
+        static::restored($recompute);
     }
 
     /**

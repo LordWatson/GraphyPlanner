@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\User;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -20,7 +21,10 @@ class OrganizationWelcomeMail extends Mailable implements ShouldQueue
     public function __construct(
         public User $owner,
         public ?string $setPasswordUrl = null,
-    ) {}
+    ) {
+        // Step I-2.8: every mailable runs on the mail queue.
+        $this->onQueue(Queues::MAIL);
+    }
 
     public function build(): self
     {

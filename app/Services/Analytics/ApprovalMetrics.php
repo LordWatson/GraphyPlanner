@@ -7,8 +7,10 @@ use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Support\Analytics\AnalyticsRange;
 use App\Support\Analytics\AnalyticsScope;
+use App\Support\Analytics\SqlDialect;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Query\Expression;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -21,9 +23,10 @@ use Illuminate\Support\Str;
  * - **First-time approval rate**: of the posts first approved in the range, the share approved
  *   without ever going through `changes_requested` before.
  *
- * Medians/p90s are computed in PHP over one organization's transitions in range — cheap at agency
- * scale and identical on Postgres and SQLite. Phase 9's SLA can mark these overdue later without
- * changing the shape.
+ * Step I-2.7: the pairing of each transition with the one before it happens in SQL (window
+ * functions, standard on MySQL 8 and SQLite); only the in-range durations reach PHP, where the
+ * median/p90 is taken (MySQL has no `percentile_cont`). Phase 9's SLA can mark these overdue
+ * later without changing the shape.
  */
 class ApprovalMetrics
 {
@@ -58,7 +61,11 @@ class ApprovalMetrics
     }
 
     /**
-     * One pass over the transitions of every post with activity in the range.
+     * Step I-2.7: one windowed query over the transitions of every post with activity in the
+     * range. Per post, ordered by (`created_at`, `id`): `LAG` gives the previous status and its
+     * time, and running `SUM()`s over the preceding rows say whether the post was approved or sent
+     * back before. Only the in-range rows come back, already paired — the history before the range
+     * is read by the window, never shipped to PHP.
      *
      * @return array{0: list<float>, 1: list<float>, 2: int, 3: int}
      */
@@ -71,57 +78,48 @@ class ApprovalMetrics
             ->whereBetween('created_at', [$from, $to])
             ->select('post_id');
 
-        /** @var Collection<int, Collection<int, PostActivityLog>> $byPost */
-        $byPost = PostActivityMetrics::realTransitions(PostActivityLog::query())
-            ->whereIn('post_id', $activePosts)
-            ->where('created_at', '<=', $to)
-            ->orderBy('post_id')
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get(['id', 'post_id', 'from_status', 'to_status', 'created_at'])
-            ->groupBy('post_id');
+        $window = 'OVER (PARTITION BY post_activity_logs.post_id ORDER BY post_activity_logs.created_at, post_activity_logs.id';
+        $before = $window.' ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)';
+
+        $transitions = PostActivityMetrics::realTransitions(PostActivityLog::query())
+            ->whereIn('post_activity_logs.post_id', $activePosts)
+            ->where('post_activity_logs.created_at', '<=', $to)
+            ->toBase()
+            ->select(['post_activity_logs.to_status', 'post_activity_logs.created_at'])
+            ->selectRaw("LAG(post_activity_logs.to_status) {$window}) as prev_status")
+            ->selectRaw("LAG(post_activity_logs.created_at) {$window}) as prev_at")
+            ->selectRaw("SUM(CASE WHEN post_activity_logs.to_status = ? THEN 1 ELSE 0 END) {$before} as approvals_before", [PostStatus::Approved->value])
+            ->selectRaw("SUM(CASE WHEN post_activity_logs.to_status = ? THEN 1 ELSE 0 END) {$before} as changes_before", [PostStatus::ChangesRequested->value]);
+
+        $rows = DB::query()
+            ->fromSub($transitions, 'transitions')
+            ->whereBetween('created_at', [$from, $to])
+            ->select(['prev_status', 'to_status', 'approvals_before', 'changes_before'])
+            ->addSelect(new Expression(SqlDialect::secondsBetween('prev_at', 'created_at').' as seconds'))
+            ->get();
 
         $clientHours = [];
         $internalHours = [];
         $firstApprovals = 0;
         $cleanFirstApprovals = 0;
 
-        foreach ($byPost as $logs) {
-            $previous = null;
-            $seenChanges = false;
-            $seenApproval = false;
+        foreach ($rows as $row) {
+            if ($row->prev_status !== null) {
+                $hours = round(max(0, (int) $row->seconds) / 3600, 1);
 
-            foreach ($logs as $log) {
-                $at = CarbonImmutable::instance($log->created_at ?? $to);
-                $inRange = $at->betweenIncluded($from, $to);
-
-                if ($previous !== null && $inRange) {
-                    $hours = round(CarbonImmutable::instance($previous->created_at ?? $at)->diffInSeconds($at) / 3600, 1);
-
-                    if ($previous->to_status === PostStatus::WaitingClient
-                        && in_array($log->to_status, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
-                        $clientHours[] = $hours;
-                    }
-
-                    if ($previous->to_status === PostStatus::InternalReview) {
-                        $internalHours[] = $hours;
-                    }
+                if ($row->prev_status === PostStatus::WaitingClient->value
+                    && in_array($row->to_status, [PostStatus::Approved->value, PostStatus::ChangesRequested->value], true)) {
+                    $clientHours[] = $hours;
                 }
 
-                if ($log->to_status === PostStatus::Approved && ! $seenApproval) {
-                    $seenApproval = true;
-
-                    if ($inRange) {
-                        $firstApprovals++;
-                        $cleanFirstApprovals += $seenChanges ? 0 : 1;
-                    }
+                if ($row->prev_status === PostStatus::InternalReview->value) {
+                    $internalHours[] = $hours;
                 }
+            }
 
-                if ($log->to_status === PostStatus::ChangesRequested) {
-                    $seenChanges = true;
-                }
-
-                $previous = $log;
+            if ($row->to_status === PostStatus::Approved->value && (int) $row->approvals_before === 0) {
+                $firstApprovals++;
+                $cleanFirstApprovals += (int) $row->changes_before === 0 ? 1 : 0;
             }
         }
 

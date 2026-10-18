@@ -5,21 +5,21 @@ import {
     Download,
     Sparkles,
     Wand2,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { RefineForm } from "@/components/image-studio/image-tile";
-import type { StudioVariant } from "@/components/image-studio/types";
-import { SocialPostPreview } from "@/components/social-post-preview";
-import { Button } from "@/components/ui/button";
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { RefineForm } from '@/components/image-studio/image-tile';
+import type { StudioVariant } from '@/components/image-studio/types';
+import { SocialPostPreview } from '@/components/social-post-preview';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogTitle,
-} from "@/components/ui/dialog";
-import { download } from "@/routes/ai-image-variants";
+} from '@/components/ui/dialog';
+import { download } from '@/routes/ai-image-variants';
 
-const PREVIEWABLE = ["instagram", "tiktok", "facebook", "linkedin"];
+const PREVIEWABLE = ['instagram', 'tiktok', 'facebook', 'linkedin'];
 
 /**
  * Preview of one tile inside a lightweight platform frame carrying the real caption, so the team
@@ -77,25 +77,25 @@ export function ImageLightbox({
 
         const target = event.target as HTMLElement;
 
-        if (["INPUT", "TEXTAREA"].includes(target.tagName)) {
+        if (['INPUT', 'TEXTAREA'].includes(target.tagName)) {
             return;
         }
 
-        if (event.key === "ArrowRight") {
+        if (event.key === 'ArrowRight') {
             event.preventDefault();
             step(1);
-        } else if (event.key === "ArrowLeft") {
+        } else if (event.key === 'ArrowLeft') {
             event.preventDefault();
             step(-1);
         } else if (
-            event.key === "Enter" &&
+            event.key === 'Enter' &&
             canManage &&
-            target.tagName !== "BUTTON" &&
-            target.tagName !== "A"
+            target.tagName !== 'BUTTON' &&
+            target.tagName !== 'A'
         ) {
             event.preventDefault();
             onToggleSelect(variant);
-        } else if (event.key.toLowerCase() === "r" && canManage) {
+        } else if (event.key.toLowerCase() === 'r' && canManage) {
             event.preventDefault();
             setRefining(true);
         }
@@ -103,7 +103,7 @@ export function ImageLightbox({
 
     const previewPlatform = PREVIEWABLE.includes(platform)
         ? platform
-        : "instagram";
+        : 'instagram';
 
     return (
         <Dialog
@@ -118,15 +118,15 @@ export function ImageLightbox({
                     <div className="flex flex-col gap-5">
                         <div className="flex flex-col gap-1 pr-8">
                             <DialogTitle>
-                                {variant.tier === "final"
-                                    ? "Final image"
+                                {variant.tier === 'final'
+                                    ? 'Final image'
                                     : `Draft ${(index ?? 0) + 1} of ${variants.length}`}
                             </DialogTitle>
                             <DialogDescription>
                                 ← → to browse
                                 {canManage
-                                    ? " · Enter to select · R to refine"
-                                    : ""}
+                                    ? ' · Enter to select · R to refine'
+                                    : ''}
                             </DialogDescription>
                         </div>
 
@@ -146,7 +146,7 @@ export function ImageLightbox({
                             <div className="mx-auto w-full max-w-md min-w-0">
                                 <SocialPostPreview
                                     target={{
-                                        id: "studio",
+                                        id: 'studio',
                                         platform: previewPlatform,
                                         handle,
                                     }}
@@ -157,7 +157,7 @@ export function ImageLightbox({
                                             id: variant.assetId ?? variant.id,
                                             url: variant.url,
                                             original_filename: null,
-                                            type: "image",
+                                            type: 'image',
                                         },
                                     ]}
                                 />
@@ -202,7 +202,7 @@ export function ImageLightbox({
                                         Refine
                                     </Button>
                                 )}
-                                {canManage && variant.tier === "draft" && (
+                                {canManage && variant.tier === 'draft' && (
                                     <Button
                                         variant="outline"
                                         onClick={() => onFinalize(variant)}
@@ -219,7 +219,7 @@ export function ImageLightbox({
                                         aria-pressed={selected}
                                     >
                                         <Check />
-                                        {selected ? "Selected" : "Select"}
+                                        {selected ? 'Selected' : 'Select'}
                                     </Button>
                                 )}
                             </div>

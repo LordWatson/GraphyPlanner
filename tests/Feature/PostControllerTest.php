@@ -54,7 +54,7 @@ class PostControllerTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.posts.index', $client));
 
         $post = Post::firstOrFail();
         $londonTarget = $post->targets()->where('social_account_id', $london->id)->firstOrFail();
@@ -113,15 +113,15 @@ class PostControllerTest extends TestCase
             'scheduled_local_time' => '09:00',
         ]);
 
-        $response = $this->actingAs($owner)->get(route('clients.show', $client));
+        $response = $this->actingAs($owner)->get(route('clients.posts.index', $client));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('posts', 1)
+            ->has('posts.data', 1)
             ->has('targetAccounts', 1)
             ->where('can.createPost', true)
-            ->where('posts.0.id', $post->id)
-            ->where('posts.0.targets.0.social_account_id', $account->id)
+            ->where('posts.data.0.id', $post->id)
+            ->where('posts.data.0.targets.0.social_account_id', $account->id)
             ->where('targetAccounts.0.id', $account->id)
         );
     }

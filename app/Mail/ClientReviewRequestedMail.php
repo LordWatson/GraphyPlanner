@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Post;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -19,7 +20,10 @@ class ClientReviewRequestedMail extends Mailable implements ShouldQueue
     public function __construct(
         public Post $post,
         public string $reviewUrl,
-    ) {}
+    ) {
+        // Step I-2.8: every mailable runs on the mail queue.
+        $this->onQueue(Queues::MAIL);
+    }
 
     public function build(): self
     {

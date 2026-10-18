@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\ClientInvitation;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -19,7 +20,10 @@ class ClientInvitationMail extends Mailable implements ShouldQueue
     public function __construct(
         public ClientInvitation $invitation,
         public string $acceptUrl,
-    ) {}
+    ) {
+        // Step I-2.8: every mailable runs on the mail queue.
+        $this->onQueue(Queues::MAIL);
+    }
 
     public function build(): self
     {

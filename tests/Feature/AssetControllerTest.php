@@ -32,7 +32,7 @@ class AssetControllerTest extends TestCase
             'file' => UploadedFile::fake()->image('cover.jpg'),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.media', $client));
         $this->assertDatabaseHas('assets', [
             'client_id' => $client->id,
             'org_id' => $org->id,
@@ -85,7 +85,7 @@ class AssetControllerTest extends TestCase
             'file' => UploadedFile::fake()->image('cover.jpg'),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.media', $client));
         $this->assertDatabaseCount('assets', 1);
     }
 
@@ -103,7 +103,7 @@ class AssetControllerTest extends TestCase
             'file' => UploadedFile::fake()->create('clip.mp4', 2048, 'video/mp4'),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.media', $client));
         $this->assertDatabaseHas('assets', [
             'client_id' => $client->id,
             'org_id' => $org->id,
@@ -132,7 +132,7 @@ class AssetControllerTest extends TestCase
             'file' => UploadedFile::fake()->create('clip.mp4', 15000, 'video/mp4'),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.media', $client));
         $this->assertDatabaseCount('assets', 1);
     }
 
@@ -162,7 +162,7 @@ class AssetControllerTest extends TestCase
             'url' => 'https://www.figma.com/file/abc123',
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.media', $client));
         $this->assertDatabaseHas('assets', [
             'client_id' => $client->id,
             'source' => 'figma',
@@ -216,7 +216,7 @@ class AssetControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->delete(route('assets.destroy', $asset));
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.media', $client));
         // Step I-1.5: a soft delete — the file stays until the client is purged.
         $this->assertSoftDeleted($asset);
         Storage::disk('public')->assertExists($path);
@@ -231,10 +231,10 @@ class AssetControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.show', $client));
+        $response = $this->actingAs($reviewer)->get(route('clients.media', $client));
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->has('assets', 1));
+        $response->assertInertia(fn ($page) => $page->component('clients/tabs/media')->has('assets.data', 1));
     }
 
     /**

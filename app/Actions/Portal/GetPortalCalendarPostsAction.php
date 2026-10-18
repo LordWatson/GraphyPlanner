@@ -6,6 +6,7 @@ use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\User;
+use App\Support\Calendar\CalendarWindow;
 use Illuminate\Support\Collection;
 
 /**
@@ -21,12 +22,14 @@ class GetPortalCalendarPostsAction
      */
     public function __invoke(
         User $user,
+        CalendarWindow $window,
         ?PostStatus $status = null,
         ?int $campaignId = null,
         ?Platform $platform = null,
     ): Collection {
         $status = $status?->isClientVisible() ? $status : null;
 
+        // Step I-2.3: only the visible window, like the internal calendar.
         return Post::query()
             ->where('org_id', $user->org_id)
             ->where('client_id', $user->client_id)
@@ -40,7 +43,17 @@ class GetPortalCalendarPostsAction
                 'targets.socialAccount',
                 fn ($q) => $q->where('platform', $platform),
             ))
-            ->with(['client:id,name', 'campaign:id,name', 'targets.socialAccount'])
-            ->get();
+            ->whereHas('targets', fn ($target) => $target->whereBetween(CalendarWindow::TARGET_DATE_COLUMN, $window->targetDateRange()))
+            ->with([
+                'client:id,name',
+                'campaign:id,name',
+                'targets' => fn ($target) => $target
+                    ->whereBetween(CalendarWindow::TARGET_DATE_COLUMN, $window->targetDateRange())
+                    ->select(['id', 'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc'])
+                    ->orderBy('id'),
+                'targets.socialAccount:id,platform,handle,timezone',
+            ])
+            ->orderBy('id')
+            ->get(['id', 'org_id', 'client_id', 'campaign_id', 'status', 'master_caption']);
     }
 }

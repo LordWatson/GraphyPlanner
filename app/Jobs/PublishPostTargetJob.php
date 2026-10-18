@@ -8,6 +8,7 @@ use App\Enums\PostTargetStatus;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Support\Publishing\TargetResult;
+use App\Support\Queues;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,7 +47,10 @@ class PublishPostTargetJob implements ShouldQueue
     public function __construct(
         public readonly int $targetId,
         public readonly string $attemptId,
-    ) {}
+    ) {
+        // Step I-2.8: publishing has its own queue and workers.
+        $this->onQueue(Queues::PUBLISHING);
+    }
 
     /**
      * @return array<int, int>

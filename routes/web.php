@@ -12,6 +12,7 @@ use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
+use App\Http\Controllers\ClientTabController;
 use App\Http\Controllers\DailyBriefController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
@@ -106,6 +107,14 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     });
 
     Route::resource('clients', ClientController::class);
+    // Step I-2.4: one route per client page tab (`clients.show` is the Social accounts tab).
+    Route::get('clients/{client}/posts', [ClientTabController::class, 'posts'])->name('clients.posts.index');
+    Route::get('clients/{client}/media', [ClientTabController::class, 'media'])->name('clients.media');
+    Route::get('clients/{client}/campaigns', [ClientTabController::class, 'campaigns'])->name('clients.campaigns.index');
+    Route::get('clients/{client}/billing', [ClientTabController::class, 'billing'])->name('clients.billing');
+    Route::get('clients/{client}/portal-access', [ClientTabController::class, 'portalAccess'])->name('clients.portal-access');
+    Route::get('clients/{client}/ai', [ClientTabController::class, 'ai'])->name('clients.ai.index');
+    Route::get('clients/{client}/briefs', [ClientTabController::class, 'briefs'])->name('clients.briefs');
     // Step I-1.5: "delete" (above) archives; these act on archived (soft-deleted) clients.
     Route::post('clients/{client}/restore', [ClientController::class, 'restore'])
         ->withTrashed()
@@ -365,6 +374,14 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
     Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
 
     Route::resource('clients', ClientController::class);
+    // Step I-2.4: one route per client page tab (`clients.show` is the Social accounts tab).
+    Route::get('clients/{client}/posts', [ClientTabController::class, 'posts'])->name('clients.posts.index');
+    Route::get('clients/{client}/media', [ClientTabController::class, 'media'])->name('clients.media');
+    Route::get('clients/{client}/campaigns', [ClientTabController::class, 'campaigns'])->name('clients.campaigns.index');
+    Route::get('clients/{client}/billing', [ClientTabController::class, 'billing'])->name('clients.billing');
+    Route::get('clients/{client}/portal-access', [ClientTabController::class, 'portalAccess'])->name('clients.portal-access');
+    Route::get('clients/{client}/ai', [ClientTabController::class, 'ai'])->name('clients.ai.index');
+    Route::get('clients/{client}/briefs', [ClientTabController::class, 'briefs'])->name('clients.briefs');
 
     Route::get('clients/{client}/brand-brain', [BrandBrainController::class, 'edit'])
         ->name('clients.brand-brain.edit');

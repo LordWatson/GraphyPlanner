@@ -24,7 +24,7 @@ class CampaignController extends Controller
     {
         $action($client, $request->validated());
 
-        return to_route('clients.show', $client);
+        return to_route('clients.campaigns.index', $client);
     }
 
     /**
@@ -95,7 +95,7 @@ class CampaignController extends Controller
 
         $campaign->delete();
 
-        return to_route('clients.show', $clientId);
+        return to_route('clients.campaigns.index', $clientId);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\OrganizationReport;
 use App\Models\User;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -31,7 +32,10 @@ class OrganizationReportMail extends Mailable implements ShouldQueue
         public array $summary,
         public string $csv,
         public ?string $pdf = null,
-    ) {}
+    ) {
+        // Step I-2.8: every mailable runs on the mail queue.
+        $this->onQueue(Queues::MAIL);
+    }
 
     public function build(): self
     {

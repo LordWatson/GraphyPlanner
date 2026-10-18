@@ -55,7 +55,7 @@ class AssetController extends Controller
      * Callers that want to stay on their current page (e.g. the post editor's inline "upload
      * asset" widget, added so users don't have to flick over to the client's Assets tab) send
      * `Accept: application/json` and get the created asset back as JSON instead of being
-     * redirected to `clients.show`.
+     * redirected to `clients.media`.
      */
     public function store(StoreAssetRequest $request, Client $client, CreateAssetAction $action): RedirectResponse|JsonResponse
     {
@@ -72,7 +72,7 @@ class AssetController extends Controller
             ], 201);
         }
 
-        return to_route('clients.show', $client);
+        return to_route('clients.media', $client);
     }
 
     /**
@@ -86,6 +86,6 @@ class AssetController extends Controller
 
         $action($asset);
 
-        return to_route('clients.show', $clientId);
+        return to_route('clients.media', $clientId);
     }
 }

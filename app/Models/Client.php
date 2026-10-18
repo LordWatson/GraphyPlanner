@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Clients\RecomputeClientHealthAction;
 use App\Enums\BillingCycle;
 use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
@@ -36,6 +37,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $approval_email
  * @property string|null $billing_email
  * @property string|null $billing_address
+ * @property ClientHealth|null $health_status
+ * @property string|null $health_reason
+ * @property Carbon|null $health_computed_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -62,7 +66,26 @@ class Client extends Model
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
             'retainer_amount' => 'decimal:2',
+            'health_status' => ClientHealth::class,
+            'health_computed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Attributes `ClientHealthService`'s rules read — changing one re-materializes health.
+     *
+     * @var list<string>
+     */
+    public const HEALTH_INPUTS = ['status', 'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle'];
+
+    protected static function booted(): void
+    {
+        // Step I-2.5: keep `clients.health_*` current. The action saves quietly, so no loop.
+        static::saved(function (self $client) {
+            if (($client->wasRecentlyCreated && $client->health_computed_at === null) || $client->wasChanged(self::HEALTH_INPUTS)) {
+                app(RecomputeClientHealthAction::class)($client);
+            }
+        });
     }
 
     /**
@@ -163,12 +186,26 @@ class Client extends Model
     }
 
     /**
-     * Computed (not persisted) health status/reason. See `App\Services\ClientHealthService`.
+     * Health status/reason. Step I-2.5: read from the materialized columns kept current by
+     * `RecomputeClientHealthAction`; computed live (see `ClientHealthService`) only for a row that
+     * has never been computed.
      *
      * @return array{status: ClientHealth, reason: string}
      */
     public function health(): array
     {
+        if ($this->health_status instanceof ClientHealth && $this->health_reason !== null) {
+            return ['status' => $this->health_status, 'reason' => $this->health_reason];
+        }
+
         return app(ClientHealthService::class)->compute($this);
+    }
+
+    /**
+     * @return HasMany<ClientHealthHistory, $this>
+     */
+    public function healthHistory(): HasMany
+    {
+        return $this->hasMany(ClientHealthHistory::class);
     }
 }

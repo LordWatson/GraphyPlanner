@@ -5,8 +5,12 @@ namespace App\Models;
 use App\Enums\ApprovalMode;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
+use App\Policies\PostPolicy;
+use App\Services\ClientHashtagService;
+use App\Services\SharedPropsCache;
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -72,6 +76,18 @@ class Post extends Model
         $query->whereIn('client_id', Client::query()->select('id'));
     }
 
+    /**
+     * Step I-2.3: the set-based form of `PostPolicy::reschedule`'s post rules (status not
+     * locked, no published target) — callers still check the role and org.
+     *
+     * @param  Builder<Post>  $query
+     */
+    public function scopeReschedulable(Builder $query): void
+    {
+        $query->whereNotIn('posts.status', PostPolicy::NON_RESCHEDULABLE_STATUSES)
+            ->whereDoesntHave('targets', fn (Builder $target) => $target->where('status', PostTargetStatus::Published));
+    }
+
     protected static function booted(): void
     {
         // Some users type hashtags with a leading "#" (e.g. "#launch"), others without
@@ -90,6 +106,33 @@ class Post extends Model
                 ->values()
                 ->all();
         });
+
+        // Step I-2.6: the portal's cached "Approvals" badge counts this client's waiting posts.
+        static::saved(function (self $post) {
+            if ($post->wasChanged('status') || $post->wasRecentlyCreated) {
+                SharedPropsCache::forgetPendingApprovals($post->client_id);
+            }
+        });
+        static::deleted(fn (self $post) => SharedPropsCache::forgetPendingApprovals($post->client_id));
+        static::restored(fn (self $post) => SharedPropsCache::forgetPendingApprovals($post->client_id));
+
+        // Step I-2.6: keep the client's hashtag vocabulary (`client_hashtags`) in step with every
+        // write path — actions, AI, factories. `updated` still sees the pre-save original. Runs
+        // inside the caller's transaction, if any.
+        static::created(fn (self $post) => app(ClientHashtagService::class)->recordChange($post, null));
+        static::updated(function (self $post) {
+            if ($post->wasChanged('hashtags')) {
+                $before = $post->getOriginal('hashtags');
+                app(ClientHashtagService::class)->recordChange($post, is_array($before) ? $before : null);
+            }
+        });
+        static::deleted(function (self $post) {
+            // Force-deleting an already-trashed post was counted out when it was trashed.
+            if (! $post->isForceDeleting() || $post->getOriginal('deleted_at') === null) {
+                app(ClientHashtagService::class)->recordRemoval($post);
+            }
+        });
+        static::restored(fn (self $post) => app(ClientHashtagService::class)->recordChange($post, null));
     }
 
     /**

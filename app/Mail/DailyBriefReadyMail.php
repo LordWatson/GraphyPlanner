@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\Client;
 use App\Models\DailyBrief;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -21,7 +22,10 @@ class DailyBriefReadyMail extends Mailable implements ShouldQueue
     public function __construct(
         public Client $client,
         public DailyBrief $brief,
-    ) {}
+    ) {
+        // Step I-2.8: every mailable runs on the mail queue.
+        $this->onQueue(Queues::MAIL);
+    }
 
     public function build(): self
     {

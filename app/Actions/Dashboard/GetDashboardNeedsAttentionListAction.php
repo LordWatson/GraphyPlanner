@@ -18,19 +18,22 @@ class GetDashboardNeedsAttentionListAction
      * posts waiting on internal review, then posts waiting on the client, then posts missing media. Reuses `GetNeedsAttentionItemsAction`
      * so the dashboard and the `/home` page never disagree on what needs attention.
      *
-     * @return array<int, array<string, mixed>>
+     * Step I-2.2: each bucket only fetches `$limit` rows, and `total` is the sum of the buckets'
+     * SQL counts — the card no longer builds a 100-row list just to count it.
+     *
+     * @return array{rows: list<array<string, mixed>>, total: int}
      */
     public function __invoke(User $user, int $limit = 4): array
     {
-        $items = ($this->getNeedsAttentionItems)($user);
+        $items = ($this->getNeedsAttentionItems)($user, $limit);
 
         $rows = [];
 
-        foreach ($items['failedPublishes'] as $post) {
+        foreach ($items['failedPublishes']['items'] as $post) {
             $rows[] = $this->postRow($post, 'failed');
         }
 
-        foreach ($items['disconnectedAccounts'] as $account) {
+        foreach ($items['disconnectedAccounts']['items'] as $account) {
             $rows[] = [
                 'key' => 'account-'.$account['account_id'],
                 'type' => 'disconnected',
@@ -42,19 +45,22 @@ class GetDashboardNeedsAttentionListAction
             ];
         }
 
-        foreach ($items['internalReviews'] as $post) {
+        foreach ($items['internalReviews']['items'] as $post) {
             $rows[] = $this->postRow($post, 'internal_review');
         }
 
-        foreach ($items['waitingApprovals'] as $post) {
+        foreach ($items['waitingApprovals']['items'] as $post) {
             $rows[] = $this->postRow($post, 'waiting');
         }
 
-        foreach ($items['missingMedia'] as $post) {
+        foreach ($items['missingMedia']['items'] as $post) {
             $rows[] = $this->postRow($post, 'missing_media');
         }
 
-        return array_slice($rows, 0, $limit);
+        return [
+            'rows' => array_slice($rows, 0, $limit),
+            'total' => array_sum(array_column($items, 'total')),
+        ];
     }
 
     /**

@@ -59,6 +59,10 @@ class DashboardController extends Controller
 
         $unapprovedDraftsCount = $canViewCalendar ? $unapprovedDraftsQuery->count() : 0;
 
+        $needsAttention = $canViewHome
+            ? $getDashboardNeedsAttentionList($user)
+            : ['rows' => [], 'total' => 0];
+
         return Inertia::render('dashboard', [
             'summary' => [
                 'clients' => $clientsCount,
@@ -69,9 +73,7 @@ class DashboardController extends Controller
                 'scheduledNext24h' => $canViewCalendar
                     ? $getUpcomingPostCount($user, 1)
                     : 0,
-                'needsAttention' => $canViewHome
-                    ? count($getDashboardNeedsAttentionList($user, 100))
-                    : 0,
+                'needsAttention' => $needsAttention['total'],
                 'unapprovedDrafts' => $unapprovedDraftsCount,
                 'activeClients' => $activeClientsCount,
             ],
@@ -81,9 +83,7 @@ class DashboardController extends Controller
             'upcomingPosts' => $canViewCalendar
                 ? $getUpcomingPostOccurrences($user)
                 : [],
-            'needsAttentionItems' => $canViewHome
-                ? $getDashboardNeedsAttentionList($user)
-                : [],
+            'needsAttentionItems' => $needsAttention['rows'],
             'clientHealth' => $canViewClients
                 ? $getClientHealthSummary($user->org_id)
                 : [],

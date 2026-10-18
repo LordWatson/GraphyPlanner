@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Organization;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -23,7 +24,10 @@ class UpcomingPostReminderMail extends Mailable implements ShouldQueue
         public Organization $organization,
         public array $occurrences,
         public int $days,
-    ) {}
+    ) {
+        // Step I-2.8: every mailable runs on the mail queue.
+        $this->onQueue(Queues::MAIL);
+    }
 
     public function build(): self
     {

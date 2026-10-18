@@ -16,6 +16,15 @@ class CalendarControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Step I-2.3: the calendar serves the current month's grid by default; pin "now" so the
+        // October 2026 fixtures stay inside it.
+        $this->travelTo(now()->setDate(2026, 10, 15)->setTime(12, 0));
+    }
+
     /**
      * §12 acceptance test (Step 0.11): a post's two targets on accounts in different timezones
      * must render at their correct local times in "each account local" mode, and the toggle must

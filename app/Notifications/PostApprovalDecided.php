@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Enums\ApprovalDecision;
 use App\Models\Post;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -22,6 +23,16 @@ class PostApprovalDecided extends Notification implements ShouldQueue
         private readonly Post $post,
         private readonly ApprovalDecision $decision,
     ) {}
+
+    /**
+     * Step I-2.8: bell notifications and mail each run on their own queue.
+     *
+     * @return array<string, string>
+     */
+    public function viaQueues(): array
+    {
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+    }
 
     /**
      * @return array<int, string>

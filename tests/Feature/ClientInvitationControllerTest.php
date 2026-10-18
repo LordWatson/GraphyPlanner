@@ -28,7 +28,7 @@ class ClientInvitationControllerTest extends TestCase
             'email' => 'contact@acme.test',
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.portal-access', $client));
         $this->assertDatabaseHas('client_invitations', [
             'client_id' => $client->id,
             'email' => 'contact@acme.test',
@@ -72,7 +72,7 @@ class ClientInvitationControllerTest extends TestCase
             'email' => 'contact@acme.test',
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.portal-access', $client));
         $this->assertDatabaseCount('client_invitations', 2);
     }
 
@@ -114,7 +114,7 @@ class ClientInvitationControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->delete(route('invitations.destroy', $invitation));
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.portal-access', $client));
         $this->assertNotNull($invitation->fresh()->revoked_at);
     }
 
@@ -147,13 +147,13 @@ class ClientInvitationControllerTest extends TestCase
 
         $tokenHash = ClientInvitation::first()->token_hash;
 
-        $response = $this->actingAs($owner)->get(route('clients.show', $client));
+        $response = $this->actingAs($owner)->get(route('clients.portal-access', $client));
 
         $response->assertOk();
         $response->assertDontSee($tokenHash, false);
         $response->assertInertia(fn ($page) => $page
-            ->has('invitations', 1)
-            ->where('invitations.0.email', 'contact@acme.test')
+            ->has('invitations.data', 1)
+            ->where('invitations.data.0.email', 'contact@acme.test')
         );
     }
 }

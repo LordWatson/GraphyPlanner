@@ -27,7 +27,7 @@ class CampaignControllerTest extends TestCase
             'start_date' => now()->toDateString(),
         ]);
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.campaigns.index', $client));
         $this->assertDatabaseHas('campaigns', [
             'client_id' => $client->id,
             'org_id' => $org->id,
@@ -104,7 +104,7 @@ class CampaignControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->delete(route('campaigns.destroy', $campaign));
 
-        $response->assertRedirect(route('clients.show', $client));
+        $response->assertRedirect(route('clients.campaigns.index', $client));
         $this->assertSoftDeleted($campaign);
     }
 
@@ -117,10 +117,10 @@ class CampaignControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.show', $client));
+        $response = $this->actingAs($reviewer)->get(route('clients.campaigns.index', $client));
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->has('campaigns', 1));
+        $response->assertInertia(fn ($page) => $page->has('campaigns.data', 1));
     }
 
     public function test_viewer_can_view_a_campaign_show_page_with_its_posts(): void

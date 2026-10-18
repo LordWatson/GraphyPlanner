@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Post;
 use App\Models\PostComment;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -23,6 +24,16 @@ class PostCommentMentioned extends Notification implements ShouldQueue
         private readonly PostComment $comment,
         private readonly bool $forPortal,
     ) {}
+
+    /**
+     * Step I-2.8: bell notifications and mail each run on their own queue.
+     *
+     * @return array<string, string>
+     */
+    public function viaQueues(): array
+    {
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+    }
 
     /**
      * @return array<int, string>

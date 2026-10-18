@@ -42,14 +42,19 @@ use App\Services\AI\Images\GeminiImageProvider;
 use App\Services\AI\Images\NullImageProvider;
 use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
+use App\Services\Analytics\AnalyticsCache;
 use App\Services\LocalAssetStorage;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Services\SharedPropsCache;
 use App\Support\RateLimits;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -119,6 +124,16 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        // Step I-2.6: the notification bell's cached unread count changes when one is stored.
+        Event::listen(function (NotificationSent $event): void {
+            if ($event->channel === 'database' && $event->notifiable instanceof User) {
+                SharedPropsCache::forgetUnreadNotifications($event->notifiable->id);
+            }
+        });
+
+        // Step I-2.7: writes that change an org's analytics orphan its cached summaries.
+        AnalyticsCache::registerInvalidation();
+
         // Step I-1.7: named rate limiters (`throttle:ai`, `throttle:exports`, …) — see RateLimits.
         RateLimits::register();
 
@@ -154,6 +169,11 @@ class AppServiceProvider extends ServiceProvider
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );
+
+        // Step I-2.6: an N+1 or a typo'd fillable key fails loudly in dev and tests instead of
+        // quietly slowing production down or dropping data.
+        Model::preventLazyLoading(! app()->isProduction());
+        Model::preventSilentlyDiscardingAttributes(! app()->isProduction());
 
         Password::defaults(fn (): ?Password => app()->isProduction()
             ? Password::min(12)

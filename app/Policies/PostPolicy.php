@@ -74,12 +74,7 @@ class PostPolicy
      */
     public function reschedule(User $user, Post $post): bool
     {
-        if (in_array($post->status, [
-            PostStatus::Publishing,
-            PostStatus::Published,
-            PostStatus::PartiallyPublished,
-            PostStatus::Archived,
-        ], true)) {
+        if (in_array($post->status, self::NON_RESCHEDULABLE_STATUSES, true)) {
             return false;
         }
 
@@ -87,8 +82,28 @@ class PostPolicy
             return false;
         }
 
-        return $user->org_id === $post->org_id
-            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+        return $user->org_id === $post->org_id && self::canRescheduleAny($user);
+    }
+
+    /**
+     * Statuses a post can never be dragged out of. Shared with `Post::scopeReschedulable`, the
+     * set-based form of this rule the calendar uses (Step I-2.3).
+     *
+     * @var list<PostStatus>
+     */
+    public const NON_RESCHEDULABLE_STATUSES = [
+        PostStatus::Publishing,
+        PostStatus::Published,
+        PostStatus::PartiallyPublished,
+        PostStatus::Archived,
+    ];
+
+    /**
+     * The role half of `reschedule()`, for callers that check posts as a set.
+     */
+    public static function canRescheduleAny(User $user): bool
+    {
+        return in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
     }
 
     /**

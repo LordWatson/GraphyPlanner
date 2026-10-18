@@ -19,7 +19,7 @@ class ClientInvitationController extends Controller
     {
         $action($client, $request->validated('email'), $request->user());
 
-        return to_route('clients.show', $client);
+        return to_route('clients.portal-access', $client);
     }
 
     /**
@@ -31,6 +31,6 @@ class ClientInvitationController extends Controller
 
         $invitation->update(['revoked_at' => now()]);
 
-        return to_route('clients.show', $invitation->client_id);
+        return to_route('clients.portal-access', $invitation->client_id);
     }
 }

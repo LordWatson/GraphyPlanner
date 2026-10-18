@@ -18,17 +18,19 @@ use App\Models\PostTarget;
 use App\Models\User;
 use App\Services\AI\Images\ImageQuotaGuard;
 use App\Services\Analytics\AiUsageMetrics;
+use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\ApprovalMetrics;
 use App\Services\Analytics\PostActivityMetrics;
 use App\Services\Analytics\RevenueMetrics;
 use App\Services\Analytics\TeamWorkloadMetrics;
-use App\Services\ClientHealthService;
 use App\Support\Analytics\AnalyticsAccess;
 use App\Support\Analytics\AnalyticsScope;
 use App\Support\Analytics\OrganizationAnalyticsFilters;
 use App\Support\Analytics\SeriesBuckets;
+use App\Support\Analytics\SqlDialect;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -65,8 +67,8 @@ class GetOrganizationAnalyticsSummaryAction
         private readonly AiUsageMetrics $aiMetrics,
         private readonly ApprovalMetrics $approvalMetrics,
         private readonly TeamWorkloadMetrics $teamMetrics,
-        private readonly ClientHealthService $health,
         private readonly ImageQuotaGuard $imageQuota,
+        private readonly AnalyticsCache $cache,
     ) {}
 
     /**
@@ -78,6 +80,21 @@ class GetOrganizationAnalyticsSummaryAction
             throw new \InvalidArgumentException('Analytics filters belong to a different organization.');
         }
 
+        // Step I-2.7: cached per (org, filters, viewer) for five minutes — the viewer is part of
+        // the key because sections are role-scoped. See AnalyticsCache for invalidation.
+        return $this->cache->remember($organization->id, 'summary', [
+            'filters' => $filters->toArray(),
+            'viewer' => $viewer->id,
+            'role' => $viewer->role?->value,
+            'currency' => $organization->default_currency,
+        ], fn () => $this->build($organization, $filters, $viewer));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function build(Organization $organization, OrganizationAnalyticsFilters $filters, User $viewer): array
+    {
         $scope = $filters->scope();
         $range = $filters->range;
         $metrics = AnalyticsAccess::visibleMetrics($viewer, $filters);
@@ -89,9 +106,10 @@ class GetOrganizationAnalyticsSummaryAction
             ? $this->revenueMetrics->primaryCurrency($scope, $range, $organization->default_currency)
             : $organization->default_currency;
 
-        // Health is computed once per client and shared by the clients section and the top list.
+        // Health is read once per client (Step I-2.5: the stored column) and shared by the
+        // clients section and the top list.
         $clients = $this->clients($scope);
-        $health = $clients->mapWithKeys(fn (Client $client) => [$client->id => $this->health->compute($client)]);
+        $health = $clients->mapWithKeys(fn (Client $client) => [$client->id => $client->health()]);
 
         $summary = [
             'scope' => $clientId === null ? 'organization' : 'client',
@@ -133,7 +151,7 @@ class GetOrganizationAnalyticsSummaryAction
     }
 
     /**
-     * Every non-archived client in scope, with what health needs eager-loaded.
+     * Every non-archived client in scope (health is materialized on the row, Step I-2.5).
      *
      * @return EloquentCollection<int, Client>
      */
@@ -141,7 +159,6 @@ class GetOrganizationAnalyticsSummaryAction
     {
         return $scope->applyToClientOwned(Client::query(), 'id')
             ->where('status', '!=', ClientStatus::Archived)
-            ->with('socialAccounts:id,client_id,connection_status')
             ->orderBy('name')
             ->get();
     }
@@ -161,7 +178,7 @@ class GetOrganizationAnalyticsSummaryAction
             return null;
         }
 
-        $result = $health[$client->id] ?? $this->health->compute($client);
+        $result = $health[$client->id] ?? $client->health();
 
         return [
             'id' => $client->id,
@@ -321,18 +338,19 @@ class GetOrganizationAnalyticsSummaryAction
         $range = $filters->range;
         $overdue = $scope->applyToClientOwned(Invoice::query())->overdue();
 
-        // Average days from sending to payment, over invoices paid in the range (PHP, so Postgres
-        // and SQLite agree — the same approach as the invoice ledger).
-        $durations = $this->revenueMetrics->paid($scope, $range)
+        // Average whole days from sending to payment, over invoices paid in the range
+        // (Step I-2.7: averaged in SQL).
+        $averageDays = $this->revenueMetrics->paid($scope, $range)
             ->whereNotNull('sent_at')
-            ->get(['sent_at', 'paid_at'])
-            ->map(fn (Invoice $invoice) => max(0, (int) $invoice->sent_at?->diffInDays($invoice->paid_at)));
+            ->toBase()
+            ->select(new Expression('AVG('.SqlDialect::wholeDaysBetween('sent_at', 'paid_at').') as average'))
+            ->value('average');
 
         return [
             ...$this->revenueMetrics->summary($scope, $range),
             'overdue' => $this->revenueMetrics->totalsByCurrency(clone $overdue),
             'overdue_count' => $overdue->count(),
-            'average_days_to_pay' => $durations->isEmpty() ? null : (int) round($durations->avg()),
+            'average_days_to_pay' => $averageDays === null ? null : (int) round((float) $averageDays),
             'retainers' => $this->retainers($scope, $organization),
         ];
     }
@@ -426,16 +444,21 @@ class GetOrganizationAnalyticsSummaryAction
         $range = $filters->range;
         $buckets = new SeriesBuckets($range);
 
-        $created = $buckets->countByBucket($scope->posts()->whereBetween('posts.created_at', $range->utcBounds())->pluck('posts.created_at'));
+        // Step I-2.7: counted per bucket in SQL (bucket edges bound in the org timezone).
+        $created = $buckets->countByBucketSql($scope->posts()->whereBetween('posts.created_at', $range->utcBounds()), 'posts.created_at');
 
-        $logs = $this->postMetrics->transitionTimes($scope, $range, [
-            PostStatus::Published,
-            PostStatus::Failed,
-            PostStatus::WaitingClient,
-            PostStatus::Approved,
-        ]);
+        $transitions = $buckets->countByBucketAndGroupSql(
+            $this->postMetrics->transitionsInRange($scope, $range, [
+                PostStatus::Published,
+                PostStatus::Failed,
+                PostStatus::WaitingClient,
+                PostStatus::Approved,
+            ]),
+            'post_activity_logs.created_at',
+            'post_activity_logs.to_status',
+        );
 
-        $count = fn (PostStatus $status) => $buckets->countByBucket($logs->where('to_status', $status)->pluck('created_at'));
+        $count = fn (PostStatus $status): array => $transitions[$status->value] ?? [];
         $published = $count(PostStatus::Published);
         $failed = $count(PostStatus::Failed);
         $sent = $count(PostStatus::WaitingClient);
