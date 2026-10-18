@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\SuperAdmin;
 
+use App\Actions\Analytics\GetOrganizationAnalyticsSummaryAction;
 use App\Actions\Organizations\RegisterOrganizationAction;
 use App\Actions\SuperAdmin\DeleteOrganizationAction;
 use App\Actions\SuperAdmin\GetOrganizationDetailAction;
-use App\Actions\SuperAdmin\GetPlatformAnalyticsSummaryAction;
 use App\Actions\SuperAdmin\ListOrganizationsAction;
 use App\Actions\SuperAdmin\ReinstateOrganizationAction;
 use App\Actions\SuperAdmin\SuspendOrganizationAction;
@@ -18,10 +18,12 @@ use App\Http\Requests\SuperAdmin\StoreOrganizationRequest;
 use App\Http\Requests\SuperAdmin\SuspendOrganizationRequest;
 use App\Http\Requests\SuperAdmin\UpdateOrganizationRequest;
 use App\Models\Organization;
+use App\Support\Analytics\OrganizationAnalyticsFilters;
 use App\Support\Options\CurrencyOptions;
 use App\Support\Options\TimezoneOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -139,11 +141,18 @@ class OrganizationController extends Controller
     }
 
     /**
-     * Step 15.4 — the per-org drill-down: the platform analytics, scoped to one organization.
+     * Step 15.4 — the per-org drill-down. Since Step 17.9 it runs the organization's own analytics
+     * (`GetOrganizationAnalyticsSummaryAction`, every section visible to a super admin, in the
+     * org's timezone), so support and sales see exactly what the customer's Owner sees.
      */
-    public function analytics(AnalyticsFilterRequest $request, Organization $organization, GetPlatformAnalyticsSummaryAction $summary): Response
+    public function analytics(AnalyticsFilterRequest $request, Organization $organization, GetOrganizationAnalyticsSummaryAction $summary): Response
     {
         $this->authorize('view', $organization);
+
+        $filters = OrganizationAnalyticsFilters::fromArray(
+            Arr::only($request->validated(), ['range', 'from', 'to']),
+            $organization,
+        );
 
         return Inertia::render('super-admin/organizations/analytics', [
             'organization' => [
@@ -152,7 +161,7 @@ class OrganizationController extends Controller
                 'is_suspended' => $organization->isSuspended(),
                 'is_preview' => $organization->isPreviewFixture(),
             ],
-            'summary' => $summary($request->filters()->forOrganization($organization->id)),
+            'summary' => $summary($organization, $filters, $request->user()),
         ]);
     }
 }

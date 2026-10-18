@@ -19,6 +19,10 @@ export type User = {
 
 export type Auth = {
     user: User;
+    /** Shared chapter gates (`HandleInertiaRequests::share()`), so nav never re-derives roles. */
+    can?: {
+        viewAnalytics?: boolean;
+    };
 };
 
 export type Passkey = {

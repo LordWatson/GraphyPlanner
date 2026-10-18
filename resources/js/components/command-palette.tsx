@@ -26,6 +26,8 @@ import {
     create as createClient,
     index as clientsIndex,
 } from '@/routes/clients';
+import { index as analyticsIndex } from '@/routes/analytics';
+import { create as createAnalyticsReport } from '@/routes/analytics/reports';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
@@ -110,6 +112,7 @@ function useCommands(close: () => void): Command[] {
         const isBilling =
             auth.user.role === 'owner' || auth.user.role === 'strategist';
         const isOwner = auth.user.role === 'owner';
+        const canViewAnalytics = auth.can?.viewAnalytics === true;
 
         const chapterCommand = (
             chapter: Chapter,
@@ -131,6 +134,10 @@ function useCommands(close: () => void): Command[] {
             chapterCommand(chapters.clients, clientsIndex()),
             ...(isBilling
                 ? [chapterCommand(chapters.invoices, invoicesIndex())]
+                : []),
+            // Phase 17 — `OrganizationPolicy::viewAnalytics`, shared as `auth.can`.
+            ...(canViewAnalytics
+                ? [chapterCommand(chapters.analytics, analyticsIndex())]
                 : []),
             ...(isOwner ? [chapterCommand(chapters.staff, staffIndex())] : []),
             chapterCommand(chapters.settings, editProfile()),
@@ -181,6 +188,19 @@ function useCommands(close: () => void): Command[] {
                   ]
                 : studioCommands;
 
+        // Saved reports are built by Owners/Strategists (`OrganizationReportPolicy::create`).
+        if (isBilling && canViewAnalytics) {
+            list.push({
+                id: 'create-analytics-report',
+                group: 'Create',
+                label: 'Build a report',
+                hint: 'Save an analytics view to re-run, export or email.',
+                keywords: 'new report analytics saved export schedule',
+                icon: Plus,
+                run: visit(createAnalyticsReport()),
+            });
+        }
+
         if (isBilling) {
             list.push({
                 id: 'create-client',
@@ -209,7 +229,13 @@ function useCommands(close: () => void): Command[] {
         });
 
         return list;
-    }, [auth.user.role, close, resolvedAppearance, updateAppearance]);
+    }, [
+        auth.user.role,
+        auth.can?.viewAnalytics,
+        close,
+        resolvedAppearance,
+        updateAppearance,
+    ]);
 }
 
 function CommandPalette({

@@ -16,6 +16,7 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { Chapter } from '@/lib/chapters';
 import { chapters, platformChapters } from '@/lib/chapters';
 import { calendar, dashboard, needsAttention } from '@/routes';
+import { index as analyticsIndex } from '@/routes/analytics';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
@@ -155,6 +156,10 @@ function studioGroups(
                 navItem(chapters.clients, clientsIndex()),
                 ...(canViewLedger
                     ? [navItem(chapters.invoices, invoicesIndex())]
+                    : []),
+                // Phase 17 — `OrganizationPolicy::viewAnalytics`, shared as `auth.can`.
+                ...(auth.can?.viewAnalytics
+                    ? [navItem(chapters.analytics, analyticsIndex())]
                     : []),
             ],
         },

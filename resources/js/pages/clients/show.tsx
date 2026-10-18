@@ -10,6 +10,7 @@ import {
     Instagram,
     Languages,
     Lightbulb,
+    LineChart as LineChartIcon,
     Link2,
     Linkedin,
     Loader2,
@@ -63,7 +64,12 @@ import {
     totalsByCurrency,
 } from '@/lib/currency';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
-import { edit, index, destroy as destroyClient } from '@/routes/clients';
+import {
+    analytics as clientAnalytics,
+    edit,
+    index,
+    destroy as destroyClient,
+} from '@/routes/clients';
 import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
 import {
     destroy as destroySocialAccount,
@@ -317,7 +323,10 @@ export default function ClientShow({
         }[];
     };
 }) {
-    const { currency } = usePage<{ currency: string }>().props;
+    const { currency, auth } = usePage<{
+        currency: string;
+        auth: { can?: { viewAnalytics?: boolean } };
+    }>().props;
     const [activeTab, setActiveTab] = useState('social-accounts');
     const [assetSource, setAssetSource] = useState<'upload' | 'figma' | 'url'>(
         'upload',
@@ -994,6 +1003,16 @@ export default function ClientShow({
                             <FileImage />
                             Assets
                         </TabsTrigger>
+                        {/* Step 17.5 — the client's analytics is its own page, opened from the tab row. */}
+                        {auth.can?.viewAnalytics && (
+                            <Link
+                                href={clientAnalytics(client.id)}
+                                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/40 inline-flex h-[calc(100%-1px)] min-h-8 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] [&_svg]:size-4 [&_svg]:shrink-0"
+                            >
+                                <LineChartIcon />
+                                Analytics
+                            </Link>
+                        )}
 
                         {(can.viewBilling || can.viewInvitations) && (
                             <span

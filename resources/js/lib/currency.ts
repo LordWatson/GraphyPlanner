@@ -31,6 +31,9 @@ export function formatCurrencyCompact(
         style: 'currency',
         currency,
         notation: 'compact',
+        // Both bounds explicit: a currency's default minimum (2) above this maximum is resolved
+        // differently by Node's ICU (SSR) and browsers ("$0.0" vs "$0"), breaking hydration.
+        minimumFractionDigits: 0,
         maximumFractionDigits: 1,
     }).format(numericAmount);
 }

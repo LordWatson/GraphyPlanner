@@ -163,10 +163,7 @@ export default function EditReport({
                         eyebrow="02"
                         title="What it covers"
                         icon={SlidersHorizontal}
-                        description={describeRange({
-                            ...form.data.filters,
-                            granularity: defaults.filters.granularity,
-                        })}
+                        description={describeRange(form.data.filters)}
                     >
                         <AnalyticsFilterBar
                             value={form.data.filters}

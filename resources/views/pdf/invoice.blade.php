@@ -53,22 +53,9 @@
     $hasItems = $items->isNotEmpty();
     $index = 0;
 
-    // Master Alima artwork (public/brand) — never redrawn. Cream mark on a Deep Teal tile, 22.5% radius.
-    $mark = (string) file_get_contents(public_path('brand/alima_mark_cream.svg'));
-    preg_match('/viewBox="([^"]+)"/', $mark, $markBox);
-    preg_match_all('/ d="([^"]+)"/', $mark, $markPaths);
-    [, , $markW, $markH] = array_map('floatval', explode(' ', $markBox[1]));
-    $markScale = 28 / $markW; // mark at 70% of the 40px tile
-    $logo = 'data:image/svg+xml;base64,'.base64_encode(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">'
-        .'<rect width="40" height="40" rx="9" fill="#205557"/>'
-        .'<g fill="#F5F2E8" transform="translate(6 '.round((40 - $markH * $markScale) / 2, 2).') scale('.round($markScale, 5).')">'
-        .implode('', array_map(fn (string $d) => '<path d="'.$d.'"/>', $markPaths[1]))
-        .'</g></svg>'
-    );
-    $wordmark = 'data:image/svg+xml;base64,'.base64_encode((string) file_get_contents(public_path('brand/alima_logo_teal.svg')));
-
-    $font = fn (string $file) => str_replace('\\', '/', $fontDir.'/'.$file);
+    // Master Alima artwork (public/brand) — never redrawn. Shared with the analytics report PDF.
+    $logo = \App\Support\Pdf\PdfBrand::markTile();
+    $wordmark = \App\Support\Pdf\PdfBrand::wordmark();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -76,10 +63,7 @@
     <meta charset="utf-8">
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
-        @font-face { font-family: 'Poppins'; font-weight: normal; font-style: normal; src: url('{{ $font('Poppins-Regular.ttf') }}') format('truetype'); }
-        @font-face { font-family: 'Poppins'; font-weight: bold; font-style: normal; src: url('{{ $font('Poppins-SemiBold.ttf') }}') format('truetype'); }
-        @font-face { font-family: 'DM Mono'; font-weight: normal; font-style: normal; src: url('{{ $font('DMMono-Regular.ttf') }}') format('truetype'); }
-        @font-face { font-family: 'DM Mono'; font-weight: bold; font-style: normal; src: url('{{ $font('DMMono-Medium.ttf') }}') format('truetype'); }
+        @include('pdf.partials.brand-fonts')
 
         /* Top/bottom margins keep continuation pages off the edges; the header band pulls itself
            back up into the first page's top margin. */

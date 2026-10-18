@@ -1,14 +1,11 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
+import { RangePicker } from '@/components/analytics/filter-controls';
+import { OrganizationAnalyticsView } from '@/components/analytics/organization-analytics-view';
+import type { OrgSummary } from '@/components/analytics/types';
+import { orgFilterQuery } from '@/components/analytics/types';
 import { Page, PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
-import type { FilterState } from '@/components/super-admin/analytics-filter-bar';
-import {
-    AnalyticsFilterBar,
-    filterQuery,
-} from '@/components/super-admin/analytics-filter-bar';
-import { PlatformAnalyticsView } from '@/components/super-admin/platform-analytics-view';
-import type { PlatformSummary } from '@/components/super-admin/types';
 import { Button } from '@/components/ui/button';
 import { formatDateRange } from '@/lib/dates';
 import {
@@ -18,8 +15,9 @@ import {
 } from '@/routes/super-admin/organizations';
 
 /**
- * Step 15.4 — the per-org drill-down: the platform analytics scoped to one organization, for
- * support and sales conversations.
+ * Step 15.4 / 17.9 — the per-org drill-down. It renders the organization's own analytics (every
+ * section, in the org's timezone), so support and sales see exactly what the customer's Owner
+ * sees on their 06 Analytics page.
  */
 export default function OrganizationAnalytics({
     organization,
@@ -31,40 +29,20 @@ export default function OrganizationAnalytics({
         is_suspended: boolean;
         is_preview: boolean;
     };
-    summary: PlatformSummary;
+    summary: OrgSummary;
 }) {
-    const state: FilterState = {
-        range: summary.filters.range,
-        from: summary.filters.from,
-        to: summary.filters.to,
-        org_ids: [],
-        metrics: summary.filters.metrics,
-    };
-
-    const apply = (next: FilterState) =>
-        router.get(
-            organizationAnalytics.url(organization.id, {
-                query: filterQuery({ ...next, org_ids: [] }),
-            }),
-            undefined,
-            { preserveState: true, preserveScroll: true, replace: true },
-        );
-
     return (
         <>
             <Head title={`${organization.name} analytics`} />
             <Page>
                 <PageHeader
-                    eyebrow={formatDateRange(
-                        summary.filters.from,
-                        summary.filters.to,
-                    )}
+                    eyebrow={`${formatDateRange(summary.filters.from, summary.filters.to)} · ${summary.filters.timezone}`}
                     title={
                         <>
                             {organization.name}, in <em>numbers</em>.
                         </>
                     }
-                    description="The same figures as platform analytics, for this organization alone."
+                    description="The organization's own analytics — exactly what its Owner sees, in their timezone."
                     meta={
                         organization.is_suspended ? (
                             <StatusPill kind="organization" value="suspended" />
@@ -82,9 +60,28 @@ export default function OrganizationAnalytics({
                     }
                 />
 
-                <AnalyticsFilterBar value={state} onChange={apply} />
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <RangePicker
+                        range={summary.filters.range}
+                        from={summary.filters.from}
+                        to={summary.filters.to}
+                        onChange={(range) =>
+                            router.get(
+                                organizationAnalytics.url(organization.id, {
+                                    query: orgFilterQuery(range),
+                                }),
+                                undefined,
+                                {
+                                    preserveState: true,
+                                    preserveScroll: true,
+                                    replace: true,
+                                },
+                            )
+                        }
+                    />
+                </div>
 
-                <PlatformAnalyticsView summary={summary} scope="organization" />
+                <OrganizationAnalyticsView summary={summary} links={false} />
             </Page>
         </>
     );

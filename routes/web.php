@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiImageController;
+use App\Http\Controllers\Analytics\AnalyticsController as OrganizationAnalyticsController;
+use App\Http\Controllers\Analytics\ReportController as OrganizationReportController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
@@ -259,6 +261,18 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
         ->name('invitations.destroy');
 
+    // Phase 17: chapter 06 Analytics — every staff role (sections gated per role inside, see
+    // `AnalyticsAccess`); client reviewers get a 403 from `OrganizationAnalyticsFilterRequest`.
+    Route::get('analytics', [OrganizationAnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->name('analytics.export');
+    Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->name('analytics.pdf');
+    Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
+    Route::resource('analytics/reports', OrganizationReportController::class)
+        ->names('analytics.reports')
+        ->parameters(['reports' => 'report']);
+    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->name('analytics.reports.export');
+    Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->name('analytics.reports.pdf');
+
     // The Staff module (Owner-only, see StaffPolicy): a real CRUD resource over the org's
     // `User` records, alongside the invitation flow that creates them.
     Route::resource('staff', StaffController::class)->only(['index', 'show', 'edit', 'update', 'destroy']);
@@ -412,6 +426,15 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('clients.invitations.store');
     Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
         ->name('invitations.destroy');
+    // Phase 17: read-only analytics mirror (exports included — they're GETs).
+    Route::get('analytics', [OrganizationAnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->name('analytics.export');
+    Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->name('analytics.pdf');
+    Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
+    Route::get('analytics/reports', [OrganizationReportController::class, 'index'])->name('analytics.reports.index');
+    Route::get('analytics/reports/{report}', [OrganizationReportController::class, 'show'])->name('analytics.reports.show');
+    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->name('analytics.reports.export');
+    Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->name('analytics.reports.pdf');
 });
 
 require __DIR__.'/settings.php';

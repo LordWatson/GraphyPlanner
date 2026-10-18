@@ -26,3 +26,8 @@ Schedule::command('ai:generate-daily-briefs')->dailyAt('06:00');
 // Step 16.13: deletes files of AI Image Studio variants discarded or never selected after
 // `ai.images.prune_after_days` (30 by default). Images attached to a post are always kept.
 Schedule::command('ai-images:prune')->dailyAt('03:30');
+
+// Step 17.8: emails saved organization reports on their weekly (Monday) / monthly (1st) schedule,
+// at most once per period per report, skipping suspended orgs — see
+// SendScheduledOrganizationReportsAction.
+Schedule::command('analytics:send-scheduled-reports')->dailyAt('07:00');

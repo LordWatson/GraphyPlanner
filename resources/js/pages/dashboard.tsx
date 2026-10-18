@@ -36,6 +36,7 @@ import {
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { calendar, dashboard, needsAttention } from '@/routes';
+import { index as analyticsIndex } from '@/routes/analytics';
 import { index as clientsIndex, show as showClient } from '@/routes/clients';
 import { edit as editPost } from '@/routes/posts';
 import type { Auth } from '@/types';
@@ -185,6 +186,8 @@ export default function Dashboard({
 }: DashboardProps) {
     const { currency, auth } = usePage<{ currency: string; auth: Auth }>()
         .props;
+    // Phase 17: the Overview's charts hand off to chapter 06 with that section pre-selected.
+    const canViewAnalytics = auth.can?.viewAnalytics === true;
     const firstName = auth.user.name.split(' ')[0];
 
     const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -570,6 +573,9 @@ export default function Dashboard({
                                     className="border-0"
                                 />
                             )}
+                            {canViewAnalytics && (
+                                <FullAnalyticsLink section="revenue" />
+                            )}
                         </Panel>
                     )}
 
@@ -773,6 +779,9 @@ export default function Dashboard({
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
+                                {canViewAnalytics && (
+                                    <FullAnalyticsLink section="posts" />
+                                )}
                             </Panel>
                         )}
 
@@ -830,3 +839,17 @@ Dashboard.layout = {
         },
     ],
 };
+
+/** "See full analytics" — opens 06 Analytics with the matching section pre-selected. */
+function FullAnalyticsLink({ section }: { section: 'posts' | 'revenue' }) {
+    return (
+        <div className="border-border/70 mt-4 flex justify-end border-t pt-3">
+            <Button variant="link" size="sm" className="h-auto px-0" asChild>
+                <Link href={analyticsIndex({ query: { metrics: [section] } })}>
+                    See full analytics
+                    <ArrowRight />
+                </Link>
+            </Button>
+        </div>
+    );
+}
