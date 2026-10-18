@@ -11,6 +11,10 @@ use App\Models\AiPostIdea;
 use App\Models\AiTrend;
 use App\Models\Asset;
 use App\Models\Campaign;
+use App\Models\CampaignDeliverable;
+use App\Models\CampaignPhase;
+use App\Models\CampaignShareLink;
+use App\Models\CampaignTemplate;
 use App\Models\Client;
 use App\Models\ClientInvitation;
 use App\Models\Invoice;
@@ -165,6 +169,7 @@ class CrossTenantRouteTest extends TestCase
         $generation = AiImageGeneration::factory()->create(['org_id' => $org->id, 'client_id' => $client->id]);
         $trend = AiTrend::create(['org_id' => $org->id, 'client_id' => $client->id, 'title' => 'Trend', 'summary' => 'Summary', 'platforms' => ['instagram'], 'confidence' => 0.5]);
         $idea = AiPostIdea::create(['org_id' => $org->id, 'client_id' => $client->id, 'title' => 'Idea', 'description' => 'Description', 'platforms' => ['instagram']]);
+        $campaign = Campaign::factory()->for($client)->create(['org_id' => $org->id]);
 
         return [
             Organization::class => $org,
@@ -172,7 +177,11 @@ class CrossTenantRouteTest extends TestCase
             Client::class => $client,
             Post::class => $post,
             PostActivityLog::class => PostActivityLog::factory()->create(['post_id' => $post->id, 'to_status' => PostStatus::WaitingClient]),
-            Campaign::class => Campaign::factory()->for($client)->create(['org_id' => $org->id]),
+            Campaign::class => $campaign,
+            CampaignPhase::class => CampaignPhase::factory()->create(['campaign_id' => $campaign->id]),
+            CampaignDeliverable::class => CampaignDeliverable::factory()->create(['campaign_id' => $campaign->id]),
+            CampaignShareLink::class => CampaignShareLink::query()->create(['campaign_id' => $campaign->id, 'token_hash' => hash('sha256', 'foreign'), 'expires_at' => now()->addDay()]),
+            CampaignTemplate::class => CampaignTemplate::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'name' => 'Their template', 'duration_days' => 14, 'phases' => [], 'deliverables' => []]),
             Asset::class => Asset::factory()->for($client)->create(['org_id' => $org->id]),
             SocialAccount::class => SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]),
             Invoice::class => $invoice,

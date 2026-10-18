@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Models\CampaignDeliverable;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use Illuminate\Support\Carbon;
@@ -33,6 +34,15 @@ class UpdatePostAction
     ): Post {
         return DB::transaction(function () use ($post, $data, $evaluateChecklist, $transition) {
             $post->update(array_diff_key($data, ['targets' => null, 'asset_ids' => null]));
+
+            // Campaigns enhancement C-3.2: a post that leaves its campaign frees the planned slot
+            // it was started from, so that slot reads "Not started" again.
+            if ($post->wasChanged('campaign_id')) {
+                CampaignDeliverable::query()
+                    ->where('post_id', $post->id)
+                    ->where('campaign_id', '!=', $post->campaign_id ?? 0)
+                    ->update(['post_id' => null]);
+            }
 
             if (array_key_exists('targets', $data)) {
                 $post->targets()->delete();

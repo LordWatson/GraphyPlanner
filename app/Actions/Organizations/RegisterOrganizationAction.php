@@ -2,6 +2,7 @@
 
 namespace App\Actions\Organizations;
 
+use App\Actions\Campaigns\SeedStarterCampaignTemplatesAction;
 use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Organization;
@@ -56,6 +57,9 @@ class RegisterOrganizationAction
             if (! $selfServe) {
                 $owner->markEmailAsVerified();
             }
+
+            // Campaigns enhancement C-3.4: three starter templates to begin with.
+            (new SeedStarterCampaignTemplatesAction)($organization);
 
             return $owner;
         });

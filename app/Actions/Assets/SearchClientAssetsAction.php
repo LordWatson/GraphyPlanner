@@ -18,12 +18,14 @@ class SearchClientAssetsAction
      *
      * @return LengthAwarePaginator<int, Asset>
      */
-    public function __invoke(Client $client, ?string $search = null, ?AssetType $type = null, int $page = 1): LengthAwarePaginator
+    public function __invoke(Client $client, ?string $search = null, ?AssetType $type = null, int $page = 1, ?int $campaignId = null): LengthAwarePaginator
     {
         $search = trim((string) $search);
 
         return $client->assets()
             ->with('campaign:id,name')
+            // Step C-4.1: one campaign's asset kit (the client relation keeps it to this client).
+            ->when($campaignId !== null, fn ($query) => $query->where('campaign_id', $campaignId))
             ->when($search !== '', function ($query) use ($search) {
                 // Treat the user's input literally: `%` / `_` are not wildcards here.
                 $escaped = addcslashes($search, '\\%_');

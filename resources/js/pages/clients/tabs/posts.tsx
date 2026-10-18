@@ -1,3 +1,5 @@
+import { CampaignChip } from '@/components/campaigns/campaign-chip';
+import type { CampaignChipData } from '@/components/campaigns/types';
 import { Link, router } from '@inertiajs/react';
 import { Pencil, Plus, Send, Share2 } from 'lucide-react';
 import type { PostTargetAccount } from '@/components/posts/new-post-dialog';
@@ -40,6 +42,7 @@ type PostData = {
     id: number;
     campaign_id: number | null;
     campaign_name: string | null;
+    campaign: CampaignChipData | null;
     status: string;
     approval_mode: string;
     master_caption: string | null;
@@ -204,10 +207,10 @@ export default function ClientPostsTab({
                                                     kind="post"
                                                     value={post.status}
                                                 />
-                                                {post.campaign_name && (
-                                                    <span className="text-muted-foreground text-xs">
-                                                        {post.campaign_name}
-                                                    </span>
+                                                {post.campaign && (
+                                                    <CampaignChip
+                                                        campaign={post.campaign}
+                                                    />
                                                 )}
                                             </div>
                                             <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">

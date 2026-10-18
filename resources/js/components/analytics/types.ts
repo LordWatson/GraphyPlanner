@@ -171,6 +171,15 @@ export type OrgSummary = {
         overdue_count: number;
         average_days_to_pay: number | null;
         retainers: { monthly: CurrencyTotal[]; clients: number };
+        /** Campaigns enhancement C-8.3: billed lines tagged with a campaign, per currency. */
+        by_campaign: {
+            campaign_id: number;
+            name: string;
+            code: string | null;
+            colour: string | null;
+            currency: string;
+            total: number;
+        }[];
     } | null;
     ai: {
         generated: number;

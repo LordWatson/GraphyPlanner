@@ -18,6 +18,7 @@ use App\Models\PostComment;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Database\Seeders\Concerns\SeedsCampaignShowcase;
 use Illuminate\Database\Seeder;
 
 /**
@@ -28,6 +29,8 @@ use Illuminate\Database\Seeder;
  */
 class DemoContentSeeder extends Seeder
 {
+    use SeedsCampaignShowcase;
+
     public function run(): void
     {
         $owner = User::firstWhere('email', 'test@example.com');
@@ -64,6 +67,9 @@ class DemoContentSeeder extends Seeder
                 ]
             );
         });
+
+        // Campaigns enhancement C-9.1: the full campaign story (brief, phases, plan, results).
+        $this->seedCampaignShowcase($client, $owner, $socialAccounts, $client->name);
 
         $campaigns = collect([
             ['name' => 'Spring Refresh', 'status' => CampaignStatus::Completed, 'offsetStart' => -8, 'offsetEnd' => -4],

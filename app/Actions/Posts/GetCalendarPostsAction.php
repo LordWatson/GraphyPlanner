@@ -34,7 +34,7 @@ class GetCalendarPostsAction
             ->whereHas('targets', fn ($target) => $target->whereBetween(CalendarWindow::TARGET_DATE_COLUMN, $window->targetDateRange()))
             ->with([
                 'client:id,name',
-                'campaign:id,name',
+                'campaign:id,name,code,colour',
                 'targets' => fn ($target) => $target
                     ->whereBetween(CalendarWindow::TARGET_DATE_COLUMN, $window->targetDateRange())
                     ->select(['id', 'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc'])

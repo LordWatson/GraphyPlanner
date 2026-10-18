@@ -4,19 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Actions\Clients\BuildClientPageHeaderAction;
 use App\Actions\Posts\ListClientPostsAction;
+use App\Contracts\CampaignFeatures;
+use App\Enums\CampaignFeature;
 use App\Enums\PostStatus;
 use App\Http\Requests\ClientBillingTabRequest;
 use App\Http\Requests\ClientPostsTabRequest;
 use App\Models\Asset;
 use App\Models\Campaign;
+use App\Models\CampaignTemplate;
 use App\Models\Client;
 use App\Models\ClientInvitation;
 use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
+use App\Services\CampaignHealthService;
 use App\Services\InvoiceLedgerService;
+use App\Support\Campaigns\CampaignClock;
+use App\Support\Campaigns\CampaignPresenter;
 use App\Support\Clients\ClientTabPresenter;
 use App\Support\Options\CurrencyOptions;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -32,7 +39,11 @@ class ClientTabController extends Controller
 
     public const INVOICES_PER_PAGE = 8;
 
-    public function __construct(private readonly BuildClientPageHeaderAction $header) {}
+    public function __construct(
+        private readonly BuildClientPageHeaderAction $header,
+        private readonly CampaignHealthService $health,
+        private readonly CampaignFeatures $features,
+    ) {}
 
     /**
      * Posts are filtered (caption search, status, campaign, channel) and paged in SQL.
@@ -79,13 +90,36 @@ class ClientTabController extends Controller
         $this->authorize('viewAny', [Campaign::class, $client]);
         $user = $request->user();
 
+        $today = CampaignClock::today($user->organization);
+        $page = $client->campaigns()
+            ->with(['owner:id,name', 'client:id,name'])
+            ->orderByRaw("status = 'archived'")
+            ->orderByRaw('start_date is null')
+            ->orderByDesc('start_date')
+            ->latest('id')
+            ->paginate(self::PER_PAGE);
+        $health = $this->health->computeMany(new EloquentCollection($page->items()), $today);
+
         return Inertia::render('clients/tabs/campaigns', [
             ...($this->header)($client, $user, 'campaigns'),
-            'campaigns' => $client->campaigns()
-                ->latest()
-                ->latest('id')
-                ->paginate(self::PER_PAGE)
-                ->through(fn (Campaign $campaign) => ClientTabPresenter::campaign($campaign, $user)),
+            // Campaigns enhancement: the same presenter as the hub, plus derived health per row.
+            'campaigns' => $page->through(fn (Campaign $campaign) => CampaignPresenter::forStaff($campaign, $user, $today, [
+                'health' => isset($health[$campaign->id]) ? $health[$campaign->id]->toArray() : null,
+                'can' => ['update' => $user->can('update', $campaign), 'delete' => $user->can('delete', $campaign)],
+            ], withBilling: false)),
+            'formOptions' => CampaignController::formOptions($client->org_id),
+            // C-9.3: a client's first campaign is offered a template start, once (empty tab only).
+            'starterTemplates' => $page->total() === 0 && $user->can('create', [Campaign::class, $client]) && $this->features->enabled($user->organization, CampaignFeature::Templates)
+                ? CampaignTemplate::query()
+                    ->where('org_id', $client->org_id)
+                    ->orderByDesc('is_starter')
+                    ->orderBy('name')
+                    ->limit(3)
+                    ->get()
+                    ->map(fn (CampaignTemplate $template) => CampaignPresenter::templateSummary($template))
+                    ->all()
+                : [],
+            'platformOptions' => CampaignPresenter::platformOptions(),
         ]);
     }
 

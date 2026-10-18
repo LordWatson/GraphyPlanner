@@ -1,6 +1,13 @@
 import { router, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
-import { CornerDownLeft, Moon, Plus, Search, Sun } from 'lucide-react';
+import {
+    CornerDownLeft,
+    Megaphone,
+    Moon,
+    Plus,
+    Search,
+    Sun,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
     createContext,
@@ -27,6 +34,7 @@ import {
     index as clientsIndex,
 } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
+import { index as campaignsIndex } from '@/routes/campaigns';
 import { create as createAnalyticsReport } from '@/routes/analytics/reports';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
@@ -132,6 +140,16 @@ function useCommands(close: () => void): Command[] {
             chapterCommand(chapters.attention, needsAttention()),
             chapterCommand(chapters.calendar, calendar()),
             chapterCommand(chapters.clients, clientsIndex()),
+            {
+                id: 'section-campaigns',
+                group: 'Chapters',
+                label: 'Campaigns',
+                hint: 'Every campaign, in one place.',
+                keywords: 'launch brief plan board',
+                icon: Megaphone,
+                chapter: chapters.clients,
+                run: visit(campaignsIndex()),
+            },
             ...(isBilling
                 ? [chapterCommand(chapters.invoices, invoicesIndex())]
                 : []),

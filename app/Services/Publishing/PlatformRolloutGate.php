@@ -43,4 +43,19 @@ class PlatformRolloutGate
     {
         return (bool) config("publishing.rollout.{$stage->value}", false);
     }
+
+    /**
+     * Campaigns enhancement C-3.3: whether the org can publish to a platform at all (any of its
+     * stages enabled), so the AI planner never suggests work for a platform that can't go out.
+     */
+    public function platformEnabled(Platform $platform): bool
+    {
+        return match ($platform) {
+            Platform::Instagram => $this->stageEnabled(PlatformRolloutStage::InstagramFeed)
+                || $this->stageEnabled(PlatformRolloutStage::InstagramReels),
+            Platform::TikTok => $this->stageEnabled(PlatformRolloutStage::TikTok),
+            Platform::Facebook => $this->stageEnabled(PlatformRolloutStage::Facebook),
+            Platform::LinkedIn => $this->stageEnabled(PlatformRolloutStage::LinkedIn),
+        };
+    }
 }

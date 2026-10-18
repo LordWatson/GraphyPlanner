@@ -1,171 +1,118 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
-import InputError from '@/components/input-error';
+import {
+    CampaignCoreFields,
+    CampaignSettingsFields,
+    NONE,
+    toPayload,
+} from '@/components/campaigns/campaign-form-fields';
+import type {
+    CampaignFormData,
+    CampaignFormOptions,
+} from '@/components/campaigns/campaign-form-fields';
+import type { StaffCampaign } from '@/components/campaigns/types';
+import { Page, PageHeader, Panel } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { index as indexClients } from '@/routes/clients';
-import {
+    index as campaignsIndex,
     show as showCampaign,
     update as updateCampaign,
 } from '@/routes/campaigns';
-import { PageHeader } from '@/components/page';
 
-type CampaignData = {
-    id: number;
-    name: string;
-    status: string;
-    status_label: string;
-    start_date: string | null;
-    end_date: string | null;
-    goal: string | null;
-    notes: string | null;
-};
-
-type StatusOption = { value: string; label: string };
-
+/**
+ * Campaign settings (Steps C-0.2, C-4.2 defaults, C-8.1 billing). Status is not edited here — it
+ * moves through the workspace header's actions so every change is checked and logged.
+ */
 export default function CampaignEdit({
     campaign,
-    client,
-    statuses,
+    options,
 }: {
-    campaign: CampaignData;
-    client: { id: number; name: string };
-    statuses: StatusOption[];
+    campaign: StaffCampaign;
+    options: CampaignFormOptions;
 }) {
+    const form = useForm<CampaignFormData>({
+        name: campaign.name,
+        code: campaign.code ?? '',
+        owner_id: campaign.owner ? String(campaign.owner.id) : NONE,
+        objective: campaign.objective ?? NONE,
+        colour: campaign.colour ?? '',
+        platforms: campaign.platforms,
+        start_date: campaign.start_date ?? '',
+        end_date: campaign.end_date ?? '',
+        goal: campaign.goal ?? '',
+        notes: campaign.notes ?? '',
+        hashtags: campaign.hashtags,
+        default_link_url: campaign.default_link_url ?? '',
+        utm_campaign: campaign.utm_campaign ?? '',
+        billing_type: campaign.billing?.billing_type ?? NONE,
+        fee_amount: campaign.billing?.fee_amount ?? '',
+    });
+    const canBill = campaign.billing !== null;
+
+    const submit = (event: React.FormEvent) => {
+        event.preventDefault();
+        form.transform((data) => {
+            const payload = toPayload(data);
+
+            if (!canBill) {
+                delete payload.billing_type;
+                delete payload.fee_amount;
+            }
+
+            return payload;
+        });
+        form.put(updateCampaign.url(campaign.id));
+    };
+
     return (
         <>
-            <Head title={`Edit ${campaign.name} — ${client.name}`} />
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 md:px-8 md:py-9">
-                <div className="flex flex-col gap-4">
-                    <Link
-                        href={showCampaign(campaign.id)}
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-                    >
-                        <ArrowLeft className="size-4" />
-                        Back to {campaign.name}
-                    </Link>
-                </div>
-
+            <Head title={`Edit ${campaign.name}`} />
+            <Page width="narrow">
+                <Link
+                    href={showCampaign(campaign.id)}
+                    className="text-muted-foreground hover:text-foreground -mb-4 inline-flex items-center gap-1.5 self-start text-sm"
+                >
+                    <ArrowLeft className="size-4" />
+                    Back to {campaign.name}
+                </Link>
                 <PageHeader
-                    title="Edit campaign"
-                    description={
+                    eyebrow={`Campaign — ${campaign.client.name}`}
+                    title={
                         <>
-                            {campaign.name} — {client.name}
+                            Campaign <em>details</em>.
                         </>
                     }
+                    description="Who owns it, when it runs, and the defaults every post in it gets."
                 />
 
-                <Form
-                    {...updateCampaign.form(campaign.id)}
-                    className="border-border bg-card grid gap-4 rounded-2xl border p-4 shadow-sm"
-                >
-                    {({ processing, errors }) => (
-                        <>
-                            <div className="grid gap-1">
-                                <Label htmlFor="name">Name</Label>
-                                <Input
-                                    id="name"
-                                    name="name"
-                                    defaultValue={campaign.name}
-                                    required
-                                />
-                                <InputError message={errors.name} />
-                            </div>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                <div className="grid gap-1">
-                                    <Label htmlFor="status">Status</Label>
-                                    <Select
-                                        name="status"
-                                        defaultValue={campaign.status}
-                                    >
-                                        <SelectTrigger
-                                            id="status"
-                                            className="w-full"
-                                        >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {statuses.map((status) => (
-                                                <SelectItem
-                                                    key={status.value}
-                                                    value={status.value}
-                                                >
-                                                    {status.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={errors.status} />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="start_date">
-                                        Start date
-                                    </Label>
-                                    <Input
-                                        id="start_date"
-                                        name="start_date"
-                                        type="date"
-                                        defaultValue={campaign.start_date ?? ''}
-                                    />
-                                    <InputError message={errors.start_date} />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="end_date">End date</Label>
-                                    <Input
-                                        id="end_date"
-                                        name="end_date"
-                                        type="date"
-                                        defaultValue={campaign.end_date ?? ''}
-                                    />
-                                    <InputError message={errors.end_date} />
-                                </div>
-                            </div>
-                            <div className="grid gap-1">
-                                <Label htmlFor="goal">Goal</Label>
-                                <textarea
-                                    id="goal"
-                                    name="goal"
-                                    rows={4}
-                                    defaultValue={campaign.goal ?? ''}
-                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-                                />
-                                <InputError message={errors.goal} />
-                            </div>
-                            <div className="grid gap-1">
-                                <Label htmlFor="notes">Notes</Label>
-                                <textarea
-                                    id="notes"
-                                    name="notes"
-                                    rows={4}
-                                    defaultValue={campaign.notes ?? ''}
-                                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-                                />
-                                <InputError message={errors.notes} />
-                            </div>
-                            <div>
-                                <Button type="submit" disabled={processing}>
-                                    Save changes
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </Form>
-            </div>
+                <form onSubmit={submit} className="flex flex-col gap-5">
+                    <Panel eyebrow="A — The basics" title="What and when">
+                        <CampaignCoreFields form={form} options={options} />
+                    </Panel>
+                    <Panel
+                        eyebrow="B — Defaults & notes"
+                        title="What every post gets"
+                    >
+                        <CampaignSettingsFields
+                            form={form}
+                            options={options}
+                            canBill={canBill}
+                        />
+                    </Panel>
+                    <div className="flex items-center justify-end gap-2">
+                        <Button asChild variant="ghost">
+                            <Link href={showCampaign(campaign.id)}>Cancel</Link>
+                        </Button>
+                        <Button type="submit" disabled={form.processing}>
+                            Save changes
+                        </Button>
+                    </div>
+                </form>
+            </Page>
         </>
     );
 }
 
 CampaignEdit.layout = {
-    breadcrumbs: [
-        { title: 'Clients', href: indexClients() },
-        { title: 'Edit campaign', href: indexClients() },
-    ],
+    breadcrumbs: [{ title: 'Campaigns', href: campaignsIndex() }],
 };

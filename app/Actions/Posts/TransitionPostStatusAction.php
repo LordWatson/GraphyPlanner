@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Campaigns\MarkCampaignWentLiveAction;
 use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
@@ -99,7 +100,9 @@ class TransitionPostStatusAction
                 ]);
             }
 
-            if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true)) {
+            // Unscheduling (scheduled → approved, C-6.1) keeps the existing approval; it isn't a
+            // new decision, so no approval row.
+            if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true) && $from !== PostStatus::Scheduled) {
                 $locked->approvals()->create([
                     'user_id' => $user?->id,
                     'decision' => $to === PostStatus::Approved
@@ -143,6 +146,11 @@ class TransitionPostStatusAction
                 }
 
                 $this->notify($locked, $to, $user, $notifications);
+
+                // Campaigns enhancement C-6.3: the campaign's first post out marks it live.
+                if (in_array($to, [PostStatus::Published, PostStatus::PartiallyPublished], true) && $locked->campaign_id !== null) {
+                    app(MarkCampaignWentLiveAction::class)($locked);
+                }
             });
 
             return $locked;

@@ -25,4 +25,12 @@ class CommentMentionParser
             ->values()
             ->all();
     }
+
+    /**
+     * The body as a reader sees it: `@[Name](id)` tokens become `@Name` (notification previews).
+     */
+    public static function toPlainText(string $body): string
+    {
+        return (string) preg_replace('/@\[([^\]]+)\]\(\d+\)/', '@$1', $body);
+    }
 }

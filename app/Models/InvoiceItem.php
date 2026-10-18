@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property int $invoice_id
  * @property int $org_id
  * @property int|null $post_id
+ * @property int|null $campaign_id
  * @property string $description
  * @property bool $is_billable
  * @property string|null $price
@@ -25,7 +26,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'invoice_id', 'org_id', 'post_id', 'description', 'is_billable', 'price', 'quantity', 'sort_order',
+    'invoice_id', 'org_id', 'post_id', 'campaign_id', 'description', 'is_billable', 'price', 'quantity', 'sort_order',
 ])]
 class InvoiceItem extends Model
 {

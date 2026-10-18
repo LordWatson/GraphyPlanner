@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $upload_post_webhook_secret
  * @property string|null $xai_key
  * @property int|null $ai_monthly_image_quota
+ * @property array<string, bool>|null $campaign_features
  * @property Carbon|null $suspended_at
  * @property string|null $suspension_reason
  * @property int|null $suspended_by
@@ -35,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota'])]
+#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -62,6 +63,7 @@ class Organization extends Model
             'invoice_payment_terms_days' => 'integer',
             'ai_monthly_image_quota' => 'integer',
             'suspended_at' => 'datetime',
+            'campaign_features' => 'array',
         ];
     }
 

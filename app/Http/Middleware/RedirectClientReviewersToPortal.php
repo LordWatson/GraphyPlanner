@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\Role;
+use App\Models\Campaign;
 use App\Models\Post;
 use Closure;
 use Illuminate\Http\Request;
@@ -29,8 +30,20 @@ class RedirectClientReviewersToPortal
         return match ($request->route()?->getName()) {
             'calendar' => to_route('portal.calendar', $request->only(['campaign_id', 'status', 'platform'])),
             'posts.edit' => $this->redirectForPost($request->route('post'), $user->client_id),
+            // Step C-1.1/C-1.2: the campaigns hub and workspace have portal counterparts.
+            'campaigns.index', 'campaigns.compare' => to_route('portal.campaigns.index'),
+            'campaigns.show' => $this->redirectForCampaign($request->route('campaign'), $user->client_id),
             default => to_route('portal.dashboard'),
         };
+    }
+
+    private function redirectForCampaign(mixed $campaign, ?int $clientId): Response
+    {
+        if ($campaign instanceof Campaign && $campaign->client_id === $clientId) {
+            return to_route('portal.campaigns.show', $campaign);
+        }
+
+        return to_route('portal.campaigns.index');
     }
 
     /**

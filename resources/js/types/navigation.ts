@@ -13,4 +13,6 @@ export type NavItem = {
     isActive?: boolean;
     /** Chapter number from `lib/chapters.ts`, shown as the mono index in the sidebar. */
     number?: string;
+    /** Sections inside the chapter (e.g. 04 Clients → Campaigns), indented under it. */
+    subItems?: NavItem[];
 };

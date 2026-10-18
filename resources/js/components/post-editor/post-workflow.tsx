@@ -218,7 +218,7 @@ function TransitionDialog({
 }) {
     const blockedBy =
         action?.to === 'scheduled' && !checklist.passed
-            ? checklist.items.filter((item) => !item.passed)
+            ? checklist.items.filter((item) => !item.passed && !item.soft)
             : [];
     const Icon = action?.icon;
 

@@ -36,6 +36,9 @@ class BuildCalendarOccurrencesAction
                     'client_name' => $post->client?->name,
                     'campaign_id' => $post->campaign_id,
                     'campaign_name' => $post->campaign?->name,
+                    // Campaigns enhancement C-1.3: the chip (colour + code).
+                    'campaign_code' => $post->campaign?->code,
+                    'campaign_colour' => $post->campaign?->colour?->value,
                     'status' => $post->status->value,
                     'status_label' => $post->status->label(),
                     'master_caption' => $post->master_caption,

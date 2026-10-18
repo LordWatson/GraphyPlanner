@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Campaigns\GetLiveCampaignsAction;
 use App\Actions\Dashboard\GetClientHealthSummaryAction;
 use App\Actions\Dashboard\GetDashboardNeedsAttentionListAction;
 use App\Actions\Dashboard\GetUnapprovedDraftsAction;
@@ -32,6 +33,7 @@ class DashboardController extends Controller
         GetClientHealthSummaryAction $getClientHealthSummary,
         GetUnapprovedDraftsAction $getUnapprovedDrafts,
         GetPublishReliabilityStatsAction $getPublishReliabilityStats,
+        GetLiveCampaignsAction $getLiveCampaigns,
     ): Response {
         $user = $request->user();
 
@@ -90,6 +92,10 @@ class DashboardController extends Controller
             'unapprovedDraftsList' => $canViewCalendar
                 ? $getUnapprovedDrafts($user)
                 : [],
+            // Campaigns enhancement C-1.4: deferred, so the Overview paints first.
+            'liveCampaigns' => $canViewClients && $user->role !== Role::ClientReviewer
+                ? Inertia::defer(fn () => $getLiveCampaigns($user))
+                : ['items' => [], 'total' => 0],
             'publishReliability' => $canViewCalendar
                 ? $getPublishReliabilityStats($user->org_id)
                 : ['monthly' => [], 'averageAttemptsToSuccess' => null],

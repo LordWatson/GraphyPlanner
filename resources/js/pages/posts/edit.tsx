@@ -17,6 +17,9 @@ import {
     AiCaptionSuggestions,
     type AiCaptionSuggestion,
 } from '@/components/post-editor/ai-caption-suggestions';
+import { CampaignChip } from '@/components/campaigns/campaign-chip';
+import { CampaignField } from '@/components/post-editor/campaign-field';
+import type { CampaignOption } from '@/components/post-editor/campaign-field';
 import { ChannelSchedule } from '@/components/post-editor/channel-schedule';
 import { MediaPicker } from '@/components/post-editor/media-picker';
 import { MusicField } from '@/components/post-editor/music-field';
@@ -42,6 +45,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { cn } from '@/lib/utils';
+import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { update as updatePost } from '@/routes/posts';
@@ -58,6 +62,7 @@ function getXsrfTokenFromCookie(): string {
 }
 
 type EditorState = {
+    campaignId: string;
     caption: string;
     hashtags: string[];
     assetIds: number[];
@@ -69,6 +74,7 @@ type EditorState = {
 
 function initialEditorState(post: PostData): EditorState {
     return {
+        campaignId: post.campaign_id ? String(post.campaign_id) : '',
         caption: post.master_caption ?? '',
         hashtags: post.hashtags ?? [],
         assetIds: post.assets.map((asset) => asset.id),
@@ -231,6 +237,7 @@ export default function PostEdit({
     allowedTransitions,
     can,
     hashtagSuggestions,
+    campaignOptions,
     mentionableUsers,
     ai,
     imageStudio,
@@ -248,6 +255,7 @@ export default function PostEdit({
         create_asset: boolean;
     };
     hashtagSuggestions: string[];
+    campaignOptions: CampaignOption[];
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
     imageStudio?: ImageStudioData | null;
@@ -255,6 +263,7 @@ export default function PostEdit({
     // The page remounts with fresh props after every successful save/transition, so this snapshot
     // is always "what's on the server" — the baseline for unsaved-changes tracking.
     const [initial] = useState(() => initialEditorState(post));
+    const [campaignId, setCampaignId] = useState(initial.campaignId);
     const [caption, setCaption] = useState(initial.caption);
     const [hashtags, setHashtags] = useState(initial.hashtags);
     const [selectedAssetIds, setSelectedAssetIds] = useState(initial.assetIds);
@@ -275,6 +284,7 @@ export default function PostEdit({
     const isDirty =
         can.update &&
         JSON.stringify({
+            campaignId,
             caption,
             hashtags,
             assetIds: selectedAssetIds,
@@ -306,6 +316,7 @@ export default function PostEdit({
     }, [isDirty]);
 
     const discardChanges = () => {
+        setCampaignId(initial.campaignId);
         setCaption(initial.caption);
         setHashtags(initial.hashtags);
         setSelectedAssetIds(initial.assetIds);
@@ -514,6 +525,11 @@ export default function PostEdit({
               selectedAccounts,
               schedule: Object.values(scheduleRows),
               mediaCount: selectedAssetIds.length,
+              hashtags,
+              campaignHashtags:
+                  campaignOptions.find(
+                      (option) => String(option.id) === campaignId,
+                  )?.hashtags ?? [],
           })
         : post.checklist.items;
 
@@ -544,11 +560,7 @@ export default function PostEdit({
                 </div>
 
                 <PageHeader
-                    eyebrow={
-                        post.campaign_name
-                            ? `Post ${post.id} — ${post.campaign_name}`
-                            : `Post ${post.id}`
-                    }
+                    eyebrow={`Post ${post.id}`}
                     title={
                         <>
                             {client.name} <em>post</em>
@@ -561,6 +573,11 @@ export default function PostEdit({
                                 value={post.status}
                                 label={post.status_label}
                             />
+                            {post.campaign && (
+                                <Link href={showCampaign(post.campaign.id)}>
+                                    <CampaignChip campaign={post.campaign} />
+                                </Link>
+                            )}
                             {post.targets.map((target) => {
                                 const Icon = platformIcon(target.platform);
                                 const when = formatLocalSchedule(
@@ -708,6 +725,34 @@ export default function PostEdit({
                                                     />
                                                 ))}
                                             </div>
+
+                                            <CampaignField
+                                                postId={post.id}
+                                                value={campaignId}
+                                                options={campaignOptions}
+                                                caption={caption}
+                                                hashtags={hashtags}
+                                                error={errors.campaign_id}
+                                                onChange={setCampaignId}
+                                                onAddHashtags={(tags) =>
+                                                    setHashtags((current) => [
+                                                        ...current,
+                                                        ...tags,
+                                                    ])
+                                                }
+                                                onAddLink={(link) =>
+                                                    setCaption((current) =>
+                                                        current.trim() === ''
+                                                            ? link
+                                                            : `${current.trimEnd()}\n\n${link}`,
+                                                    )
+                                                }
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="campaign_id"
+                                                value={campaignId}
+                                            />
                                         </Panel>
 
                                         <Panel
@@ -746,6 +791,11 @@ export default function PostEdit({
                                         >
                                             <MediaPicker
                                                 clientId={client.id}
+                                                campaignId={
+                                                    campaignId
+                                                        ? Number(campaignId)
+                                                        : undefined
+                                                }
                                                 selected={selectedAssets}
                                                 onChange={setAttachedAssets}
                                                 canUpload={can.create_asset}

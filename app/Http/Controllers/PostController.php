@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
 use App\Actions\Posts\DeletePostAction;
@@ -13,6 +14,7 @@ use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
 use App\Actions\Publishing\RetryFailedPostTargetsAction;
 use App\Actions\Publishing\SearchMusicAction;
+use App\Enums\CampaignStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
@@ -24,12 +26,14 @@ use App\Http\Requests\TransitionPostRequest;
 use App\Http\Requests\UpdatePostRequest;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
+use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Services\ClientHashtagService;
 use App\Services\PostNotificationService;
 use App\Support\AI\Images\ImageStudioPresenter;
+use App\Support\Campaigns\CampaignPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,6 +65,7 @@ class PostController extends Controller
         PostNotificationService $notifications,
         ImageStudioPresenter $studio,
         ClientHashtagService $hashtags,
+        ApplyCampaignDefaultsAction $defaults,
     ): Response {
         $this->authorize('view', $post);
 
@@ -115,6 +120,9 @@ class PostController extends Controller
                 'create_asset' => $user->can('create', [Asset::class, $client]),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
+            // Campaigns enhancement C-1.3 / C-4.2: the client's open campaigns (plus the post's
+            // own, whatever its status) with what joining each offers the post.
+            'campaignOptions' => $this->campaignOptions($post, $defaults),
             'mentionableUsers' => $mentionableUsers->map(fn ($mentionable) => [
                 'id' => $mentionable->id,
                 'name' => $mentionable->name,
@@ -290,6 +298,31 @@ class PostController extends Controller
     }
 
     /**
+     * Campaigns enhancement C-1.3 / C-4.2 — the campaigns a post can join (the client's open ones,
+     * plus its current campaign), each with its chip and what it offers: its hashtag set and its
+     * default link with UTM parameters for the post's first platform.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function campaignOptions(Post $post, ApplyCampaignDefaultsAction $defaults): array
+    {
+        $platform = $post->targets->first()?->socialAccount?->platform->value;
+
+        return array_values(Campaign::query()
+            ->where('client_id', $post->client_id)
+            ->where(fn ($query) => $query->whereIn('status', CampaignStatus::open())->orWhere('id', $post->campaign_id))
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Campaign $campaign) => [
+                ...CampaignPresenter::chip($campaign),
+                'status' => $campaign->status->value,
+                'hashtags' => $campaign->hashtags ?? [],
+                'link' => $defaults->link($campaign, $platform),
+            ])
+            ->all());
+    }
+
+    /**
      * Build the hashtag autocomplete list (Instagram-style tag picker) shown in the editor: the
      * client's `BrandBrain` `hashtag_policy.always_use` list, then (Step I-2.6) the client's
      * top tags by usage and recency from `client_hashtags`, deduped and capped at 50.
@@ -321,6 +354,7 @@ class PostController extends Controller
             'client_id' => $post->client_id,
             'campaign_id' => $post->campaign_id,
             'campaign_name' => $post->campaign?->name,
+            'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'status' => $post->status->value,
             'status_label' => $post->status->label(),
             'approval_mode' => $post->approval_mode->value,

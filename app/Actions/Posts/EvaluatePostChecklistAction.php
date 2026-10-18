@@ -16,11 +16,11 @@ class EvaluatePostChecklistAction
      * editor obviously needs before a post can go out. See `.junie/modules/posts.md` for the open
      * question and the exact item list.
      *
-     * @return array{items: array<int, array{key: string, label: string, passed: bool}>, passed: bool}
+     * @return array{items: array<int, array{key: string, label: string, passed: bool, soft?: bool}>, passed: bool}
      */
     public function __invoke(Post $post): array
     {
-        $post->loadMissing('targets.socialAccount', 'assets');
+        $post->loadMissing('targets.socialAccount', 'assets', 'campaign');
 
         $hasCaption = filled($post->master_caption);
         $targets = $post->targets;
@@ -57,9 +57,23 @@ class EvaluatePostChecklistAction
             ],
         ];
 
+        // Campaigns enhancement C-4.2: a soft check — a warning in the editor, never a blocker.
+        $campaignTags = $post->campaign->hashtags ?? [];
+
+        if ($campaignTags !== []) {
+            $postTags = array_map(fn ($tag) => mb_strtolower(ltrim((string) $tag, '#')), $post->hashtags ?? []);
+
+            $items[] = [
+                'key' => 'campaign_hashtags',
+                'label' => 'Campaign hashtags are included',
+                'passed' => collect($campaignTags)->every(fn ($tag) => in_array(mb_strtolower(ltrim((string) $tag, '#')), $postTags, true)),
+                'soft' => true,
+            ];
+        }
+
         return [
             'items' => $items,
-            'passed' => collect($items)->every(fn (array $item) => $item['passed']),
+            'passed' => collect($items)->every(fn (array $item) => $item['passed'] || ($item['soft'] ?? false)),
         ];
     }
 }

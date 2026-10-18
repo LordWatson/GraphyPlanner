@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Campaigns\GetCalendarCampaignLayerAction;
 use App\Actions\Posts\BuildCalendarOccurrencesAction;
 use App\Actions\Posts\GetCalendarPostsAction;
 use App\Enums\Platform;
@@ -27,7 +28,7 @@ class CalendarController extends Controller
      * month navigation is a partial reload of `occurrences`/`window`/`reschedulablePostIds`, and
      * undated posts come from the optional `unscheduled` prop when the drawer opens.
      */
-    public function index(CalendarRequest $request, GetCalendarPostsAction $getPosts, BuildCalendarOccurrencesAction $buildOccurrences): Response
+    public function index(CalendarRequest $request, GetCalendarPostsAction $getPosts, BuildCalendarOccurrencesAction $buildOccurrences, GetCalendarCampaignLayerAction $campaignLayer): Response
     {
         $this->authorize('viewCalendar', Post::class);
 
@@ -53,6 +54,8 @@ class CalendarController extends Controller
                 array_values($posts()->pluck('id')->map(fn ($id) => (int) $id)->all()),
             ),
             'unscheduledCount' => fn () => $getPosts->unscheduledCount($user, $filters),
+            // Step C-3.5: campaign bands + ghost deliverables for the visible window.
+            'campaignLayer' => fn () => $campaignLayer($user, $filters, $window),
             'unscheduled' => Inertia::optional(fn () => $getPosts->unscheduled($user, $filters, $request->integer('unscheduled_page', 1))
                 ->through(fn (Post $post) => [
                     'id' => $post->id,

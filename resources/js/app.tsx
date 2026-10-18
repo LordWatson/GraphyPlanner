@@ -20,6 +20,9 @@ void createInertiaApp({
                 return null;
             case name.startsWith('review/'):
                 return null;
+            // C-5.4: the public campaign preview stands alone, like the review page.
+            case name.startsWith('share/'):
+                return null;
             case name.startsWith('client-invite/'):
                 return null;
             case name.startsWith('staff-invite/'):

@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Support\Campaigns\CampaignPresenter;
 use App\Support\Invoices\InvoicePresenter;
 
 /**
@@ -86,6 +87,8 @@ final class ClientTabPresenter
             'id' => $post->id,
             'campaign_id' => $post->campaign_id,
             'campaign_name' => $post->campaign?->name,
+            // Campaigns enhancement C-1.3: the chip (colour + code).
+            'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'status' => $post->status->value,
             'approval_mode' => $post->approval_mode->value,
             'master_caption' => $post->master_caption,

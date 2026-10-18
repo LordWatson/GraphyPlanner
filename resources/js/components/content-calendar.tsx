@@ -3,6 +3,16 @@ import { Link, router } from '@inertiajs/react';
 import { CalendarX2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DragEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import type {
+    CalendarGhost,
+    CampaignLayer,
+} from '@/components/campaigns/calendar-layer';
+import {
+    CampaignDayBands,
+    GhostChip,
+    useCampaignLayerToggle,
+} from '@/components/campaigns/calendar-layer';
+import { CampaignSwatch } from '@/components/campaigns/campaign-chip';
 import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { resolveStatus, toneBgClass, toneTextClass } from '@/lib/status';
@@ -32,6 +42,9 @@ export type Occurrence = {
     client_name: string | null;
     campaign_id: number | null;
     campaign_name: string | null;
+    /** Campaigns enhancement C-1.3: the campaign chip. */
+    campaign_code?: string | null;
+    campaign_colour?: string | null;
     status: string;
     status_label: string;
     master_caption: string | null;
@@ -66,6 +79,8 @@ export type CalendarPayload = {
     };
     /** Posts the viewer may drag to another day — internal calendar only. */
     reschedulablePostIds?: number[];
+    /** Campaigns enhancement C-3.5 — bands + ghost deliverables, internal calendar only. */
+    campaignLayer?: CampaignLayer;
 };
 
 type ContentCalendarProps = CalendarPayload & {
@@ -173,7 +188,25 @@ export function ContentCalendar({
     multiClient = true,
     canReschedule,
     onReschedule,
+    campaignLayer,
 }: ContentCalendarProps) {
+    const [showCampaigns, setShowCampaigns] = useCampaignLayerToggle();
+    const bands = showCampaigns ? (campaignLayer?.bands ?? []) : [];
+    const ghostsByDate = useMemo(() => {
+        const map = new Map<string, CalendarGhost[]>();
+
+        if (!showCampaigns) {
+            return map;
+        }
+
+        for (const ghost of campaignLayer?.ghosts ?? []) {
+            if (ghost.date) {
+                map.set(ghost.date, [...(map.get(ghost.date) ?? []), ghost]);
+            }
+        }
+
+        return map;
+    }, [campaignLayer, showCampaigns]);
     // Phones open on the list view — the month grid needs ~760px and would scroll sideways.
     const [view, setView] = useState<View>(() =>
         typeof window !== 'undefined' &&
@@ -235,7 +268,12 @@ export function ContentCalendar({
             baseUrl,
             { ...filters, ...visibleWindow },
             {
-                only: ['occurrences', 'window', 'reschedulablePostIds'],
+                only: [
+                    'occurrences',
+                    'window',
+                    'reschedulablePostIds',
+                    'campaignLayer',
+                ],
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
@@ -361,11 +399,29 @@ export function ContentCalendar({
                         ? occurrence.client_name
                         : (occurrence.master_caption ?? 'Untitled post')}
                 </span>
-                <span className="text-muted-foreground truncate">
-                    {occurrence.handle ?? occurrence.platform ?? '—'}
-                    {multiClient && occurrence.master_caption
-                        ? ` · ${occurrence.master_caption}`
-                        : ''}
+                <span className="text-muted-foreground flex min-w-0 items-center gap-1.5">
+                    {occurrence.campaign_id !== null && (
+                        <span
+                            className="inline-flex shrink-0 items-center gap-1"
+                            title={occurrence.campaign_name ?? undefined}
+                        >
+                            <CampaignSwatch
+                                colour={occurrence.campaign_colour}
+                                className="size-2"
+                            />
+                            {occurrence.campaign_code && (
+                                <span className="font-mono text-[10px]">
+                                    {occurrence.campaign_code}
+                                </span>
+                            )}
+                        </span>
+                    )}
+                    <span className="truncate">
+                        {occurrence.handle ?? occurrence.platform ?? '—'}
+                        {multiClient && occurrence.master_caption
+                            ? ` · ${occurrence.master_caption}`
+                            : ''}
+                    </span>
                 </span>
             </Link>
         );
@@ -481,9 +537,22 @@ export function ContentCalendar({
                                         )}
                                     >
                                         {renderDayNumber(day, !isCurrentMonth)}
+                                        <CampaignDayBands
+                                            bands={bands}
+                                            day={key}
+                                            labelled={day.getDay() === 0}
+                                        />
                                         <div className="flex flex-col gap-1">
                                             {dayOccurrences.map(
                                                 renderOccurrenceChip,
+                                            )}
+                                            {(ghostsByDate.get(key) ?? []).map(
+                                                (ghost) => (
+                                                    <GhostChip
+                                                        key={`g-${ghost.id}`}
+                                                        ghost={ghost}
+                                                    />
+                                                ),
                                             )}
                                         </div>
                                     </div>
@@ -534,7 +603,20 @@ export function ContentCalendar({
                                         </span>
                                         {renderDayNumber(day)}
                                     </div>
+                                    <CampaignDayBands
+                                        bands={bands}
+                                        day={key}
+                                        labelled
+                                    />
                                     {dayOccurrences.map(renderOccurrenceChip)}
+                                    {(ghostsByDate.get(key) ?? []).map(
+                                        (ghost) => (
+                                            <GhostChip
+                                                key={`g-${ghost.id}`}
+                                                ghost={ghost}
+                                            />
+                                        ),
+                                    )}
                                 </div>
                             );
                         })}
@@ -683,6 +765,23 @@ export function ContentCalendar({
                         {orgTimezone}
                     </ToggleGroupItem>
                 </ToggleGroup>
+
+                {campaignLayer && (
+                    <ToggleGroup
+                        type="multiple"
+                        variant="outline"
+                        size="sm"
+                        value={showCampaigns ? ['campaigns'] : []}
+                        onValueChange={(value) =>
+                            setShowCampaigns(value.includes('campaigns'))
+                        }
+                        aria-label="Layers"
+                    >
+                        <ToggleGroupItem value="campaigns" className="px-3">
+                            Campaigns & plan
+                        </ToggleGroupItem>
+                    </ToggleGroup>
+                )}
             </div>
 
             <div className="border-border flex flex-wrap items-center gap-2 border-y py-3">

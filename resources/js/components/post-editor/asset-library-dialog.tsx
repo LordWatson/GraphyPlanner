@@ -69,7 +69,12 @@ export function AssetLibraryDialog({
     title = 'Asset library',
     description = 'Pick the media for this post. The number shows the order it will appear in.',
     confirmLabel = 'Attach',
+    campaignId,
+    defaultScope = 'campaign',
 }: {
+    /** Step C-4.1: offer "This campaign / Whole library", narrowing to the campaign's kit. */
+    campaignId?: number;
+    defaultScope?: 'campaign' | 'all';
     open: boolean;
     onOpenChange: (open: boolean) => void;
     clientId: number;
@@ -94,6 +99,10 @@ export function AssetLibraryDialog({
     const [draft, setDraft] = useState<AssetData[]>(selected);
     const [reloadKey, setReloadKey] = useState(0);
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    // Step C-4.1: a campaign post's library opens on its campaign's kit first.
+    const [scope, setScope] = useState<'campaign' | 'all'>(
+        campaignId !== undefined ? defaultScope : 'all',
+    );
 
     // Fresh draft each time the dialog opens.
     useEffect(() => {
@@ -126,6 +135,10 @@ export function AssetLibraryDialog({
                     search: debouncedSearch || undefined,
                     type: type === 'all' ? undefined : type,
                     page,
+                    campaign:
+                        campaignId !== undefined && scope === 'campaign'
+                            ? campaignId
+                            : undefined,
                 },
             }),
             {
@@ -158,7 +171,16 @@ export function AssetLibraryDialog({
             });
 
         return () => controller.abort();
-    }, [open, clientId, debouncedSearch, type, page, reloadKey]);
+    }, [
+        open,
+        clientId,
+        debouncedSearch,
+        type,
+        page,
+        reloadKey,
+        scope,
+        campaignId,
+    ]);
 
     const toggle = (asset: AssetData) => {
         setDraft((current) =>
@@ -210,6 +232,28 @@ export function AssetLibraryDialog({
                             autoFocus
                         />
                     </div>
+                    {campaignId !== undefined && (
+                        <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            value={scope}
+                            onValueChange={(value) => {
+                                if (value === 'campaign' || value === 'all') {
+                                    setScope(value);
+                                    setPage(1);
+                                }
+                            }}
+                            aria-label="Which assets"
+                        >
+                            <ToggleGroupItem value="campaign" className="px-3">
+                                This campaign
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="all" className="px-3">
+                                Whole library
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                    )}
                     {!imagesOnly && (
                         <ToggleGroup
                             type="single"

@@ -89,6 +89,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
         prefixes: [
             '/clients',
             '/campaigns',
+            '/campaign-templates',
             '/posts',
             '/ai-trends',
             '/ai-post-ideas',
