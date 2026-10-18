@@ -2,7 +2,6 @@
 
 namespace App\Support\Clients;
 
-use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\ClientInvitation;
 use App\Models\Invoice;
@@ -104,28 +103,6 @@ final class ClientTabPresenter
             'can' => [
                 'update' => $user->can('update', $post),
                 'delete' => $user->can('delete', $post),
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function asset(Asset $asset, User $user): array
-    {
-        return [
-            'id' => $asset->id,
-            'campaign_id' => $asset->campaign_id,
-            'source' => $asset->source->value,
-            'type' => $asset->type?->value,
-            'url' => $asset->url,
-            'original_filename' => $asset->original_filename,
-            'mime_type' => $asset->mime_type,
-            'size' => $asset->size,
-            'rights' => $asset->rights,
-            'variant_group_id' => $asset->variant_group_id,
-            'can' => [
-                'delete' => $user->can('delete', $asset),
             ],
         ];
     }

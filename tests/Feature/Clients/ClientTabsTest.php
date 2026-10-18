@@ -80,7 +80,6 @@ class ClientTabsTest extends TestCase
 
         $tabs = [
             ['clients.posts.index', 'clients/tabs/posts', 'posts', 25, 30],
-            ['clients.media', 'clients/tabs/media', 'assets', 24, 26],
             ['clients.campaigns.index', 'clients/tabs/campaigns', 'campaigns', 2, 2],
             ['clients.billing', 'clients/tabs/billing', 'invoices', 2, 2],
             ['clients.portal-access', 'clients/tabs/portal-access', 'invitations', 1, 1],
@@ -101,6 +100,25 @@ class ClientTabsTest extends TestCase
         $this->actingAs($this->owner)
             ->get(route('clients.posts.index', [$this->client, 'page' => 2]))
             ->assertInertia(fn ($page) => $page->has('posts.data', 5)->has('targetAccounts'));
+    }
+
+    /**
+     * The Assets tab loads no asset rows — only the header count. The library is browsed through
+     * the paged `clients.assets.index` dialog instead.
+     */
+    public function test_the_assets_tab_only_carries_the_asset_count(): void
+    {
+        Asset::factory()->for($this->client)->count(26)->create(['org_id' => $this->org->id]);
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.media', $this->client))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('clients/tabs/media')
+                ->where('tab', 'media')
+                ->where('stats.assets', 26)
+                ->where('can.createAsset', true)
+                ->missing('assets'));
     }
 
     public function test_the_ai_tab_defers_trends_and_ideas_and_is_gated(): void

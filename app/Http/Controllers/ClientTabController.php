@@ -24,8 +24,6 @@ class ClientTabController extends Controller
 {
     public const PER_PAGE = 25;
 
-    public const ASSETS_PER_PAGE = 24;
-
     public function __construct(private readonly BuildClientPageHeaderAction $header) {}
 
     public function posts(Request $request, Client $client): Response
@@ -48,18 +46,16 @@ class ClientTabController extends Controller
         ]);
     }
 
+    /**
+     * The Assets tab renders only the header (its stat card carries the asset count); the library
+     * itself is browsed through the paged `clients.assets.index` dialog, so no asset rows load here.
+     */
     public function media(Request $request, Client $client): Response
     {
         $this->authorize('viewAny', [Asset::class, $client]);
-        $user = $request->user();
 
         return Inertia::render('clients/tabs/media', [
-            ...($this->header)($client, $user, 'media'),
-            'assets' => $client->assets()
-                ->latest()
-                ->latest('id')
-                ->paginate(self::ASSETS_PER_PAGE)
-                ->through(fn (Asset $asset) => ClientTabPresenter::asset($asset, $user)),
+            ...($this->header)($client, $request->user(), 'media'),
         ]);
     }
 

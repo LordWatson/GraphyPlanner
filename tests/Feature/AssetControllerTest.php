@@ -234,7 +234,66 @@ class AssetControllerTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('clients.media', $client));
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('clients/tabs/media')->has('assets.data', 1));
+        $response->assertInertia(fn ($page) => $page->component('clients/tabs/media')->where('stats.assets', 1));
+
+        $this->actingAs($reviewer)
+            ->getJson(route('clients.assets.index', $client))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.can.delete', false);
+    }
+
+    public function test_json_delete_returns_no_content_instead_of_redirecting(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $asset = Asset::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->actingAs($owner)
+            ->deleteJson(route('assets.destroy', $asset))
+            ->assertNoContent();
+
+        $this->assertSoftDeleted($asset);
+    }
+
+    public function test_json_delete_is_forbidden_without_permission(): void
+    {
+        $org = Organization::factory()->create();
+        $viewer = User::factory()->for($org, 'organization')->role(Role::Viewer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $asset = Asset::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->actingAs($viewer)
+            ->deleteJson(route('assets.destroy', $asset))
+            ->assertForbidden();
+
+        $this->assertNotSoftDeleted($asset);
+    }
+
+    /**
+     * The Assets tab's library dialog shows a remove button only where the policy allows it:
+     * Designers may remove only assets they uploaded themselves.
+     */
+    public function test_asset_library_reports_per_asset_delete_ability(): void
+    {
+        $org = Organization::factory()->create();
+        $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $own = Asset::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'uploaded_by' => $designer->id,
+            'created_at' => now()->addMinute(),
+        ]);
+        $theirs = Asset::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $this->actingAs($designer)
+            ->getJson(route('clients.assets.index', $client))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $own->id)
+            ->assertJsonPath('data.0.can.delete', true)
+            ->assertJsonPath('data.1.id', $theirs->id)
+            ->assertJsonPath('data.1.can.delete', false);
     }
 
     /**

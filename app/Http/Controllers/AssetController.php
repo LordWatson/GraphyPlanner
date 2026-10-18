@@ -12,12 +12,15 @@ use App\Models\Asset;
 use App\Models\Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class AssetController extends Controller
 {
     /**
      * A page of the client's asset library as JSON, filtered by filename search and type — the
-     * post editor's "Browse library" dialog pages through this instead of preloading every asset.
+     * post editor's "Browse library" dialog and the client Assets tab page through this instead of
+     * preloading every asset. `can.delete` lets the Assets tab offer removal per asset.
      */
     public function index(SearchAssetsRequest $request, Client $client, SearchClientAssetsAction $action): JsonResponse
     {
@@ -39,6 +42,9 @@ class AssetController extends Controller
                 'is_ai_generated' => $asset->is_ai_generated,
                 'campaign_name' => $asset->campaign?->name,
                 'created_at' => $asset->created_at?->toIso8601String(),
+                'can' => [
+                    'delete' => $request->user()->can('delete', $asset),
+                ],
             ])->values(),
             'meta' => [
                 'current_page' => $assets->currentPage(),
@@ -76,15 +82,20 @@ class AssetController extends Controller
     }
 
     /**
-     * Delete an asset (removing its stored file, if any).
+     * Delete an asset (removing its stored file, if any). JSON callers (the Assets tab's library
+     * dialog) get a 204 so the dialog can refresh in place instead of following a redirect.
      */
-    public function destroy(Asset $asset, DeleteAssetAction $action): RedirectResponse
+    public function destroy(Request $request, Asset $asset, DeleteAssetAction $action): RedirectResponse|Response
     {
         $this->authorize('delete', $asset);
 
         $clientId = $asset->client_id;
 
         $action($asset);
+
+        if ($request->wantsJson()) {
+            return response()->noContent();
+        }
 
         return to_route('clients.media', $clientId);
     }

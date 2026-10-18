@@ -1,4 +1,11 @@
-import { ChevronLeft, ChevronRight, ImageOff, Search } from 'lucide-react';
+import {
+    ChevronLeft,
+    ChevronRight,
+    ImageOff,
+    Loader2,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { EmptyState } from '@/components/page';
 import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
@@ -18,9 +25,10 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { index as assetIndex } from '@/routes/clients/assets';
 
-type LibraryAsset = AssetData & {
+export type LibraryAsset = AssetData & {
     campaign_name: string | null;
     created_at: string | null;
+    can?: { delete: boolean };
 };
 
 type LibraryPage = {
@@ -42,16 +50,21 @@ const typeFilters = [
 
 /**
  * Browse a client's whole asset library — searched, filtered and paged server-side
- * (`clients.assets.index`) so it stays fast however large the library grows. Selection is a
- * draft until "Attach"; already-attached assets start ticked and keep their order, new picks are
- * appended in the order they were clicked.
+ * (`clients.assets.index`) so it stays fast however large the library grows.
+ *
+ * `select` mode (default): selection is a draft until "Attach"; already-attached assets start
+ * ticked and keep their order, new picks are appended in the order they were clicked.
+ * `manage` mode (client Assets tab): each asset opens in a new tab, and assets the viewer may
+ * delete get a remove button wired to `onDelete`; the page reloads after a successful delete.
  */
 export function AssetLibraryDialog({
     open,
     onOpenChange,
     clientId,
-    selected,
+    mode = 'select',
+    selected = [],
     onConfirm,
+    onDelete,
     imagesOnly = false,
     title = 'Asset library',
     description = 'Pick the media for this post. The number shows the order it will appear in.',
@@ -60,8 +73,11 @@ export function AssetLibraryDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
     clientId: number;
-    selected: AssetData[];
-    onConfirm: (assets: AssetData[]) => void;
+    mode?: 'select' | 'manage';
+    selected?: AssetData[];
+    onConfirm?: (assets: AssetData[]) => void;
+    /** `manage` mode: remove an asset; resolve `true` on success so the page reloads. */
+    onDelete?: (asset: LibraryAsset) => Promise<boolean>;
     /** Lock the library to images (e.g. Brand Brain visual references, Step 16.4). */
     imagesOnly?: boolean;
     title?: string;
@@ -77,6 +93,7 @@ export function AssetLibraryDialog({
     const [error, setError] = useState<string | null>(null);
     const [draft, setDraft] = useState<AssetData[]>(selected);
     const [reloadKey, setReloadKey] = useState(0);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
 
     // Fresh draft each time the dialog opens.
     useEffect(() => {
@@ -151,6 +168,23 @@ export function AssetLibraryDialog({
         );
     };
 
+    const remove = async (asset: LibraryAsset) => {
+        if (!onDelete) {
+            return;
+        }
+
+        setDeletingId(asset.id);
+
+        try {
+            if (await onDelete(asset)) {
+                setReloadKey((key) => key + 1);
+            }
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const managing = mode === 'manage';
     const meta = result?.meta;
     const assets = result?.data ?? [];
     const filtered = debouncedSearch !== '' || type !== 'all';
@@ -252,57 +286,29 @@ export function AssetLibraryDialog({
                                 loading && 'opacity-60',
                             )}
                         >
-                            {assets.map((asset) => {
-                                const order = draft.findIndex(
-                                    (a) => a.id === asset.id,
-                                );
-                                const isSelected = order !== -1;
-
-                                return (
-                                    <li key={asset.id} className="min-w-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => toggle(asset)}
-                                            aria-pressed={isSelected}
-                                            className="group focus-visible:ring-ring/40 flex w-full flex-col gap-1.5 rounded-xl text-left outline-none focus-visible:ring-[3px]"
-                                        >
-                                            <span
-                                                className={cn(
-                                                    'bg-muted relative block aspect-square w-full overflow-hidden rounded-xl border transition',
-                                                    isSelected
-                                                        ? 'border-primary ring-primary ring-2'
-                                                        : 'border-border group-hover:border-foreground/30',
-                                                )}
-                                            >
-                                                <AssetThumbnail asset={asset} />
-                                                <span
-                                                    className={cn(
-                                                        'absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full border font-mono text-[11px] transition',
-                                                        isSelected
-                                                            ? 'bg-primary text-primary-foreground border-transparent'
-                                                            : 'bg-card/80 border-border text-transparent',
-                                                    )}
-                                                >
-                                                    {isSelected
-                                                        ? order + 1
-                                                        : ''}
-                                                </span>
-                                            </span>
-                                            <span className="min-w-0 px-0.5">
-                                                <span className="block truncate text-xs">
-                                                    {asset.original_filename ??
-                                                        `Asset #${asset.id}`}
-                                                </span>
-                                                {asset.campaign_name && (
-                                                    <span className="text-muted-foreground block truncate text-[11px]">
-                                                        {asset.campaign_name}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </button>
-                                    </li>
-                                );
-                            })}
+                            {assets.map((asset) =>
+                                managing ? (
+                                    <ManagedAsset
+                                        key={asset.id}
+                                        asset={asset}
+                                        deleting={deletingId === asset.id}
+                                        onDelete={
+                                            onDelete && asset.can?.delete
+                                                ? () => void remove(asset)
+                                                : undefined
+                                        }
+                                    />
+                                ) : (
+                                    <SelectableAsset
+                                        key={asset.id}
+                                        asset={asset}
+                                        order={draft.findIndex(
+                                            (a) => a.id === asset.id,
+                                        )}
+                                        onToggle={() => toggle(asset)}
+                                    />
+                                ),
+                            )}
                         </ul>
                     )}
                 </div>
@@ -352,44 +358,159 @@ export function AssetLibraryDialog({
                     </div>
                 )}
 
-                <DialogFooter className="items-center sm:justify-between">
-                    <span className="text-muted-foreground text-sm">
-                        {draft.length === 0
-                            ? 'Nothing selected'
-                            : `${draft.length} selected`}
-                        {draft.length > 0 && (
-                            <Button
-                                type="button"
-                                variant="link"
-                                className="ml-2 h-auto text-sm"
-                                onClick={() => setDraft([])}
-                            >
-                                Clear
-                            </Button>
-                        )}
-                    </span>
-                    <span className="flex gap-2">
+                {managing ? (
+                    <DialogFooter>
                         <Button
                             type="button"
                             variant="ghost"
                             onClick={() => onOpenChange(false)}
                         >
-                            Cancel
+                            Close
                         </Button>
-                        <Button
-                            type="button"
-                            onClick={() => {
-                                onConfirm(draft);
-                                onOpenChange(false);
-                            }}
-                        >
+                    </DialogFooter>
+                ) : (
+                    <DialogFooter className="items-center sm:justify-between">
+                        <span className="text-muted-foreground text-sm">
                             {draft.length === 0
-                                ? `${confirmLabel} none`
-                                : `${confirmLabel} ${draft.length}`}
-                        </Button>
-                    </span>
-                </DialogFooter>
+                                ? 'Nothing selected'
+                                : `${draft.length} selected`}
+                            {draft.length > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    className="ml-2 h-auto text-sm"
+                                    onClick={() => setDraft([])}
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </span>
+                        <span className="flex gap-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => onOpenChange(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    onConfirm?.(draft);
+                                    onOpenChange(false);
+                                }}
+                            >
+                                {draft.length === 0
+                                    ? `${confirmLabel} none`
+                                    : `${confirmLabel} ${draft.length}`}
+                            </Button>
+                        </span>
+                    </DialogFooter>
+                )}
             </DialogContent>
         </Dialog>
+    );
+}
+
+function AssetCaption({ asset }: { asset: LibraryAsset }) {
+    return (
+        <span className="min-w-0 px-0.5">
+            <span className="block truncate text-xs">
+                {asset.original_filename ?? `Asset #${asset.id}`}
+            </span>
+            {asset.campaign_name && (
+                <span className="text-muted-foreground block truncate text-[11px]">
+                    {asset.campaign_name}
+                </span>
+            )}
+        </span>
+    );
+}
+
+/** `select` mode tile: toggles the asset in the draft; the badge shows its attach order. */
+function SelectableAsset({
+    asset,
+    order,
+    onToggle,
+}: {
+    asset: LibraryAsset;
+    order: number;
+    onToggle: () => void;
+}) {
+    const isSelected = order !== -1;
+
+    return (
+        <li className="min-w-0">
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-pressed={isSelected}
+                className="group focus-visible:ring-ring/40 flex w-full flex-col gap-1.5 rounded-xl text-left outline-none focus-visible:ring-[3px]"
+            >
+                <span
+                    className={cn(
+                        'bg-muted relative block aspect-square w-full overflow-hidden rounded-xl border transition',
+                        isSelected
+                            ? 'border-primary ring-primary ring-2'
+                            : 'border-border group-hover:border-foreground/30',
+                    )}
+                >
+                    <AssetThumbnail asset={asset} />
+                    <span
+                        className={cn(
+                            'absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full border font-mono text-[11px] transition',
+                            isSelected
+                                ? 'bg-primary text-primary-foreground border-transparent'
+                                : 'bg-card/80 border-border text-transparent',
+                        )}
+                    >
+                        {isSelected ? order + 1 : ''}
+                    </span>
+                </span>
+                <AssetCaption asset={asset} />
+            </button>
+        </li>
+    );
+}
+
+/** `manage` mode tile: opens the asset in a new tab, with a remove button when allowed. */
+function ManagedAsset({
+    asset,
+    deleting,
+    onDelete,
+}: {
+    asset: LibraryAsset;
+    deleting: boolean;
+    onDelete?: () => void;
+}) {
+    return (
+        <li className="group relative min-w-0">
+            <a
+                href={asset.url ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                className="focus-visible:ring-ring/40 flex w-full flex-col gap-1.5 rounded-xl outline-none focus-visible:ring-[3px]"
+            >
+                <span className="bg-muted border-border group-hover:border-foreground/30 relative block aspect-square w-full overflow-hidden rounded-xl border transition">
+                    <AssetThumbnail asset={asset} />
+                </span>
+                <AssetCaption asset={asset} />
+            </a>
+            {onDelete && (
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    disabled={deleting}
+                    aria-label={`Remove ${asset.original_filename ?? 'asset'}`}
+                    className="bg-card/90 border-border text-foreground hover:bg-card hover:text-destructive focus-visible:ring-ring/40 absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-full border opacity-0 transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-[3px] disabled:opacity-100 [@media(hover:none)]:opacity-100"
+                >
+                    {deleting ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                        <Trash2 className="size-3.5" />
+                    )}
+                </button>
+            )}
+        </li>
     );
 }
