@@ -4,11 +4,14 @@ namespace App\Actions\SuperAdmin;
 
 use App\Models\Organization;
 use App\Models\SuperAdminReport;
+use App\Support\Scheduling\SchedulerHeartbeat;
 use App\Support\SuperAdmin\AnalyticsFilters;
 
 /**
  * Step 15.1/15.4 — the super admin landing page (`/super-admin`): the last 30 days of platform
  * analytics plus the lists support works from — newest signups, suspended orgs, saved reports.
+ * Step I-1.8: plus system health — scheduler heartbeats (stale = no run within two intervals)
+ * and the queue backlog.
  */
 class GetSuperAdminOverviewAction
 {
@@ -17,7 +20,7 @@ class GetSuperAdminOverviewAction
     public function __construct(private readonly GetPlatformAnalyticsSummaryAction $summary) {}
 
     /**
-     * @return array{summary: array<string, mixed>, recentOrganizations: list<array<string, mixed>>, suspendedOrganizations: list<array<string, mixed>>, reports: list<array<string, mixed>>}
+     * @return array{summary: array<string, mixed>, recentOrganizations: list<array<string, mixed>>, suspendedOrganizations: list<array<string, mixed>>, reports: list<array<string, mixed>>, health: array{schedulers: list<array<string, mixed>>, queue: array{pending: int|null, failed: int}}}
      */
     public function __invoke(): array
     {
@@ -34,6 +37,10 @@ class GetSuperAdminOverviewAction
 
         return [
             'summary' => ($this->summary)(AnalyticsFilters::fromArray(['range' => '30d'])),
+            'health' => [
+                'schedulers' => SchedulerHeartbeat::status(),
+                'queue' => SchedulerHeartbeat::queueBacklog(),
+            ],
             'recentOrganizations' => array_values(Organization::query()
                 ->excludingPreview()
                 ->with('owner')

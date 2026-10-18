@@ -2,32 +2,24 @@
 
 namespace App\Actions\Assets;
 
-use App\Contracts\AssetStorage;
-use App\Enums\AssetSource;
 use App\Models\Asset;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DeleteAssetAction
 {
-    public function __construct(private AssetStorage $storage) {}
-
     /**
-     * Delete an asset, removing its stored file (if any) first.
+     * Delete an asset. Step I-1.5: a soft delete — the row and its stored file are kept so the
+     * asset can be restored and any post history that used it stays intact. Files are removed
+     * from storage only when the client (or organization) is purged — see `PurgeClientAction`.
      */
     public function __invoke(Asset $asset): void
     {
-        DB::transaction(function () use ($asset) {
-            if (in_array($asset->source, [AssetSource::Upload, AssetSource::Ai], true) && $asset->disk && $asset->path) {
-                $this->storage->delete($asset->disk, $asset->path);
-            }
+        $asset->delete();
 
-            $asset->delete();
-
-            Log::info('Asset deleted', [
-                'client_id' => $asset->client_id,
-                'asset_id' => $asset->id,
-            ]);
-        });
+        Log::info('Asset deleted (soft)', [
+            'org_id' => $asset->org_id,
+            'client_id' => $asset->client_id,
+            'asset_id' => $asset->id,
+        ]);
     }
 }

@@ -4,8 +4,10 @@ namespace App\Http\Requests;
 
 use App\Enums\ApprovalMode;
 use App\Enums\PostStatus;
+use App\Models\Client;
 use App\Models\Post;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class StorePostRequest extends FormRequest
@@ -23,10 +25,15 @@ class StorePostRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Step I-1.9: referenced records must belong to this client — a bare `exists:` rule would
+        // accept another organization's ids.
+        $client = $this->route('client');
+        $clientId = $client instanceof Client ? $client->id : null;
+
         return [
             'status' => ['nullable', new Enum(PostStatus::class)],
             'approval_mode' => ['nullable', new Enum(ApprovalMode::class)],
-            'campaign_id' => ['nullable', 'integer', 'exists:campaigns,id'],
+            'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
             'master_caption' => ['nullable', 'string'],
             'hashtags' => ['nullable', 'array'],
             'hashtags.*' => ['string'],
@@ -34,7 +41,7 @@ class StorePostRequest extends FormRequest
             'location' => ['nullable', 'array'],
 
             'targets' => ['nullable', 'array'],
-            'targets.*.social_account_id' => ['required', 'integer', 'exists:social_accounts,id'],
+            'targets.*.social_account_id' => ['required', 'integer', Rule::exists('social_accounts', 'id')->where('client_id', $clientId)->whereNull('deleted_at')],
             'targets.*.scheduled_local_date' => ['nullable', 'date'],
             'targets.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
         ];

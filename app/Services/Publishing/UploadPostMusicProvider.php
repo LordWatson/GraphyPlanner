@@ -8,6 +8,7 @@ use App\Enums\Platform;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Models\SocialAccount;
 use App\Support\Publishing\MusicTrack;
+use App\Support\Publishing\VendorHttp;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -179,9 +180,9 @@ class UploadPostMusicProvider implements MusicProvider
     {
         $apiKey = $account->organization?->upload_post_key ?? '';
 
-        return Http::baseUrl($this->baseUrl())
+        return VendorHttp::forReads(Http::baseUrl($this->baseUrl())
             ->withHeaders(['Authorization' => 'Apikey '.$apiKey])
-            ->acceptJson();
+            ->acceptJson());
     }
 
     private function baseUrl(): string

@@ -24,6 +24,7 @@ import {
     Send,
     Share2,
     Trash2,
+    Archive,
     TrendingUp,
     UploadCloud,
     UserPlus,
@@ -338,7 +339,6 @@ export default function ClientShow({
         number | null
     >(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [deleteConfirmName, setDeleteConfirmName] = useState('');
     const [deleting, setDeleting] = useState(false);
 
     // Step 2.4 — "Trends & Ideas" panel. Owner/Strategist only, gated behind config('ai.enabled').
@@ -365,23 +365,25 @@ export default function ClientShow({
 
         try {
             const [trendsRes, ideasRes] = await Promise.all([
-                fetch(
-                    aiClients.trends.url(client.id, {
-                        query: { platforms: aiPlatforms },
-                    }),
-                    {
-                        credentials: 'same-origin',
-                        headers: {
-                            Accept: 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
+                // Step I-1.7: POST — these call a paid vendor and save rows.
+                fetch(aiClients.trends.url(client.id), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
                     },
-                ),
+                    body: JSON.stringify({ platforms: aiPlatforms }),
+                }),
                 fetch(aiClients.ideas.url(client.id), {
+                    method: 'POST',
                     credentials: 'same-origin',
                     headers: {
                         Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
+                        'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
                     },
                 }),
             ]);
@@ -805,13 +807,10 @@ export default function ClientShow({
                                     type="button"
                                     variant="destructive"
                                     size="sm"
-                                    onClick={() => {
-                                        setDeleteConfirmName('');
-                                        setDeleteDialogOpen(true);
-                                    }}
+                                    onClick={() => setDeleteDialogOpen(true)}
                                 >
-                                    <Trash2 />
-                                    Delete
+                                    <Archive />
+                                    Archive
                                 </Button>
                             )}
                         </>
@@ -835,29 +834,15 @@ export default function ClientShow({
                 >
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Delete {client.name}?</DialogTitle>
+                            <DialogTitle>Archive {client.name}?</DialogTitle>
                             <DialogDescription>
-                                This action cannot be undone. This will
-                                permanently delete the client and all of its
-                                associated data. To confirm, type{' '}
-                                <strong>{client.name}</strong> below.
+                                It leaves every list, its publishing and
+                                reminders pause, and its portal and review links
+                                stop working. Posts, invoices and history are
+                                all kept — restore it any time from Clients →
+                                Archived.
                             </DialogDescription>
                         </DialogHeader>
-
-                        <div className="grid gap-1">
-                            <Label htmlFor="delete-confirm-name">
-                                Client name
-                            </Label>
-                            <Input
-                                id="delete-confirm-name"
-                                value={deleteConfirmName}
-                                onChange={(event) =>
-                                    setDeleteConfirmName(event.target.value)
-                                }
-                                autoComplete="off"
-                                placeholder={client.name}
-                            />
-                        </div>
 
                         <DialogFooter>
                             <Button
@@ -870,14 +855,11 @@ export default function ClientShow({
                             <Button
                                 type="button"
                                 variant="destructive"
-                                disabled={
-                                    deleteConfirmName !== client.name ||
-                                    deleting
-                                }
+                                disabled={deleting}
                                 onClick={handleDeleteClient}
                             >
-                                <Trash2 />
-                                Delete client
+                                <Archive />
+                                Archive client
                             </Button>
                         </DialogFooter>
                     </DialogContent>

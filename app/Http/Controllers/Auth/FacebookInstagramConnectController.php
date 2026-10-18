@@ -6,6 +6,7 @@ use App\Actions\SocialAccounts\ConnectMetaAudioAccessAction;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\SocialAccount;
+use App\Services\ConnectStateStore;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,11 @@ use RuntimeException;
  */
 class FacebookInstagramConnectController extends Controller
 {
+    /** Step I-1.6: the `ConnectStateStore` flow name for Facebook Login. */
+    private const STATE_FLOW = 'meta';
+
+    public function __construct(private readonly ConnectStateStore $states = new ConnectStateStore) {}
+
     /**
      * Redirect the browser to Facebook's OAuth dialog for the given social account.
      */
@@ -38,7 +44,8 @@ class FacebookInstagramConnectController extends Controller
             'client_id' => config('services.facebook.client_id'),
             'redirect_uri' => $this->redirectUri($client, $socialAccount),
             'scope' => 'instagram_basic,instagram_content_publish',
-            'state' => $socialAccount->id,
+            // Step I-1.6: a signed, single-use state (not the guessable account id).
+            'state' => $this->states->issue($socialAccount, request()->user(), self::STATE_FLOW),
             'response_type' => 'code',
         ];
 
@@ -60,6 +67,10 @@ class FacebookInstagramConnectController extends Controller
 
         abort_unless($socialAccount->client_id === $client->id, 404);
 
+        if (! $this->validState($request, $socialAccount->id)) {
+            return to_route('clients.show', $client)->with('error', 'Instagram connection via Facebook failed: the request expired. Please try again.');
+        }
+
         return $this->handleCallback($request, $client, $socialAccount, $action);
     }
 
@@ -75,11 +86,16 @@ class FacebookInstagramConnectController extends Controller
         Request $request,
         ConnectMetaAudioAccessAction $action,
     ): RedirectResponse {
-        $socialAccount = SocialAccount::find($request->query('state'));
+        // Step I-1.6: the account comes from the signed, single-use state — never from a raw id.
+        $payload = $this->states->consume($request->query('state'), self::STATE_FLOW);
+        $socialAccount = $payload && $payload['user_id'] === $request->user()?->id
+            ? SocialAccount::find($payload['social_account_id'])
+            : null;
 
         if (! $socialAccount) {
             Log::warning('Facebook Instagram connect static callback missing/invalid state', [
-                'state' => $request->query('state'),
+                'user_id' => $request->user()?->id,
+                'ip' => $request->ip(),
             ]);
 
             return to_route('dashboard')->with('error', 'Instagram connection via Facebook failed.');
@@ -190,6 +206,26 @@ class FacebookInstagramConnectController extends Controller
         }
 
         throw new RuntimeException('No Instagram Business account is connected to any of this Facebook Page(s).');
+    }
+
+    /**
+     * Step I-1.6: the state must have been issued for this account to this same user.
+     */
+    private function validState(Request $request, int $socialAccountId): bool
+    {
+        $payload = $this->states->consume($request->query('state'), self::STATE_FLOW);
+        $valid = $payload !== null
+            && $payload['social_account_id'] === $socialAccountId
+            && $payload['user_id'] === $request->user()?->id;
+
+        if (! $valid) {
+            Log::warning('Facebook Instagram connect callback rejected: missing, invalid or reused state', [
+                'social_account_id' => $socialAccountId,
+                'user_id' => $request->user()?->id,
+            ]);
+        }
+
+        return $valid;
     }
 
     private function redirectUri(Client $client, SocialAccount $socialAccount): string

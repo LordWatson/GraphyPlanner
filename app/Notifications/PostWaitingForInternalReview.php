@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Post;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * `TransitionPostStatusAction` whenever a post lands in `internal_review`, so someone picks it up
  * before it goes to the client. In-app (database) only; no email.
  */
-class PostWaitingForInternalReview extends Notification
+class PostWaitingForInternalReview extends Notification implements ShouldQueue
 {
     use Queueable;
 

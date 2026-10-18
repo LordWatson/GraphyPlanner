@@ -57,7 +57,8 @@ class ClientInvitationAcceptController extends Controller
             ->where('token_hash', hash('sha256', $token))
             ->first();
 
-        if (! $invitation || ! $invitation->isPending()) {
+        // Step I-1.5: an archived client's invitations can't be accepted (`client` is null then).
+        if (! $invitation || ! $invitation->isPending() || $invitation->client === null) {
             throw new NotFoundHttpException;
         }
 

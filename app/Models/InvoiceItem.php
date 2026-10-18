@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\InvoiceItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,7 +30,7 @@ use Illuminate\Support\Carbon;
 class InvoiceItem extends Model
 {
     /** @use HasFactory<InvoiceItemFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory;
 
     /**
      * @return array<string, string>
@@ -48,7 +50,7 @@ class InvoiceItem extends Model
      */
     public function invoice(): BelongsTo
     {
-        return $this->belongsTo(Invoice::class);
+        return $this->belongsTo(Invoice::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -64,7 +66,7 @@ class InvoiceItem extends Model
      */
     public function post(): BelongsTo
     {
-        return $this->belongsTo(Post::class);
+        return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

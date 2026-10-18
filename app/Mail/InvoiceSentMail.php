@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\Invoice;
 use App\Support\MoneyFormatter;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  * there is one. Also used for payment reminders (`$isReminder`), which reuse the same layout with
  * reminder copy.
  */
-class InvoiceSentMail extends Mailable
+class InvoiceSentMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\StaffInvitation;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Sent to a newly-invited staff member (via Resend) inviting them to join the organization,
  * containing a signed accept-invite link (a fresh, single-use `StaffInvitation` token).
  */
-class StaffInvitationMail extends Mailable
+class StaffInvitationMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -32,13 +33,14 @@ use Illuminate\Support\Carbon;
  * @property int|null $suspended_by
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 #[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * The frozen "Preview Studio" fixture org that powers `/preview/*` (Step 0.14). Super admins

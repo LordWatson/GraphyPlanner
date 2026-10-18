@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -46,6 +47,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
+     * The frozen "Preview Studio" owner seeded by `PreviewSeeder` (Step 0.14). Only ever
+     * authenticated per-request on `/preview/*` (Step I-1.1).
+     */
+    public const PREVIEW_EMAIL = 'preview@graphy.test';
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -75,7 +82,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(Client::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -99,5 +106,10 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function isSuperAdmin(): bool
     {
         return $this->role === Role::SuperAdmin;
+    }
+
+    public function isPreviewUser(): bool
+    {
+        return $this->email === self::PREVIEW_EMAIL;
     }
 }

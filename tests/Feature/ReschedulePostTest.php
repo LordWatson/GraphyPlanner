@@ -136,7 +136,7 @@ class ReschedulePostTest extends TestCase
     {
         $owner = $this->user(Role::Owner);
 
-        foreach ([PostStatus::Scheduled, PostStatus::Publishing, PostStatus::Published, PostStatus::Archived] as $status) {
+        foreach ([PostStatus::Publishing, PostStatus::Published, PostStatus::PartiallyPublished, PostStatus::Archived] as $status) {
             $post = $this->makePost($status);
             $target = $this->target($post, 'UTC', '2026-10-20', '09:00', '2026-10-20T09:00:00+00:00');
 
@@ -171,8 +171,8 @@ class ReschedulePostTest extends TestCase
     {
         $movable = $this->makePost();
         $this->target($movable, 'UTC', '2026-10-20', '09:00', '2026-10-20T09:00:00+00:00');
-        $scheduled = $this->makePost(PostStatus::Scheduled);
-        $this->target($scheduled, 'UTC', '2026-10-21', '09:00', '2026-10-21T09:00:00+00:00');
+        $published = $this->makePost(PostStatus::Published);
+        $this->target($published, 'UTC', '2026-10-21', '09:00', '2026-10-21T09:00:00+00:00');
 
         $this->actingAs($this->user(Role::Designer))
             ->get(route('calendar'))

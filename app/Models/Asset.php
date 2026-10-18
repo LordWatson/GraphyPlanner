@@ -4,12 +4,17 @@ namespace App\Models;
 
 use App\Enums\AssetSource;
 use App\Enums\AssetType;
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
+use App\Support\StoredFileUrl;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -34,6 +39,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_ai_generated
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'uploaded_by', 'source', 'type', 'disk', 'path', 'url',
@@ -43,7 +49,18 @@ use Illuminate\Support\Carbon;
 class Asset extends Model
 {
     /** @use HasFactory<AssetFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory, SoftDeletes;
+
+    /**
+     * Step I-1.6: a private file's URL is signed and short-lived, so it's minted on every read
+     * instead of trusting the URL stored at upload time.
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function url(): Attribute
+    {
+        return Attribute::make(get: fn (?string $value): ?string => StoredFileUrl::resolve($this->disk, $this->path, $value));
+    }
 
     /**
      * @return array<string, string>
@@ -70,7 +87,8 @@ class Asset extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -78,7 +96,7 @@ class Asset extends Model
      */
     public function campaign(): BelongsTo
     {
-        return $this->belongsTo(Campaign::class);
+        return $this->belongsTo(Campaign::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -96,7 +114,7 @@ class Asset extends Model
      */
     public function aiImageVariant(): BelongsTo
     {
-        return $this->belongsTo(AiImageVariant::class);
+        return $this->belongsTo(AiImageVariant::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

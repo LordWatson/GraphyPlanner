@@ -38,6 +38,7 @@ class InvoiceLifecycleTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        Storage::fake('local');
         Mail::fake();
 
         $this->org = Organization::factory()->create(['invoice_payment_terms_days' => 30]);
@@ -108,9 +109,9 @@ class InvoiceLifecycleTest extends TestCase
         $this->assertSame('accounts@client.test', $invoice->sent_to_email);
         $this->assertTrue($invoice->hasPdf());
         $this->assertSame($invoice->generatedPdfFilename(), $invoice->pdf_original_filename);
-        Storage::disk('public')->assertExists($invoice->pdf_path);
+        Storage::disk('local')->assertExists($invoice->pdf_path);
 
-        Mail::assertSent(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('accounts@client.test')
+        Mail::assertQueued(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('accounts@client.test')
             && $mail->personalMessage === 'Thanks for a great month!'
             && ! $mail->isReminder);
         Notification::assertSentTo($reviewer, InvoiceIssued::class);
@@ -124,7 +125,7 @@ class InvoiceLifecycleTest extends TestCase
             ->post(route('invoices.send', $invoice), ['email' => 'cfo@client.test'])
             ->assertSessionHasNoErrors();
 
-        Mail::assertSent(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('cfo@client.test'));
+        Mail::assertQueued(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('cfo@client.test'));
         $this->assertSame('cfo@client.test', $invoice->fresh()->sent_to_email);
     }
 
@@ -135,7 +136,7 @@ class InvoiceLifecycleTest extends TestCase
 
         $this->actingAs($this->owner)->post(route('invoices.send', $invoice))->assertSessionHasNoErrors();
 
-        Mail::assertSent(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('approvals@client.test'));
+        Mail::assertQueued(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('approvals@client.test'));
     }
 
     public function test_an_invoice_is_marked_sent_without_email_when_the_client_has_no_contact(): void
@@ -148,7 +149,7 @@ class InvoiceLifecycleTest extends TestCase
         $invoice->refresh();
         $this->assertSame(InvoiceStatus::Sent, $invoice->status);
         $this->assertNull($invoice->sent_to_email);
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_an_itemised_invoice_must_be_finalized_before_it_is_sent(): void
@@ -159,7 +160,7 @@ class InvoiceLifecycleTest extends TestCase
         $this->actingAs($this->owner)->post(route('invoices.send', $invoice))->assertSessionHasErrors('status');
 
         $this->assertSame(InvoiceStatus::Draft, $invoice->fresh()->status);
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_a_zero_amount_invoice_cannot_be_sent(): void
@@ -259,7 +260,7 @@ class InvoiceLifecycleTest extends TestCase
 
         $this->assertModelExists($sent);
         $this->assertModelExists($paid);
-        $this->assertModelMissing($void);
+        $this->assertSoftDeleted($void);
     }
 
     public function test_a_reminder_emails_the_original_recipient_and_is_throttled(): void
@@ -268,7 +269,7 @@ class InvoiceLifecycleTest extends TestCase
 
         $this->actingAs($this->owner)->post(route('invoices.remind', $invoice))->assertSessionHasNoErrors();
 
-        Mail::assertSent(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('original@client.test') && $mail->isReminder);
+        Mail::assertQueued(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('original@client.test') && $mail->isReminder);
         $invoice->refresh();
         $this->assertSame(1, $invoice->reminder_count);
         $this->assertNotNull($invoice->last_reminded_at);
@@ -281,7 +282,7 @@ class InvoiceLifecycleTest extends TestCase
     {
         $this->actingAs($this->owner)->post(route('invoices.remind', $this->draft()))->assertSessionHasErrors('invoice');
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_a_reminder_needs_somebody_to_email(): void
@@ -291,7 +292,7 @@ class InvoiceLifecycleTest extends TestCase
 
         $this->actingAs($this->owner)->post(route('invoices.remind', $invoice))->assertSessionHasErrors('email');
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_duplicating_copies_items_into_a_fresh_draft(): void

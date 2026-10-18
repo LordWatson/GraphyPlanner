@@ -42,9 +42,9 @@ class SendUpcomingPostRemindersCommandTest extends TestCase
 
         $this->artisan('posts:send-upcoming-reminders', ['--days' => 3])->assertSuccessful();
 
-        Mail::assertSent(UpcomingPostReminderMail::class, 2);
-        Mail::assertSent(UpcomingPostReminderMail::class, fn ($mail) => $mail->hasTo($owner->email));
-        Mail::assertSent(UpcomingPostReminderMail::class, fn ($mail) => $mail->hasTo($designer->email));
+        Mail::assertQueued(UpcomingPostReminderMail::class, 2);
+        Mail::assertQueued(UpcomingPostReminderMail::class, fn ($mail) => $mail->hasTo($owner->email));
+        Mail::assertQueued(UpcomingPostReminderMail::class, fn ($mail) => $mail->hasTo($designer->email));
 
         $this->assertNotNull($target->fresh()->reminder_sent_at);
     }
@@ -73,7 +73,7 @@ class SendUpcomingPostRemindersCommandTest extends TestCase
 
         $this->artisan('posts:send-upcoming-reminders', ['--days' => 3])->assertSuccessful();
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_it_ignores_posts_that_are_not_scheduled_or_outside_the_window(): void
@@ -111,6 +111,6 @@ class SendUpcomingPostRemindersCommandTest extends TestCase
 
         $this->artisan('posts:send-upcoming-reminders', ['--days' => 3])->assertSuccessful();
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 }

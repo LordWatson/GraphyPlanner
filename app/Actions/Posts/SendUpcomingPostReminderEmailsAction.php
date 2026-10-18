@@ -5,6 +5,7 @@ namespace App\Actions\Posts;
 use App\Enums\PostStatus;
 use App\Mail\UpcomingPostReminderMail;
 use App\Models\Organization;
+use App\Models\Post;
 use App\Models\PostTarget;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,9 @@ class SendUpcomingPostReminderEmailsAction
      * `UpcomingPostReminderMail`. Marks each notified target's `reminder_sent_at` so a re-run of
      * the command never sends a duplicate reminder for the same target.
      *
+     * Step I-1.8: works one organization at a time (only the org ids are loaded up front), so a
+     * busy week never pulls every due target of every organization into memory at once.
+     *
      * @return int the number of `PostTarget`s that were reminded about
      */
     public function __invoke(int $days = 3): int
@@ -27,23 +31,35 @@ class SendUpcomingPostReminderEmailsAction
         $now = Carbon::now();
         $until = $now->clone()->addDays($days);
 
-        $targets = PostTarget::query()
+        $due = fn () => PostTarget::query()
             ->whereNull('reminder_sent_at')
             ->whereNotNull('scheduled_at_utc')
             ->whereBetween('scheduled_at_utc', [$now, $until])
-            ->whereHas('post', fn ($q) => $q->where('status', PostStatus::Scheduled))
+            // Step I-1.5: an archived client's posts are paused — no reminders either.
+            ->whereIn('post_id', Post::query()->where('status', PostStatus::Scheduled)->forActiveClients()->select('id'))
             // Step 15.3: members of a suspended organization are locked out — don't email them.
-            ->whereHas('post.organization', fn ($q) => $q->whereNull('suspended_at'))
-            ->with(['post.client:id,name', 'post.organization', 'socialAccount'])
-            ->get();
+            ->whereHas('post.organization', fn ($q) => $q->whereNull('suspended_at'));
 
-        if ($targets->isEmpty()) {
-            return 0;
-        }
+        $orgIds = $due()
+            ->join('posts', 'posts.id', '=', 'post_targets.post_id')
+            ->distinct()
+            ->orderBy('posts.org_id')
+            ->pluck('posts.org_id');
 
-        $targetsByOrg = $targets->groupBy(fn (PostTarget $target) => $target->post->org_id);
+        $reminded = 0;
 
-        foreach ($targetsByOrg as $orgId => $orgTargets) {
+        foreach ($orgIds as $orgId) {
+            $orgTargets = $due()
+                ->whereHas('post', fn ($q) => $q->where('org_id', $orgId))
+                ->with(['post.client:id,name', 'post.organization', 'socialAccount'])
+                ->get();
+
+            if ($orgTargets->isEmpty()) {
+                continue;
+            }
+
+            $reminded += $orgTargets->count();
+
             /** @var Organization|null $organization */
             $organization = $orgTargets->first()->post->organization;
 
@@ -83,6 +99,6 @@ class SendUpcomingPostReminderEmailsAction
             ]);
         }
 
-        return $targets->count();
+        return $reminded;
     }
 }

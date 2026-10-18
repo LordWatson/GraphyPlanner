@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\ClientInvitation;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Sent to a newly-invited client contact (via Resend) inviting them to the Step 6.2 client
  * portal, containing a signed accept-invite link (a fresh, single-use `ClientInvitation` token).
  */
-class ClientInvitationMail extends Mailable
+class ClientInvitationMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

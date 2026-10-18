@@ -34,6 +34,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('settings/organization', [OrganizationController::class, 'edit'])->name('organization.edit');
     Route::put('settings/organization', [OrganizationController::class, 'update'])->name('organization.update');
+    // Step I-1.6: "Test connection" for the stored Upload-Post key.
+    Route::post('settings/organization/test-upload-post', [OrganizationController::class, 'testUploadPost'])
+        ->middleware('throttle:6,1')
+        ->name('organization.test-upload-post');
 
     // Step 16.11: Owner-only AI usage (images this month vs quota, estimated cost).
     Route::get('settings/ai-usage', [AiUsageController::class, 'edit'])->name('ai-usage.edit');

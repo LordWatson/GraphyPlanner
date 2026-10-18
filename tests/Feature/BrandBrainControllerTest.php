@@ -120,6 +120,7 @@ class BrandBrainControllerTest extends TestCase
     public function test_owner_can_upload_a_brand_persona_pdf(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -137,12 +138,13 @@ class BrandBrainControllerTest extends TestCase
         $this->assertNotNull($brandBrain);
         $this->assertSame('persona.pdf', $brandBrain->persona_original_filename);
         $this->assertNotNull($brandBrain->persona_path);
-        Storage::disk('public')->assertExists($brandBrain->persona_path);
+        Storage::disk('local')->assertExists($brandBrain->persona_path);
     }
 
     public function test_uploading_a_new_brand_persona_replaces_the_old_file(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -154,19 +156,20 @@ class BrandBrainControllerTest extends TestCase
 
         $brandBrain = BrandBrain::firstWhere('client_id', $client->id);
         $oldPath = $brandBrain->persona_path;
-        Storage::disk('public')->assertExists($oldPath);
+        Storage::disk('local')->assertExists($oldPath);
 
         $this->actingAs($owner)->post(route('clients.brand-brain.persona.store', $client), [
             'persona' => UploadedFile::fake()->create('second.pdf', 100, 'application/pdf'),
         ]);
 
-        Storage::disk('public')->assertMissing($oldPath);
+        Storage::disk('local')->assertMissing($oldPath);
         $this->assertSame('second.pdf', $brandBrain->fresh()->persona_original_filename);
     }
 
     public function test_designer_cannot_upload_a_brand_persona_pdf(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
@@ -182,6 +185,7 @@ class BrandBrainControllerTest extends TestCase
     public function test_brand_persona_upload_rejects_non_pdf_files(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();

@@ -3,6 +3,7 @@
 namespace App\Services\Publishing;
 
 use App\Contracts\PublishAdapter;
+use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Support\Publishing\TargetResult;
@@ -15,7 +16,12 @@ use Illuminate\Support\Collection;
  */
 class NullPublishAdapter implements PublishAdapter
 {
-    public function connectAccount(SocialAccount $account): string
+    public function verifyCredentials(Organization $organization): bool
+    {
+        return false;
+    }
+
+    public function connectAccount(SocialAccount $account, ?string $state = null): string
     {
         return '';
     }

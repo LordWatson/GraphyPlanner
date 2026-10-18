@@ -5,8 +5,10 @@ namespace App\Http\Requests;
 use App\Enums\AssetSource;
 use App\Enums\AssetType;
 use App\Models\Asset;
+use App\Models\Client;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class StoreAssetRequest extends FormRequest
@@ -24,10 +26,15 @@ class StoreAssetRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Step I-1.9: referenced records must belong to this client — a bare `exists:` rule would
+        // accept another organization's ids.
+        $client = $this->route('client');
+        $clientId = $client instanceof Client ? $client->id : null;
+
         return [
             // AssetSource::Ai is system-only (the Image Studio creates those rows), never user-submitted.
             'source' => ['required', (new Enum(AssetSource::class))->except([AssetSource::Ai])],
-            'campaign_id' => ['nullable', 'integer', 'exists:campaigns,id'],
+            'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
             'type' => ['nullable', new Enum(AssetType::class)],
             'file' => [
                 'required_if:source,upload',

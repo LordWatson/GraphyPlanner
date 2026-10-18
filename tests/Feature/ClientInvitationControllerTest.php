@@ -34,7 +34,7 @@ class ClientInvitationControllerTest extends TestCase
             'email' => 'contact@acme.test',
             'invited_by_user_id' => $owner->id,
         ]);
-        Mail::assertSent(ClientInvitationMail::class);
+        Mail::assertQueued(ClientInvitationMail::class);
     }
 
     public function test_a_duplicate_pending_invitation_to_the_same_email_is_rejected(): void

@@ -35,6 +35,7 @@ class BrandReferencesTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        Storage::fake('local');
         $this->org = Organization::factory()->create();
         $this->client = Client::factory()->for($this->org, 'organization')->create();
         $this->owner = User::factory()->for($this->org, 'organization')->role(Role::Owner)->create();
@@ -77,7 +78,7 @@ class BrandReferencesTest extends TestCase
         $this->assertSame(ReferenceImageRole::Logo, $rows[0]->role);
         $this->assertSame('image/webp', $rows[0]->normalized_mime_type);
 
-        $normalized = Storage::disk('public')->get((string) $rows[0]->normalized_path);
+        $normalized = Storage::disk('local')->get((string) $rows[0]->normalized_path);
         $this->assertSame(1024, getimagesizefromstring((string) $normalized)[0]);
 
         $this->actingAs($this->owner)->get(route('clients.brand-brain.edit', $this->client))
@@ -93,7 +94,7 @@ class BrandReferencesTest extends TestCase
         $this->actingAs($this->owner)->put(route('clients.brand-brain.references.update', $this->client), ['references' => []]);
 
         $this->assertCount(0, $this->client->fresh()->brandBrain->referenceAssets);
-        Storage::disk('public')->assertMissing((string) $path);
+        Storage::disk('local')->assertMissing((string) $path);
     }
 
     public function test_the_reference_limit_is_enforced(): void

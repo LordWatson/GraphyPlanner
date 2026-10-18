@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\OrganizationScope;
+use App\Support\StoredFileUrl;
 use Database\Factories\BrandBrainFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,6 +42,17 @@ class BrandBrain extends Model
     use HasFactory;
 
     /**
+     * Step I-1.6: a private file's URL is signed and short-lived, so it's minted on every read
+     * instead of trusting the URL stored at upload time.
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function personaUrl(): Attribute
+    {
+        return Attribute::make(get: fn (?string $value): ?string => StoredFileUrl::resolve($this->persona_disk, $this->persona_path, $value));
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -59,7 +73,8 @@ class BrandBrain extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

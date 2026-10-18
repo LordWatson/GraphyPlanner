@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Actions\Posts\PostStatusTransitionMap;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Enums\Role;
@@ -54,7 +55,7 @@ class PostPolicy
      */
     public function update(User $user, Post $post): bool
     {
-        if (in_array($post->status, [PostStatus::Scheduled, PostStatus::Published], true)) {
+        if (in_array($post->status, [PostStatus::Scheduled, PostStatus::Published, PostStatus::PartiallyPublished], true)) {
             return false;
         }
 
@@ -65,13 +66,20 @@ class PostPolicy
     /**
      * Determine whether the user can move a post to another day from the calendar.
      *
-     * Same lock as `update` (a `scheduled` post already has its publish job queued for the old
-     * time, a `published` one is out), plus a post mid-publish or archived, and any post with a
-     * target that has already gone out — shifting a published target's date would rewrite history.
+     * Step I-1.2: a `scheduled` post can be moved — `ReschedulePostAction` re-dispatches its
+     * publish job with a fresh dispatch id, so the old queued job no-ops. Still blocked: anything
+     * that has gone (or is going) out — `publishing`, `published`, `partially_published` —
+     * `archived`, and any post with a target already published, since shifting a published
+     * target's date would rewrite history.
      */
     public function reschedule(User $user, Post $post): bool
     {
-        if (in_array($post->status, [PostStatus::Publishing, PostStatus::Archived], true)) {
+        if (in_array($post->status, [
+            PostStatus::Publishing,
+            PostStatus::Published,
+            PostStatus::PartiallyPublished,
+            PostStatus::Archived,
+        ], true)) {
             return false;
         }
 
@@ -79,14 +87,25 @@ class PostPolicy
             return false;
         }
 
-        return $this->update($user, $post);
+        return $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
     }
 
     /**
-     * Determine whether the user can delete a post.
+     * Determine whether the user can delete a post (Step I-1.5: a soft delete via
+     * `DeletePostAction`). Anything that has gone — or is going — out can only be archived:
+     * `publishing`, `published`, `partially_published`, or any post with a published target.
      */
     public function delete(User $user, Post $post): bool
     {
+        if (in_array($post->status, [PostStatus::Publishing, PostStatus::Published, PostStatus::PartiallyPublished], true)) {
+            return false;
+        }
+
+        if ($post->targets->contains(fn ($target) => $target->status === PostTargetStatus::Published)) {
+            return false;
+        }
+
         return $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist], true);
     }
@@ -100,6 +119,11 @@ class PostPolicy
      */
     public function transition(User $user, Post $post, PostStatus $to): bool
     {
+        // Step I-1.3: retrying failed targets has its own action/route (`retryFailedTargets`).
+        if (PostStatusTransitionMap::isRetryMove($post->status, $to)) {
+            return false;
+        }
+
         if ($user->role === Role::ClientReviewer) {
             return $user->client_id === $post->client_id
                 && $post->status === PostStatus::WaitingClient
@@ -107,6 +131,16 @@ class PostPolicy
         }
 
         return $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
+     * Step I-1.3: resend only the failed targets of a `failed`/`partially_published` post.
+     */
+    public function retryFailedTargets(User $user, Post $post): bool
+    {
+        return in_array($post->status, [PostStatus::Failed, PostStatus::PartiallyPublished], true)
+            && $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
     }
 

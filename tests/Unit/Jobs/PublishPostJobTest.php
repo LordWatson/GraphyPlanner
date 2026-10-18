@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Jobs;
 
-use App\Actions\Posts\TransitionPostStatusAction;
 use App\Contracts\PublishAdapter;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -24,14 +23,8 @@ class PublishPostJobTest extends TestCase
 
     public function test_it_publishes_every_target_and_keeps_the_post_publishing_pending_vendor_confirmation_when_all_targets_are_accepted(): void
     {
-        $org = Organization::factory()->create();
-        $client = Client::factory()->for($org, 'organization')->create();
-        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Scheduled]);
-        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::LinkedIn]);
-        $target = $post->targets()->create([
-            'social_account_id' => $account->id,
-            'scheduled_at_utc' => now(),
-        ]);
+        [$post, $account] = $this->scheduledPost();
+        $target = $post->targets()->firstOrFail();
 
         $adapter = Mockery::mock(PublishAdapter::class);
         $adapter->shouldReceive('publish')
@@ -42,7 +35,7 @@ class PublishPostJobTest extends TestCase
             ]));
         $this->app->instance(PublishAdapter::class, $adapter);
 
-        (new PublishPostJob($post->id))->handle($adapter, app(TransitionPostStatusAction::class));
+        $this->runJob($post);
 
         $post->refresh();
         $target->refresh();
@@ -54,25 +47,22 @@ class PublishPostJobTest extends TestCase
         $this->assertSame(PostTargetStatus::Pending, $target->status);
         $this->assertSame('ext-123', $target->external_post_id);
         $this->assertNull($target->error);
+        $this->assertNotNull($target->publish_attempt_id);
+        $this->assertNotNull($target->publish_requested_at);
     }
 
     public function test_it_marks_the_post_and_target_failed_when_a_target_fails(): void
     {
-        $org = Organization::factory()->create();
-        $client = Client::factory()->for($org, 'organization')->create();
-        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Scheduled]);
-        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::LinkedIn]);
-        $target = $post->targets()->create([
-            'social_account_id' => $account->id,
-            'scheduled_at_utc' => now(),
-        ]);
+        [$post, $account] = $this->scheduledPost();
+        $target = $post->targets()->firstOrFail();
 
         $adapter = Mockery::mock(PublishAdapter::class);
         $adapter->shouldReceive('publish')->once()->andReturn(collect([
             new TargetResult(accountId: $account->id, ok: false, error: 'Vendor rejected the request'),
         ]));
+        $this->app->instance(PublishAdapter::class, $adapter);
 
-        (new PublishPostJob($post->id))->handle($adapter, app(TransitionPostStatusAction::class));
+        $this->runJob($post);
 
         $post->refresh();
         $target->refresh();
@@ -96,9 +86,44 @@ class PublishPostJobTest extends TestCase
 
         $adapter = Mockery::mock(PublishAdapter::class);
         $adapter->shouldNotReceive('publish');
+        $this->app->instance(PublishAdapter::class, $adapter);
 
-        (new PublishPostJob($post->id))->handle($adapter, app(TransitionPostStatusAction::class));
+        $this->runJob($post);
 
         $this->assertSame(PostStatus::Draft, $post->refresh()->status);
+    }
+
+    public function test_it_is_unique_per_post_and_dispatch_id(): void
+    {
+        $this->assertSame('7:abc', (new PublishPostJob(7, 'abc'))->uniqueId());
+        $this->assertSame('7:none', (new PublishPostJob(7))->uniqueId());
+        $this->assertSame(3, (new PublishPostJob(7))->tries);
+        $this->assertSame([30, 120, 600], (new PublishPostJob(7))->backoff());
+    }
+
+    /**
+     * @return array{0: Post, 1: SocialAccount}
+     */
+    private function scheduledPost(): array
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'status' => PostStatus::Scheduled,
+            'publish_dispatch_id' => 'dispatch-1',
+        ]);
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::LinkedIn]);
+        $post->targets()->create([
+            'social_account_id' => $account->id,
+            'scheduled_at_utc' => now(),
+        ]);
+
+        return [$post, $account];
+    }
+
+    private function runJob(Post $post): void
+    {
+        $this->app->call([new PublishPostJob($post->id, $post->publish_dispatch_id), 'handle']);
     }
 }

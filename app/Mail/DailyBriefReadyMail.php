@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\Client;
 use App\Models\DailyBrief;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  * fresh AI trends/ideas is ready, respecting the quiet hours window configured in
  * `config('ai.daily_briefs')` — see `GenerateDailyBriefsAction`.
  */
-class DailyBriefReadyMail extends Mailable
+class DailyBriefReadyMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

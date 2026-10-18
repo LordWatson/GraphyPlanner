@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\OrganizationReport;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
  * Sent synchronously by `SendScheduledOrganizationReportsAction` (the attachments are raw bytes,
  * which don't belong in a queue payload).
  */
-class OrganizationReportMail extends Mailable
+class OrganizationReportMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

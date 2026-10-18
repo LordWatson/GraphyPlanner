@@ -63,6 +63,7 @@ class AiImageStudioTest extends TestCase
 
         Config::set('ai.enabled', true);
         Storage::fake('public');
+        Storage::fake('local');
         RateLimiter::clear('ai-images:org:1');
 
         self::$calls = [];
@@ -174,14 +175,14 @@ class AiImageStudioTest extends TestCase
         $this->assertSame($generation->uuid, $asset->variant_group_id);
         $this->assertNotNull($asset->ai_image_variant_id);
         $this->assertStringStartsWith("ai-images/{$this->org->id}/{$this->client->id}/", (string) $asset->path);
-        Storage::disk('public')->assertExists((string) $asset->path);
+        Storage::disk('local')->assertExists((string) $asset->path);
 
         // Distinct seeds so a set shows range, not near-duplicates.
         $this->assertCount(4, $generation->variants->pluck('seed')->unique());
 
         $variant = $generation->variants->first();
         $this->assertNotNull($variant->preview_path);
-        Storage::disk('public')->assertExists((string) $variant->preview_path);
+        Storage::disk('local')->assertExists((string) $variant->preview_path);
 
         $this->assertDatabaseCount('ai_usage_logs', 4);
         $this->assertDatabaseHas('ai_usage_logs', ['method' => 'image.generate', 'succeeded' => true, 'org_id' => $this->org->id]);

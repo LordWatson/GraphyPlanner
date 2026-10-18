@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\Log;
  * `publishing` (i.e. its webhook never arrived, or never will for a vendor that doesn't send
  * one), asks `PublishAdapter::checkStatus()` for the vendor's current verdict and, if resolved,
  * finalizes it through `SyncPublishStatusAction` exactly like the webhook does.
+ *
+ * Step I-1.3: a target still `pending` past `publishing.delivery_timeout_hours` (accepted but never
+ * confirmed, or never sent at all) is failed with "No delivery confirmation after N hours", so a
+ * post can't sit in `publishing` forever — it lands on Home as failed/partially published.
+ * Step I-1.8: rows are walked with `lazyById()` instead of loaded all at once.
  */
 class PollPendingPublishStatusesAction
 {
@@ -21,20 +26,35 @@ class PollPendingPublishStatusesAction
         SyncPublishStatusAction $sync,
         int $olderThanMinutes = 5,
     ): int {
+        $checked = 0;
+        $timeoutHours = max(1, (int) config('publishing.delivery_timeout_hours', 24));
+        $timedOutBefore = now()->subHours($timeoutHours);
+
         $targets = PostTarget::query()
             ->where('status', PostTargetStatus::Pending)
-            ->whereNotNull('external_post_id')
             ->where('updated_at', '<=', now()->subMinutes($olderThanMinutes))
             ->whereHas('post', fn ($query) => $query->where('status', PostStatus::Publishing))
             ->with('socialAccount')
-            ->get();
-
-        $checked = 0;
+            ->lazyById(200);
 
         foreach ($targets as $target) {
+            if ($target->updated_at !== null && $target->updated_at->lessThanOrEqualTo($timedOutBefore)) {
+                Log::warning('PollPendingPublishStatusesAction: delivery confirmation timed out', [
+                    'post_target_id' => $target->id,
+                    'post_id' => $target->post_id,
+                    'timeout_hours' => $timeoutHours,
+                ]);
+
+                $sync($target, false, __('No delivery confirmation after :hours hours.', ['hours' => $timeoutHours]));
+
+                continue;
+            }
+
             $account = $target->socialAccount;
 
             if (! $account || ! $target->external_post_id) {
+                // Not sent yet (its target job is still queued) — the timeout above catches it if
+                // it never is.
                 continue;
             }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AiImageVariant;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -10,9 +11,16 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class ImageVariantActionRequest extends FormRequest
 {
+    /**
+     * Step I-1.9: authorize before validating (see `GenerateImagesRequest`).
+     */
     public function authorize(): bool
     {
-        return true;
+        $variant = $this->route('variant');
+
+        return $variant instanceof AiImageVariant
+            && $variant->generation !== null
+            && $this->user()->can('manage', $variant->generation);
     }
 
     /**

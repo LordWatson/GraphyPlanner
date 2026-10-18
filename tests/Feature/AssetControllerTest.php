@@ -21,6 +21,7 @@ class AssetControllerTest extends TestCase
     public function test_owner_can_upload_a_file_asset(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -41,12 +42,13 @@ class AssetControllerTest extends TestCase
         ]);
 
         $asset = Asset::first();
-        Storage::disk('public')->assertExists($asset->path);
+        Storage::disk('local')->assertExists($asset->path);
     }
 
     public function test_json_request_returns_the_created_asset_instead_of_redirecting(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -72,6 +74,7 @@ class AssetControllerTest extends TestCase
     public function test_designer_can_upload_an_asset(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
@@ -89,6 +92,7 @@ class AssetControllerTest extends TestCase
     public function test_owner_can_upload_a_video_asset(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -109,12 +113,13 @@ class AssetControllerTest extends TestCase
         ]);
 
         $asset = Asset::first();
-        Storage::disk('public')->assertExists($asset->path);
+        Storage::disk('local')->assertExists($asset->path);
     }
 
     public function test_video_upload_exceeding_image_limit_but_within_video_limit_succeeds(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         config(['assets.max_upload_size_kb' => 100]);
         config(['assets.max_video_upload_size_kb' => 20000]);
 
@@ -197,6 +202,7 @@ class AssetControllerTest extends TestCase
     public function test_owner_can_delete_an_uploaded_asset_and_its_file(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -211,8 +217,9 @@ class AssetControllerTest extends TestCase
         $response = $this->actingAs($owner)->delete(route('assets.destroy', $asset));
 
         $response->assertRedirect(route('clients.show', $client));
-        $this->assertDatabaseMissing('assets', ['id' => $asset->id]);
-        Storage::disk('public')->assertMissing($path);
+        // Step I-1.5: a soft delete — the file stays until the client is purged.
+        $this->assertSoftDeleted($asset);
+        Storage::disk('public')->assertExists($path);
     }
 
     public function test_client_reviewer_sees_assets_scoped_to_their_client(): void

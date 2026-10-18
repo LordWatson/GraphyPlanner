@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PostTargetStatus;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\PostTargetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,12 +22,14 @@ use Illuminate\Support\Carbon;
  * @property PostTargetStatus $status
  * @property string|null $external_post_id
  * @property string|null $error
+ * @property string|null $publish_attempt_id
+ * @property Carbon|null $publish_requested_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc',
-    'reminder_sent_at', 'status', 'external_post_id', 'error',
+    'reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at',
 ])]
 class PostTarget extends Model
 {
@@ -42,6 +45,7 @@ class PostTarget extends Model
             'scheduled_local_date' => 'date',
             'scheduled_at_utc' => 'datetime',
             'reminder_sent_at' => 'datetime',
+            'publish_requested_at' => 'datetime',
             'status' => PostTargetStatus::class,
         ];
     }
@@ -51,7 +55,7 @@ class PostTarget extends Model
      */
     public function post(): BelongsTo
     {
-        return $this->belongsTo(Post::class);
+        return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -59,6 +63,6 @@ class PostTarget extends Model
      */
     public function socialAccount(): BelongsTo
     {
-        return $this->belongsTo(SocialAccount::class);
+        return $this->belongsTo(SocialAccount::class)->withoutGlobalScope(OrganizationScope::class);
     }
 }

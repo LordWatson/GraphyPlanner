@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use Database\Factories\DailyBriefFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,7 +30,7 @@ use Illuminate\Support\Carbon;
 class DailyBrief extends Model
 {
     /** @use HasFactory<DailyBriefFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory;
 
     /**
      * @return array<string, string>
@@ -56,6 +58,7 @@ class DailyBrief extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 }

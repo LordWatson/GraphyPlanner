@@ -178,16 +178,11 @@ function ActivityItem({
                         {log.note}
                     </blockquote>
                 )}
-                {log.review_url && (
+                {log.review_link_sent && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <a
-                            href={log.review_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-muted-foreground hover:text-foreground min-w-0 break-all underline underline-offset-2"
-                        >
-                            Client review link
-                        </a>
+                        <span className="text-muted-foreground">
+                            Review link emailed to the client
+                        </span>
                         {canResend && (
                             <Form
                                 {...postActivityLogs.resendReviewEmail.form([

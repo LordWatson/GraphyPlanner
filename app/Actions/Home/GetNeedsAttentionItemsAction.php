@@ -39,6 +39,7 @@ class GetNeedsAttentionItemsAction
         $isClientReviewer = $user->role === Role::ClientReviewer;
 
         $postsQuery = Post::query()
+            ->forActiveClients()
             ->where('org_id', $user->org_id)
             ->with(['client:id,name', 'targets.socialAccount', 'assets']);
 
@@ -49,8 +50,12 @@ class GetNeedsAttentionItemsAction
         $posts = $postsQuery->get();
 
         $failedPublishes = $posts
-            ->filter(fn (Post $post) => $post->status === PostStatus::Failed)
-            ->map(fn (Post $post) => $this->transformPost($post, 'Publish failed'))
+            // Step I-1.3: a partial publish needs the same attention (retry the failed channels).
+            ->filter(fn (Post $post) => in_array($post->status, [PostStatus::Failed, PostStatus::PartiallyPublished], true))
+            ->map(fn (Post $post) => $this->transformPost(
+                $post,
+                $post->status === PostStatus::PartiallyPublished ? 'Partly published — some channels failed' : 'Publish failed',
+            ))
             ->values()
             ->all();
 

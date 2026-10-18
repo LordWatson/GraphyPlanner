@@ -19,7 +19,9 @@ class TransitionPostRequest extends FormRequest
         $to = PostStatus::tryFrom((string) $this->input('to'));
 
         if ($to === null) {
-            return true; // let validation surface the invalid `to` value.
+            // Let validation surface the invalid `to` value — but only to someone who can see the
+            // post at all (Step I-1.9: another organization gets a 403, not validation errors).
+            return $this->user()->can('view', $this->route('post'));
         }
 
         return $this->user()->can('transition', [$this->route('post'), $to]);

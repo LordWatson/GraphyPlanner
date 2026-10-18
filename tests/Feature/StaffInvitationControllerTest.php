@@ -34,7 +34,7 @@ class StaffInvitationControllerTest extends TestCase
             'role' => Role::Strategist->value,
             'invited_by_user_id' => $owner->id,
         ]);
-        Mail::assertSent(StaffInvitationMail::class);
+        Mail::assertQueued(StaffInvitationMail::class);
     }
 
     public function test_a_duplicate_pending_invitation_to_the_same_email_is_rejected(): void

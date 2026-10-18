@@ -1,11 +1,20 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowUpRight, Building2, Plus } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    Archive,
+    ArchiveRestore,
+    ArrowUpRight,
+    Building2,
+    Plus,
+    Trash2,
+} from 'lucide-react';
+import { confirmDialog } from '@/components/confirm-dialog';
 import { EmptyState, Page, PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { formatDate } from '@/lib/dates';
 import { resolveStatus, toneBgClass } from '@/lib/status';
 import { cn } from '@/lib/utils';
-import { create, index, show } from '@/routes/clients';
+import { create, index, purge, restore, show } from '@/routes/clients';
 
 type ClientRow = {
     id: number;
@@ -15,17 +24,27 @@ type ClientRow = {
     default_language: string | null;
     health: string;
     health_reason: string;
+    archived_at: string | null;
+    has_invoices: boolean | null;
 };
 
 const healthOrder = ['red', 'amber', 'green'] as const;
 
 export default function ClientsIndex({
     clients,
+    filters,
+    archivedCount,
     can,
 }: {
     clients: ClientRow[];
-    can: { create: boolean };
+    filters: { archived: boolean };
+    archivedCount: number;
+    can: { create: boolean; manageArchive: boolean };
 }) {
+    if (filters.archived) {
+        return <ArchivedClients clients={clients} can={can} />;
+    }
+
     const healthCounts = healthOrder.map((health) => ({
         health,
         count: clients.filter((client) => client.health === health).length,
@@ -69,14 +88,31 @@ export default function ClientsIndex({
                         ))
                     }
                     actions={
-                        can.create && (
-                            <Button asChild>
-                                <Link href={create()}>
-                                    <Plus />
-                                    Add client
-                                </Link>
-                            </Button>
-                        )
+                        <>
+                            {archivedCount > 0 && (
+                                <Button variant="outline" asChild>
+                                    <Link
+                                        href={index({
+                                            query: { archived: 1 },
+                                        })}
+                                    >
+                                        <Archive />
+                                        Archived
+                                        <span className="font-mono tabular-nums">
+                                            {archivedCount}
+                                        </span>
+                                    </Link>
+                                </Button>
+                            )}
+                            {can.create && (
+                                <Button asChild>
+                                    <Link href={create()}>
+                                        <Plus />
+                                        Add client
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
                     }
                 />
 
@@ -149,6 +185,111 @@ export default function ClientsIndex({
                                         </span>
                                         <ArrowUpRight className="text-muted-foreground group-hover:text-primary hidden size-4 justify-self-end transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:block" />
                                     </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </Page>
+        </>
+    );
+}
+
+/**
+ * Step I-1.5 — archived (soft-deleted) clients: restore, or purge for good once no invoices
+ * remain (invoices are legal records and block a purge).
+ */
+function ArchivedClients({
+    clients,
+    can,
+}: {
+    clients: ClientRow[];
+    can: { manageArchive: boolean };
+}) {
+    const restoreClient = (client: ClientRow) =>
+        router.post(restore.url(client.id), {}, { preserveScroll: true });
+
+    const purgeClient = async (client: ClientRow) => {
+        const confirmed = await confirmDialog({
+            title: `Delete ${client.name} for good?`,
+            description:
+                'Its posts, assets, campaigns and history are removed permanently, along with its stored files. This can’t be undone.',
+            confirmLabel: 'Delete permanently',
+            tone: 'destructive',
+        });
+
+        if (confirmed) {
+            router.delete(purge.url(client.id), { preserveScroll: true });
+        }
+    };
+
+    return (
+        <>
+            <Head title="Archived clients" />
+            <Page>
+                <PageHeader
+                    eyebrow={`${String(clients.length).padStart(2, '0')} archived`}
+                    title="Archived clients."
+                    description="Out of every list, with publishing paused. Restore one to pick up where you left off."
+                    actions={
+                        <Button variant="outline" asChild>
+                            <Link href={index()}>Back to the roster</Link>
+                        </Button>
+                    }
+                />
+
+                {clients.length === 0 ? (
+                    <EmptyState
+                        icon={Archive}
+                        title="Nothing archived."
+                        description="Archived clients show up here, ready to restore."
+                    />
+                ) : (
+                    <div className="animate-rise border-border bg-card overflow-hidden rounded-2xl border">
+                        <ul className="divide-border/70 divide-y">
+                            {clients.map((client) => (
+                                <li
+                                    key={client.id}
+                                    className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4"
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col">
+                                        <span className="font-display truncate text-xl leading-tight">
+                                            {client.name}
+                                        </span>
+                                        <span className="text-muted-foreground text-sm">
+                                            {client.archived_at
+                                                ? `Archived ${formatDate(client.archived_at.slice(0, 10))}`
+                                                : 'Archived'}
+                                            {client.has_invoices &&
+                                                ' · has invoices, so it can only be restored'}
+                                        </span>
+                                    </span>
+                                    {can.manageArchive && (
+                                        <span className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    restoreClient(client)
+                                                }
+                                            >
+                                                <ArchiveRestore />
+                                                Restore
+                                            </Button>
+                                            {!client.has_invoices && (
+                                                <Button
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        void purgeClient(client)
+                                                    }
+                                                >
+                                                    <Trash2 />
+                                                    Delete permanently
+                                                </Button>
+                                            )}
+                                        </span>
+                                    )}
                                 </li>
                             ))}
                         </ul>

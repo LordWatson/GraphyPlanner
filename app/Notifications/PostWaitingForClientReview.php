@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Post;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * dispatched from `TransitionPostStatusAction` whenever a post lands in `waiting_client`,
  * alongside the existing `ClientReviewRequestedMail` email.
  */
-class PostWaitingForClientReview extends Notification
+class PostWaitingForClientReview extends Notification implements ShouldQueue
 {
     use Queueable;
 

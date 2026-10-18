@@ -18,13 +18,20 @@ class UpdatePostAction
      * `{social_account_id, scheduled_local_date, scheduled_local_time}` — each target's
      * `scheduled_at_utc` is (re)computed independently from its own social account's timezone
      * (spec §4.6). `$data['asset_ids']` (when present) fully replaces the post's attached assets.
+     *
+     * Step I-1.2: if the post is `scheduled` (content edits are policy-locked there today, but the
+     * action stays safe if that changes), its publish job is re-dispatched with a fresh id so the
+     * new times apply and the old job no-ops.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function __invoke(
         Post $post,
         array $data,
         EvaluatePostChecklistAction $evaluateChecklist = new EvaluatePostChecklistAction,
+        TransitionPostStatusAction $transition = new TransitionPostStatusAction,
     ): Post {
-        return DB::transaction(function () use ($post, $data, $evaluateChecklist) {
+        return DB::transaction(function () use ($post, $data, $evaluateChecklist, $transition) {
             $post->update(array_diff_key($data, ['targets' => null, 'asset_ids' => null]));
 
             if (array_key_exists('targets', $data)) {
@@ -57,6 +64,10 @@ class UpdatePostAction
 
             $post->refresh();
             $post->update(['checklist_snapshot' => $evaluateChecklist($post)]);
+
+            if (array_key_exists('targets', $data)) {
+                ReschedulePostAction::redispatchIfScheduled($post, $transition);
+            }
 
             Log::info('Post updated', [
                 'post_id' => $post->id,

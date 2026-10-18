@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\BillingCycle;
 use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
+use App\Models\Concerns\BelongsToOrganization;
 use App\Services\ClientHealthService;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -36,6 +38,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $billing_address
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 #[Fillable([
     'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
@@ -45,7 +48,7 @@ use Illuminate\Support\Carbon;
 class Client extends Model
 {
     /** @use HasFactory<ClientFactory> */
-    use HasFactory;
+    use BelongsToOrganization, HasFactory, SoftDeletes;
 
     /**
      * @return array<string, string>

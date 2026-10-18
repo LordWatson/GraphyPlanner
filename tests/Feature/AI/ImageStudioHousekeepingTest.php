@@ -65,6 +65,7 @@ class ImageStudioHousekeepingTest extends TestCase
     public function test_prune_removes_old_unselected_and_discarded_files_but_keeps_attached_ones(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $client = Client::factory()->create();
         $old = now()->subDays(40);
 

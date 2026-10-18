@@ -49,6 +49,7 @@ class DashboardController extends Controller
 
         $unapprovedDraftsStatuses = [PostStatus::Draft, PostStatus::InternalReview, PostStatus::ChangesRequested];
         $unapprovedDraftsQuery = Post::query()
+            ->forActiveClients()
             ->where('org_id', $user->org_id)
             ->whereIn('status', $unapprovedDraftsStatuses);
 

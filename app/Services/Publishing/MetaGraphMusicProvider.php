@@ -7,6 +7,7 @@ use App\Enums\Platform;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Models\SocialAccount;
 use App\Support\Publishing\MusicTrack;
+use App\Support\Publishing\VendorHttp;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -144,9 +145,9 @@ class MetaGraphMusicProvider implements MusicProvider
     private function request(SocialAccount $account): PendingRequest
     {
         try {
-            return Http::baseUrl($this->baseUrl())
+            return VendorHttp::forReads(Http::baseUrl($this->baseUrl())
                 ->acceptJson()
-                ->withQueryParameters(['access_token' => $account->meta_access_token]);
+                ->withQueryParameters(['access_token' => $account->meta_access_token]));
         } catch (Throwable $e) {
             Log::error('Meta Graph API Instagram audio request failed to build', [
                 'social_account_id' => $account->id,

@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Post;
 use App\Models\PostComment;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -13,7 +14,7 @@ use Illuminate\Notifications\Notification;
  * (org user or client-portal user) — separate from `PostCommentAdded`, which notifies the
  * "other side" of the conversation regardless of mentions.
  */
-class PostCommentMentioned extends Notification
+class PostCommentMentioned extends Notification implements ShouldQueue
 {
     use Queueable;
 

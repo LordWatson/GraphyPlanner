@@ -13,7 +13,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { edit } from '@/routes/organization';
+import { edit, testUploadPost } from '@/routes/organization';
+
+/** "Key is set (…a1b2)" — Step I-1.6 shows the last four characters, never the key. */
+function storedHint(
+    isSet: boolean,
+    last4: string | null,
+    noun: string,
+): string {
+    if (!isSet) {
+        return 'Not set';
+    }
+
+    return `${noun} is set${last4 ? ` (…${last4})` : ''} — leave blank to keep it`;
+}
 
 type Option = { value: string; label: string };
 
@@ -28,6 +41,9 @@ type OrganizationProps = {
         has_upload_post_key: boolean;
         has_upload_post_webhook_secret: boolean;
         has_xai_key: boolean;
+        upload_post_key_last4: string | null;
+        upload_post_webhook_secret_last4: string | null;
+        xai_key_last4: string | null;
     };
     currencies: Option[];
 };
@@ -210,11 +226,11 @@ export default function Organization({
                                     className="mt-1 block w-full"
                                     name="upload_post_key"
                                     autoComplete="off"
-                                    placeholder={
-                                        organization.has_upload_post_key
-                                            ? 'Key is set — leave blank to keep it'
-                                            : 'Not set'
-                                    }
+                                    placeholder={storedHint(
+                                        organization.has_upload_post_key,
+                                        organization.upload_post_key_last4,
+                                        'Key',
+                                    )}
                                 />
 
                                 <InputError
@@ -236,7 +252,11 @@ export default function Organization({
                                     autoComplete="off"
                                     placeholder={
                                         organization.has_upload_post_webhook_secret
-                                            ? 'Secret is set — leave blank to keep it'
+                                            ? storedHint(
+                                                  true,
+                                                  organization.upload_post_webhook_secret_last4,
+                                                  'Secret',
+                                              )
                                             : 'Not set — copy the whsec_... value from the Upload-Post notifications dashboard'
                                     }
                                 />
@@ -258,11 +278,11 @@ export default function Organization({
                                     className="mt-1 block w-full"
                                     name="xai_key"
                                     autoComplete="off"
-                                    placeholder={
-                                        organization.has_xai_key
-                                            ? 'Key is set — leave blank to keep it'
-                                            : 'Not set'
-                                    }
+                                    placeholder={storedHint(
+                                        organization.has_xai_key,
+                                        organization.xai_key_last4,
+                                        'Key',
+                                    )}
                                 />
 
                                 <InputError
@@ -282,6 +302,32 @@ export default function Organization({
                         </>
                     )}
                 </Form>
+
+                {organization.has_upload_post_key && (
+                    <Form
+                        {...testUploadPost.form()}
+                        options={{ preserveScroll: true }}
+                        className="border-border flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+                    >
+                        {({ processing }) => (
+                            <>
+                                <p className="text-muted-foreground text-sm">
+                                    Check that Upload-Post accepts your saved
+                                    key. Nothing gets published.
+                                </p>
+                                <Button
+                                    type="submit"
+                                    variant="outline"
+                                    disabled={processing}
+                                >
+                                    {processing
+                                        ? 'Testing…'
+                                        : 'Test connection'}
+                                </Button>
+                            </>
+                        )}
+                    </Form>
+                )}
             </div>
         </>
     );

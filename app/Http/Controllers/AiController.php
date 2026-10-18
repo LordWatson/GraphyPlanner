@@ -40,7 +40,7 @@ class AiController extends Controller
         $this->authorize('view', $client);
         $this->authorizeAiUse($request, $client->org_id);
 
-        $platformValues = array_values(Arr::wrap($request->query('platforms', [])));
+        $platformValues = array_values(Arr::wrap($request->input('platforms', [])));
         $platforms = array_values(array_filter(array_map(function ($value) {
             try {
                 return Platform::from((string) $value)->value;

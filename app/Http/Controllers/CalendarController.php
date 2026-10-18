@@ -30,6 +30,7 @@ class CalendarController extends Controller
         $orgTimezone = $user->organization?->default_timezone ?? 'UTC';
 
         $query = Post::query()
+            ->forActiveClients()
             ->where('org_id', $user->org_id)
             ->with(['client:id,name', 'campaign:id,name', 'targets.socialAccount']);
 

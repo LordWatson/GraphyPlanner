@@ -2,45 +2,39 @@
 
 namespace App\Actions\Posts;
 
-use App\Mail\ClientReviewRequestedMail;
+use App\Enums\PostStatus;
 use App\Models\PostActivityLog;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 
 class ResendClientReviewEmailAction
 {
     /**
-     * Re-send the Step 0.13 review-portal link email for an existing `PostActivityLog` entry
-     * (the `waiting_client` transition that first sent it), reusing the same signed URL rather
-     * than issuing a new `ReviewToken` — an org user triggers this when the client claims they
-     * never received (or lost) the original email.
+     * Re-send the Step 0.13 review-portal link email for a post still waiting on the client — an
+     * org user triggers this when the client claims they never received (or lost) the original.
+     *
+     * Step I-1.6: the original link is never stored, so this mints a fresh token (revoking the
+     * previous ones) through `SendClientReviewRequestedEmailAction` instead of replaying a URL.
      */
-    public function __invoke(PostActivityLog $activityLog): void
-    {
-        if (blank($activityLog->review_url)) {
-            throw new \InvalidArgumentException(
-                "Activity log {$activityLog->id} has no review URL to resend."
-            );
-        }
-
+    public function __invoke(
+        PostActivityLog $activityLog,
+        SendClientReviewRequestedEmailAction $sendClientReviewRequestedEmail = new SendClientReviewRequestedEmailAction,
+    ): void {
         $post = $activityLog->post;
-        $client = $post->client;
 
-        if (blank($client?->approval_email)) {
-            Log::warning('Skipped resending client review email — no approval_email on file', [
-                'client_id' => $post->client_id,
-                'post_id' => $post->id,
+        if ($activityLog->to_status !== PostStatus::WaitingClient || $post->status !== PostStatus::WaitingClient) {
+            throw ValidationException::withMessages([
+                'review' => __('Only a post that is still waiting on the client can have its review link re-sent.'),
             ]);
-
-            return;
         }
 
-        Mail::to($client->approval_email)->send(new ClientReviewRequestedMail($post, $activityLog->review_url));
+        $token = $sendClientReviewRequestedEmail($post);
 
         Log::info('Client review requested email re-sent', [
-            'client_id' => $client->id,
+            'client_id' => $post->client_id,
             'post_id' => $post->id,
             'activity_log_id' => $activityLog->id,
+            'review_token_id' => $token?->id,
         ]);
     }
 }

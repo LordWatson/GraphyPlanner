@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,6 +31,8 @@ use Illuminate\Support\Carbon;
 #[Fillable(['org_id', 'client_id', 'title', 'description', 'platforms', 'suggested_caption', 'suggested_post_at', 'post_id'])]
 class AiPostIdea extends Model
 {
+    use BelongsToOrganization;
+
     /**
      * @return array<string, string>
      */
@@ -52,7 +56,8 @@ class AiPostIdea extends Model
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        // Step I-1.5: an archived (soft-deleted) client still owns its records.
+        return $this->belongsTo(Client::class)->withTrashed()->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -60,6 +65,6 @@ class AiPostIdea extends Model
      */
     public function post(): BelongsTo
     {
-        return $this->belongsTo(Post::class);
+        return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
     }
 }

@@ -28,7 +28,8 @@ class GetPublishReliabilityStatsAction
         $start = Carbon::now()->startOfMonth()->subMonths($months - 1);
 
         $logs = PostActivityLog::query()
-            ->whereIn('to_status', [PostStatus::Failed, PostStatus::Published])
+            // Step I-1.3: `partially_published` counts as a failed attempt.
+            ->whereIn('to_status', [PostStatus::Failed, PostStatus::PartiallyPublished, PostStatus::Published])
             ->where('created_at', '>=', $start)
             ->whereIn('post_id', Post::query()->where('org_id', $orgId)->select('id'))
             ->orderBy('created_at')
@@ -47,7 +48,7 @@ class GetPublishReliabilityStatsAction
             $monthly[] = [
                 'month' => $key,
                 'label' => $cursor->format('M Y'),
-                'failed' => $monthLogs->where('to_status', PostStatus::Failed)->count(),
+                'failed' => $monthLogs->whereIn('to_status', [PostStatus::Failed, PostStatus::PartiallyPublished])->count(),
                 'published' => $monthLogs->where('to_status', PostStatus::Published)->count(),
             ];
         }
@@ -58,7 +59,7 @@ class GetPublishReliabilityStatsAction
             $failuresSoFar = 0;
 
             foreach ($postLogs as $log) {
-                if ($log->to_status === PostStatus::Failed) {
+                if ($log->to_status === PostStatus::Failed || $log->to_status === PostStatus::PartiallyPublished) {
                     $failuresSoFar++;
 
                     continue;

@@ -50,20 +50,40 @@ class PostStatusTransitionMap
         ],
         PostStatus::Publishing->value => [
             PostStatus::Published->value,
+            PostStatus::PartiallyPublished->value,
             PostStatus::Failed->value,
         ],
         PostStatus::Published->value => [
             PostStatus::Archived->value,
         ],
+        PostStatus::PartiallyPublished->value => [
+            // Step I-1.3: "Retry failed targets" (`RetryFailedPostTargetsAction`) only.
+            PostStatus::Publishing->value,
+            PostStatus::Archived->value,
+        ],
         PostStatus::Failed->value => [
             PostStatus::Draft->value,
             PostStatus::Scheduled->value,
+            // Step I-1.3: "Retry failed targets" (`RetryFailedPostTargetsAction`) only.
+            PostStatus::Publishing->value,
             PostStatus::Archived->value,
         ],
         PostStatus::Archived->value => [
             PostStatus::Draft->value,
         ],
     ];
+
+    /**
+     * Moves that only the publishing pipeline may make: `publishing` can be entered by hand from
+     * `scheduled` (a manual override), but from `failed`/`partially_published` it means "retry the
+     * failed targets", which must go through `RetryFailedPostTargetsAction` so the target jobs are
+     * actually dispatched.
+     */
+    public static function isRetryMove(PostStatus $from, PostStatus $to): bool
+    {
+        return $to === PostStatus::Publishing
+            && in_array($from, [PostStatus::Failed, PostStatus::PartiallyPublished], true);
+    }
 
     public static function isAllowed(PostStatus $from, PostStatus $to): bool
     {

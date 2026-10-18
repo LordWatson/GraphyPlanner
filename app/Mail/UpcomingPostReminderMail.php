@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\Organization;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Sent to every user of an organization to warn them that one or more `PostTarget`s are due to
  * be published within the reminder window (see `SendUpcomingPostReminderEmailsAction`).
  */
-class UpcomingPostReminderMail extends Mailable
+class UpcomingPostReminderMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

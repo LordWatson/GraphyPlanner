@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ReferenceImageRole;
+use App\Models\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,6 @@ class BrandBrainReferenceAsset extends Model
      */
     public function asset(): BelongsTo
     {
-        return $this->belongsTo(Asset::class);
+        return $this->belongsTo(Asset::class)->withoutGlobalScope(OrganizationScope::class);
     }
 }

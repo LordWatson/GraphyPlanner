@@ -2,11 +2,13 @@
 
 namespace App\Actions\Posts;
 
+use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ReschedulePostAction
@@ -20,9 +22,18 @@ class ReschedulePostAction
      * A target's `reminder_sent_at` is cleared so the upcoming-post reminder fires again for the
      * new date. Rejects (as a validation error on `days`) any move that would land a target in
      * the past.
+     *
+     * Step I-1.2: a `scheduled` post can be moved too. Its `publish_dispatch_id` is replaced in
+     * the same transaction and a new `PublishPostJob` is dispatched after commit, so the job still
+     * queued for the old time no-ops when it fires and the post publishes at the new time
+     * (earlier or later).
      */
-    public function __invoke(Post $post, int $days, ?User $user = null): Post
-    {
+    public function __invoke(
+        Post $post,
+        int $days,
+        ?User $user = null,
+        TransitionPostStatusAction $transition = new TransitionPostStatusAction,
+    ): Post {
         $post->loadMissing('targets.socialAccount');
 
         $changes = [];
@@ -56,12 +67,14 @@ class ReschedulePostAction
             ];
         }
 
-        DB::transaction(function () use ($post, $changes) {
+        DB::transaction(function () use ($post, $changes, $transition) {
             foreach ($post->targets as $target) {
                 if (isset($changes[$target->id])) {
                     $target->update($changes[$target->id]);
                 }
             }
+
+            $this->redispatchIfScheduled($post, $transition);
         });
 
         Log::info('Post rescheduled from calendar', [
@@ -73,5 +86,29 @@ class ReschedulePostAction
         ]);
 
         return $post->refresh();
+    }
+
+    /**
+     * Give a `scheduled` post a fresh dispatch id and queue its publish job for the new times
+     * (after commit). Shared with `UpdatePostAction`. Must run inside a transaction.
+     */
+    public static function redispatchIfScheduled(Post $post, TransitionPostStatusAction $transition): void
+    {
+        /** @var Post|null $locked */
+        $locked = Post::query()->whereKey($post->id)->lockForUpdate()->first();
+
+        if ($locked?->status !== PostStatus::Scheduled) {
+            return;
+        }
+
+        $locked->update(['publish_dispatch_id' => (string) Str::uuid()]);
+
+        DB::afterCommit(fn () => $transition->dispatchPublishJob($locked));
+
+        Log::info('Scheduled post re-dispatched after a schedule change', [
+            'post_id' => $locked->id,
+            'org_id' => $locked->org_id,
+            'publish_dispatch_id' => $locked->publish_dispatch_id,
+        ]);
     }
 }

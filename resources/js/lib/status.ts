@@ -27,7 +27,8 @@ export type StatusKind =
     | 'invitation'
     | 'imageGeneration'
     | 'imageVariant'
-    | 'organization';
+    | 'organization'
+    | 'scheduler';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -42,6 +43,7 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         scheduled: { tone: 'brand', label: 'Scheduled' },
         publishing: { tone: 'warning', label: 'Publishing' },
         published: { tone: 'success', label: 'Published' },
+        partially_published: { tone: 'warning', label: 'Partially published' },
         failed: { tone: 'danger', label: 'Failed' },
         archived: { tone: 'muted', label: 'Archived' },
     },
@@ -113,6 +115,11 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         failed: { tone: 'danger', label: 'Failed' },
     },
     // Super admin console (Phase 15): an organization's platform status.
+    // Step I-1.8: super admin system health — scheduler heartbeats.
+    scheduler: {
+        ok: { tone: 'success', label: 'Running' },
+        stale: { tone: 'danger', label: 'Stale' },
+    },
     organization: {
         active: { tone: 'success', label: 'Active' },
         suspended: { tone: 'danger', label: 'Suspended' },

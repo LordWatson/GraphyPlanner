@@ -61,7 +61,7 @@ class GenerateDailyBriefsActionTest extends TestCase
 
         $this->assertDatabaseMissing('daily_briefs', ['client_id' => $pausedClient->id]);
 
-        Mail::assertSent(DailyBriefReadyMail::class, fn (DailyBriefReadyMail $mail) => $mail->hasTo($owner->email));
+        Mail::assertQueued(DailyBriefReadyMail::class, fn (DailyBriefReadyMail $mail) => $mail->hasTo($owner->email));
     }
 
     public function test_it_is_idempotent_for_the_same_client_and_day(): void
@@ -72,8 +72,8 @@ class GenerateDailyBriefsActionTest extends TestCase
         User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         Client::factory()->for($org, 'organization')->create(['status' => ClientStatus::Active]);
 
-        $trends = new AiTrends();
-        $ideas = new AiPostIdeas();
+        $trends = new AiTrends;
+        $ideas = new AiPostIdeas;
 
         $action = $this->mockedAction($trends, $ideas, 1);
 
@@ -94,10 +94,10 @@ class GenerateDailyBriefsActionTest extends TestCase
         User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         Client::factory()->for($org, 'organization')->create(['status' => ClientStatus::Active]);
 
-        $action = $this->mockedAction(new AiTrends(), new AiPostIdeas(), 1);
+        $action = $this->mockedAction(new AiTrends, new AiPostIdeas, 1);
         $action();
 
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
         $brief = DailyBrief::query()->first();
         $this->assertNull($brief->notified_at);
 

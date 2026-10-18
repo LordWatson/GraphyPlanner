@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Role;
 use App\Models\AiPostIdea;
 use App\Models\AiTrend;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\User;
-use App\Enums\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -36,7 +36,7 @@ class AiControllerTest extends TestCase
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
 
-        $response = $this->actingAs($owner)->getJson(route('clients.ai.trends', $client).'?platforms[]=instagram');
+        $response = $this->actingAs($owner)->postJson(route('clients.ai.trends', $client), ['platforms' => ['instagram']]);
 
         $response->assertOk();
         $response->assertJsonStructure(['trends']);
@@ -48,7 +48,7 @@ class AiControllerTest extends TestCase
         $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
         $client = Client::factory()->for($org, 'organization')->create();
 
-        $response = $this->actingAs($strategist)->getJson(route('clients.ai.ideas', $client));
+        $response = $this->actingAs($strategist)->postJson(route('clients.ai.ideas', $client));
 
         $response->assertOk();
         $response->assertJsonStructure(['ideas']);
@@ -61,7 +61,7 @@ class AiControllerTest extends TestCase
         $client = Client::factory()->for($org, 'organization')->create();
         $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
 
-        $response = $this->actingAs($owner)->getJson(route('posts.ai.captions', $post));
+        $response = $this->actingAs($owner)->postJson(route('posts.ai.captions', $post));
 
         $response->assertOk();
         $response->assertJsonStructure(['suggestions']);
@@ -73,7 +73,7 @@ class AiControllerTest extends TestCase
         $designer = User::factory()->for($org, 'organization')->role(Role::Designer)->create();
         $client = Client::factory()->for($org, 'organization')->create();
 
-        $response = $this->actingAs($designer)->getJson(route('clients.ai.trends', $client));
+        $response = $this->actingAs($designer)->postJson(route('clients.ai.trends', $client));
 
         $response->assertForbidden();
     }
@@ -86,7 +86,7 @@ class AiControllerTest extends TestCase
         $otherOrg = Organization::factory()->create();
         $otherOwner = User::factory()->for($otherOrg, 'organization')->role(Role::Owner)->create();
 
-        $response = $this->actingAs($otherOwner)->getJson(route('clients.ai.trends', $client));
+        $response = $this->actingAs($otherOwner)->postJson(route('clients.ai.trends', $client));
 
         $response->assertForbidden();
     }
@@ -99,7 +99,7 @@ class AiControllerTest extends TestCase
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
 
-        $response = $this->actingAs($owner)->getJson(route('clients.ai.trends', $client));
+        $response = $this->actingAs($owner)->postJson(route('clients.ai.trends', $client));
 
         $response->assertNotFound();
     }

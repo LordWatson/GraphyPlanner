@@ -66,15 +66,15 @@ class ScheduledReportsTest extends TestCase
 
         // Saturday 17 Oct: never sent → due now.
         $this->assertSame(1, $this->send('2026-10-17 07:00:00'));
-        Mail::assertSentCount(1);
+        Mail::assertQueuedCount(1);
 
         // Sunday — same week (Mon 12 Oct onwards), nothing more.
         $this->assertSame(0, $this->send('2026-10-18 07:00:00'));
-        Mail::assertSentCount(1);
+        Mail::assertQueuedCount(1);
 
         // Monday 19 Oct (London) — a new week.
         $this->assertSame(1, $this->send('2026-10-19 07:00:00'));
-        Mail::assertSentCount(2);
+        Mail::assertQueuedCount(2);
         $this->assertSame('2026-10-19 07:00:00', $report->refresh()->last_sent_at?->format('Y-m-d H:i:s'));
 
         $this->artisan('analytics:send-scheduled-reports')->expectsOutput('Sent 0 scheduled report(s).')->assertSuccessful();
@@ -99,7 +99,7 @@ class ScheduledReportsTest extends TestCase
         $this->org->forceFill(['suspended_at' => now()])->save();
 
         $this->assertSame(0, $this->send('2026-10-19 07:00:00'));
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
     }
 
     public function test_recipients_who_left_or_changed_role_are_skipped(): void
@@ -111,9 +111,9 @@ class ScheduledReportsTest extends TestCase
 
         $this->assertSame(1, $this->send('2026-10-19 07:00:00'));
 
-        Mail::assertSentCount(1);
-        Mail::assertSent(OrganizationReportMail::class, fn (OrganizationReportMail $mail) => $mail->hasTo($this->owner->email));
-        Mail::assertNotSent(OrganizationReportMail::class, fn (OrganizationReportMail $mail) => $mail->hasTo($foreign->email) || $mail->hasTo($this->reviewer->email));
+        Mail::assertQueuedCount(1);
+        Mail::assertQueued(OrganizationReportMail::class, fn (OrganizationReportMail $mail) => $mail->hasTo($this->owner->email));
+        Mail::assertNotQueued(OrganizationReportMail::class, fn (OrganizationReportMail $mail) => $mail->hasTo($foreign->email) || $mail->hasTo($this->reviewer->email));
         $this->assertNotNull($report->refresh()->last_sent_at);
     }
 
@@ -122,7 +122,7 @@ class ScheduledReportsTest extends TestCase
         $report = $this->scheduled(ReportSchedule::Weekly, [$this->reviewer->id]);
 
         $this->assertSame(0, $this->send('2026-10-19 07:00:00'));
-        Mail::assertNothingSent();
+        Mail::assertNothingOutgoing();
         $this->assertNull($report->refresh()->last_sent_at);
     }
 
@@ -132,7 +132,7 @@ class ScheduledReportsTest extends TestCase
 
         $this->send('2026-10-19 07:00:00');
 
-        Mail::assertSent(OrganizationReportMail::class, function (OrganizationReportMail $mail) {
+        Mail::assertQueued(OrganizationReportMail::class, function (OrganizationReportMail $mail) {
             if (! $mail->hasTo($this->designer->email)) {
                 return false;
             }
@@ -148,7 +148,7 @@ class ScheduledReportsTest extends TestCase
                 && str_contains($html, 'Hi Dee');
         });
 
-        Mail::assertSent(OrganizationReportMail::class, function (OrganizationReportMail $mail) {
+        Mail::assertQueued(OrganizationReportMail::class, function (OrganizationReportMail $mail) {
             return $mail->hasTo($this->owner->email)
                 && $mail->summary['revenue'] !== null
                 && str_contains($mail->csv, 'revenue,invoiced,2000,AED')
@@ -162,7 +162,7 @@ class ScheduledReportsTest extends TestCase
 
         $this->send('2026-10-19 07:00:00');
 
-        Mail::assertSent(OrganizationReportMail::class, function (OrganizationReportMail $mail) {
+        Mail::assertQueued(OrganizationReportMail::class, function (OrganizationReportMail $mail) {
             $mail->build();
             $names = array_column($mail->rawAttachments, 'name');
 
