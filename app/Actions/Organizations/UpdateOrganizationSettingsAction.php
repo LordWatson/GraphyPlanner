@@ -14,7 +14,8 @@ class UpdateOrganizationSettingsAction
      *
      * Keys are only ever written when present in $data (an empty/omitted value leaves
      * the currently stored key untouched, so the form never needs to redisplay a secret
-     * to "keep" it).
+     * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
+     * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
      * @param  array{default_timezone: string, default_currency: string, billing_details?: string|null, payment_instructions?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
      */
@@ -51,6 +52,12 @@ class UpdateOrganizationSettingsAction
             }
 
             $organization->save();
+
+            // Step I-3.6 / M-2.5: a new Upload-Post key registers the publish webhook and stores
+            // its secret automatically (unless a secret was typed in by hand with it).
+            if (! empty($data['upload_post_key']) && empty($data['upload_post_webhook_secret'])) {
+                DB::afterCommit(fn () => app(RegisterUploadPostWebhookAction::class)($organization));
+            }
 
             Log::info('Organization settings updated', [
                 'org_id' => $organization->id,

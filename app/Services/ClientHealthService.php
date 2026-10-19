@@ -6,6 +6,7 @@ use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
 use App\Enums\ConnectionStatus;
 use App\Models\Client;
+use App\Models\SocialAccount;
 
 /**
  * Computes a client's health status (Red/Amber/Green) and the human-readable reason behind it.
@@ -89,6 +90,19 @@ class ClientHealthService
             && (($client->retainer_amount === null) !== ($client->billing_cycle === null))
         ) {
             return $this->result(ClientHealth::Amber, 'Client billing setup is incomplete (retainer amount or billing cycle missing).');
+        }
+
+        // Step I-3.9 / M-2.7: a connection about to lapse (or lapsed) that couldn't be refreshed.
+        $expiring = $client->loadMissing('socialAccounts')->socialAccounts
+            ->first(fn (SocialAccount $account) => $account->tokenExpiryStage() !== null);
+
+        if ($expiring !== null) {
+            return $this->result(ClientHealth::Amber, sprintf(
+                'The %s connection for %s %s — reconnect it.',
+                $expiring->platform->label(),
+                $expiring->handle,
+                $expiring->tokenExpiryPhrase(),
+            ));
         }
 
         return null;

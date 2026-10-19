@@ -31,6 +31,17 @@ class CheckAllSocialAccountsHealthAction
             }
         }
 
+        // Step I-3.9 / M-2.7: accounts that aren't connected to the vendor can still hold a Meta
+        // token (music search) that needs refreshing or a warning.
+        $withTokens = SocialAccount::query()
+            ->where('connection_status', '!=', ConnectionStatus::Connected)
+            ->whereNotNull('meta_access_token_expires_at')
+            ->lazyById(200);
+
+        foreach ($withTokens as $account) {
+            app(CheckTokenExpiryAction::class)($account);
+        }
+
         return $flagged;
     }
 }

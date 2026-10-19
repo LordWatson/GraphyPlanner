@@ -35,7 +35,8 @@ class PostFactory extends Factory
         return [
             'client_id' => Client::factory(),
             'status' => PostStatus::Draft,
-            'approval_mode' => ApprovalMode::ClientRequired,
+            // Step M-2.9: `client_required` is enforced now; tests that need the client step say so.
+            'approval_mode' => ApprovalMode::InternalOnly,
             'master_caption' => fake()->sentence(),
             'hashtags' => [],
             'music' => null,

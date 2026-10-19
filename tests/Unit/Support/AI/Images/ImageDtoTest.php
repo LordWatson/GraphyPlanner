@@ -12,7 +12,7 @@ use App\Support\AI\Images\GeneratedImage;
 use App\Support\AI\Images\ImagePromptRenderer;
 use App\Support\AI\Images\ImageRenderOptions;
 use App\Support\AI\Images\ReferenceImage;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 /**
  * Step 16.1: DTO construction/serialisation, the aspect-ratio enum and the prompt renderer.
@@ -81,6 +81,11 @@ class ImageDtoTest extends TestCase
             Platform::TikTok->value => ImageAspectRatio::Story_9_16,
             Platform::Facebook->value => ImageAspectRatio::Square_1_1,
             Platform::LinkedIn->value => ImageAspectRatio::Square_1_1,
+            Platform::YouTube->value => ImageAspectRatio::Story_9_16,
+            Platform::GoogleBusiness->value => ImageAspectRatio::Portrait_4_5,
+            Platform::Threads->value => ImageAspectRatio::Portrait_4_5,
+            Platform::Pinterest->value => ImageAspectRatio::Story_9_16,
+            Platform::X->value => ImageAspectRatio::Landscape_16_9,
         ];
 
         foreach (Platform::cases() as $platform) {

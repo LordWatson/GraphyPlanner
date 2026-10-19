@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\SocialAccount;
 use App\Services\ConnectStateStore;
+use App\Services\Publishing\MetaTokenService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -163,23 +164,8 @@ class FacebookInstagramConnectController extends Controller
      */
     private function exchangeForLongLivedToken(string $shortLivedToken): array
     {
-        $response = Http::get($this->graphUrl('/oauth/access_token'), [
-            'grant_type' => 'fb_exchange_token',
-            'client_id' => config('services.facebook.client_id'),
-            'client_secret' => config('services.facebook.client_secret'),
-            'fb_exchange_token' => $shortLivedToken,
-        ]);
-
-        if (! $response->successful() || ! $response->json('access_token')) {
-            throw new RuntimeException($response->json('error.message') ?? 'Unable to obtain a long-lived Facebook access token.');
-        }
-
-        $expiresIn = $response->json('expires_in');
-
-        return [
-            $response->json('access_token'),
-            $expiresIn ? now()->addSeconds((int) $expiresIn) : null,
-        ];
+        // Step M-2.7: the same exchange refreshes a long-lived token later (`MetaTokenService`).
+        return app(MetaTokenService::class)->exchange($shortLivedToken);
     }
 
     private function resolveInstagramBusinessUserId(string $accessToken): string

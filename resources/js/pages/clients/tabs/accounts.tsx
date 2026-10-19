@@ -1,8 +1,28 @@
 import { Form, router } from '@inertiajs/react';
-import { Link2, Share2, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import {
+    AlertTriangle,
+    Clock,
+    Link2,
+    Settings2,
+    Share2,
+    Trash2,
+} from 'lucide-react';
+import { useCallback, useState } from 'react';
+import type { ConnectInviteData } from '@/components/clients/connect-invite-panel';
+import { ConnectInvitePanel } from '@/components/clients/connect-invite-panel';
 import InputError from '@/components/input-error';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { useConnectPopup } from '@/hooks/use-connect-popup';
+import { formatDateTime } from '@/lib/dates';
+import type { PlatformCapability } from '@/lib/platforms';
+import { capabilityOf, usePlatforms } from '@/lib/platforms';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,16 +39,16 @@ import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
 import {
     connect as connectSocialAccount,
     destroy as destroySocialAccount,
+    update as updateSocialAccount,
 } from '@/routes/social-accounts';
 import type { ClientPageProps } from '@/components/clients/client-layout';
 import {
     ClientLayout,
     TabHeading,
     TabPanel,
-    getXsrfTokenFromCookie,
-    platformIcon,
-    platformOptions,
+    usePlatformOptions,
 } from '@/components/clients/client-layout';
+import { platformIcon } from '@/components/platform-icon';
 
 type SocialAccountData = {
     id: number;
@@ -39,8 +59,138 @@ type SocialAccountData = {
     language: string | null;
     country: string | null;
     connection_status: string;
+    /** Step M-2.6: the registry settings (e.g. Pinterest board) and the required ones missing. */
+    platform_settings: Record<string, string>;
+    missing_settings: string[];
+    /** Step M-2.7: the last health check, its error, and when the stored token expires. */
+    last_health_check_at: string | null;
+    last_health_error: string | null;
+    token_expires_at: string | null;
+    token_expiry: string | null;
     can: { update: boolean; delete: boolean; connect: boolean };
 };
+
+/** One input per registry setting for a platform (`platform_settings[key]`). */
+function SettingsFields({
+    capability,
+    values,
+    errors,
+}: {
+    capability: PlatformCapability;
+    values?: Record<string, string>;
+    errors: Record<string, string | undefined>;
+}) {
+    const settings = Object.entries(capability.settings);
+
+    if (settings.length === 0) {
+        return null;
+    }
+
+    return (
+        <>
+            {settings.map(([key, setting]) => (
+                <div key={key} className="grid content-start gap-1">
+                    <Label htmlFor={`setting-${key}`}>
+                        {setting.label}
+                        {!setting.required && (
+                            <span className="text-muted-foreground font-normal">
+                                {' '}
+                                (optional)
+                            </span>
+                        )}
+                    </Label>
+                    <Input
+                        id={`setting-${key}`}
+                        name={`platform_settings[${key}]`}
+                        defaultValue={values?.[key] ?? ''}
+                        required={setting.required}
+                    />
+                    {setting.help && (
+                        <p className="text-muted-foreground text-xs">
+                            {setting.help}
+                        </p>
+                    )}
+                    <InputError message={errors[`platform_settings.${key}`]} />
+                </div>
+            ))}
+        </>
+    );
+}
+
+/** Edit an account's registry settings (keeps every other field as it is). */
+function AccountSettingsDialog({
+    account,
+    capability,
+    onClose,
+}: {
+    account: SocialAccountData;
+    capability: PlatformCapability;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <Form
+                    {...updateSocialAccount.form(account.id)}
+                    options={{ preserveScroll: true }}
+                    onSuccess={onClose}
+                    className="grid gap-4"
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {capability.label} settings
+                                </DialogTitle>
+                                <DialogDescription>
+                                    What {capability.label} needs to publish for{' '}
+                                    {account.handle}.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <input
+                                type="hidden"
+                                name="platform"
+                                value={account.platform}
+                            />
+                            <input
+                                type="hidden"
+                                name="handle"
+                                value={account.handle}
+                            />
+                            <input
+                                type="hidden"
+                                name="display_name"
+                                value={account.display_name ?? ''}
+                            />
+                            <input
+                                type="hidden"
+                                name="timezone"
+                                value={account.timezone}
+                            />
+                            <SettingsFields
+                                capability={capability}
+                                values={account.platform_settings}
+                                errors={errors}
+                            />
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={onClose}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? 'Saving…' : 'Save settings'}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 /**
  * Step I-2.4 — Social accounts — the client page's default tab (`clients.show`).
@@ -48,85 +198,30 @@ type SocialAccountData = {
 export default function ClientAccountsTab({
     socialAccounts,
     timezones,
+    connectInvites = null,
     ...page
 }: ClientPageProps & {
     socialAccounts: SocialAccountData[];
     timezones: { value: string; label: string }[];
+    /** Step M-2.8: live self-connect links (null when the viewer can't create them). */
+    connectInvites?: ConnectInviteData[] | null;
 }) {
+    const platformOptions = usePlatformOptions(true);
+    const registry = usePlatforms();
     const { client, can } = page;
-    const [connectingAccountId, setConnectingAccountId] = useState<
-        number | null
-    >(null);
-
-    // The vendor's hosted connect flow finishes in the popup opened by `handleConnect` below, not
-    // in this tab, so we listen for the confirmation `postMessage` it sends (see
-    // `resources/views/social-accounts/connected.blade.php`) and refresh the accounts list here.
-    useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) {
-                return;
-            }
-
-            if (event.data?.type === 'graphy:social-account-connected') {
-                router.reload({ only: ['socialAccounts', 'stats'] });
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-
-        return () => window.removeEventListener('message', handleMessage);
-    }, []);
-
-    // Opens the vendor's hosted connect page in a separate popup/tab (instead of taking over this
-    // one), and refreshes the social accounts list once that popup is closed as a fallback in case
-    // the `postMessage` confirmation above didn't arrive.
-    const handleConnect = async (accountId: number) => {
-        setConnectingAccountId(accountId);
-
-        const popup = window.open('about:blank', `graphy-connect-${accountId}`);
-
-        try {
-            const response = await fetch(connectSocialAccount.url(accountId), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-                },
-            });
-
-            const data = await response.json();
-
-            if (!response.ok || !data.url) {
-                popup?.close();
-                toast.error(
-                    data.message ??
-                        'Unable to start the Upload-Post connect flow.',
-                );
-                return;
-            }
-
-            if (popup) {
-                popup.location.href = data.url;
-
-                const interval = window.setInterval(() => {
-                    if (popup.closed) {
-                        window.clearInterval(interval);
-                        router.reload({ only: ['socialAccounts', 'stats'] });
-                    }
-                }, 1000);
-            } else {
-                // Popup was blocked — fall back to a plain new tab.
-                window.open(data.url, '_blank');
-            }
-        } catch {
-            popup?.close();
-            toast.error('Unable to start the Upload-Post connect flow.');
-        } finally {
-            setConnectingAccountId(null);
-        }
-    };
+    const [newPlatform, setNewPlatform] = useState('instagram');
+    const [editing, setEditing] = useState<SocialAccountData | null>(null);
+    const refreshAccounts = useCallback(
+        () => router.reload({ only: ['socialAccounts', 'stats'] }),
+        [],
+    );
+    const { connectingId, connect } = useConnectPopup(refreshAccounts);
+    const accountPlatforms = [
+        ...new Set(socialAccounts.map((account) => account.platform)),
+    ].map((value) => ({
+        value,
+        label: capabilityOf(registry, value).label || value,
+    }));
     return (
         <ClientLayout {...page}>
             <TabPanel>
@@ -152,7 +247,8 @@ export default function ClientAccountsTab({
                                             </Label>
                                             <Select
                                                 name="platform"
-                                                defaultValue="instagram"
+                                                value={newPlatform}
+                                                onValueChange={setNewPlatform}
                                             >
                                                 <SelectTrigger
                                                     id="platform"
@@ -238,6 +334,13 @@ export default function ClientAccountsTab({
                                                 message={errors.timezone}
                                             />
                                         </div>
+                                        <SettingsFields
+                                            capability={capabilityOf(
+                                                registry,
+                                                newPlatform,
+                                            )}
+                                            errors={errors}
+                                        />
                                         <div className="col-span-full">
                                             <Button
                                                 type="submit"
@@ -259,9 +362,9 @@ export default function ClientAccountsTab({
                         ) : (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 {socialAccounts.map((account) => {
-                                    const PlatformIcon =
-                                        platformIcon[account.platform] ??
-                                        Share2;
+                                    const PlatformIcon = platformIcon(
+                                        account.platform,
+                                    );
                                     return (
                                         <div
                                             key={account.id}
@@ -288,9 +391,84 @@ export default function ClientAccountsTab({
                                                             account.handle}{' '}
                                                         · {account.timezone}
                                                     </span>
+                                                    {account.missing_settings
+                                                        .length > 0 && (
+                                                        <span className="text-warning flex items-center gap-1 text-xs">
+                                                            <AlertTriangle className="size-3.5" />
+                                                            Add the{' '}
+                                                            {account.missing_settings
+                                                                .map(
+                                                                    (key) =>
+                                                                        capabilityOf(
+                                                                            registry,
+                                                                            account.platform,
+                                                                        )
+                                                                            .settings[
+                                                                            key
+                                                                        ]
+                                                                            ?.label ??
+                                                                        key,
+                                                                )
+                                                                .join(', ')
+                                                                .toLowerCase()}{' '}
+                                                            before it can
+                                                            publish.
+                                                        </span>
+                                                    )}
+                                                    {account.token_expiry && (
+                                                        <span className="text-warning flex items-center gap-1 text-xs">
+                                                            <Clock className="size-3.5" />
+                                                            Connection{' '}
+                                                            {
+                                                                account.token_expiry
+                                                            }{' '}
+                                                            — reconnect it.
+                                                        </span>
+                                                    )}
+                                                    {account.last_health_error ? (
+                                                        <span className="text-destructive flex items-center gap-1 text-xs">
+                                                            <AlertTriangle className="size-3.5" />
+                                                            {
+                                                                account.last_health_error
+                                                            }
+                                                        </span>
+                                                    ) : (
+                                                        account.last_health_check_at && (
+                                                            <span className="text-muted-foreground text-[11px]">
+                                                                Checked{' '}
+                                                                {formatDateTime(
+                                                                    account.last_health_check_at,
+                                                                )}
+                                                            </span>
+                                                        )
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-2">
+                                                {account.can.update &&
+                                                    Object.keys(
+                                                        capabilityOf(
+                                                            registry,
+                                                            account.platform,
+                                                        ).settings,
+                                                    ).length > 0 && (
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="outline"
+                                                            title="Settings"
+                                                            onClick={() =>
+                                                                setEditing(
+                                                                    account,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Settings2 />
+                                                            <span className="sr-only">
+                                                                Settings
+                                                            </span>
+                                                        </Button>
+                                                    )}
                                                 {account.can.connect &&
                                                     account.connection_status !==
                                                         'connected' && (
@@ -299,13 +477,16 @@ export default function ClientAccountsTab({
                                                             size="icon"
                                                             variant="outline"
                                                             disabled={
-                                                                connectingAccountId ===
+                                                                connectingId ===
                                                                 account.id
                                                             }
                                                             title="Connect"
                                                             onClick={() =>
-                                                                handleConnect(
+                                                                void connect(
                                                                     account.id,
+                                                                    connectSocialAccount.url(
+                                                                        account.id,
+                                                                    ),
                                                                 )
                                                             }
                                                         >
@@ -344,6 +525,27 @@ export default function ClientAccountsTab({
                                     );
                                 })}
                             </div>
+                        )}
+
+                        {connectInvites !== null &&
+                            socialAccounts.length > 0 && (
+                                <ConnectInvitePanel
+                                    clientId={client.id}
+                                    clientName={client.name}
+                                    invites={connectInvites}
+                                    platforms={accountPlatforms}
+                                />
+                            )}
+
+                        {editing && (
+                            <AccountSettingsDialog
+                                account={editing}
+                                capability={capabilityOf(
+                                    registry,
+                                    editing.platform,
+                                )}
+                                onClose={() => setEditing(null)}
+                            />
                         )}
                     </>
                 </>

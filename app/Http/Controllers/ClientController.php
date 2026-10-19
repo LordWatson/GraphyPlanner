@@ -9,6 +9,7 @@ use App\Actions\Clients\ListClientsAction;
 use App\Actions\Clients\PurgeClientAction;
 use App\Actions\Clients\RestoreClientAction;
 use App\Actions\Clients\UpdateClientAction;
+use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Enums\Role;
@@ -16,6 +17,7 @@ use App\Http\Requests\ClientIndexRequest;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
+use App\Models\ConnectInvite;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Support\Clients\ClientPresenter;
@@ -69,6 +71,8 @@ class ClientController extends Controller
         return Inertia::render('clients/create', [
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
+            // Step M-2.9: how this client's new posts get approved.
+            'approvalModes' => array_map(fn (ApprovalMode $mode) => ['value' => $mode->value, 'label' => $mode->label()], ApprovalMode::cases()),
             'languages' => LanguageOptions::options(),
             'owners' => $this->ownerOptions($request),
         ]);
@@ -104,6 +108,17 @@ class ClientController extends Controller
                     ->map(fn (SocialAccount $socialAccount) => ClientTabPresenter::socialAccount($socialAccount, $user))
                 : [],
             'timezones' => $canViewSocialAccounts ? TimezoneOptions::options() : [],
+            // Step M-2.8: live self-connect links (never the links themselves — only shown once).
+            'connectInvites' => $user->can('createConnectInvite', [SocialAccount::class, $client])
+                ? ConnectInvite::query()
+                    ->where('client_id', $client->id)
+                    ->active()
+                    ->with('creator:id,name')
+                    ->latest()
+                    ->get()
+                    ->map(fn (ConnectInvite $invite) => ConnectInviteController::present($invite))
+                    ->values()
+                : null,
         ]);
     }
 

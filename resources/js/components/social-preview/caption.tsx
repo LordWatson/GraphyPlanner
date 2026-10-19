@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
 import { Fragment, useState } from 'react';
 import { foldCaption } from '@/lib/media-format';
+import { capabilityOf, usePlatforms } from '@/lib/platforms';
 import { textDirection } from '@/lib/text-direction';
 import { cn } from '@/lib/utils';
 
 const TOKEN = /(#[\p{L}\p{N}_]+|@[\p{L}\p{N}_.]+|https?:\/\/[^\s]+)/gu;
 
 /**
- * Caption text with hashtags, mentions and links styled the way each app does: Instagram and
- * TikTok don't link URLs in captions, Facebook and LinkedIn do; TikTok sets tags bold on video.
+ * Caption text with hashtags, mentions and links styled the way each app does: URLs are links only
+ * where the platform makes them clickable (`links_in_caption`); tags read bold on full-screen media.
  */
 export function RichCaption({
     text,
@@ -20,7 +21,8 @@ export function RichCaption({
     /** Sits over full-screen media (TikTok, Reels): tags read bold, not coloured. */
     onMedia?: boolean;
 }) {
-    const linksUrls = platform === 'facebook' || platform === 'linkedin';
+    // Links read as links only where the platform makes them clickable (the registry).
+    const linksUrls = capabilityOf(usePlatforms(), platform).links_in_caption;
     const tagClass = onMedia
         ? 'font-semibold'
         : cn('text-info', platform === 'linkedin' && 'font-semibold');
@@ -79,6 +81,7 @@ export function FoldedCaption({
     className?: string;
 }) {
     const [expanded, setExpanded] = useState(false);
+    const registry = usePlatforms();
 
     if (!text.trim()) {
         return (
@@ -96,7 +99,10 @@ export function FoldedCaption({
         );
     }
 
-    const { visible, truncated } = foldCaption(text, platform);
+    const { visible, truncated } = foldCaption(
+        text,
+        capabilityOf(registry, platform).caption_fold,
+    );
     const shown = expanded || !truncated ? text : visible;
 
     return (

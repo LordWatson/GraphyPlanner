@@ -35,6 +35,17 @@ final class ClientTabPresenter
             'posting_windows' => $socialAccount->posting_windows,
             'persona_override' => $socialAccount->persona_override,
             'connection_status' => $socialAccount->connection_status->value,
+            // Step M-2.6: the registry settings (Pinterest board, …) and which required ones are missing.
+            'platform_settings' => (object) ($socialAccount->platform_settings ?? []),
+            'missing_settings' => array_values(array_filter(
+                $socialAccount->platform->spec()->requiredSettings,
+                fn (string $setting) => blank($socialAccount->platform_settings[$setting] ?? null),
+            )),
+            // Step M-2.7: the last health check and the token's expiry.
+            'last_health_check_at' => $socialAccount->last_health_check_at?->toIso8601String(),
+            'last_health_error' => $socialAccount->last_health_error,
+            'token_expires_at' => $socialAccount->meta_access_token_expires_at?->toIso8601String(),
+            'token_expiry' => $socialAccount->tokenExpiryPhrase(),
             'can' => [
                 'update' => $user->can('update', $socialAccount),
                 'delete' => $user->can('delete', $socialAccount),

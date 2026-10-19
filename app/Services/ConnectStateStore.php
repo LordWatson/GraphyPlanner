@@ -18,11 +18,16 @@ class ConnectStateStore
 {
     public const TTL_MINUTES = 10;
 
-    public function issue(SocialAccount $account, ?User $user, string $flow): string
+    /**
+     * @param  array<string, int|string|null>  $context  extra values the callback needs (Step M-2.8:
+     *                                                   `connect_invite_id`, `via`)
+     */
+    public function issue(SocialAccount $account, ?User $user, string $flow, array $context = []): string
     {
         $state = Str::random(48);
 
         Cache::put($this->key($flow, $state), [
+            ...$context,
             'social_account_id' => $account->id,
             'user_id' => $user?->id,
         ], now()->addMinutes(self::TTL_MINUTES));
@@ -33,7 +38,7 @@ class ConnectStateStore
     /**
      * Pull (single use) the payload for a state, or null when it's missing/unknown/expired/used.
      *
-     * @return array{social_account_id: int, user_id: int|null}|null
+     * @return array{social_account_id: int, user_id: int|null, connect_invite_id?: int|null, via?: string|null}|null
      */
     public function consume(mixed $state, string $flow): ?array
     {
@@ -41,7 +46,7 @@ class ConnectStateStore
             return null;
         }
 
-        /** @var array{social_account_id: int, user_id: int|null}|null $payload */
+        /** @var array{social_account_id: int, user_id: int|null, connect_invite_id?: int|null, via?: string|null}|null $payload */
         $payload = Cache::pull($this->key($flow, $state));
 
         return is_array($payload) ? $payload : null;

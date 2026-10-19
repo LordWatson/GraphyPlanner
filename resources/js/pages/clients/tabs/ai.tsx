@@ -1,5 +1,5 @@
 import { Deferred, router } from '@inertiajs/react';
-import { Loader2, Share2, TrendingUp } from 'lucide-react';
+import { Loader2, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -27,9 +27,9 @@ import {
     ClientLayout,
     TabHeading,
     TabPanel,
-    platformIcon,
-    platformOptions,
+    usePlatformOptions,
 } from '@/components/clients/client-layout';
+import { platformIcon } from '@/components/platform-icon';
 
 /**
  * Step I-2.4 — Trends & Ideas tab (`clients.ai.index`). Trends and ideas are deferred props.
@@ -46,6 +46,7 @@ export default function ClientAiTab({
     trends?: AiTrendData[];
     ideas?: AiIdeaData[];
 }) {
+    const platformOptions = usePlatformOptions();
     const { client } = page;
     const ai = { pillars, campaigns: campaignOptions, trends, ideas };
     const [aiLoading, setAiLoading] = useState(false);
@@ -161,8 +162,9 @@ export default function ClientAiTab({
                                 const selected = aiPlatforms.includes(
                                     platform.value,
                                 );
-                                const PlatformIcon =
-                                    platformIcon[platform.value] ?? Share2;
+                                const PlatformIcon = platformIcon(
+                                    platform.value,
+                                );
 
                                 return (
                                     <button

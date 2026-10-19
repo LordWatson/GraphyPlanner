@@ -4,7 +4,7 @@ namespace Tests\Unit\Enums;
 
 use App\Enums\MediaRatio;
 use App\Enums\Platform;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class MediaRatioTest extends TestCase
 {

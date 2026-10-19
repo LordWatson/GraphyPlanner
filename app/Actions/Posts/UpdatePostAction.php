@@ -4,7 +4,9 @@ namespace App\Actions\Posts;
 
 use App\Models\CampaignDeliverable;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,21 +14,34 @@ use Illuminate\Support\Facades\Log;
 class UpdatePostAction
 {
     /**
-     * Update a post's content, per-target schedule, and attached media, then refresh its §6
-     * checklist snapshot (Step 0.10 editor UI).
+     * Per-target fields a save may set; any not sent for a target are left as they are.
+     */
+    private const TARGET_FIELDS = ['caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format'];
+
+    /**
+     * Update a post's content, per-target schedule and channel overrides, and attached media,
+     * then refresh its §6 checklist snapshot (Step 0.10 editor UI).
      *
-     * `$data['targets']` (when present) fully replaces the post's `PostTarget`s, one row per
-     * `{social_account_id, scheduled_local_date, scheduled_local_time}` — each target's
-     * `scheduled_at_utc` is (re)computed independently from its own social account's timezone
-     * (spec §4.6). `$data['asset_ids']` (when present) fully replaces the post's attached assets.
+     * `$data['targets']` (when present) is the full set of channels, one entry per
+     * `{social_account_id, scheduled_local_date, scheduled_local_time, ...overrides}`. Channels no
+     * longer listed are removed; listed ones are updated in place (Step M-2.2: so a channel keeps
+     * its overrides, publish status and vendor ids across saves) or created. Each target's
+     * `scheduled_at_utc` is (re)computed independently from its own account's timezone (spec
+     * §4.6), and a changed time re-arms its upcoming-post reminder.
      *
-     * `$data['media_format']` stores the image format per channel (unset channels fall back to
-     * their default), and `$data['asset_crops']` (`{assetId: {x, y, zoom}}`) each image's framing.
-     * When crops are sent with `asset_ids`, an attached image missing from them resets to centred.
+     * Step I-3.1 / M-2.2: a target's `caption_override`, `hashtags_override`, `first_comment` and
+     * `link_url` override the post's master values (`null` = use the master; an empty string /
+     * list = none on this channel). Step I-3.2 / M-2.3: `format` picks the target's format (`null`
+     * = Auto).
      *
-     * Step I-1.2: if the post is `scheduled` (content edits are policy-locked there today, but the
-     * action stays safe if that changes), its publish job is re-dispatched with a fresh id so the
-     * new times apply and the old job no-ops.
+     * `$data['asset_ids']` (when present) fully replaces the attached media, in that order (the
+     * carousel order). `$data['asset_crops']` (`{assetId: {x, y, zoom}}`) sets each image's framing
+     * and `$data['asset_alt_texts']` (`{assetId: text}`) its alt text. When either is sent with
+     * `asset_ids`, an attached image missing from it resets (centred / no alt text).
+     * `$data['media_format']` stores the image format per channel.
+     *
+     * Step I-1.2: if the post is `scheduled`, its publish job is re-dispatched with a fresh id so
+     * the new times apply and the old job no-ops.
      *
      * @param  array<string, mixed>  $data
      */
@@ -36,12 +51,20 @@ class UpdatePostAction
         EvaluatePostChecklistAction $evaluateChecklist = new EvaluatePostChecklistAction,
         TransitionPostStatusAction $transition = new TransitionPostStatusAction,
     ): Post {
-        return DB::transaction(function () use ($post, $data, $evaluateChecklist, $transition) {
+        // Step I-3.6 / M-2.5: editing a post the vendor is holding for later recalls those
+        // channels first (the edit is refused if the vendor says it's too late), and re-submits
+        // them with the new content once saved — the old version never goes out.
+        $vendor = app(VendorScheduleService::class);
+        $recalled = $post->canBeRecalled() ? $vendor->recall($post, 'targets') : [];
+
+        return DB::transaction(function () use ($post, $data, $evaluateChecklist, $transition, $vendor, $recalled) {
+            DB::afterCommit(fn () => $vendor->resubmit($post, $recalled));
+
             if (array_key_exists('media_format', $data)) {
                 $data['media_format'] = self::normalizeMediaFormat($data['media_format']);
             }
 
-            $post->update(array_diff_key($data, ['targets' => null, 'asset_ids' => null, 'asset_crops' => null]));
+            $post->update(array_diff_key($data, array_flip(['targets', 'asset_ids', 'asset_crops', 'asset_alt_texts'])));
 
             // Campaigns enhancement C-3.2: a post that leaves its campaign frees the planned slot
             // it was started from, so that slot reads "Not started" again.
@@ -53,44 +76,10 @@ class UpdatePostAction
             }
 
             if (array_key_exists('targets', $data)) {
-                $post->targets()->delete();
-
-                foreach ($data['targets'] ?? [] as $target) {
-                    $account = SocialAccount::findOrFail($target['social_account_id']);
-
-                    $scheduledAtUtc = null;
-
-                    if (! empty($target['scheduled_local_date']) && ! empty($target['scheduled_local_time'])) {
-                        $scheduledAtUtc = Carbon::parse(
-                            $target['scheduled_local_date'].' '.$target['scheduled_local_time'],
-                            $account->timezone,
-                        )->utc();
-                    }
-
-                    $post->targets()->create([
-                        'social_account_id' => $account->id,
-                        'scheduled_local_date' => $target['scheduled_local_date'] ?? null,
-                        'scheduled_local_time' => $target['scheduled_local_time'] ?? null,
-                        'scheduled_at_utc' => $scheduledAtUtc,
-                    ]);
-                }
+                $this->syncTargets($post, (array) ($data['targets'] ?? []));
             }
 
-            $crops = $data['asset_crops'] ?? null;
-
-            if (array_key_exists('asset_ids', $data)) {
-                $attach = [];
-
-                foreach ((array) ($data['asset_ids'] ?? []) as $assetId) {
-                    $attach[(int) $assetId] = is_array($crops) ? self::pivotFraming($crops[$assetId] ?? null) : [];
-                }
-
-                $post->assets()->sync($attach);
-            } elseif (is_array($crops)) {
-                foreach ($crops as $assetId => $crop) {
-                    $post->assets()->updateExistingPivot((int) $assetId, self::pivotFraming($crop));
-                }
-            }
+            $this->syncAssets($post, $data);
 
             $post->refresh();
             $post->update(['checklist_snapshot' => $evaluateChecklist($post)]);
@@ -102,11 +91,132 @@ class UpdatePostAction
             Log::info('Post updated', [
                 'post_id' => $post->id,
                 'target_count' => $post->targets()->count(),
+                'customized_target_count' => $post->targets->filter(fn (PostTarget $target) => $target->isCustomized())->count(),
                 'media_format' => $post->media_format,
             ]);
 
             return $post->refresh();
         });
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $targets
+     */
+    private function syncTargets(Post $post, array $targets): void
+    {
+        $existing = $post->targets()->get()->keyBy('social_account_id');
+        $keep = [];
+
+        foreach ($targets as $input) {
+            $account = SocialAccount::query()->whereKey((int) $input['social_account_id'])->firstOrFail();
+            $keep[] = $account->id;
+
+            $date = filled($input['scheduled_local_date'] ?? null) ? (string) $input['scheduled_local_date'] : null;
+            $time = filled($input['scheduled_local_time'] ?? null) ? (string) $input['scheduled_local_time'] : null;
+
+            $attributes = [
+                'scheduled_local_date' => $date,
+                'scheduled_local_time' => $time,
+                'scheduled_at_utc' => $date !== null && $time !== null
+                    ? Carbon::parse($date.' '.$time, $account->timezone)->utc()
+                    : null,
+            ];
+
+            foreach (self::TARGET_FIELDS as $field) {
+                if (array_key_exists($field, $input)) {
+                    $attributes[$field] = self::normalizeTargetField($field, $input[$field]);
+                }
+            }
+
+            /** @var PostTarget|null $target */
+            $target = $existing->get($account->id);
+
+            if ($target === null) {
+                $post->targets()->create(['social_account_id' => $account->id, ...$attributes]);
+
+                continue;
+            }
+
+            $target->fill($attributes);
+
+            if ($target->isDirty('scheduled_at_utc') || $target->isDirty('scheduled_local_date')) {
+                $target->reminder_sent_at = null;
+            }
+
+            $target->save();
+        }
+
+        $post->targets()->whereNotIn('social_account_id', $keep)->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function syncAssets(Post $post, array $data): void
+    {
+        $crops = is_array($data['asset_crops'] ?? null) ? $data['asset_crops'] : null;
+        $altTexts = is_array($data['asset_alt_texts'] ?? null) ? $data['asset_alt_texts'] : null;
+
+        if (array_key_exists('asset_ids', $data)) {
+            $attach = [];
+
+            foreach (array_values((array) ($data['asset_ids'] ?? [])) as $order => $assetId) {
+                $assetId = (int) $assetId;
+                $attach[$assetId] = ['sort_order' => $order];
+
+                if ($crops !== null) {
+                    $attach[$assetId] += self::pivotFraming($crops[$assetId] ?? null);
+                }
+
+                if ($altTexts !== null) {
+                    $attach[$assetId]['alt_text'] = self::nullableText($altTexts[$assetId] ?? null);
+                }
+            }
+
+            $post->assets()->sync($attach);
+
+            return;
+        }
+
+        foreach ($crops ?? [] as $assetId => $crop) {
+            $post->assets()->updateExistingPivot((int) $assetId, self::pivotFraming($crop));
+        }
+
+        foreach ($altTexts ?? [] as $assetId => $text) {
+            $post->assets()->updateExistingPivot((int) $assetId, ['alt_text' => self::nullableText($text)]);
+        }
+    }
+
+    private static function normalizeTargetField(string $field, mixed $value): mixed
+    {
+        if ($field === 'hashtags_override') {
+            if (is_string($value)) {
+                $value = $value === '' ? null : json_decode($value, true);
+            }
+
+            if (! is_array($value)) {
+                return null;
+            }
+
+            return array_values(array_unique(array_filter(
+                array_map(fn ($tag) => ltrim(trim((string) $tag), '#'), $value),
+                fn ($tag) => $tag !== '',
+            )));
+        }
+
+        if ($field === 'format') {
+            return filled($value) ? (string) $value : null;
+        }
+
+        // Overrides: null = use the master, '' = none on this channel.
+        return $value === null ? null : trim((string) $value);
+    }
+
+    private static function nullableText(mixed $value): ?string
+    {
+        $text = trim((string) ($value ?? ''));
+
+        return $text === '' ? null : $text;
     }
 
     /**

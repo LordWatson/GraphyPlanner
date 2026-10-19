@@ -2,32 +2,45 @@
 
 namespace App\Enums;
 
+use App\Services\Publishing\PlatformCapabilities;
+use App\Support\Publishing\PlatformSpec;
+
+/**
+ * The networks a social account can live on. Every rule about a platform (limits, formats, media,
+ * link policy, vendor field names) lives in `config/platforms.php`, read through
+ * `App\Services\Publishing\PlatformCapabilities` (Step I-3.3 / M-2.1). The helpers below only
+ * delegate to it, so existing callers keep working and never hold a rule of their own.
+ */
 enum Platform: string
 {
     case Instagram = 'instagram';
     case TikTok = 'tiktok';
     case Facebook = 'facebook';
     case LinkedIn = 'linkedin';
+    // Step I-3.4 / M-2.6 — each behind its own rollout flag (`config/publishing.php`).
+    case YouTube = 'youtube';
+    case GoogleBusiness = 'google_business';
+    case Threads = 'threads';
+    case Pinterest = 'pinterest';
+    case X = 'x';
+
+    public function spec(): PlatformSpec
+    {
+        return app(PlatformCapabilities::class)->for($this);
+    }
 
     public function label(): string
     {
-        return match ($this) {
-            self::Instagram => 'Instagram',
-            self::TikTok => 'TikTok',
-            self::Facebook => 'Facebook',
-            self::LinkedIn => 'LinkedIn',
-        };
+        return $this->spec()->label;
     }
 
     /**
      * Whether this platform accepts a post with no media attached (spec §12 exit criterion:
-     * "Schedule blocked without media unless platform is text-only"). Interim definition — only
-     * LinkedIn is treated as text-only-capable, since the exact spec §6/§9 list wasn't available
-     * in this repo. See `.junie/modules/posts.md` for the open question.
+     * "Schedule blocked without media unless platform is text-only").
      */
     public function isTextOnlyCapable(): bool
     {
-        return $this === self::LinkedIn;
+        return $this->spec()->textOnly;
     }
 
     /**
@@ -45,46 +58,28 @@ enum Platform: string
     }
 
     /**
-     * Interim caption character limit used for the editor's per-target character count and the
-     * §6 checklist. The exact spec §6/§9 numbers weren't available in this repo — these mirror the
-     * platforms' commonly documented public limits at the time of writing.
+     * Caption character limit, counted on the caption as it publishes (hashtags included).
      */
     public function captionLimit(): int
     {
-        return match ($this) {
-            self::Instagram => 2200,
-            self::TikTok => 2200,
-            self::Facebook => 63206,
-            self::LinkedIn => 3000,
-        };
+        return $this->spec()->captionLimit;
     }
 
     /**
-     * Interim per-platform hashtag ceiling used by App\Services\AI\AiGuardrailService (Step 2.6)
-     * to flag AI caption suggestions that exceed a platform's commonly documented hashtag norms
-     * — enforced as a clear warning rather than a silent edit.
+     * The platform's hashtag norm, used by the checklist and the AI guardrails (Step 2.6) as a
+     * clear warning rather than a silent edit.
      */
     public function maxHashtags(): int
     {
-        return match ($this) {
-            self::Instagram => 30,
-            self::TikTok => 30,
-            self::Facebook => 30,
-            self::LinkedIn => 5,
-        };
+        return $this->spec()->maxHashtags;
     }
 
     /**
-     * Whether this platform's caption policy is comfortable with links inline in the caption
-     * body. Used by App\Services\AI\AiGuardrailService (Step 2.6) to warn — not silently
-     * strip — when an AI suggestion includes a link on a platform that generally buries/penalizes
-     * in-caption links (TikTok, Instagram).
+     * Whether a link in the caption body is clickable / welcome here. Platforms that bury
+     * in-caption links (TikTok, Instagram) get a warning, never a silent strip.
      */
     public function allowsLinksInCaption(): bool
     {
-        return match ($this) {
-            self::Instagram, self::TikTok => false,
-            self::Facebook, self::LinkedIn => true,
-        };
+        return $this->spec()->linksInCaption;
     }
 }

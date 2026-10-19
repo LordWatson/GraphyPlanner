@@ -44,6 +44,7 @@ class ReviewController extends Controller
                 'assets' => $post->assets->map(fn ($asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
+                    'thumbnail_url' => $asset->thumbnailUrl(),
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
                     'source' => $asset->source?->value,
@@ -55,6 +56,7 @@ class ReviewController extends Controller
                     'handle' => $target->socialAccount?->handle,
                     'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),
                     'scheduled_local_time' => $target->scheduled_local_time,
+                    ...PostMediaPresenter::channelPreview($target->setRelation('post', $post)),
                 ])->values(),
                 'can_decide' => $post->status === PostStatus::WaitingClient,
                 'comments' => $post->comments

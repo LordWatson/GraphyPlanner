@@ -104,7 +104,7 @@ class GetCampaignBoardAction
         return array_values(array_map(
             fn (PostStatus $status) => $status->value,
             array_filter(
-                PostStatusTransitionMap::allowedFrom($post->status),
+                PostStatusTransitionMap::allowedFor($post),
                 fn (PostStatus $to) => in_array($to, self::DROPPABLE, true) && $user->can('transition', [$post, $to]),
             ),
         ));

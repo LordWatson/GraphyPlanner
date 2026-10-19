@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ApprovalMode;
+use App\Enums\AssetType;
 use App\Enums\MediaRatio;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -15,6 +16,7 @@ use App\Services\SharedPropsCache;
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +38,10 @@ use Illuminate\Support\Carbon;
  * @property string|null $master_caption
  * @property string|null $review_message
  * @property array<int, string>|null $hashtags
+ * @property string|null $link_url
+ * @property string|null $first_comment
+ * @property int|null $cover_asset_id
+ * @property int|null $thumb_offset_ms
  * @property array<string, mixed>|null $music
  * @property array<string, mixed>|null $location
  * @property array<string, string>|null $media_format
@@ -47,6 +53,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'created_by', 'status', 'publish_dispatch_id', 'approval_mode',
     'master_caption', 'review_message', 'hashtags', 'music', 'location', 'media_format', 'checklist_snapshot',
+    'link_url', 'first_comment', 'cover_asset_id', 'thumb_offset_ms',
 ])]
 class Post extends Model
 {
@@ -181,6 +188,16 @@ class Post extends Model
     }
 
     /**
+     * Step I-3.2 / M-2.3: the image a video publishes with as its cover/thumbnail, if any.
+     *
+     * @return BelongsTo<Asset, $this>
+     */
+    public function coverAsset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'cover_asset_id')->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
      * Step C-3.2: the campaign deliverable this post was started from, if any.
      *
      * @return HasOne<CampaignDeliverable, $this>
@@ -232,7 +249,10 @@ class Post extends Model
     public function assets(): BelongsToMany
     {
         return $this->belongsToMany(Asset::class, 'post_assets')
-            ->withPivot(['crop_x', 'crop_y', 'crop_zoom']);
+            ->withPivot(['crop_x', 'crop_y', 'crop_zoom', 'alt_text', 'sort_order'])
+            // Step I-3.2 / M-2.3: carousel slides publish in this order.
+            ->orderByPivot('sort_order')
+            ->orderBy('post_assets.id');
     }
 
     /**
@@ -241,6 +261,51 @@ class Post extends Model
     public function mediaRatioFor(Platform $platform): MediaRatio
     {
         return MediaRatio::resolve($this->media_format, $platform);
+    }
+
+    /**
+     * Step I-3.6 / M-2.5: a `publishing` post that hasn't actually gone out anywhere — every
+     * channel is either held by the vendor for a later time or failed before reaching it — so it
+     * can still be unscheduled, moved or edited (its held channels are cancelled first).
+     */
+    public function canBeRecalled(): bool
+    {
+        $this->loadMissing('targets');
+
+        return $this->status === PostStatus::Publishing
+            && $this->targets->contains(fn (PostTarget $target) => $target->isVendorHeld())
+            && $this->targets->every(fn (PostTarget $target) => $target->isVendorHeld() || $target->status === PostTargetStatus::Failed);
+    }
+
+    /**
+     * The attached items that actually go out, in order: a post with a video sends that one video
+     * (the vendor's video endpoint takes a single file); otherwise every image, as a carousel.
+     * Documents and other files never publish.
+     *
+     * @return Collection<int, Asset>
+     */
+    public function publishableMedia(): Collection
+    {
+        $this->loadMissing('assets');
+
+        $video = $this->assets->first(fn (Asset $asset) => $asset->type === AssetType::Video);
+
+        return $video !== null
+            ? new Collection([$video])
+            : $this->assets->filter(fn (Asset $asset) => $asset->type === AssetType::Image)->values();
+    }
+
+    /**
+     * `image` / `video` per item that publishes (`publishableMedia()`) — what the capability
+     * registry matches formats against (`PlatformCapabilities::resolveFormat()`).
+     *
+     * @return list<string>
+     */
+    public function mediaKinds(): array
+    {
+        return array_values($this->publishableMedia()
+            ->map(fn (Asset $asset) => $asset->type === AssetType::Video ? 'video' : 'image')
+            ->all());
     }
 
     /**

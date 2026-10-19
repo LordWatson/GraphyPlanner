@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $country
  * @property string|null $default_location
  * @property array<int, array{day: string, start: string, end: string}>|null $posting_windows
+ * @property array<string, mixed>|null $platform_settings
  * @property string|null $persona_override
  * @property ConnectionStatus $connection_status
  * @property string|null $provider
@@ -38,6 +39,9 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $meta_access_token_expires_at
  * @property string|null $meta_instagram_user_id
  * @property Carbon|null $connected_at
+ * @property Carbon|null $last_health_check_at
+ * @property string|null $last_health_error
+ * @property string|null $token_expiry_warning
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -47,6 +51,7 @@ use Illuminate\Support\Carbon;
     'language', 'country', 'default_location', 'posting_windows', 'persona_override',
     'connection_status', 'provider', 'external_profile_id', 'external_account_id', 'connected_at',
     'meta_access_token', 'meta_access_token_expires_at', 'meta_instagram_user_id',
+    'platform_settings', 'last_health_check_at', 'last_health_error', 'token_expiry_warning',
 ])]
 // Step I-1.6: never serialized — a `toArray()`/Inertia prop of an account can't leak the Meta
 // token or the vendor profile id.
@@ -55,6 +60,16 @@ class SocialAccount extends Model
 {
     /** @use HasFactory<SocialAccountFactory> */
     use BelongsToOrganization, HasFactory, SoftDeletes;
+
+    /** Step I-3.9 / M-2.7: token expiry warning stages (`token_expiry_warning`). */
+    public const TOKEN_EXPIRES_THIS_WEEK = '7d';
+
+    public const TOKEN_EXPIRES_TOMORROW = '1d';
+
+    public const TOKEN_EXPIRED = 'expired';
+
+    /** Days before expiry the first warning goes out. */
+    public const TOKEN_WARNING_DAYS = 7;
 
     /**
      * @return array<string, string>
@@ -65,6 +80,8 @@ class SocialAccount extends Model
             'platform' => Platform::class,
             'connection_status' => ConnectionStatus::class,
             'posting_windows' => 'array',
+            'platform_settings' => 'array',
+            'last_health_check_at' => 'datetime',
             'connected_at' => 'datetime',
             // Step 1.9.2: a Meta user access token must never be stored/logged in plaintext —
             // Laravel's `encrypted` cast handles that transparently for both reads and writes.
@@ -85,12 +102,52 @@ class SocialAccount extends Model
         };
 
         static::saved(function (self $account) use ($recompute) {
-            if ($account->wasChanged('connection_status') || $account->wasChanged('client_id') || ($account->wasRecentlyCreated && ! $account->wasChanged())) {
+            // Step M-2.7: so does a token expiry warning stage.
+            if ($account->wasChanged('connection_status') || $account->wasChanged('client_id') || $account->wasChanged('token_expiry_warning')
+                || ($account->wasRecentlyCreated && ! $account->wasChanged())) {
                 $recompute($account);
             }
         });
         static::deleted($recompute);
         static::restored($recompute);
+    }
+
+    /**
+     * Step I-3.9 / M-2.7: where the stored Meta token stands — `expired`, `1d` (expires within a
+     * day), `7d` (within a week) or null (fine, or no token).
+     */
+    public function tokenExpiryStage(): ?string
+    {
+        if (blank($this->meta_access_token) || $this->meta_access_token_expires_at === null) {
+            return null;
+        }
+
+        return match (true) {
+            $this->meta_access_token_expires_at->isPast() => self::TOKEN_EXPIRED,
+            $this->meta_access_token_expires_at->lte(now()->addDay()) => self::TOKEN_EXPIRES_TOMORROW,
+            $this->meta_access_token_expires_at->lte(now()->addDays(self::TOKEN_WARNING_DAYS)) => self::TOKEN_EXPIRES_THIS_WEEK,
+            default => null,
+        };
+    }
+
+    /**
+     * "expires in 5 days", "expires tomorrow", "has expired" — for Home and health reasons.
+     */
+    public function tokenExpiryPhrase(): ?string
+    {
+        $expiresAt = $this->meta_access_token_expires_at;
+
+        if ($this->tokenExpiryStage() === null || $expiresAt === null) {
+            return null;
+        }
+
+        if ($expiresAt->isPast()) {
+            return 'has expired';
+        }
+
+        $days = (int) ceil(now()->diffInHours($expiresAt) / 24);
+
+        return $days <= 1 ? 'expires within a day' : "expires in {$days} days";
     }
 
     /**

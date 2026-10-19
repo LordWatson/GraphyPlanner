@@ -65,12 +65,10 @@ class PostMediaFormatTest extends TestCase
         $this->actingAs($this->owner)->get(route('posts.edit', $post))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('post.media_format', [
-                    'instagram' => '4:5',
-                    'tiktok' => 'original',
-                    'facebook' => 'original',
-                    'linkedin' => 'original',
-                ])
+                ->where('post.media_format.instagram', '4:5')
+                ->where('post.media_format.tiktok', 'original')
+                ->where('post.media_format.facebook', 'original')
+                ->where('post.media_format.linkedin', 'original')
                 ->where('post.assets.0.width', 1600)
                 ->where('post.assets.0.height', 900)
                 ->where('post.assets.0.crop', ['x' => 0.25, 'y' => 0.75, 'zoom' => 1.5])

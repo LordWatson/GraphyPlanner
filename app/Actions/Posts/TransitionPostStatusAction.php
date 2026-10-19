@@ -15,13 +15,51 @@ use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
 use App\Services\PostNotificationService;
+use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class TransitionPostStatusAction
 {
+    /** Step M-2.9: set only while `overrideApproval()` runs. */
+    private bool $overriding = false;
+
+    /**
+     * Step I-3.8 / M-2.9 — an Owner approves a `client_required` post without the client. The
+     * reason is required and lands on the approval record and the activity log ("Approval
+     * override: …"), so it's always visible who skipped the client and why.
+     */
+    public function overrideApproval(Post $post, User $owner, string $reason): Post
+    {
+        $this->overriding = true;
+
+        try {
+            $result = $this($post, PostStatus::Approved, $owner, 'Approval override: '.trim($reason));
+        } finally {
+            $this->overriding = false;
+        }
+
+        Log::warning('Client approval overridden', [
+            'post_id' => $post->id,
+            'org_id' => $post->org_id,
+            'user_id' => $owner->id,
+        ]);
+
+        return $result;
+    }
+
+    private function allowed(Post $post, PostStatus $to, ?PostStatus $from = null): bool
+    {
+        $from ??= $post->status;
+
+        return $this->overriding
+            ? PostStatusTransitionMap::isAllowed($from, $to) && PostStatusTransitionMap::needsClientApproval($post, $from, $to)
+            : PostStatusTransitionMap::isAllowedFor($post, $to, $from);
+    }
+
     /**
      * Move a post to a new status, guarded by `PostStatusTransitionMap`. Always records an
      * activity log entry; also records an approval record when the destination status is a
@@ -42,6 +80,13 @@ class TransitionPostStatusAction
      * Step I-1.2: entering `scheduled` writes a fresh `publish_dispatch_id` and hands it to the
      * publish job; leaving `scheduled` clears it, so any job still queued for an older schedule
      * no-ops when it fires.
+     *
+     * Step I-3.8 / M-2.9: a `client_required` post can't go from internal review straight to
+     * `approved` — only through the client, or an Owner's `overrideApproval()`.
+     *
+     * Step I-3.6 / M-2.5: `publishing → approved/draft` ("Unschedule" while every channel is still
+     * held by the vendor) cancels those vendor-held publishes first, through
+     * `VendorScheduleService::recall()`, and resets every channel to unsent.
      */
     public function __invoke(
         Post $post,
@@ -52,8 +97,20 @@ class TransitionPostStatusAction
         SendClientReviewRequestedEmailAction $sendClientReviewRequestedEmail = new SendClientReviewRequestedEmailAction,
         PostNotificationService $notifications = new PostNotificationService,
     ): Post {
-        if (! PostStatusTransitionMap::isAllowed($post->status, $to)) {
+        if (! $this->allowed($post, $to)) {
             throw new InvalidPostTransitionException($post->id, $post->status, $to);
+        }
+
+        // Step I-3.6 / M-2.5: unscheduling a `publishing` post cancels its vendor-held channels
+        // before anything changes here — if the vendor says it's too late, nothing moves.
+        if (PostStatusTransitionMap::isRecallMove($post->status, $to)) {
+            if (! $post->canBeRecalled()) {
+                throw ValidationException::withMessages([
+                    'to' => __('Some channels have already gone out, so this post can’t be taken off the schedule.'),
+                ]);
+            }
+
+            app(VendorScheduleService::class)->recall($post, 'to');
         }
 
         $locked = DB::transaction(function () use ($post, $to, $user, $comment, $evaluateChecklist, $sendClientReviewRequestedEmail, $notifications) {
@@ -61,7 +118,7 @@ class TransitionPostStatusAction
             $locked = Post::query()->whereKey($post->id)->lockForUpdate()->firstOrFail();
             $from = $locked->status;
 
-            if (! PostStatusTransitionMap::isAllowed($from, $to)) {
+            if (! $this->allowed($locked, $to, $from)) {
                 Log::warning('Post transition rejected: status changed concurrently', [
                     'post_id' => $locked->id,
                     'user_id' => $user?->id,
@@ -74,7 +131,7 @@ class TransitionPostStatusAction
 
             $dispatchId = match (true) {
                 $to === PostStatus::Scheduled => (string) Str::uuid(),
-                $from === PostStatus::Scheduled => null,
+                $from === PostStatus::Scheduled, PostStatusTransitionMap::isRecallMove($from, $to) => null,
                 default => $locked->publish_dispatch_id,
             };
 
@@ -90,7 +147,7 @@ class TransitionPostStatusAction
             // otherwise the old vendor error/external id would keep showing next to the target
             // even though a fresh publish attempt is about to run (the error itself is preserved
             // on the activity log entry created below instead).
-            if ($from === PostStatus::Failed && $to === PostStatus::Scheduled) {
+            if (($from === PostStatus::Failed && $to === PostStatus::Scheduled) || PostStatusTransitionMap::isRecallMove($from, $to)) {
                 $locked->targets()->update([
                     'status' => PostTargetStatus::Pending,
                     'external_post_id' => null,
@@ -102,7 +159,7 @@ class TransitionPostStatusAction
 
             // Unscheduling (scheduled → approved, C-6.1) keeps the existing approval; it isn't a
             // new decision, so no approval row.
-            if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true) && $from !== PostStatus::Scheduled) {
+            if (in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true) && ! in_array($from, [PostStatus::Scheduled, PostStatus::Publishing], true)) {
                 $locked->approvals()->create([
                     'user_id' => $user?->id,
                     'decision' => $to === PostStatus::Approved

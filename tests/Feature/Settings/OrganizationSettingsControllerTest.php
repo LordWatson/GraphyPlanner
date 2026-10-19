@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class OrganizationSettingsControllerTest extends TestCase
@@ -46,6 +47,7 @@ class OrganizationSettingsControllerTest extends TestCase
 
     public function test_owner_can_update_the_organization_settings()
     {
+        Http::fake(['app.upload-post.com/*' => Http::response(['success' => true, 'notifications' => ['webhook_secret' => 'whsec_auto']])]);
         $user = User::factory()->role(Role::Owner)->create();
 
         $response = $this->actingAs($user)->put(route('organization.update'), [
@@ -62,6 +64,49 @@ class OrganizationSettingsControllerTest extends TestCase
         $this->assertSame('EUR', $organization->default_currency);
         $this->assertSame('up-secret-key', $organization->upload_post_key);
         $this->assertSame('xai-secret-key', $organization->xai_key);
+    }
+
+    /**
+     * Step I-3.6 / M-2.5: saving a new Upload-Post key registers the publish webhook with the
+     * vendor (authenticated with that key) and stores the secret it issues.
+     */
+    public function test_saving_an_upload_post_key_registers_the_webhook_and_stores_its_secret()
+    {
+        Http::fake(['app.upload-post.com/api/uploadposts/users/notifications' => Http::response([
+            'success' => true,
+            'notifications' => ['webhook_url' => route('webhooks.upload-post'), 'webhook_secret' => 'whsec_123'],
+        ])]);
+        $user = User::factory()->role(Role::Owner)->create();
+
+        $this->actingAs($user)->put(route('organization.update'), [
+            'default_timezone' => 'UTC',
+            'default_currency' => 'USD',
+            'upload_post_key' => 'new-key',
+        ])->assertRedirect(route('organization.edit'));
+
+        Http::assertSent(fn ($request) => $request->method() === 'POST'
+            && $request->hasHeader('Authorization', 'Apikey new-key')
+            && $request['webhook_url'] === route('webhooks.upload-post')
+            && $request['webhook_events']['upload_completed'] === true);
+
+        $this->assertSame('whsec_123', $user->organization->fresh()->upload_post_webhook_secret);
+    }
+
+    public function test_a_failed_webhook_registration_keeps_the_key_and_the_old_secret()
+    {
+        Http::fake(['app.upload-post.com/*' => Http::response(['error' => 'nope'], 401)]);
+        $user = User::factory()->role(Role::Owner)->create();
+        $user->organization->update(['upload_post_webhook_secret' => 'whsec_old']);
+
+        $this->actingAs($user)->put(route('organization.update'), [
+            'default_timezone' => 'UTC',
+            'default_currency' => 'USD',
+            'upload_post_key' => 'new-key',
+        ])->assertRedirect(route('organization.edit'));
+
+        $organization = $user->organization->fresh();
+        $this->assertSame('new-key', $organization->upload_post_key);
+        $this->assertSame('whsec_old', $organization->upload_post_webhook_secret);
     }
 
     public function test_blank_keys_do_not_overwrite_existing_stored_keys()

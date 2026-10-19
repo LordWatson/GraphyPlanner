@@ -34,7 +34,7 @@ function Usage({
 
 /**
  * One row per client social account: tick it to publish there, then give it its own local date
- * and time. Times are never shared implicitly (spec §4.6) — "Use for all" is an explicit, per-click
+ * and time. A channel with required settings missing (e.g. a Pinterest board) says so. Times are never shared implicitly (spec §4.6) — "Use for all" is an explicit, per-click
  * copy of one row's values into the other selected rows, each still stored independently.
  */
 export function ChannelSchedule({
@@ -43,8 +43,7 @@ export function ChannelSchedule({
     onToggle,
     onChange,
     onApplyToAll,
-    captionLength,
-    hashtagCount,
+    usage,
     error,
 }: {
     accounts: TargetAccountData[];
@@ -56,8 +55,8 @@ export function ChannelSchedule({
         value: string,
     ) => void;
     onApplyToAll: (accountId: number) => void;
-    captionLength: number;
-    hashtagCount: number;
+    /** Step M-2.2: the caption length (as it publishes there) and hashtag count per channel. */
+    usage: Record<number, { chars: number; tags: number }>;
     error?: string;
 }) {
     const selectedIds = Object.keys(rows).map(Number);
@@ -118,6 +117,13 @@ export function ChannelSchedule({
                                         {account.platform_label} ·{' '}
                                         {account.timezone}
                                     </span>
+                                    {(account.missing_settings?.length ?? 0) >
+                                        0 && (
+                                        <span className="text-warning text-xs">
+                                            Needs its settings finished before
+                                            it can publish.
+                                        </span>
+                                    )}
                                 </span>
                             </label>
 
@@ -166,12 +172,12 @@ export function ChannelSchedule({
                                             </Button>
                                         )}
                                         <Usage
-                                            used={captionLength}
+                                            used={usage[account.id]?.chars ?? 0}
                                             limit={account.caption_limit}
                                             unit="chars"
                                         />
                                         <Usage
-                                            used={hashtagCount}
+                                            used={usage[account.id]?.tags ?? 0}
                                             limit={account.max_hashtags}
                                             unit="tags"
                                         />
@@ -183,30 +189,7 @@ export function ChannelSchedule({
                 })}
             </ul>
 
-            {selectedIds.map((accountId, i) => (
-                <span key={accountId} hidden>
-                    <input
-                        type="hidden"
-                        name={`targets[${i}][social_account_id]`}
-                        value={accountId}
-                    />
-                    <input
-                        type="hidden"
-                        name={`targets[${i}][scheduled_local_date]`}
-                        value={rows[accountId].date}
-                    />
-                    <input
-                        type="hidden"
-                        name={`targets[${i}][scheduled_local_time]`}
-                        value={rows[accountId].time}
-                    />
-                </span>
-            ))}
-
-            {/* With no channel ticked, still send the field so saving clears the last one. */}
-            {selectedIds.length === 0 && (
-                <input type="hidden" name="targets" value="" />
-            )}
+            {/* The target fields are rendered once, with the overrides, by `TargetFields`. */}
 
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>

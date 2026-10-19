@@ -4,7 +4,9 @@ namespace App\Contracts;
 
 use App\Models\Organization;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Support\Publishing\CancelResult;
 use App\Support\Publishing\TargetResult;
 use Illuminate\Support\Collection;
 
@@ -46,10 +48,18 @@ interface PublishAdapter
     public function publish(Post $post, Collection $targets): Collection;
 
     /**
-     * Cancel a previously scheduled/published post on the vendor, if
-     * supported. Optional — adapters that can't cancel should no-op.
+     * Step I-3.6 / M-2.5: cancel a publish the vendor is holding for a future time (the target's
+     * `external_post_id` is the vendor's job id). Takes the target so the request authenticates
+     * as its organization. Must never report success unless the vendor confirmed the cancel —
+     * callers rely on that to avoid double posts.
      */
-    public function cancel(string $externalPostId): void;
+    public function cancel(PostTarget $target): CancelResult;
+
+    /**
+     * Step I-3.6 / M-2.5: register `$url` as the organization's publish-outcome webhook with the
+     * vendor and return the signing secret it issues (null when registration failed).
+     */
+    public function registerWebhook(Organization $organization, string $url): ?string;
 
     /**
      * Check the current connection health of a SocialAccount against the

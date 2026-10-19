@@ -58,6 +58,7 @@ class ShowCampaignShareLinkAction
                 'assets' => $post->assets->map(fn (Asset $asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
+                    'thumbnail_url' => $asset->thumbnailUrl(),
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
                     'source' => $asset->source->value,

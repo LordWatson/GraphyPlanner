@@ -29,14 +29,20 @@ import {
     MIN_ZOOM,
     normalizeCrop,
 } from '@/lib/media-format';
+import { usePlatforms } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 
-const platformNames: Record<string, string> = {
-    instagram: 'Instagram',
-    tiktok: 'TikTok',
-    facebook: 'Facebook',
-    linkedin: 'LinkedIn',
-};
+/** Display name per platform, from the capability registry. */
+function usePlatformNames(): Record<string, string> {
+    const registry = usePlatforms();
+
+    return Object.fromEntries(
+        Object.values(registry).map((platform) => [
+            platform.value,
+            platform.label,
+        ]),
+    );
+}
 
 export function FormatPicker({
     platform,
@@ -51,6 +57,7 @@ export function FormatPicker({
     onChange: (value: string) => void;
     className?: string;
 }) {
+    const platformNames = usePlatformNames();
     const choices = options[platform] ?? [];
 
     if (choices.length < 2) {
@@ -272,6 +279,7 @@ function DialogBody({
     onApply: (crops: Record<number, Crop>, format: MediaFormat) => void;
     onCancel: () => void;
 }) {
+    const platformNames = usePlatformNames();
     const [platform, setPlatform] = useState(initialPlatform);
     const [format, setFormat] = useState<MediaFormat>(initialFormat);
     const [crops, setCrops] = useState<Record<number, Crop>>(() =>

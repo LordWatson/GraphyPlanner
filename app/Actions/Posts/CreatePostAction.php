@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Enums\ApprovalMode;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\SocialAccount;
@@ -26,12 +27,14 @@ class CreatePostAction
         return DB::transaction(function () use ($client, $data) {
             $post = Post::create([
                 ...array_diff_key($data, ['targets' => null]),
+                // Step I-3.8 / M-2.9: the client's default unless the post chose one.
+                'approval_mode' => $data['approval_mode'] ?? $client->default_approval_mode ?? ApprovalMode::ClientRequired,
                 'org_id' => $client->org_id,
                 'client_id' => $client->id,
             ]);
 
             foreach ($data['targets'] ?? [] as $target) {
-                $account = SocialAccount::findOrFail($target['social_account_id']);
+                $account = SocialAccount::query()->whereKey((int) $target['social_account_id'])->firstOrFail();
 
                 $scheduledAtUtc = null;
 

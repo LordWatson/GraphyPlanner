@@ -1,7 +1,7 @@
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import type { CampaignChipData } from '@/components/campaigns/types';
 import { Link, router } from '@inertiajs/react';
-import { Pencil, Plus, Send, Share2 } from 'lucide-react';
+import { Pencil, Plus, Send } from 'lucide-react';
 import type { PostTargetAccount } from '@/components/posts/new-post-dialog';
 import { NewPostDialog } from '@/components/posts/new-post-dialog';
 import { StatusPill } from '@/components/status-pill';
@@ -16,9 +16,9 @@ import {
     ClientLayout,
     TabHeading,
     TabPanel,
-    platformIcon,
-    platformOptions,
+    usePlatformOptions,
 } from '@/components/clients/client-layout';
+import { platformIcon } from '@/components/platform-icon';
 import type { TabFilterOption } from '@/components/clients/tab-filters';
 import {
     TabSearchFilter,
@@ -78,6 +78,7 @@ export default function ClientPostsTab({
     };
     targetAccounts: PostTargetAccount[];
 }) {
+    const platformOptions = usePlatformOptions();
     const { client, can } = page;
     const posts = postPage.data;
     const filtered =
@@ -227,10 +228,9 @@ export default function ClientPostsTab({
                                             <div className="flex flex-wrap gap-2">
                                                 {post.targets.map((target) => {
                                                     const AccountIcon =
-                                                        platformIcon[
-                                                            target.platform ??
-                                                                ''
-                                                        ] ?? Share2;
+                                                        platformIcon(
+                                                            target.platform,
+                                                        );
                                                     return (
                                                         <span
                                                             key={target.id}

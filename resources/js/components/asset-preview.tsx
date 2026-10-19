@@ -4,6 +4,8 @@ import type { Crop } from '@/lib/media-format';
 export type AssetPreviewData = {
     id: number;
     url: string | null;
+    /** Step M-2.4: a small preview for grids, when made. */
+    thumbnail_url?: string | null;
     original_filename: string | null;
     type: string | null;
     source: string | null;
@@ -63,8 +65,9 @@ export function AssetPreview({ asset }: { asset: AssetPreviewData }) {
         ) {
             return (
                 <img
-                    src={asset.url}
+                    src={asset.thumbnail_url ?? asset.url}
                     alt={label}
+                    loading="lazy"
                     className="border-border aspect-square w-full rounded-md border object-cover"
                 />
             );

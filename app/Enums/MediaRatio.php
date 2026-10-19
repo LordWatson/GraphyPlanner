@@ -17,14 +17,6 @@ enum MediaRatio: string
     case Landscape = '1.91:1';
     case Vertical = '9:16';
 
-    /**
-     * Instagram's accepted feed range (width ÷ height): anything taller than 4:5 or wider than
-     * 1.91:1 is rejected by its API, so an `Original` image outside it is cropped to the bound.
-     */
-    public const INSTAGRAM_MIN = 0.8;
-
-    public const INSTAGRAM_MAX = 1.91;
-
     public function label(): string
     {
         return match ($this) {
@@ -53,17 +45,19 @@ enum MediaRatio: string
     }
 
     /**
-     * The formats each channel offers in the editor, in display order. The first is the default.
+     * The formats each channel offers in the editor, in display order (the registry's
+     * `media_ratios`, `config/platforms.php`). The first is the default.
      *
      * @return list<self>
      */
     public static function optionsFor(Platform $platform): array
     {
-        return match ($platform) {
-            Platform::Instagram => [self::Original, self::Square, self::Portrait, self::Classic, self::Landscape],
-            Platform::TikTok => [self::Original, self::Vertical],
-            Platform::Facebook, Platform::LinkedIn => [self::Original, self::Square, self::Portrait, self::Landscape],
-        };
+        $options = array_values(array_filter(array_map(
+            fn (string $value) => self::tryFrom($value),
+            $platform->spec()->mediaRatios,
+        )));
+
+        return $options === [] ? [self::Original] : $options;
     }
 
     /**

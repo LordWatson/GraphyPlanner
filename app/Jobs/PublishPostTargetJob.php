@@ -73,7 +73,7 @@ class PublishPostTargetJob implements ShouldQueue
         }
 
         /** @var Post $post */
-        $post = Post::with('targets.socialAccount', 'assets', 'organization', 'client')->findOrFail($target->post_id);
+        $post = Post::with('targets.socialAccount', 'assets', 'coverAsset', 'organization', 'client')->findOrFail($target->post_id);
         $account = $post->targets->firstWhere('id', $target->id)?->socialAccount;
 
         $result = $account

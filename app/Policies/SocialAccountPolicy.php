@@ -53,6 +53,26 @@ class SocialAccountPolicy
     }
 
     /**
+     * Step M-2.8: send a client a self-connect link (Owner/Strategist, like starting a connection).
+     */
+    public function createConnectInvite(User $user, Client $client): bool
+    {
+        return $this->create($user, $client);
+    }
+
+    /**
+     * Step M-2.8: a client contact may connect their own client's accounts from the portal —
+     * nothing else about the account opens up to them.
+     */
+    public function connectAsClient(User $user, SocialAccount $socialAccount): bool
+    {
+        return $user->role === Role::ClientReviewer
+            && $user->client_id !== null
+            && $user->client_id === $socialAccount->client_id
+            && $user->org_id === $socialAccount->org_id;
+    }
+
+    /**
      * Determine whether the user can delete a social account.
      */
     public function delete(User $user, SocialAccount $socialAccount): bool

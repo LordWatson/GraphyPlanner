@@ -20,7 +20,12 @@ import {
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { CampaignField } from '@/components/post-editor/campaign-field';
 import type { CampaignOption } from '@/components/post-editor/campaign-field';
+import {
+    ChannelCustomizer,
+    TargetFields,
+} from '@/components/post-editor/channel-customizer';
 import { ChannelSchedule } from '@/components/post-editor/channel-schedule';
+import { MediaDetails } from '@/components/post-editor/media-details';
 import { MediaPicker } from '@/components/post-editor/media-picker';
 import { MusicField } from '@/components/post-editor/music-field';
 import { PostDiscussion } from '@/components/post-editor/post-discussion';
@@ -32,20 +37,37 @@ import {
 } from '@/components/post-editor/readiness-checklist';
 import type {
     AssetData,
+    ChannelState,
+    ChecklistFix,
     PostData,
     ScheduleRows,
     TargetAccountData,
     TransitionOption,
 } from '@/components/post-editor/types';
-import { formatLocalSchedule } from '@/components/post-editor/types';
+import {
+    EMPTY_CHANNEL,
+    formatLocalSchedule,
+} from '@/components/post-editor/types';
 import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import type { Crop, MediaFormat, MediaFormatOptions } from '@/lib/media-format';
-import { DEFAULT_CROP, normalizeCrop } from '@/lib/media-format';
+import {
+    DEFAULT_CROP,
+    normalizeCrop,
+    publishedCaption,
+} from '@/lib/media-format';
+import { capabilityOf, usePlatforms } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
@@ -75,6 +97,17 @@ type EditorState = {
     mediaFormat: MediaFormat;
     /** Framing of the attached media only, keyed by asset id. */
     crops: Record<number, Crop>;
+    /** Step M-2.2: the master link and first comment. */
+    link: string;
+    firstComment: string;
+    /** Step M-2.2 / M-2.3: each channel's own content and format, keyed by account id. */
+    channels: Record<number, ChannelState>;
+    /** Alt text per attached image. */
+    altTexts: Record<number, string>;
+    coverAssetId: number | null;
+    thumbOffsetMs: number | null;
+    /** Step M-2.9: whether the client must approve this post. */
+    approvalMode: string;
 };
 
 function initialEditorState(post: PostData): EditorState {
@@ -99,7 +132,43 @@ function initialEditorState(post: PostData): EditorState {
         crops: Object.fromEntries(
             post.assets.map((asset) => [asset.id, normalizeCrop(asset.crop)]),
         ),
+        link: post.link_url ?? '',
+        firstComment: post.first_comment ?? '',
+        channels: Object.fromEntries(
+            post.targets.map((target) => [
+                target.social_account_id,
+                {
+                    caption: target.caption_override,
+                    hashtags: target.hashtags_override,
+                    firstComment: target.first_comment,
+                    link: target.link_url,
+                    format: target.format,
+                } satisfies ChannelState,
+            ]),
+        ),
+        altTexts: Object.fromEntries(
+            post.assets
+                .filter((asset) => asset.alt_text)
+                .map((asset) => [asset.id, asset.alt_text ?? '']),
+        ),
+        coverAssetId: post.cover_asset_id,
+        thumbOffsetMs: post.thumb_offset_ms,
+        approvalMode: post.approval_mode,
     };
+}
+
+/** `image`/`video` per item that publishes: a post with a video sends just that video. */
+function mediaKindsOf(assets: AssetData[]): string[] {
+    const isVideo = (asset: AssetData) =>
+        (asset.type ?? '').startsWith('video');
+    const isImage = (asset: AssetData) =>
+        (asset.type ?? '').startsWith('image');
+
+    if (assets.some(isVideo)) {
+        return ['video'];
+    }
+
+    return assets.filter(isImage).map(() => 'image');
 }
 
 const captionClass =
@@ -262,6 +331,7 @@ export default function PostEdit({
         resend_review_email: boolean;
         retry_failed_targets: boolean;
         delete: boolean;
+        override_approval: boolean;
         create_asset: boolean;
     };
     hashtagSuggestions: string[];
@@ -284,9 +354,29 @@ export default function PostEdit({
     const [locationName, setLocationName] = useState(initial.locationName);
     const [mediaFormat, setMediaFormat] = useState(initial.mediaFormat);
     const [crops, setCrops] = useState(initial.crops);
+    const [link, setLink] = useState(initial.link);
+    const [firstComment, setFirstComment] = useState(initial.firstComment);
+    const [channels, setChannels] = useState(initial.channels);
+    const [altTexts, setAltTexts] = useState(initial.altTexts);
+    const [coverAssetId, setCoverAssetId] = useState(initial.coverAssetId);
+    const [thumbOffsetMs, setThumbOffsetMs] = useState(initial.thumbOffsetMs);
+    const [approvalMode, setApprovalMode] = useState(initial.approvalMode);
+    const registry = usePlatforms();
     // Only attached media's framing is saved (and compared), so a removed image's edits drop out.
     const selectedCrops: Record<number, Crop> = Object.fromEntries(
         selectedAssetIds.map((id) => [id, crops[id] ?? DEFAULT_CROP]),
+    );
+    // Likewise only selected channels' overrides and attached images' alt text.
+    const selectedChannels: Record<number, ChannelState> = Object.fromEntries(
+        Object.keys(scheduleRows).map((id) => [
+            Number(id),
+            channels[Number(id)] ?? EMPTY_CHANNEL,
+        ]),
+    );
+    const selectedAltTexts: Record<number, string> = Object.fromEntries(
+        selectedAssetIds
+            .filter((id) => (altTexts[id] ?? '') !== '')
+            .map((id) => [id, altTexts[id]]),
     );
 
     // Asset details for every id the editor knows about (saved media, library picks, inline
@@ -311,6 +401,13 @@ export default function PostEdit({
             locationName,
             mediaFormat,
             crops: selectedCrops,
+            link,
+            firstComment,
+            channels: selectedChannels,
+            altTexts: selectedAltTexts,
+            coverAssetId,
+            thumbOffsetMs,
+            approvalMode,
         } satisfies EditorState) !== JSON.stringify(initial);
 
     useUnsavedChangesGuard(isDirty);
@@ -345,6 +442,37 @@ export default function PostEdit({
         setLocationName(initial.locationName);
         setMediaFormat(initial.mediaFormat);
         setCrops(initial.crops);
+        setLink(initial.link);
+        setFirstComment(initial.firstComment);
+        setChannels(initial.channels);
+        setAltTexts(initial.altTexts);
+        setCoverAssetId(initial.coverAssetId);
+        setThumbOffsetMs(initial.thumbOffsetMs);
+        setApprovalMode(initial.approvalMode);
+    };
+
+    // Step M-2.3 / M-2.4: the checklist's one-click fixes change unsaved state only.
+    const applyFix = (fix: ChecklistFix) => {
+        if (fix.action === 'format' && fix.social_account_id) {
+            const accountId = fix.social_account_id;
+            setChannels((current) => ({
+                ...current,
+                [accountId]: {
+                    ...(current[accountId] ?? EMPTY_CHANNEL),
+                    format: fix.value,
+                },
+            }));
+        }
+
+        if (fix.action === 'media_format' && fix.platform) {
+            const platform = fix.platform;
+            setMediaFormat((current) => ({
+                ...current,
+                [platform]: fix.value,
+            }));
+        }
+
+        toast.success('Fixed — save to keep it.');
     };
 
     // Step 2.4 — "Suggest with AI". Never overwrites the caption without an explicit click, and
@@ -551,33 +679,83 @@ export default function PostEdit({
         ),
     );
 
+    const mediaKinds = mediaKindsOf(selectedAssets);
+
     const checklistItems = can.update
         ? liveChecklist(post.checklist.items, {
               caption,
               selectedAccounts,
               schedule: Object.values(scheduleRows),
               mediaCount: selectedAssetIds.length,
+              mediaKinds,
               hashtags,
               campaignHashtags:
                   campaignOptions.find(
                       (option) => String(option.id) === campaignId,
                   )?.hashtags ?? [],
+              channels: selectedChannels,
+              link,
+              firstComment,
+              registry,
           })
         : post.checklist.items;
 
+    // Each channel's preview carries its own caption, hashtags, link, first comment and format.
     const previewTargets = can.update
-        ? selectedAccounts.map((a) => ({
-              id: a.id,
-              platform: a.platform,
-              handle: a.handle,
-              display_name: a.display_name,
-          }))
+        ? selectedAccounts.map((a) => {
+              const channel = selectedChannels[a.id] ?? EMPTY_CHANNEL;
+
+              return {
+                  id: a.id,
+                  platform: a.platform,
+                  handle: a.handle,
+                  display_name: a.display_name,
+                  caption: channel.caption,
+                  hashtags: channel.hashtags,
+                  link: channel.link ?? (link || null),
+                  firstComment: channel.firstComment ?? (firstComment || null),
+                  format: channel.format,
+              };
+          })
         : post.targets.map((t) => ({
               id: t.social_account_id,
               platform: t.platform ?? '',
               handle: t.handle ?? '',
               display_name: t.display_name,
+              format: t.format,
+              link: t.link_url ?? post.link_url,
+              firstComment: t.first_comment ?? post.first_comment,
+              publishedCaption: t.published_caption,
           }));
+
+    // Per-channel usage for the schedule rows: the caption as it publishes there.
+    const channelUsage = Object.fromEntries(
+        selectedAccounts.map((account) => {
+            const channel = selectedChannels[account.id] ?? EMPTY_CHANNEL;
+            const tags = channel.hashtags ?? hashtags;
+
+            return [
+                account.id,
+                {
+                    chars: publishedCaption(
+                        channel.caption ?? caption,
+                        tags,
+                        capabilityOf(registry, account.platform),
+                        channel.link ?? link,
+                    ).length,
+                    tags: tags.length,
+                },
+            ];
+        }),
+    );
+    const altTextPlatforms = [
+        ...new Set(
+            selectedAccounts
+                .map((account) => capabilityOf(registry, account.platform))
+                .filter((capability) => capability.alt_text)
+                .map((capability) => capability.label),
+        ),
+    ];
 
     return (
         <>
@@ -643,6 +821,7 @@ export default function PostEdit({
                     canResendReviewEmail={can.resend_review_email}
                     canRetryFailedTargets={can.retry_failed_targets}
                     canDelete={can.delete}
+                    canOverrideApproval={can.override_approval}
                 />
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
@@ -760,6 +939,58 @@ export default function PostEdit({
                                                 ))}
                                             </div>
 
+                                            <div className="grid gap-5 sm:grid-cols-2">
+                                                <div className="grid content-start gap-2">
+                                                    <Label htmlFor="link_url">
+                                                        Link
+                                                    </Label>
+                                                    <Input
+                                                        id="link_url"
+                                                        name="link_url"
+                                                        type="url"
+                                                        value={link}
+                                                        onChange={(e) =>
+                                                            setLink(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="https://"
+                                                    />
+                                                    <p className="text-muted-foreground text-xs">
+                                                        Each channel uses it the
+                                                        way it can — see
+                                                        Customize below.
+                                                    </p>
+                                                    <InputError
+                                                        message={
+                                                            errors.link_url
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="grid content-start gap-2">
+                                                    <Label htmlFor="first_comment">
+                                                        First comment
+                                                    </Label>
+                                                    <Input
+                                                        id="first_comment"
+                                                        name="first_comment"
+                                                        dir="auto"
+                                                        value={firstComment}
+                                                        onChange={(e) =>
+                                                            setFirstComment(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="Posted as a comment right after"
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            errors.first_comment
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+
                                             <CampaignField
                                                 postId={post.id}
                                                 value={campaignId}
@@ -832,8 +1063,7 @@ export default function PostEdit({
                                                 onApplyToAll={
                                                     applyScheduleToAll
                                                 }
-                                                captionLength={caption.length}
-                                                hashtagCount={hashtags.length}
+                                                usage={channelUsage}
                                                 error={
                                                     errors[
                                                         'targets.0.social_account_id'
@@ -844,6 +1074,40 @@ export default function PostEdit({
 
                                         <Panel
                                             eyebrow="03"
+                                            title="Customize per channel"
+                                            description="Different caption, hashtags, first comment, link or format for one network — everything else follows the main post."
+                                        >
+                                            <ChannelCustomizer
+                                                accounts={selectedAccounts}
+                                                channels={selectedChannels}
+                                                onChange={(accountId, next) =>
+                                                    setChannels((current) => ({
+                                                        ...current,
+                                                        [accountId]: next,
+                                                    }))
+                                                }
+                                                master={{
+                                                    caption,
+                                                    hashtags,
+                                                    firstComment,
+                                                    link,
+                                                }}
+                                                mediaKinds={mediaKinds}
+                                                hashtagSuggestions={
+                                                    hashtagSuggestions
+                                                }
+                                            />
+                                            <TargetFields
+                                                accountIds={Object.keys(
+                                                    scheduleRows,
+                                                ).map(Number)}
+                                                schedule={scheduleRows}
+                                                channels={selectedChannels}
+                                            />
+                                        </Panel>
+
+                                        <Panel
+                                            eyebrow="04"
                                             title="Media"
                                             description="Upload something new or pick from the client's library — the number is the order it appears in."
                                             actions={
@@ -868,13 +1132,85 @@ export default function PostEdit({
                                                     void handleAssetUpload(file)
                                                 }
                                             />
+                                            <MediaDetails
+                                                assets={selectedAssets}
+                                                altTexts={altTexts}
+                                                onAltTextChange={(id, text) =>
+                                                    setAltTexts((current) => ({
+                                                        ...current,
+                                                        [id]: text,
+                                                    }))
+                                                }
+                                                coverAssetId={coverAssetId}
+                                                onCoverChange={setCoverAssetId}
+                                                thumbOffsetMs={thumbOffsetMs}
+                                                onThumbOffsetChange={
+                                                    setThumbOffsetMs
+                                                }
+                                                altTextPlatforms={
+                                                    altTextPlatforms
+                                                }
+                                            />
+                                            {selectedAssetIds.map((id) => (
+                                                <input
+                                                    key={id}
+                                                    type="hidden"
+                                                    name={`asset_alt_texts[${id}]`}
+                                                    value={altTexts[id] ?? ''}
+                                                />
+                                            ))}
+                                            <input
+                                                type="hidden"
+                                                name="cover_asset_id"
+                                                value={coverAssetId ?? ''}
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="thumb_offset_ms"
+                                                value={thumbOffsetMs ?? ''}
+                                            />
                                         </Panel>
 
                                         <Panel
-                                            eyebrow="04"
+                                            eyebrow="05"
                                             title="Details"
                                             bodyClassName="grid gap-5 sm:grid-cols-2"
                                         >
+                                            <div className="grid content-start gap-2 sm:col-span-2 sm:max-w-sm">
+                                                <Label htmlFor="approval_mode">
+                                                    Approval
+                                                </Label>
+                                                <Select
+                                                    value={approvalMode}
+                                                    onValueChange={
+                                                        setApprovalMode
+                                                    }
+                                                >
+                                                    <SelectTrigger id="approval_mode">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="client_required">
+                                                            Client approval
+                                                            required
+                                                        </SelectItem>
+                                                        <SelectItem value="internal_only">
+                                                            Internal approval
+                                                            only
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <input
+                                                    type="hidden"
+                                                    name="approval_mode"
+                                                    value={approvalMode}
+                                                />
+                                                <InputError
+                                                    message={
+                                                        errors.approval_mode
+                                                    }
+                                                />
+                                            </div>
                                             <div className="grid content-start gap-2">
                                                 <Label
                                                     htmlFor="music_search"
@@ -995,6 +1331,7 @@ export default function PostEdit({
                     <aside className="grid gap-5 lg:sticky lg:top-20">
                         <ReadinessChecklist
                             items={checklistItems}
+                            onFix={can.update ? applyFix : undefined}
                             note={
                                 isDirty
                                     ? 'Reflects your unsaved edits — save before scheduling.'

@@ -75,7 +75,12 @@ class GetNeedsAttentionItemsAction
 
         $accountsQuery = SocialAccount::query()
             ->where('org_id', $user->org_id)
-            ->whereIn('connection_status', [ConnectionStatus::NotConnected, ConnectionStatus::TokenExpired])
+            // Step I-3.9 / M-2.7: plus connections expiring within a week.
+            ->where(fn (Builder $query) => $query
+                ->whereIn('connection_status', [ConnectionStatus::NotConnected, ConnectionStatus::TokenExpired])
+                ->orWhere(fn (Builder $expiring) => $expiring
+                    ->whereNotNull('meta_access_token')
+                    ->where('meta_access_token_expires_at', '<=', now()->addDays(SocialAccount::TOKEN_WARNING_DAYS))))
             ->when($user->role === Role::ClientReviewer, fn (Builder $query) => $query->where('client_id', $user->client_id));
 
         return [
@@ -120,6 +125,11 @@ class GetNeedsAttentionItemsAction
                         'handle' => $account->handle,
                         'connection_status' => $account->connection_status->value,
                         'connection_status_label' => $account->connection_status->label(),
+                        // Step M-2.7: why it's here when it is still connected.
+                        'reason' => in_array($account->connection_status, [ConnectionStatus::NotConnected, ConnectionStatus::TokenExpired], true)
+                            ? null
+                            : ucfirst('connection '.$account->tokenExpiryPhrase()),
+                        'token_expires_at' => $account->meta_access_token_expires_at?->toIso8601String(),
                     ])
                     ->all()),
                 'total' => $accountsQuery->count(),

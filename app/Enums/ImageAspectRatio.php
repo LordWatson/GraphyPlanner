@@ -64,14 +64,11 @@ enum ImageAspectRatio: string
     }
 
     /**
-     * Default format for a platform's feed: Instagram → 4:5, TikTok → 9:16, LinkedIn/Facebook → 1:1.
+     * Default format for a platform's feed — the registry's `ai_image_ratio`
+     * (`config/platforms.php`), square when unset.
      */
     public static function forPlatform(Platform $platform): self
     {
-        return match ($platform) {
-            Platform::Instagram => self::Portrait_4_5,
-            Platform::TikTok => self::Story_9_16,
-            Platform::Facebook, Platform::LinkedIn => self::Square_1_1,
-        };
+        return self::tryFrom((string) config("platforms.{$platform->value}.ai_image_ratio")) ?? self::Square_1_1;
     }
 }

@@ -5,6 +5,7 @@ namespace App\Actions\Assets;
 use App\Contracts\AssetStorage;
 use App\Enums\AssetSource;
 use App\Enums\AssetType;
+use App\Jobs\ProbeAssetJob;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\User;
@@ -56,6 +57,11 @@ class CreateAssetAction
             }
 
             $asset = Asset::create($attributes);
+
+            // Step I-3.5 / M-2.4: real size, video length/codec and a list thumbnail.
+            if ($source === AssetSource::Upload) {
+                ProbeAssetJob::dispatch($asset->id)->afterCommit();
+            }
 
             Log::info('Asset created', [
                 'client_id' => $client->id,

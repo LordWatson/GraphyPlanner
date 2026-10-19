@@ -1,5 +1,11 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useCallback } from 'react';
+import type { ConnectSlot } from '@/components/connect-slots';
+import { ConnectSlotList } from '@/components/connect-slots';
+import { useConnectPopup } from '@/hooks/use-connect-popup';
+import { connect as connectPortalAccount } from '@/routes/portal/accounts';
 import {
+    Link2,
     ArrowRight,
     CalendarDays,
     CheckCircle2,
@@ -73,11 +79,20 @@ function toRow(row: PostRow) {
 export default function PortalDashboard({
     client,
     items,
+    connectAccounts = [],
 }: {
     client: { name: string };
     items: DashboardItems;
+    /** Step M-2.8: the client's own account slots, to connect without sharing a password. */
+    connectAccounts?: ConnectSlot[];
 }) {
     const { auth } = usePage<{ auth: Auth }>().props;
+    const refreshSlots = useCallback(
+        () => router.reload({ only: ['connectAccounts'] }),
+        [],
+    );
+    const { connectingId, connect } = useConnectPopup(refreshSlots);
+    const unconnected = connectAccounts.filter((slot) => !slot.connected);
     const firstName = auth.user.name.split(' ')[0];
     const waiting = items.waitingApprovals;
     const next = waiting[0];
@@ -302,6 +317,34 @@ export default function PortalDashboard({
                         </p>
                     )}
                 </Panel>
+
+                {connectAccounts.length > 0 && (
+                    <Panel
+                        eyebrow="Your accounts"
+                        title={
+                            unconnected.length > 0
+                                ? 'Connect your accounts'
+                                : 'Your accounts are connected'
+                        }
+                        description={
+                            unconnected.length > 0
+                                ? 'Sign in on each network’s own page so the studio can publish for you — no passwords shared.'
+                                : 'The studio can publish to every account. Reconnect here if a network asks you to.'
+                        }
+                        icon={Link2}
+                    >
+                        <ConnectSlotList
+                            slots={connectAccounts}
+                            connectingId={connectingId}
+                            onConnect={(slot) =>
+                                void connect(
+                                    slot.id,
+                                    connectPortalAccount.url(slot.id),
+                                )
+                            }
+                        />
+                    </Panel>
+                )}
             </Page>
         </>
     );

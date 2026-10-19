@@ -107,7 +107,11 @@ class BulkUpdateCampaignPostsAction
             return 'Already '.mb_strtolower($to->label()).'.';
         }
 
-        if (! PostStatusTransitionMap::isAllowed($post->status, $to)) {
+        if (PostStatusTransitionMap::needsClientApproval($post, $post->status, $to)) {
+            return 'Needs the client’s approval.';
+        }
+
+        if (! PostStatusTransitionMap::isAllowedFor($post, $to)) {
             return 'A '.mb_strtolower($post->status->label()).' post can’t move to '.mb_strtolower($to->label()).'.';
         }
 

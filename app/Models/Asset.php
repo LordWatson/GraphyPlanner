@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\AssetStorage;
 use App\Enums\AssetSource;
 use App\Enums\AssetType;
 use App\Models\Concerns\BelongsToOrganization;
@@ -33,6 +34,10 @@ use Illuminate\Support\Carbon;
  * @property int|null $size
  * @property int|null $width
  * @property int|null $height
+ * @property int|null $duration_ms
+ * @property string|null $video_codec
+ * @property string|null $thumbnail_path
+ * @property Carbon|null $probed_at
  * @property string|null $rights
  * @property string|null $variant_group_id
  * @property int|null $ai_image_variant_id
@@ -44,7 +49,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'uploaded_by', 'source', 'type', 'disk', 'path', 'url',
     'original_filename', 'mime_type', 'size', 'width', 'height', 'rights', 'variant_group_id',
-    'ai_image_variant_id', 'is_ai_generated',
+    'ai_image_variant_id', 'is_ai_generated', 'duration_ms', 'video_codec', 'thumbnail_path', 'probed_at',
 ])]
 class Asset extends Model
 {
@@ -63,6 +68,28 @@ class Asset extends Model
     }
 
     /**
+     * Step I-3.5 / M-2.4: a small preview (made by `ProbeAssetJob`) for lists and grids, so they
+     * never load the full-resolution original. Falls back to the original's URL for images that
+     * haven't been probed yet; null for a video without one.
+     */
+    public function thumbnailUrl(): ?string
+    {
+        if (filled($this->thumbnail_path) && filled($this->disk)) {
+            return app(AssetStorage::class)->url((string) $this->disk, (string) $this->thumbnail_path);
+        }
+
+        return $this->type === AssetType::Video ? null : $this->url;
+    }
+
+    /**
+     * Width ÷ height, when known.
+     */
+    public function aspectRatio(): ?float
+    {
+        return $this->width && $this->height ? $this->width / $this->height : null;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -71,6 +98,7 @@ class Asset extends Model
             'source' => AssetSource::class,
             'type' => AssetType::class,
             'is_ai_generated' => 'boolean',
+            'probed_at' => 'datetime',
         ];
     }
 

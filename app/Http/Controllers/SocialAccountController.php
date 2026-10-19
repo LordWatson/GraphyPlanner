@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Actions\SocialAccounts\ConnectSocialAccountAction;
 use App\Actions\SocialAccounts\CreateSocialAccountAction;
+use App\Actions\SocialAccounts\RecordClientConnectionAction;
 use App\Actions\SocialAccounts\UpdateSocialAccountAction;
 use App\Contracts\PublishAdapter;
 use App\Http\Requests\StoreSocialAccountRequest;
 use App\Http\Requests\UpdateSocialAccountRequest;
 use App\Models\Client;
+use App\Models\ConnectInvite;
 use App\Models\SocialAccount;
+use App\Models\User;
 use App\Services\ConnectStateStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,7 +28,7 @@ class SocialAccountController extends Controller
      */
     public function store(StoreSocialAccountRequest $request, Client $client, CreateSocialAccountAction $action): RedirectResponse
     {
-        $action($client, $request->validated());
+        $action($client, $request->validatedAccount());
 
         return to_route('clients.show', $client);
     }
@@ -35,7 +38,7 @@ class SocialAccountController extends Controller
      */
     public function update(UpdateSocialAccountRequest $request, SocialAccount $socialAccount, UpdateSocialAccountAction $action): RedirectResponse
     {
-        $action($socialAccount, $request->validated());
+        $action($socialAccount, $request->validatedAccount());
 
         return to_route('clients.show', $socialAccount->client_id);
     }
@@ -80,7 +83,7 @@ class SocialAccountController extends Controller
      * since this callback is opened by `connect()` in a separate tab/popup rather than the user's
      * main Graphy tab.
      */
-    public function callback(Request $request, PublishAdapter $adapter, ConnectStateStore $states): Response
+    public function callback(Request $request, PublishAdapter $adapter, ConnectStateStore $states, RecordClientConnectionAction $record): Response
     {
         // Step I-1.6: the callback is unauthenticated, so it must carry the signed, single-use
         // state issued by `ConnectSocialAccountAction` for this very account.
@@ -100,11 +103,26 @@ class SocialAccountController extends Controller
 
         $adapter->handleCallback($request->query());
 
-        $socialAccount = SocialAccount::find($payload['social_account_id']);
+        $socialAccount = SocialAccount::query()->withoutOrgScope()->find($payload['social_account_id']);
+        $via = $payload['via'] ?? null;
+
+        // Step M-2.8: a client connected it themselves — record it and tell the agency.
+        if ($socialAccount !== null && in_array($via, ['invite', 'portal'], true)) {
+            $record(
+                $socialAccount,
+                isset($payload['connect_invite_id']) ? ConnectInvite::query()->withoutOrgScope()->find($payload['connect_invite_id']) : null,
+                $payload['user_id'] !== null ? User::query()->find($payload['user_id']) : null,
+            );
+        }
 
         return response()->view('social-accounts.connected', [
             'connected' => (bool) $socialAccount,
-            'clientUrl' => $socialAccount ? route('clients.show', $socialAccount->client_id) : route('dashboard'),
+            'clientUrl' => match (true) {
+                $socialAccount === null => route('dashboard'),
+                $via === 'invite' => null,
+                $via === 'portal' => route('portal.dashboard'),
+                default => route('clients.show', $socialAccount->client_id),
+            },
         ]);
     }
 }

@@ -1,3 +1,5 @@
+import type { PlatformCapability, PlatformFormat } from '@/lib/platforms';
+
 /**
  * Image formats and framing for post previews. The frontend mirror of `App\Enums\MediaRatio`,
  * `App\Support\Media\CropBox` and `App\Services\Media\PublishImageCropper` — keep them in step,
@@ -28,9 +30,12 @@ export const DEFAULT_CROP: Crop = { x: 0.5, y: 0.5, zoom: 1 };
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 3;
 
-/** Instagram's accepted feed range (width ÷ height) — `MediaRatio::INSTAGRAM_MIN/MAX`. */
-export const INSTAGRAM_MIN = 0.8;
-export const INSTAGRAM_MAX = 1.91;
+/**
+ * The feed range most platforms display an image in (width ÷ height) when the registry gives no
+ * range of its own. Platform rules themselves come from `config/platforms.php` (`usePlatforms()`).
+ */
+const FEED_MIN = 0.8;
+const FEED_MAX = 1.91;
 
 const quotients: Record<string, number | null> = {
     original: null,
@@ -116,35 +121,50 @@ export type MediaFrame = {
 const VERTICAL = 9 / 16;
 
 /**
- * The frame a channel shows media in, given the post's format there and the first media item's
- * shape (null when not known yet). Mirrors `PublishImageCropper::targetRatio()` for images.
+ * The frame a channel shows media in, given the post's format there, the first media item's
+ * shape (null when not known yet) and — when known — the target's registry format (Step M-2.3).
+ * Mirrors `PublishImageCropper::targetRatio()` for images:
+ * - a format with a forced framing (`crop_to`, Stories) always shows at it;
+ * - a full-screen format (`vertical`) fills a 9:16 screen — images letterbox there unless the post
+ *   crops them (TikTok photo mode);
+ * - a fixed post format crops to it; otherwise images inside an accepted range (`aspect`, the
+ *   Instagram feed) are cut into it, and other feeds centre-crop the original themselves.
  */
 export function frameFor(
     platform: string,
     format: string | null | undefined,
     firstAspect: number | null,
     isVideo: boolean,
+    spec?: PlatformFormat | null,
 ): MediaFrame {
     const aspect = firstAspect ?? 1;
+    const forced = ratioQuotient(spec?.crop_to);
+    // Before the registry reaches the page, keep the old per-platform defaults.
+    const vertical = spec
+        ? spec.vertical
+        : platform === 'tiktok' || (platform === 'instagram' && isVideo);
+    const range: [number, number] = spec?.aspect ?? [FEED_MIN, FEED_MAX];
 
     if (isVideo) {
-        // Videos publish as uploaded: Reels and TikTok fill a vertical screen, the feeds keep
-        // the clip's own shape within their display range.
-        if (platform === 'instagram' || platform === 'tiktok') {
-            return { ratio: VERTICAL, fit: 'crop', focus: false };
-        }
+        // Videos publish as uploaded: full-screen formats fill a vertical screen, feeds keep the
+        // clip's own shape within their display range.
+        return vertical || forced !== null
+            ? { ratio: VERTICAL, fit: 'crop', focus: false }
+            : {
+                  ratio: clamp(aspect, range[0], range[1]),
+                  fit: 'crop',
+                  focus: false,
+              };
+    }
 
-        return {
-            ratio: clamp(aspect, INSTAGRAM_MIN, INSTAGRAM_MAX),
-            fit: 'crop',
-            focus: false,
-        };
+    if (forced !== null) {
+        return { ratio: forced, fit: 'crop', focus: true };
     }
 
     const fixed = ratioQuotient(format);
 
-    if (platform === 'tiktok') {
-        // Photo mode always plays full screen; anything that isn't 9:16 sits on black.
+    if (vertical) {
+        // A full-screen photo format plays at 9:16; anything else sits on black.
         return fixed !== null
             ? { ratio: VERTICAL, fit: 'crop', focus: true }
             : { ratio: VERTICAL, fit: 'contain', focus: false };
@@ -154,18 +174,18 @@ export function frameFor(
         return { ratio: fixed, fit: 'crop', focus: true };
     }
 
-    if (platform === 'instagram') {
-        // We cut Instagram originals into its accepted range (and a carousel to slide one).
+    if (spec ? spec.aspect !== null : platform === 'instagram') {
+        // We cut originals into the accepted range (and a carousel to slide one).
         return {
-            ratio: clamp(aspect, INSTAGRAM_MIN, INSTAGRAM_MAX),
+            ratio: clamp(aspect, range[0], range[1]),
             fit: 'crop',
             focus: true,
         };
     }
 
-    // Facebook/LinkedIn get the original and centre-crop it into their feed range themselves.
+    // Everyone else gets the original and centre-crops it into their feed range themselves.
     return {
-        ratio: clamp(aspect, INSTAGRAM_MIN, INSTAGRAM_MAX),
+        ratio: clamp(aspect, FEED_MIN, FEED_MAX),
         fit: 'crop',
         focus: false,
     };
@@ -190,40 +210,68 @@ export function describeRatio(ratio: number): string {
 }
 
 /**
- * The caption exactly as it publishes. `UploadPostAdapter::applyHashtagCaptionOverride()`
- * appends hashtags below an eight-line "dot-dash" spacer, so they sit under the "more" fold.
+ * The caption exactly as it publishes — the mirror of `App\Support\Publishing\CaptionComposer`.
+ * With a platform's capabilities: a link goes in the caption only where there's no dedicated link
+ * field and links work in captions; hashtags are dropped where the platform doesn't use them, and
+ * sit below the eight-line "dot-dash" spacer only where it folds captions (`hashtag_spacer`).
+ * Without capabilities it behaves as before (spacer, no link).
  */
-export function publishedCaption(caption: string, hashtags: string[]): string {
-    const tags = hashtags
-        .map((tag) => tag.replace(/^#+/, '').trim())
-        .filter(Boolean);
+export function publishedCaption(
+    caption: string,
+    hashtags: string[],
+    capability?: PlatformCapability | null,
+    link?: string | null,
+): string {
+    let text = caption.trim();
+    const cleanLink = link?.trim() ?? '';
 
-    if (tags.length === 0) {
-        return caption;
+    if (
+        capability &&
+        cleanLink !== '' &&
+        !capability.link_field &&
+        capability.links_in_caption &&
+        !text.includes(cleanLink)
+    ) {
+        text = text === '' ? cleanLink : `${text}\n\n${cleanLink}`;
     }
 
-    const spacer = Array.from({ length: 8 }, () => '-').join('\n');
+    const tags =
+        capability && !capability.hashtags
+            ? []
+            : [
+                  ...new Set(
+                      hashtags
+                          .map((tag) => tag.replace(/^#+/, '').trim())
+                          .filter(Boolean),
+                  ),
+              ];
 
-    return `${caption.trim()}\n${spacer}\n${tags.map((tag) => `#${tag}`).join(' ')}`;
+    if (tags.length === 0) {
+        return capability ? text : caption;
+    }
+
+    const tagText = tags.map((tag) => `#${tag}`).join(' ');
+
+    if (text === '') {
+        return tagText;
+    }
+
+    const spacer =
+        !capability || capability.hashtag_spacer
+            ? `\n${Array.from({ length: 8 }, () => '-').join('\n')}\n`
+            : '\n\n';
+
+    return `${text}${spacer}${tagText}`;
 }
 
-/**
- * Roughly where each channel folds a caption behind "more" in the feed: whichever comes first of
- * a character count or a number of lines. Approximations of the apps' mobile layouts.
- */
-export const captionFolds: Record<string, { chars: number; lines: number }> = {
-    instagram: { chars: 125, lines: 2 },
-    tiktok: { chars: 80, lines: 2 },
-    facebook: { chars: 240, lines: 5 },
-    linkedin: { chars: 210, lines: 3 },
-};
+/** Fallback fold when the registry hasn't reached the page. */
+const DEFAULT_FOLD = { chars: 240, lines: 5 };
 
 /** The visible part of a caption before the fold, and whether anything is hidden. */
 export function foldCaption(
     text: string,
-    platform: string,
+    fold: { chars: number; lines: number } = DEFAULT_FOLD,
 ): { visible: string; truncated: boolean } {
-    const fold = captionFolds[platform] ?? { chars: 240, lines: 5 };
     const lines = text.split('\n');
     let visible = lines.slice(0, fold.lines).join('\n');
 

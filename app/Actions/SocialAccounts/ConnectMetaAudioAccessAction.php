@@ -26,6 +26,8 @@ class ConnectMetaAudioAccessAction
             $socialAccount->update([
                 'meta_access_token' => $accessToken,
                 'meta_access_token_expires_at' => $expiresAt,
+                // Step M-2.7: a fresh token clears any expiry warning.
+                'token_expiry_warning' => null,
                 'meta_instagram_user_id' => $instagramUserId,
             ]);
         });

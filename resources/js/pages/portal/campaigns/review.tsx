@@ -38,6 +38,9 @@ type ReviewPost = {
         handle: string | null;
         scheduled_local_date: string | null;
         scheduled_local_time: string | null;
+        published_caption?: string;
+        first_comment?: string | null;
+        format?: string | null;
     }[];
 };
 
@@ -254,6 +257,10 @@ export default function PortalCampaignReview({
                                             id: target.id,
                                             platform: target.platform ?? '',
                                             handle: target.handle ?? '',
+                                            publishedCaption:
+                                                target.published_caption,
+                                            firstComment: target.first_comment,
+                                            format: target.format,
                                         }}
                                         caption={post.master_caption ?? ''}
                                         hashtags={post.hashtags}
