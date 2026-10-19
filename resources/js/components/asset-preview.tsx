@@ -1,4 +1,5 @@
 import { ExternalLink, File, Figma, Image as ImageIcon } from 'lucide-react';
+import type { Crop } from '@/lib/media-format';
 
 export type AssetPreviewData = {
     id: number;
@@ -7,6 +8,10 @@ export type AssetPreviewData = {
     type: string | null;
     source: string | null;
     mime_type: string | null;
+    /** Pixel size and framing on the post (`PostMediaPresenter::framing()`), when sent. */
+    width?: number | null;
+    height?: number | null;
+    crop?: Crop | null;
 };
 
 const IMAGE_EXTENSIONS = [

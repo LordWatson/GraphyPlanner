@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ApprovalMode;
+use App\Enums\MediaRatio;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
@@ -37,6 +38,7 @@ use Illuminate\Support\Carbon;
  * @property array<int, string>|null $hashtags
  * @property array<string, mixed>|null $music
  * @property array<string, mixed>|null $location
+ * @property array<string, string>|null $media_format
  * @property array<string, mixed>|null $checklist_snapshot
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -44,7 +46,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'created_by', 'status', 'publish_dispatch_id', 'approval_mode',
-    'master_caption', 'review_message', 'hashtags', 'music', 'location', 'checklist_snapshot',
+    'master_caption', 'review_message', 'hashtags', 'music', 'location', 'media_format', 'checklist_snapshot',
 ])]
 class Post extends Model
 {
@@ -62,6 +64,7 @@ class Post extends Model
             'hashtags' => 'array',
             'music' => 'array',
             'location' => 'array',
+            'media_format' => 'array',
             'checklist_snapshot' => 'array',
         ];
     }
@@ -221,13 +224,23 @@ class Post extends Model
 
     /**
      * Media attached to this post (Step 0.10 editor UI). Reuses assets already uploaded/linked to
-     * the post's client rather than duplicating storage.
+     * the post's client rather than duplicating storage. The pivot carries each image's framing
+     * (focus point + zoom) for fixed-ratio crops — see `mediaRatioFor()` and `PublishImageCropper`.
      *
      * @return BelongsToMany<Asset, $this>
      */
     public function assets(): BelongsToMany
     {
-        return $this->belongsToMany(Asset::class, 'post_assets');
+        return $this->belongsToMany(Asset::class, 'post_assets')
+            ->withPivot(['crop_x', 'crop_y', 'crop_zoom']);
+    }
+
+    /**
+     * The image format this post uses on a channel (the editor's "Format" control).
+     */
+    public function mediaRatioFor(Platform $platform): MediaRatio
+    {
+        return MediaRatio::resolve($this->media_format, $platform);
     }
 
     /**

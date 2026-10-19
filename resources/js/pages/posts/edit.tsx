@@ -44,6 +44,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import type { Crop, MediaFormat, MediaFormatOptions } from '@/lib/media-format';
+import { DEFAULT_CROP, normalizeCrop } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
@@ -70,6 +72,9 @@ type EditorState = {
     musicId: string;
     musicName: string;
     locationName: string;
+    mediaFormat: MediaFormat;
+    /** Framing of the attached media only, keyed by asset id. */
+    crops: Record<number, Crop>;
 };
 
 function initialEditorState(post: PostData): EditorState {
@@ -90,6 +95,10 @@ function initialEditorState(post: PostData): EditorState {
         musicId: (post.music?.id as string) ?? '',
         musicName: (post.music?.name as string) ?? '',
         locationName: (post.location?.name as string) ?? '',
+        mediaFormat: { ...post.media_format },
+        crops: Object.fromEntries(
+            post.assets.map((asset) => [asset.id, normalizeCrop(asset.crop)]),
+        ),
     };
 }
 
@@ -241,6 +250,7 @@ export default function PostEdit({
     mentionableUsers,
     ai,
     imageStudio,
+    mediaFormatOptions,
 }: {
     post: PostData;
     client: { id: number; name: string };
@@ -259,6 +269,7 @@ export default function PostEdit({
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
     imageStudio?: ImageStudioData | null;
+    mediaFormatOptions: MediaFormatOptions;
 }) {
     // The page remounts with fresh props after every successful save/transition, so this snapshot
     // is always "what's on the server" — the baseline for unsaved-changes tracking.
@@ -271,6 +282,12 @@ export default function PostEdit({
     const [musicId, setMusicId] = useState(initial.musicId);
     const [musicName, setMusicName] = useState(initial.musicName);
     const [locationName, setLocationName] = useState(initial.locationName);
+    const [mediaFormat, setMediaFormat] = useState(initial.mediaFormat);
+    const [crops, setCrops] = useState(initial.crops);
+    // Only attached media's framing is saved (and compared), so a removed image's edits drop out.
+    const selectedCrops: Record<number, Crop> = Object.fromEntries(
+        selectedAssetIds.map((id) => [id, crops[id] ?? DEFAULT_CROP]),
+    );
 
     // Asset details for every id the editor knows about (saved media, library picks, inline
     // uploads). The library itself is paged server-side, so this only ever holds what's in use.
@@ -292,6 +309,8 @@ export default function PostEdit({
             musicId,
             musicName,
             locationName,
+            mediaFormat,
+            crops: selectedCrops,
         } satisfies EditorState) !== JSON.stringify(initial);
 
     useUnsavedChangesGuard(isDirty);
@@ -324,6 +343,8 @@ export default function PostEdit({
         setMusicId(initial.musicId);
         setMusicName(initial.musicName);
         setLocationName(initial.locationName);
+        setMediaFormat(initial.mediaFormat);
+        setCrops(initial.crops);
     };
 
     // Step 2.4 — "Suggest with AI". Never overwrites the caption without an explicit click, and
@@ -549,11 +570,13 @@ export default function PostEdit({
               id: a.id,
               platform: a.platform,
               handle: a.handle,
+              display_name: a.display_name,
           }))
         : post.targets.map((t) => ({
               id: t.social_account_id,
               platform: t.platform ?? '',
               handle: t.handle ?? '',
+              display_name: t.display_name,
           }));
 
     return (
@@ -764,6 +787,36 @@ export default function PostEdit({
                                                 name="campaign_id"
                                                 value={campaignId}
                                             />
+                                            {/* Image format + framing are set from the preview rail. */}
+                                            {Object.entries(mediaFormat).map(
+                                                ([platform, ratio]) => (
+                                                    <input
+                                                        key={platform}
+                                                        type="hidden"
+                                                        name={`media_format[${platform}]`}
+                                                        value={ratio ?? ''}
+                                                    />
+                                                ),
+                                            )}
+                                            {Object.entries(selectedCrops).map(
+                                                ([id, crop]) =>
+                                                    (
+                                                        [
+                                                            'x',
+                                                            'y',
+                                                            'zoom',
+                                                        ] as const
+                                                    ).map((field) => (
+                                                        <input
+                                                            key={`${id}-${field}`}
+                                                            type="hidden"
+                                                            name={`asset_crops[${id}][${field}]`}
+                                                            value={String(
+                                                                crop[field],
+                                                            )}
+                                                        />
+                                                    )),
+                                            )}
                                         </Panel>
 
                                         <Panel
@@ -966,6 +1019,16 @@ export default function PostEdit({
                                 can.update
                                     ? locationName
                                     : ((post.location?.name as string) ?? '')
+                            }
+                            mediaFormat={
+                                can.update ? mediaFormat : post.media_format
+                            }
+                            crops={can.update ? selectedCrops : initial.crops}
+                            formatOptions={mediaFormatOptions}
+                            editable={can.update}
+                            onMediaFormatChange={setMediaFormat}
+                            onCropsChange={(next) =>
+                                setCrops((current) => ({ ...current, ...next }))
                             }
                         />
                     </aside>

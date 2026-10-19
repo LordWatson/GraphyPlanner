@@ -21,6 +21,7 @@ import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
+import type { MediaFormat } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 import {
     decide as decideOnPortalPost,
@@ -53,6 +54,7 @@ type PostData = {
     hashtags: string[];
     music: { name?: string } | null;
     location: { id?: string; name?: string } | null;
+    media_format: MediaFormat;
     assets: AssetPreviewData[];
     targets: TargetData[];
     comments: CommentData[];
@@ -208,6 +210,7 @@ export default function PortalPostShow({
                                 assets={post.assets}
                                 musicName={post.music?.name ?? ''}
                                 locationName={post.location?.name ?? ''}
+                                mediaFormat={post.media_format}
                             />
                         ) : (
                             <p className="text-muted-foreground py-16 text-sm">

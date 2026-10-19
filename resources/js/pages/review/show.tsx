@@ -10,6 +10,7 @@ import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
+import type { MediaFormat } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 import { decide } from '@/routes/review';
 
@@ -36,6 +37,9 @@ type PostData = {
     master_caption: string | null;
     review_message: string | null;
     hashtags: string[];
+    music: { name?: string } | null;
+    location: { name?: string } | null;
+    media_format: MediaFormat;
     assets: AssetData[];
     targets: TargetData[];
     can_decide: boolean;
@@ -158,6 +162,9 @@ export default function ReviewShow({
                                 caption={post.master_caption ?? ''}
                                 hashtags={post.hashtags}
                                 assets={post.assets}
+                                musicName={post.music?.name ?? ''}
+                                locationName={post.location?.name ?? ''}
+                                mediaFormat={post.media_format}
                                 className="w-full max-w-md"
                             />
                         ) : (

@@ -18,6 +18,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Intervention\Image\ImageManager;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -582,5 +583,116 @@ class UploadPostAdapterTest extends TestCase
 
         $this->assertTrue($results->first()->ok);
         Http::assertSentCount(1);
+    }
+
+    /**
+     * The post's per-channel format is applied to locally stored images before they're sent, so
+     * what publishes matches the editor preview: a 16:9 photo set to Instagram 1:1 goes out square,
+     * cut around its saved focus point.
+     */
+    public function test_a_local_image_is_cropped_to_the_channel_format_before_it_is_sent(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('assets/wide.jpg', (string) ImageManager::gd()->create(1600, 900)->fill('205557')->toJpeg());
+
+        Http::fake([
+            '*/upload_photos' => Http::response(['request_id' => 'up-crop'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::Instagram,
+        ]);
+        $post = Post::factory()->create([
+            'client_id' => $account->client_id,
+            'media_format' => ['instagram' => '1:1'],
+        ]);
+        $asset = Asset::factory()->uploaded()->create([
+            'client_id' => $post->client_id,
+            'type' => AssetType::Image,
+            'mime_type' => 'image/jpeg',
+            'path' => 'assets/wide.jpg',
+        ]);
+        $post->assets()->attach($asset, ['crop_x' => 0.2, 'crop_y' => 0.5, 'crop_zoom' => 1]);
+        $post->load('assets');
+
+        $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+        Http::assertSent(function ($request) {
+            $photos = self::multipartFieldsByName($request)['photos[]'] ?? [];
+            $image = ImageManager::gd()->read($photos[0]);
+
+            return count($photos) === 1 && $image->width() === 900 && $image->height() === 900;
+        });
+        $this->assertTrue($results->first()->ok);
+    }
+
+    /**
+     * LinkedIn has no API label for AI media and reads the C2PA credentials embedded in the
+     * original, so an AI-generated image is never re-encoded for it — even with a format set.
+     */
+    public function test_an_ai_generated_image_goes_to_linkedin_uncropped(): void
+    {
+        Storage::fake('public');
+        $original = (string) ImageManager::gd()->create(1600, 900)->fill('205557')->toJpeg();
+        Storage::disk('public')->put('assets/ai.jpg', $original);
+
+        Http::fake([
+            '*/upload_photos' => Http::response(['request_id' => 'up-ai'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::LinkedIn,
+        ]);
+        $post = Post::factory()->create([
+            'client_id' => $account->client_id,
+            'media_format' => ['linkedin' => '1:1'],
+        ]);
+        $asset = Asset::factory()->uploaded()->create([
+            'client_id' => $post->client_id,
+            'type' => AssetType::Image,
+            'mime_type' => 'image/jpeg',
+            'path' => 'assets/ai.jpg',
+            'is_ai_generated' => true,
+        ]);
+        $post->assets()->attach($asset);
+        $post->load('assets');
+
+        (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+        Http::assertSent(fn ($request) => (self::multipartFieldsByName($request)['photos[]'] ?? []) === [$original]);
+    }
+
+    /**
+     * `Original` on Facebook (the default) leaves the upload exactly as it is.
+     */
+    public function test_an_original_format_sends_the_file_untouched(): void
+    {
+        Storage::fake('public');
+        $original = (string) ImageManager::gd()->create(1600, 900)->fill('205557')->toJpeg();
+        Storage::disk('public')->put('assets/original.jpg', $original);
+
+        Http::fake([
+            '*/upload_photos' => Http::response(['request_id' => 'up-orig'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::Facebook,
+        ]);
+        $post = Post::factory()->create(['client_id' => $account->client_id]);
+        $asset = Asset::factory()->uploaded()->create([
+            'client_id' => $post->client_id,
+            'type' => AssetType::Image,
+            'mime_type' => 'image/jpeg',
+            'path' => 'assets/original.jpg',
+        ]);
+        $post->assets()->attach($asset, ['crop_x' => 0, 'crop_y' => 0, 'crop_zoom' => 2]);
+        $post->load('assets');
+
+        (new UploadPostAdapter)->publish($post, new Collection([$account]));
+
+        Http::assertSent(fn ($request) => (self::multipartFieldsByName($request)['photos[]'] ?? []) === [$original]);
     }
 }

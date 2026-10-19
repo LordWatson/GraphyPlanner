@@ -1,33 +1,46 @@
 import {
     Bookmark,
-    ChevronLeft,
-    ChevronRight,
-    Facebook,
+    Camera,
+    Globe,
     Heart,
-    Instagram,
-    Linkedin,
     MessageCircle,
+    MessageSquare,
+    MoreHorizontal,
     Music2,
+    Plus,
+    Repeat2,
+    Search,
     Send,
     Share2,
     ThumbsUp,
+    X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
-import { textDirection } from '@/lib/text-direction';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
 import type { PreviewAsset } from '@/components/asset-preview-carousel';
+import { platformIcon } from '@/components/platform-icon';
+import { FoldedCaption } from '@/components/social-preview/caption';
+import {
+    CarouselArrows,
+    CarouselDots,
+    cropFor,
+    FramedMedia,
+    isVideoAsset,
+    MediaGrid,
+    publishableMedia,
+    SafeZones,
+    useMediaAspects,
+} from '@/components/social-preview/media';
+import type { Crop, MediaFormat, MediaFrame } from '@/lib/media-format';
+import { describeRatio, frameFor, publishedCaption } from '@/lib/media-format';
+import { cn } from '@/lib/utils';
 
 export type PreviewTarget = {
     id: number | string;
     platform: string;
     handle: string;
-};
-
-const platformIcon: Record<string, typeof Instagram> = {
-    instagram: Instagram,
-    tiktok: Music2,
-    facebook: Facebook,
-    linkedin: Linkedin,
+    /** The page/profile name Facebook and LinkedIn lead with; falls back to the handle. */
+    display_name?: string | null;
 };
 
 const platformLabel: Record<string, string> = {
@@ -37,319 +50,424 @@ const platformLabel: Record<string, string> = {
     linkedin: 'LinkedIn',
 };
 
-function isVideoAsset(asset: PreviewAsset): boolean {
-    if (asset.type) {
-        return asset.type.startsWith('video');
-    }
+type LayoutProps = {
+    handle: string;
+    name: string;
+    caption: string;
+    media: PreviewAsset[];
+    frame: MediaFrame;
+    crops: Record<number, Crop> | undefined;
+    aspects: ReturnType<typeof useMediaAspects>;
+    musicName?: string;
+    locationName?: string;
+    showSafeZones: boolean;
+};
 
-    return /\.(mp4|mov|webm|m4v)$/i.test(asset.url ?? '');
+function Avatar({ label, className }: { label: string; className?: string }) {
+    return (
+        <span
+            aria-hidden
+            className={cn(
+                'bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                className,
+            )}
+        >
+            {label.replace(/^@/, '').slice(0, 1).toUpperCase() || '?'}
+        </span>
+    );
 }
 
-function PreviewMedia({
-    asset,
-    className,
+/** A swipeable run of framed slides (Instagram feed, TikTok photo mode). */
+function Slides({
+    media,
+    frame,
+    crops,
+    aspects,
+    index,
+    fill = false,
 }: {
-    asset: PreviewAsset | undefined;
-    className?: string;
+    media: PreviewAsset[];
+    frame: MediaFrame;
+    crops: Record<number, Crop> | undefined;
+    aspects: ReturnType<typeof useMediaAspects>;
+    index: number;
+    fill?: boolean;
 }) {
-    if (!asset || !asset.url) {
-        return (
-            <div
-                className={cn(
-                    'bg-muted text-muted-foreground flex items-center justify-center text-xs',
-                    className,
-                )}
-            >
-                No media
-            </div>
-        );
-    }
-
-    if (isVideoAsset(asset)) {
-        return (
-            <video
-                src={asset.url}
-                className={cn('h-full w-full object-cover', className)}
-                muted
-                playsInline
-                loop
-                autoPlay
-            />
-        );
-    }
+    const active = media[Math.min(index, Math.max(media.length - 1, 0))];
 
     return (
-        <img
-            src={asset.url}
-            alt=""
-            className={cn('h-full w-full object-cover', className)}
+        <FramedMedia
+            key={active?.id ?? 'empty'}
+            asset={active}
+            frame={frame}
+            crop={active ? cropFor(active, crops) : { x: 0.5, y: 0.5, zoom: 1 }}
+            aspect={aspects.aspectOf(active)}
+            onMeasure={aspects.measure}
+            fill={fill}
         />
     );
 }
 
-/** Platforms lay the caption block out in the caption's own direction (handle included). */
-function captionDir(caption: string, hashtags: string[]): 'ltr' | 'rtl' {
-    return textDirection(caption || hashtags.join(' '));
-}
-
-function CaptionWithHashtags({
-    caption,
-    hashtags,
-}: {
-    caption: string;
-    hashtags: string[];
-}) {
-    if (!caption && hashtags.length === 0) {
-        return (
-            <span className="text-muted-foreground italic">
-                Your caption will appear here…
-            </span>
-        );
-    }
-
-    return (
-        <>
-            {caption && <span className="whitespace-pre-wrap">{caption}</span>}
-            {hashtags.length > 0 && (
-                <span className="text-primary">
-                    {caption ? ' ' : ''}
-                    {hashtags
-                        .map((tag) => `#${tag.replace(/^#+/, '')}`)
-                        .join(' ')}
-                </span>
-            )}
-        </>
-    );
-}
-
-function InstagramPreview({
+function InstagramFeed({
     handle,
     caption,
-    hashtags,
-    assets,
+    media,
+    frame,
+    crops,
+    aspects,
+    musicName,
     locationName,
-}: {
-    handle: string;
-    caption: string;
-    hashtags: string[];
-    assets: PreviewAsset[];
-    locationName?: string;
-}) {
-    const [assetIndex, setAssetIndex] = useState(0);
-    const active = assets[Math.min(assetIndex, Math.max(assets.length - 1, 0))];
+}: LayoutProps) {
+    const [index, setIndex] = useState(0);
+    const subline = musicName ? `♫ ${musicName}` : locationName;
 
     return (
-        <div className="border-border bg-card w-full overflow-hidden rounded-lg border text-sm">
-            <div className="flex items-center gap-2 p-2.5">
-                <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                    {handle.slice(0, 1).toUpperCase() || '?'}
+        <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
+            <div className="flex items-center gap-2.5 px-3 py-2.5">
+                <span className="ring-border rounded-full p-0.5 ring-2">
+                    <Avatar label={handle} className="size-7" />
                 </span>
                 <div className="grid min-w-0 flex-1 leading-tight">
                     <span className="truncate font-semibold">
                         {handle || 'your_handle'}
                     </span>
-                    {locationName && (
-                        <span className="text-muted-foreground truncate text-xs">
-                            {locationName}
+                    {subline && (
+                        <span className="text-muted-foreground truncate text-[11px]">
+                            {subline}
                         </span>
                     )}
                 </div>
+                <MoreHorizontal className="size-4" />
             </div>
 
-            <div className="bg-muted relative aspect-square w-full">
-                <PreviewMedia asset={active} />
-                {assets.length > 1 && (
-                    <>
-                        <button
-                            type="button"
-                            aria-label="Previous media"
-                            onClick={() =>
-                                setAssetIndex(
-                                    (i) =>
-                                        (i - 1 + assets.length) % assets.length,
-                                )
-                            }
-                            className="absolute top-1/2 left-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
-                        >
-                            <ChevronLeft className="size-4" />
-                        </button>
-                        <button
-                            type="button"
-                            aria-label="Next media"
-                            onClick={() =>
-                                setAssetIndex((i) => (i + 1) % assets.length)
-                            }
-                            className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
-                        >
-                            <ChevronRight className="size-4" />
-                        </button>
-                        <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
-                            {assets.map((_, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => setAssetIndex(i)}
-                                    className={cn(
-                                        'size-1.5 rounded-full transition-colors',
-                                        i === assetIndex
-                                            ? 'bg-white'
-                                            : 'bg-white/50',
-                                    )}
-                                />
-                            ))}
-                        </div>
-                    </>
+            <div className="relative">
+                <Slides
+                    media={media}
+                    frame={frame}
+                    crops={crops}
+                    aspects={aspects}
+                    index={index}
+                />
+                {media.length > 1 && (
+                    <span className="bg-ink/70 text-cream absolute top-2.5 right-2.5 rounded-full px-2 py-0.5 font-mono text-[10px] tabular-nums">
+                        {index + 1}/{media.length}
+                    </span>
                 )}
+                <CarouselArrows
+                    index={index}
+                    count={media.length}
+                    onChange={setIndex}
+                />
             </div>
 
-            <div className="flex items-center justify-between px-2.5 pt-2">
-                <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-between px-3 pt-2.5">
+                <div className="flex items-center gap-3.5">
                     <Heart className="size-5" />
                     <MessageCircle className="size-5" />
                     <Send className="size-5" />
                 </div>
+                <CarouselDots
+                    index={index}
+                    count={media.length}
+                    onChange={setIndex}
+                    className="absolute left-1/2 -translate-x-1/2"
+                />
                 <Bookmark className="size-5" />
             </div>
 
-            <div
-                dir={captionDir(caption, hashtags)}
-                className="px-2.5 py-2 leading-snug"
-            >
-                <span className="me-1 font-semibold">
-                    {handle || 'your_handle'}
+            <div className="grid gap-1 px-3 pt-2 pb-3">
+                <FoldedCaption
+                    text={caption}
+                    platform="instagram"
+                    lead={
+                        <span className="me-1 font-semibold">
+                            {handle || 'your_handle'}
+                        </span>
+                    }
+                />
+                <span className="text-muted-foreground text-[11px]">
+                    Just now
                 </span>
-                <CaptionWithHashtags caption={caption} hashtags={hashtags} />
             </div>
         </div>
     );
 }
 
-function TikTokPreview({
-    handle,
-    caption,
-    hashtags,
-    assets,
-    musicName,
+/** Full-screen vertical chrome shared by TikTok and Instagram Reels. */
+function VerticalScreen({
+    children,
+    showSafeZones,
+    platform,
 }: {
-    handle: string;
-    caption: string;
-    hashtags: string[];
-    assets: PreviewAsset[];
-    musicName?: string;
+    children: ReactNode;
+    showSafeZones: boolean;
+    platform: string;
 }) {
     return (
-        <div className="border-border relative mx-auto aspect-[9/16] w-full max-w-[340px] overflow-hidden rounded-2xl border bg-black text-white shadow-lg">
-            <div className="absolute inset-0">
-                <PreviewMedia asset={assets[0]} />
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/30" />
+        <div className="border-border bg-ink text-cream relative mx-auto aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-2xl border text-[13px] shadow-md">
+            {children}
+            {showSafeZones && <SafeZones platform={platform} />}
+        </div>
+    );
+}
 
-            <div className="absolute inset-x-0 top-0 flex items-center justify-center gap-6 p-3 text-sm font-semibold text-white/70">
-                <span>Following</span>
-                <span className="text-white">For You</span>
+function RailAction({
+    icon: Icon,
+    label,
+}: {
+    icon: typeof Heart;
+    label?: string;
+}) {
+    return (
+        <span className="flex flex-col items-center gap-0.5">
+            <Icon className="size-6 shrink-0 drop-shadow" />
+            {label && (
+                <span className="text-[10px] font-medium drop-shadow">
+                    {label}
+                </span>
+            )}
+        </span>
+    );
+}
+
+function InstagramReel({
+    handle,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    musicName,
+    showSafeZones,
+}: LayoutProps) {
+    return (
+        <VerticalScreen showSafeZones={showSafeZones} platform="instagram">
+            <Slides
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+                index={0}
+                fill
+            />
+            <div className="from-ink/80 to-ink/30 absolute inset-0 bg-gradient-to-t via-transparent" />
+
+            <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3 font-semibold">
+                <span className="text-base">Reels</span>
+                <Camera className="size-5" />
             </div>
 
-            <div className="absolute right-2.5 bottom-16 flex flex-col items-center gap-5 text-white">
-                <span className="bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold">
-                    {handle.slice(0, 1).toUpperCase() || '?'}
-                </span>
-                <div className="flex flex-col items-center gap-0.5">
-                    <Heart className="size-7 shrink-0" />
-                    <span className="text-[11px] font-medium">24.5K</span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                    <MessageCircle className="size-7 shrink-0" />
-                    <span className="text-[11px] font-medium">312</span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                    <Bookmark className="size-7 shrink-0" />
-                    <span className="text-[11px] font-medium">1.2K</span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                    <Share2 className="size-7 shrink-0" />
-                    <span className="text-[11px] font-medium">Share</span>
-                </div>
-                <span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-white/60 bg-black">
-                    <Music2 className="size-3.5" />
-                </span>
+            <div className="absolute right-2.5 bottom-20 flex flex-col items-center gap-4">
+                <RailAction icon={Heart} label="Like" />
+                <RailAction icon={MessageCircle} label="Comment" />
+                <RailAction icon={Send} label="Share" />
+                <RailAction icon={MoreHorizontal} />
+                <span className="border-cream bg-muted size-6 rounded-md border-2" />
             </div>
 
-            <div className="absolute right-16 bottom-4 left-3 grid gap-1.5 text-sm">
-                <span className="font-semibold">
-                    @{handle || 'your_handle'}
+            <div className="absolute right-14 bottom-3 left-3 grid gap-2">
+                <span className="flex items-center gap-2">
+                    <Avatar label={handle} className="size-7" />
+                    <span className="truncate font-semibold">
+                        {handle || 'your_handle'}
+                    </span>
+                    <span className="border-cream/80 rounded-md border px-2 py-0.5 text-[11px] font-semibold">
+                        Follow
+                    </span>
                 </span>
-                <p
-                    dir={captionDir(caption, hashtags)}
-                    className="line-clamp-3 leading-snug"
-                >
-                    <CaptionWithHashtags
-                        caption={caption}
-                        hashtags={hashtags}
+                <FoldedCaption
+                    text={caption}
+                    platform="instagram"
+                    onMedia
+                    className="text-[12px]"
+                />
+                <span className="text-cream/85 flex items-center gap-1.5 truncate text-[11px]">
+                    <Music2 className="size-3.5 shrink-0" />
+                    <span className="truncate">
+                        {musicName ||
+                            `${handle || 'your_handle'} · Original audio`}
+                    </span>
+                </span>
+            </div>
+        </VerticalScreen>
+    );
+}
+
+function TikTokPost({
+    handle,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    musicName,
+    showSafeZones,
+}: LayoutProps) {
+    const [index, setIndex] = useState(0);
+    const photoMode = media.length > 0 && !isVideoAsset(media[0]);
+
+    return (
+        <VerticalScreen showSafeZones={showSafeZones} platform="tiktok">
+            <Slides
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+                index={index}
+                fill
+            />
+            <div className="from-ink/85 to-ink/30 absolute inset-0 bg-gradient-to-t via-transparent" />
+
+            <div className="absolute inset-x-0 top-0 flex items-center justify-center gap-5 p-3 font-semibold">
+                <span className="text-cream/65">Following</span>
+                <span className="border-cream border-b-2 pb-0.5">For You</span>
+                <Search className="absolute right-3 size-5" />
+            </div>
+
+            {photoMode && (
+                <CarouselArrows
+                    index={index}
+                    count={media.length}
+                    onChange={setIndex}
+                />
+            )}
+
+            <div className="absolute right-2 bottom-16 flex flex-col items-center gap-4">
+                <span className="relative mb-1">
+                    <Avatar
+                        label={handle}
+                        className="border-cream size-10 border-2"
                     />
-                </p>
-                <span className="inline-flex items-center gap-1.5 truncate text-xs text-white/80">
+                    <span className="bg-cream text-ink absolute -bottom-1.5 left-1/2 flex size-4 -translate-x-1/2 items-center justify-center rounded-full">
+                        <Plus className="size-3" />
+                    </span>
+                </span>
+                <RailAction icon={Heart} label="Like" />
+                <RailAction icon={MessageCircle} label="Comment" />
+                <RailAction icon={Bookmark} label="Save" />
+                <RailAction icon={Share2} label="Share" />
+                <span className="border-cream/50 bg-ink flex size-8 items-center justify-center rounded-full border-[5px]">
+                    <Music2 className="size-3" />
+                </span>
+            </div>
+
+            <div className="absolute right-16 bottom-3 left-3 grid gap-1.5">
+                {photoMode && (
+                    <CarouselDots
+                        index={index}
+                        count={media.length}
+                        onChange={setIndex}
+                        tone="light"
+                    />
+                )}
+                <span className="font-semibold">
+                    {handle ? `@${handle.replace(/^@/, '')}` : '@your_handle'}
+                </span>
+                <FoldedCaption
+                    text={caption}
+                    platform="tiktok"
+                    onMedia
+                    className="text-[12px]"
+                />
+                <span className="text-cream/85 flex items-center gap-1.5 truncate text-[11px]">
                     <Music2 className="size-3.5 shrink-0" />
                     <span className="truncate">
                         {musicName || 'Original sound'}
                     </span>
                 </span>
             </div>
-        </div>
+        </VerticalScreen>
     );
 }
 
-function FeedStylePreview({
-    handle,
-    caption,
-    hashtags,
-    assets,
-    platform,
-}: {
-    handle: string;
-    caption: string;
-    hashtags: string[];
-    assets: PreviewAsset[];
-    platform: string;
-}) {
-    const Icon = platformIcon[platform] ?? Share2;
+function FeedMedia({
+    media,
+    frame,
+    crops,
+    aspects,
+}: Pick<LayoutProps, 'media' | 'frame' | 'crops' | 'aspects'>) {
+    if (media.length === 0) {
+        return null;
+    }
+
+    if (media.length > 1) {
+        return (
+            <MediaGrid
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspectOf={aspects.aspectOf}
+                onMeasure={aspects.measure}
+            />
+        );
+    }
 
     return (
-        <div className="border-border bg-card w-full overflow-hidden rounded-lg border text-sm">
-            <div className="flex items-center gap-2 p-2.5">
-                <span className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
-                    <Icon className="text-primary size-4" />
-                </span>
+        <Slides
+            media={media}
+            frame={frame}
+            crops={crops}
+            aspects={aspects}
+            index={0}
+        />
+    );
+}
+
+function FacebookPost({
+    name,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    locationName,
+}: LayoutProps) {
+    return (
+        <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
+            <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
+                <Avatar label={name} className="size-9" />
                 <div className="grid min-w-0 flex-1 leading-tight">
                     <span className="truncate font-semibold">
-                        {handle || 'your_handle'}
+                        {name || 'Your page'}
+                        {locationName && (
+                            <span className="text-muted-foreground font-normal">
+                                {' '}
+                                is at{' '}
+                                <span className="text-foreground font-semibold">
+                                    {locationName}
+                                </span>
+                            </span>
+                        )}
                     </span>
-                    <span className="text-muted-foreground text-xs">
-                        Just now
+                    <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+                        Just now · <Globe className="size-3" />
                     </span>
                 </div>
+                <MoreHorizontal className="text-muted-foreground size-4" />
+                <X className="text-muted-foreground size-4" />
             </div>
 
-            <div
-                dir={captionDir(caption, hashtags)}
-                className="px-2.5 pb-2 leading-snug"
-            >
-                <CaptionWithHashtags caption={caption} hashtags={hashtags} />
-            </div>
+            <FoldedCaption
+                text={caption}
+                platform="facebook"
+                className="px-3 pb-2.5"
+            />
 
-            {assets.length > 0 && assets[0]?.url && (
-                <div className="bg-muted aspect-video w-full">
-                    <PreviewMedia asset={assets[0]} />
-                </div>
-            )}
+            <FeedMedia
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+            />
 
-            <div className="text-muted-foreground flex items-center gap-4 px-2.5 py-2">
-                <span className="flex items-center gap-1.5 text-xs">
+            <div className="border-border/70 text-muted-foreground mx-3 mt-1 flex items-center justify-around border-t py-1.5 text-xs font-medium">
+                <span className="flex items-center gap-1.5 py-1">
                     <ThumbsUp className="size-4" /> Like
                 </span>
-                <span className="flex items-center gap-1.5 text-xs">
+                <span className="flex items-center gap-1.5 py-1">
                     <MessageCircle className="size-4" /> Comment
                 </span>
-                <span className="flex items-center gap-1.5 text-xs">
+                <span className="flex items-center gap-1.5 py-1">
                     <Share2 className="size-4" /> Share
                 </span>
             </div>
@@ -357,11 +475,110 @@ function FeedStylePreview({
     );
 }
 
+function LinkedInPost({
+    name,
+    handle,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+}: LayoutProps) {
+    return (
+        <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
+            <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
+                <Avatar label={name} className="size-10 rounded-md" />
+                <div className="grid min-w-0 flex-1 leading-tight">
+                    <span className="truncate font-semibold">
+                        {name || 'Your company'}
+                    </span>
+                    {handle && name !== handle && (
+                        <span className="text-muted-foreground truncate text-[11px]">
+                            {handle}
+                        </span>
+                    )}
+                    <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+                        Now · <Globe className="size-3" />
+                    </span>
+                </div>
+                <span className="text-info flex items-center gap-0.5 text-xs font-semibold">
+                    <Plus className="size-3.5" /> Follow
+                </span>
+            </div>
+
+            <FoldedCaption
+                text={caption}
+                platform="linkedin"
+                className="px-3 pb-2.5"
+            />
+
+            <FeedMedia
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+            />
+
+            <div className="border-border/70 text-muted-foreground mx-3 mt-1 grid grid-cols-4 border-t py-1.5 text-[11px] font-medium">
+                {[
+                    { icon: ThumbsUp, label: 'Like' },
+                    { icon: MessageSquare, label: 'Comment' },
+                    { icon: Repeat2, label: 'Repost' },
+                    { icon: Send, label: 'Send' },
+                ].map(({ icon: Icon, label }) => (
+                    <span
+                        key={label}
+                        className="flex flex-col items-center gap-0.5 py-1"
+                    >
+                        <Icon className="size-4" />
+                        {label}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/** What the preview is showing, e.g. "Feed · 4:5", "Reel", "Photo mode · 3 slides". */
+function describePlacement(
+    platform: string,
+    media: PreviewAsset[],
+    frame: MediaFrame,
+): string {
+    const video = media.length > 0 && isVideoAsset(media[0]);
+
+    if (platform === 'tiktok') {
+        if (media.length === 0) {
+            return 'Needs media';
+        }
+
+        return video
+            ? 'Video'
+            : `Photo mode${media.length > 1 ? ` · ${media.length} slides` : ''}`;
+    }
+
+    if (platform === 'instagram' && video) {
+        return 'Reel';
+    }
+
+    if (media.length === 0) {
+        return 'Text post';
+    }
+
+    if (media.length > 1) {
+        return platform === 'instagram'
+            ? `Carousel · ${describeRatio(frame.ratio)}`
+            : `${media.length} images`;
+    }
+
+    return `${video ? 'Video' : 'Image'} · ${describeRatio(frame.ratio)}`;
+}
+
 /**
- * Live, Planable-style visual preview of how a post will render on a given social platform.
- * Purely presentational — driven by the same state the editor form already manages (caption,
- * hashtags, selected media, music/location), so it updates as the user types/selects, with no
- * network round-trip.
+ * Live, Planable-style preview of how a post renders on one channel. Purely presentational —
+ * driven by the editor's own state (caption, hashtags, media, format, framing), so it updates as
+ * the user types with no network round-trip. Media is framed by the same rules the publisher
+ * crops with (`lib/media-format.ts`), and the caption is the exact text that publishes.
  */
 export function SocialPostPreview({
     target,
@@ -370,6 +587,9 @@ export function SocialPostPreview({
     assets,
     musicName,
     locationName,
+    mediaFormat,
+    crops,
+    showSafeZones = false,
     className,
 }: {
     target: PreviewTarget;
@@ -378,65 +598,65 @@ export function SocialPostPreview({
     assets: PreviewAsset[];
     musicName?: string;
     locationName?: string;
+    /** Format per channel; the saved `media_format` or the editor's unsaved choice. */
+    mediaFormat?: MediaFormat;
+    /** Framing per asset id, overriding each asset's saved `crop` (unsaved editor edits). */
+    crops?: Record<number, Crop>;
+    /** Outline where TikTok/Reels chrome covers full-screen media. */
+    showSafeZones?: boolean;
     className?: string;
 }) {
     const platform = target.platform;
-
-    const body = useMemo(() => {
-        switch (platform) {
-            case 'instagram':
-                return (
-                    <InstagramPreview
-                        handle={target.handle}
-                        caption={caption}
-                        hashtags={hashtags}
-                        assets={assets}
-                        locationName={locationName}
-                    />
-                );
-            case 'tiktok':
-                return (
-                    <TikTokPreview
-                        handle={target.handle}
-                        caption={caption}
-                        hashtags={hashtags}
-                        assets={assets}
-                        musicName={musicName}
-                    />
-                );
-            default:
-                return (
-                    <FeedStylePreview
-                        handle={target.handle}
-                        caption={caption}
-                        hashtags={hashtags}
-                        assets={assets}
-                        platform={platform}
-                    />
-                );
-        }
-    }, [
+    const aspects = useMediaAspects();
+    const media = publishableMedia(assets);
+    const first = media[0];
+    const frame = frameFor(
         platform,
-        target.handle,
-        caption,
-        hashtags,
-        assets,
+        mediaFormat?.[platform],
+        aspects.aspectOf(first),
+        first ? isVideoAsset(first) : false,
+    );
+
+    const props: LayoutProps = {
+        handle: target.handle,
+        name: target.display_name || target.handle,
+        caption: publishedCaption(caption, hashtags),
+        media,
+        frame,
+        crops,
+        aspects,
         musicName,
         locationName,
-    ]);
+        showSafeZones,
+    };
+
+    const Icon = platformIcon(platform);
+    const isReel = platform === 'instagram' && first && isVideoAsset(first);
 
     return (
         <div
-            className={cn('flex w-full flex-col items-center gap-2', className)}
+            className={cn(
+                'flex w-full flex-col items-center gap-2.5',
+                className,
+            )}
         >
-            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
-                {(() => {
-                    const Icon = platformIcon[platform] ?? Share2;
-                    return <Icon className="size-3.5" />;
-                })()}
+            <span className="eyebrow text-muted-foreground inline-flex items-center gap-1.5">
+                <Icon className="size-3.5" />
                 {platformLabel[platform] ?? platform}
+                <span aria-hidden>·</span>
+                <span>{describePlacement(platform, media, frame)}</span>
             </span>
-            {body}
+            {platform === 'tiktok' ? (
+                <TikTokPost {...props} />
+            ) : isReel ? (
+                <InstagramReel {...props} />
+            ) : platform === 'instagram' ? (
+                <InstagramFeed {...props} />
+            ) : platform === 'linkedin' ? (
+                <LinkedInPost {...props} />
+            ) : (
+                <FacebookPost {...props} />
+            )}
         </div>
     );
 }

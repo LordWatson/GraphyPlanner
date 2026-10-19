@@ -1,8 +1,18 @@
-import { Eye, Maximize2 } from 'lucide-react';
+import { Crop as CropIcon, Eye, Info, Maximize2, ScanLine } from 'lucide-react';
 import { useState } from 'react';
 import { platformIcon } from '@/components/platform-icon';
+import {
+    CropEditorDialog,
+    FormatPicker,
+} from '@/components/post-editor/crop-editor-dialog';
 import type { AssetData } from '@/components/post-editor/types';
+import type { PreviewTarget } from '@/components/social-post-preview';
 import { SocialPostPreview } from '@/components/social-post-preview';
+import {
+    isImageAsset,
+    isVideoAsset,
+    publishableMedia,
+} from '@/components/social-preview/media';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -10,16 +20,35 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Toggle } from '@/components/ui/toggle';
+import type { Crop, MediaFormat, MediaFormatOptions } from '@/lib/media-format';
+import {
+    captionFolds,
+    describeRatio,
+    foldCaption,
+    INSTAGRAM_MAX,
+    INSTAGRAM_MIN,
+    publishedCaption,
+    ratioLabels,
+    ratioQuotient,
+} from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 
-type PreviewTarget = { id: number; platform: string; handle: string };
+type Target = PreviewTarget & { id: number };
+
+const platformNames: Record<string, string> = {
+    instagram: 'Instagram',
+    tiktok: 'TikTok',
+    facebook: 'Facebook',
+    linkedin: 'LinkedIn',
+};
 
 function TargetSwitcher({
     targets,
     activeId,
     onSelect,
 }: {
-    targets: PreviewTarget[];
+    targets: Target[];
     activeId: number | null;
     onSelect: (id: number) => void;
 }) {
@@ -28,7 +57,11 @@ function TargetSwitcher({
     }
 
     return (
-        <div className="bg-muted flex flex-wrap gap-1 rounded-full p-1">
+        <div
+            role="tablist"
+            aria-label="Channel to preview"
+            className="bg-muted flex max-w-full gap-1 overflow-x-auto rounded-full p-1"
+        >
             {targets.map((target) => {
                 const Icon = platformIcon(target.platform);
                 const active = target.id === activeId;
@@ -37,17 +70,21 @@ function TargetSwitcher({
                     <button
                         key={target.id}
                         type="button"
+                        role="tab"
                         onClick={() => onSelect(target.id)}
-                        aria-pressed={active}
+                        aria-selected={active}
+                        title={`${platformNames[target.platform] ?? target.platform} · ${target.handle}`}
                         className={cn(
-                            'inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors',
+                            'inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs whitespace-nowrap transition-colors',
                             active
                                 ? 'bg-card text-foreground shadow-xs'
                                 : 'text-muted-foreground hover:text-foreground',
                         )}
                     >
                         <Icon className="size-3.5 shrink-0" />
-                        <span className="truncate">{target.handle}</span>
+                        <span className="max-w-24 truncate">
+                            {target.handle}
+                        </span>
                     </button>
                 );
             })}
@@ -55,7 +92,119 @@ function TargetSwitcher({
     );
 }
 
-/** The live platform mockup in the editor's right rail, with a fullscreen view. */
+/** Plain-language heads-ups about how this channel will treat the media and caption. */
+function previewNotes(
+    platform: string,
+    assets: AssetData[],
+    format: string,
+): string[] {
+    const notes: string[] = [];
+    const media = publishableMedia(assets);
+    const video = media.find(isVideoAsset);
+    const images = media.filter(isImageAsset);
+    const fixed = ratioQuotient(format);
+
+    if (
+        media.length === 0 &&
+        (platform === 'instagram' || platform === 'tiktok')
+    ) {
+        notes.push(`${platformNames[platform]} needs an image or a video.`);
+    }
+
+    if (assets.length > media.length && !video) {
+        notes.push(
+            'Documents and other files aren’t published — only images and video.',
+        );
+    } else if (video && assets.length > 1) {
+        notes.push(
+            'Only the video publishes — a post sends one video or a set of images.',
+        );
+    }
+
+    if (video) {
+        notes.push('Video publishes as uploaded — formats apply to images.');
+
+        return notes;
+    }
+
+    const first = images[0];
+
+    if (platform === 'instagram' && fixed === null && first) {
+        const aspect =
+            first.width && first.height ? first.width / first.height : null;
+
+        if (aspect && (aspect < INSTAGRAM_MIN || aspect > INSTAGRAM_MAX)) {
+            const clamped =
+                aspect < INSTAGRAM_MIN ? INSTAGRAM_MIN : INSTAGRAM_MAX;
+            notes.push(
+                `Instagram only takes 4:5 to 1.91:1, so this is cropped to ${describeRatio(clamped)} around its focus point.`,
+            );
+        }
+
+        if (images.length > 1) {
+            notes.push(
+                'Instagram shows every slide at the first image’s shape.',
+            );
+        }
+    }
+
+    if (
+        platform === 'linkedin' &&
+        fixed !== null &&
+        images.some((image) => image.is_ai_generated)
+    ) {
+        notes.push(
+            'AI images go to LinkedIn uncropped, so their content credentials stay intact.',
+        );
+    }
+
+    return notes;
+}
+
+function CaptionFoldMeter({
+    platform,
+    caption,
+}: {
+    platform: string;
+    caption: string;
+}) {
+    if (!caption.trim() || !captionFolds[platform]) {
+        return null;
+    }
+
+    const { visible, truncated } = foldCaption(caption, platform);
+
+    return (
+        <p className="text-muted-foreground flex items-baseline justify-between gap-2 text-xs">
+            <span>
+                {truncated ? 'Shown before “more”' : 'Whole caption shows'}
+            </span>
+            <span className="font-mono text-[11px] tabular-nums">
+                {truncated
+                    ? `${visible.length} / ${caption.length} chars`
+                    : `${caption.length} chars`}
+            </span>
+        </p>
+    );
+}
+
+type PanelProps = {
+    targets: Target[];
+    caption: string;
+    hashtags: string[];
+    assets: AssetData[];
+    musicName: string;
+    locationName: string;
+    mediaFormat: MediaFormat;
+    crops: Record<number, Crop>;
+    formatOptions?: MediaFormatOptions;
+    /** Lets the user change formats and framing (they still save with the post). */
+    editable: boolean;
+    onMediaFormatChange?: (format: MediaFormat) => void;
+    onCropsChange?: (crops: Record<number, Crop>) => void;
+};
+
+/** The live platform mockup in the editor's right rail, with framing tools and a fullscreen view. */
 export function PreviewPanel({
     targets,
     caption,
@@ -63,31 +212,141 @@ export function PreviewPanel({
     assets,
     musicName,
     locationName,
-}: {
-    targets: PreviewTarget[];
-    caption: string;
-    hashtags: string[];
-    assets: AssetData[];
-    musicName: string;
-    locationName: string;
-}) {
+    mediaFormat,
+    crops,
+    formatOptions = {},
+    editable,
+    onMediaFormatChange,
+    onCropsChange,
+}: PanelProps) {
     const [activeId, setActiveId] = useState<number | null>(
         targets[0]?.id ?? null,
     );
     const [fullscreen, setFullscreen] = useState(false);
+    const [framing, setFraming] = useState(false);
+    const [safeZones, setSafeZones] = useState(false);
     const active =
         targets.find((target) => target.id === activeId) ?? targets[0] ?? null;
 
-    const preview = active ? (
-        <SocialPostPreview
-            target={active}
-            caption={caption}
-            hashtags={hashtags}
-            assets={assets}
-            musicName={musicName}
-            locationName={locationName}
-        />
-    ) : null;
+    const platform = active?.platform ?? '';
+    const format = mediaFormat[platform] ?? 'original';
+    const media = publishableMedia(assets);
+    const hasVideo = media.some(isVideoAsset);
+    const images = media.filter((asset) => asset.url && isImageAsset(asset));
+    const canFrame = editable && !hasVideo && images.length > 0;
+    const vertical =
+        platform === 'tiktok' ||
+        (platform === 'instagram' && hasVideo) ||
+        format === '9:16';
+    const platforms = [...new Set(targets.map((target) => target.platform))];
+    const notes = active ? previewNotes(platform, assets, format) : [];
+    const published = publishedCaption(caption, hashtags);
+
+    const setFormat = (value: string) =>
+        onMediaFormatChange?.({ ...mediaFormat, [platform]: value });
+
+    const controls = active && !hasVideo && images.length > 0 && (
+        <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-2">
+                <span className="eyebrow text-muted-foreground">Format</span>
+                {canFrame && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFraming(true)}
+                    >
+                        <CropIcon />
+                        Frame
+                    </Button>
+                )}
+            </div>
+            {editable ? (
+                <FormatPicker
+                    platform={platform}
+                    value={format}
+                    options={formatOptions}
+                    onChange={setFormat}
+                />
+            ) : (
+                <p className="text-sm">
+                    {ratioLabels[format] ?? format}
+                    {format !== 'original' && (
+                        <span className="text-muted-foreground font-mono text-xs">
+                            {' '}
+                            {format}
+                        </span>
+                    )}
+                </p>
+            )}
+        </div>
+    );
+
+    const body = (size: 'rail' | 'full') =>
+        active ? (
+            <div className="grid gap-4">
+                <TargetSwitcher
+                    targets={targets}
+                    activeId={active.id}
+                    onSelect={setActiveId}
+                />
+                {controls}
+                {notes.length > 0 && (
+                    <ul className="grid gap-1.5">
+                        {notes.map((note) => (
+                            <li
+                                key={note}
+                                className="text-muted-foreground flex items-start gap-1.5 text-xs leading-snug"
+                            >
+                                <Info className="text-info mt-px size-3.5 shrink-0" />
+                                {note}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                <div
+                    className={cn(
+                        'mx-auto flex w-full justify-center',
+                        size === 'full' && 'max-w-[420px]',
+                    )}
+                >
+                    <SocialPostPreview
+                        key={active.id}
+                        target={active}
+                        caption={caption}
+                        hashtags={hashtags}
+                        assets={assets}
+                        musicName={musicName}
+                        locationName={locationName}
+                        mediaFormat={mediaFormat}
+                        crops={crops}
+                        showSafeZones={vertical && safeZones}
+                    />
+                </div>
+                <div className="grid gap-2">
+                    {vertical && (
+                        <Toggle
+                            size="sm"
+                            variant="outline"
+                            pressed={safeZones}
+                            onPressedChange={setSafeZones}
+                            className="justify-self-center px-3 text-xs"
+                        >
+                            <ScanLine />
+                            Safe zones
+                        </Toggle>
+                    )}
+                    <CaptionFoldMeter platform={platform} caption={published} />
+                    <p className="text-muted-foreground text-center text-[11px]">
+                        A close approximation — apps vary by device.
+                    </p>
+                </div>
+            </div>
+        ) : (
+            <p className="text-muted-foreground py-8 text-center text-sm">
+                Pick a channel to see how the post will look.
+            </p>
+        );
 
     return (
         <section className="border-border bg-card rounded-2xl border">
@@ -109,41 +368,38 @@ export function PreviewPanel({
                     </Button>
                 )}
             </div>
-            <div className="grid gap-4 p-4">
-                <TargetSwitcher
-                    targets={targets}
-                    activeId={active?.id ?? null}
-                    onSelect={setActiveId}
-                />
-                <div className="flex justify-center">
-                    {preview ?? (
-                        <p className="text-muted-foreground py-8 text-center text-sm">
-                            Pick a channel to see how the post will look.
-                        </p>
-                    )}
-                </div>
-                {active && (
-                    <p className="text-muted-foreground text-center text-[11px]">
-                        An approximation — not pixel-perfect.
-                    </p>
-                )}
-            </div>
+            <div className="p-4">{body('rail')}</div>
 
             <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>
-                            Preview{active ? ` — ${active.handle}` : ''}
+                            Preview
+                            {active
+                                ? ` — ${platformNames[platform] ?? platform} · ${active.handle}`
+                                : ''}
                         </DialogTitle>
                     </DialogHeader>
-                    <TargetSwitcher
-                        targets={targets}
-                        activeId={active?.id ?? null}
-                        onSelect={setActiveId}
-                    />
-                    <div className="flex justify-center py-2">{preview}</div>
+                    {body('full')}
                 </DialogContent>
             </Dialog>
+
+            {canFrame && (
+                <CropEditorDialog
+                    open={framing}
+                    onOpenChange={setFraming}
+                    assets={images}
+                    crops={crops}
+                    platforms={platforms}
+                    activePlatform={platform}
+                    mediaFormat={mediaFormat}
+                    formatOptions={formatOptions}
+                    onApply={(nextCrops, nextFormat) => {
+                        onCropsChange?.({ ...crops, ...nextCrops });
+                        onMediaFormatChange?.(nextFormat);
+                    }}
+                />
+            )}
         </section>
     );
 }

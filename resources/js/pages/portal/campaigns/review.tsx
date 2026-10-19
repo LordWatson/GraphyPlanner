@@ -17,6 +17,7 @@ import { SocialPostPreview } from '@/components/social-post-preview';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { formatSchedule } from '@/lib/dates';
+import type { MediaFormat } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 import { show as portalCampaign } from '@/routes/portal/campaigns';
 import { submit as submitReview } from '@/routes/portal/campaigns/review';
@@ -26,6 +27,9 @@ type ReviewPost = {
     master_caption: string | null;
     review_message: string | null;
     hashtags: string[];
+    music: { name?: string } | null;
+    location: { name?: string } | null;
+    media_format: MediaFormat;
     seen_at: string;
     assets: PreviewAsset[];
     targets: {
@@ -254,6 +258,9 @@ export default function PortalCampaignReview({
                                         caption={post.master_caption ?? ''}
                                         hashtags={post.hashtags}
                                         assets={post.assets}
+                                        musicName={post.music?.name ?? ''}
+                                        locationName={post.location?.name ?? ''}
+                                        mediaFormat={post.media_format}
                                     />
                                 ) : (
                                     <p className="text-muted-foreground py-12 text-sm">

@@ -203,6 +203,11 @@ export function ChannelSchedule({
                 </span>
             ))}
 
+            {/* With no channel ticked, still send the field so saving clears the last one. */}
+            {selectedIds.length === 0 && (
+                <input type="hidden" name="targets" value="" />
+            )}
+
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
     );

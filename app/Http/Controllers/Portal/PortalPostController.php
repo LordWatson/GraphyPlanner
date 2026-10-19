@@ -10,6 +10,7 @@ use App\Http\Requests\Portal\PortalPostDecisionRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Models\Post;
 use App\Services\PostNotificationService;
+use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -70,6 +71,7 @@ class PortalPostController extends Controller
                 'hashtags' => $post->hashtags ?? [],
                 'music' => $post->music,
                 'location' => $post->location,
+                'media_format' => PostMediaPresenter::mediaFormat($post),
                 'assets' => $post->assets->map(fn ($asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
@@ -77,6 +79,7 @@ class PortalPostController extends Controller
                     'type' => $asset->type?->value,
                     'source' => $asset->source?->value,
                     'mime_type' => $asset->mime_type,
+                    ...PostMediaPresenter::framing($asset),
                 ])->values(),
                 'targets' => $post->targets->map(fn ($target) => [
                     'social_account_id' => $target->social_account_id,

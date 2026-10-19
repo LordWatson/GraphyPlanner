@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, FileQuestion } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import type { Crop } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 
 export type PreviewAsset = {
@@ -8,6 +9,11 @@ export type PreviewAsset = {
     url: string | null;
     original_filename: string | null;
     type: string | null;
+    /** Pixel size and saved framing (`PostMediaPresenter::framing()`), when sent. */
+    width?: number | null;
+    height?: number | null;
+    crop?: Crop | null;
+    is_ai_generated?: boolean;
 };
 
 function isVideoAsset(asset: PreviewAsset): boolean {

@@ -182,6 +182,10 @@ export function MediaPicker({
                     value={asset.id}
                 />
             ))}
+            {/* With nothing attached, still send the field so saving detaches the last item. */}
+            {selected.length === 0 && (
+                <input type="hidden" name="asset_ids" value="" />
+            )}
 
             <AssetLibraryDialog
                 open={browsing}

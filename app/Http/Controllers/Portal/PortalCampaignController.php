@@ -20,6 +20,7 @@ use App\Models\Post;
 use App\Models\PostTarget;
 use App\Support\Campaigns\CampaignClock;
 use App\Support\Campaigns\CampaignPresenter;
+use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -164,11 +165,15 @@ class PortalCampaignController extends Controller
                 'review_message' => $post->review_message,
                 'hashtags' => $post->hashtags ?? [],
                 'seen_at' => $post->updated_at?->toIso8601String(),
+                'music' => $post->music,
+                'location' => $post->location,
+                'media_format' => PostMediaPresenter::mediaFormat($post),
                 'assets' => $post->assets->map(fn (Asset $asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
+                    ...PostMediaPresenter::framing($asset),
                 ])->values()->all(),
                 'targets' => $post->targets->map(fn (PostTarget $target) => [
                     'id' => $target->id,

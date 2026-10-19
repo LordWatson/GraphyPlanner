@@ -34,6 +34,7 @@ use App\Services\ClientHashtagService;
 use App\Services\PostNotificationService;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
+use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -105,6 +106,7 @@ class PostController extends Controller
                 'platform' => $account->platform->value,
                 'platform_label' => $account->platform->label(),
                 'handle' => $account->handle,
+                'display_name' => $account->display_name,
                 'timezone' => $account->timezone,
                 'caption_limit' => $account->platform->captionLimit(),
                 'max_hashtags' => $account->platform->maxHashtags(),
@@ -123,6 +125,8 @@ class PostController extends Controller
                 'create_asset' => $user->can('create', [Asset::class, $client]),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
+            // The image formats each channel offers (the preview's "Format" picker).
+            'mediaFormatOptions' => PostMediaPresenter::formatOptions(),
             // Campaigns enhancement C-1.3 / C-4.2: the client's open campaigns (plus the post's
             // own, whatever its status) with what joining each offers the post.
             'campaignOptions' => $this->campaignOptions($post, $defaults),
@@ -366,6 +370,7 @@ class PostController extends Controller
             'hashtags' => $post->hashtags ?? [],
             'music' => $post->music,
             'location' => $post->location,
+            'media_format' => PostMediaPresenter::mediaFormat($post),
             'checklist' => $evaluateChecklist($post),
             'assets' => $post->assets->map(fn ($asset) => [
                 'id' => $asset->id,
@@ -373,12 +378,14 @@ class PostController extends Controller
                 'original_filename' => $asset->original_filename,
                 'type' => $asset->type?->value,
                 'is_ai_generated' => $asset->is_ai_generated,
+                ...PostMediaPresenter::framing($asset),
             ])->values(),
             'targets' => $post->targets->map(fn ($target) => [
                 'id' => $target->id,
                 'social_account_id' => $target->social_account_id,
                 'platform' => $target->socialAccount?->platform?->value,
                 'handle' => $target->socialAccount?->handle,
+                'display_name' => $target->socialAccount?->display_name,
                 'caption_limit' => $target->socialAccount?->platform?->captionLimit(),
                 'is_text_only_capable' => $target->socialAccount?->platform?->isTextOnlyCapable() ?? false,
                 'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),

@@ -7,6 +7,7 @@ use App\Enums\PostStatus;
 use App\Http\Requests\ReviewDecisionRequest;
 use App\Models\Post;
 use App\Models\ReviewToken;
+use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -37,6 +38,9 @@ class ReviewController extends Controller
                 'master_caption' => $post->master_caption,
                 'review_message' => $post->review_message,
                 'hashtags' => $post->hashtags ?? [],
+                'music' => $post->music,
+                'location' => $post->location,
+                'media_format' => PostMediaPresenter::mediaFormat($post),
                 'assets' => $post->assets->map(fn ($asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
@@ -44,6 +48,7 @@ class ReviewController extends Controller
                     'type' => $asset->type?->value,
                     'source' => $asset->source?->value,
                     'mime_type' => $asset->mime_type,
+                    ...PostMediaPresenter::framing($asset),
                 ])->values(),
                 'targets' => $post->targets->map(fn ($target) => [
                     'platform' => $target->socialAccount?->platform?->value,

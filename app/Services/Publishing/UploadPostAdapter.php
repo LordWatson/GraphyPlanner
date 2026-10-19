@@ -12,6 +12,7 @@ use App\Models\Organization;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Services\Media\PublishImageCropper;
 use App\Support\Publishing\TargetResult;
 use App\Support\Publishing\VendorHttp;
 use Illuminate\Http\Client\PendingRequest;
@@ -37,6 +38,7 @@ class UploadPostAdapter implements PublishAdapter
     public function __construct(
         private readonly ?string $baseUrl = null,
         private readonly PlatformRolloutGate $rolloutGate = new PlatformRolloutGate,
+        private readonly PublishImageCropper $cropper = new PublishImageCropper,
     ) {}
 
     /**
@@ -335,7 +337,7 @@ class UploadPostAdapter implements PublishAdapter
                 // reach, which the vendor rejects with a generic "required"/"not allowed" error
                 // even though a URL was technically present. Assets with no local disk/path (e.g.
                 // externally-linked) still fall back to sending their URL as before.
-                $this->attachLocalMediaFiles($request, $post, $fields);
+                $this->attachLocalMediaFiles($request, $post, $account, $fields);
 
                 $response = $request->post($endpoint, $this->toMultipartFields($fields));
             }
@@ -412,9 +414,14 @@ class UploadPostAdapter implements PublishAdapter
      * unreachable) URL. Assets with no local disk/path — e.g. genuinely external links — are left
      * in `$fields` to be sent as a URL, unchanged.
      *
+     * Local images are cut to the post's format for this channel first (`PublishImageCropper`),
+     * so what publishes matches the editor preview. Videos and remote images always go out as
+     * uploaded, and so do AI-generated images bound for LinkedIn: LinkedIn has no API label and
+     * reads the C2PA credentials embedded in the original, which re-encoding would strip.
+     *
      * @param  array<string, mixed>  $fields
      */
-    private function attachLocalMediaFiles(PendingRequest $request, Post $post, array &$fields): void
+    private function attachLocalMediaFiles(PendingRequest $request, Post $post, SocialAccount $account, array &$fields): void
     {
         /** @var Asset|null $videoAsset */
         $videoAsset = $post->assets->firstWhere('type', AssetType::Video);
@@ -435,8 +442,34 @@ class UploadPostAdapter implements PublishAdapter
         $remoteImageUrls = $imageAssets->reject(fn (Asset $asset): bool => $this->hasLocalFile($asset))
             ->pluck('url')->filter()->values()->all();
 
+        /** @var array<int, string> $bytes */
+        $bytes = $localImages->mapWithKeys(fn (Asset $asset) => [
+            $asset->id => (string) Storage::disk($asset->disk)->get($asset->path),
+        ])->all();
+
+        // A carousel only sends images when there's no video, so only then does the format apply.
+        $ratio = $videoAsset ? null : $this->cropper->targetRatio(
+            $post,
+            $account->platform,
+            $this->imageSize($imageAssets->first(), $bytes),
+        );
+
         foreach ($localImages as $asset) {
-            $request->attach('photos[]', Storage::disk($asset->disk)->get($asset->path), $this->assetFilename($asset));
+            $contents = $bytes[$asset->id];
+
+            if ($ratio !== null && ! ($account->platform === Platform::LinkedIn && $asset->is_ai_generated)) {
+                $contents = $this->cropper->crop($asset, $contents, $ratio, $post) ?? $contents;
+            }
+
+            $request->attach('photos[]', $contents, $this->assetFilename($asset));
+        }
+
+        if ($ratio !== null && $remoteImageUrls !== []) {
+            Log::info('Remote images publish uncropped', [
+                'post_id' => $post->id,
+                'social_account_id' => $account->id,
+                'count' => count($remoteImageUrls),
+            ]);
         }
 
         if ($remoteImageUrls !== []) {
@@ -444,6 +477,26 @@ class UploadPostAdapter implements PublishAdapter
         } else {
             unset($fields['photos']);
         }
+    }
+
+    /**
+     * An image's pixel size: read from its local bytes when available (the stored width/height
+     * can predate EXIF rotation), else the stored dimensions, else unknown.
+     *
+     * @param  array<int, string>  $bytes
+     * @return array{0: int, 1: int}|null
+     */
+    private function imageSize(?Asset $asset, array $bytes): ?array
+    {
+        if ($asset === null) {
+            return null;
+        }
+
+        if (isset($bytes[$asset->id])) {
+            return $this->cropper->dimensions($bytes[$asset->id]);
+        }
+
+        return $asset->width && $asset->height ? [(int) $asset->width, (int) $asset->height] : null;
     }
 
     /**

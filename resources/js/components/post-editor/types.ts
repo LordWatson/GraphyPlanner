@@ -1,4 +1,5 @@
 import type { CampaignChipData } from '@/components/campaigns/types';
+import type { Crop, MediaFormat } from '@/lib/media-format';
 
 /** Prop shapes sent by `PostController::edit` to the `posts/edit` page. */
 
@@ -17,6 +18,7 @@ export type TargetData = {
     social_account_id: number;
     platform: string | null;
     handle: string | null;
+    display_name?: string | null;
     caption_limit: number | null;
     is_text_only_capable: boolean;
     scheduled_local_date: string | null;
@@ -63,6 +65,10 @@ export type AssetData = {
     type: string | null;
     /** Made in the AI Image Studio (Phase 16): shown with an "AI" label tag. */
     is_ai_generated?: boolean;
+    width?: number | null;
+    height?: number | null;
+    /** Focus point + zoom on this post (`post_assets.crop_*`). */
+    crop?: Crop | null;
 };
 
 export type PostData = {
@@ -79,6 +85,8 @@ export type PostData = {
     hashtags: string[];
     music: Record<string, unknown> | null;
     location: Record<string, unknown> | null;
+    /** Image format per channel, defaults filled in. */
+    media_format: MediaFormat;
     checklist: Checklist;
     assets: AssetData[];
     targets: TargetData[];
@@ -92,6 +100,7 @@ export type TargetAccountData = {
     platform: string;
     platform_label: string;
     handle: string;
+    display_name?: string | null;
     timezone: string;
     caption_limit: number;
     max_hashtags: number;
