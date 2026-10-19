@@ -17,7 +17,11 @@ use Illuminate\Support\Str;
  */
 class BrandImageBriefFactory
 {
-    private const SUBJECT_LIMIT = 400;
+    /**
+     * Mood, style and composition are short descriptors; the subject is deliberately uncapped so a
+     * post's whole caption can steer the image.
+     */
+    private const FIELD_LIMIT = 400;
 
     public function defaults(Client $client, ImageBriefInput $input): AiImageBrief
     {
@@ -25,7 +29,13 @@ class BrandImageBriefFactory
         $visual = $brandBrain->visual ?? [];
         $voice = $brandBrain->voice ?? [];
 
-        $subject = trim($input->title.(filled($input->description) ? '. '.$input->description : ''));
+        // An idea is described by its title + description; a post by its whole caption (its title
+        // is only the caption's first line, cut short).
+        $subject = match (true) {
+            filled($input->description) => trim($input->title.'. '.$input->description),
+            filled($input->caption) => trim((string) $input->caption),
+            default => trim($input->title),
+        };
 
         $style = filled($visual['imagery_style'] ?? null)
             ? (string) $visual['imagery_style']
@@ -36,7 +46,7 @@ class BrandImageBriefFactory
         }
 
         $brief = new AiImageBrief(
-            subject: Str::limit($this->stripHashtags($subject), self::SUBJECT_LIMIT, ''),
+            subject: $this->stripHashtags($subject),
             composition: 'One clear focal point, uncluttered background, with calm space for a caption',
             mood: filled($voice['tone'] ?? null) ? (string) $voice['tone'] : 'Warm, optimistic and inviting',
             palette: $this->palette($brandBrain),
@@ -56,7 +66,8 @@ class BrandImageBriefFactory
             $value = $overrides[$field] ?? null;
 
             if (is_string($value) && trim($value) !== '') {
-                $changes[$field] = Str::limit($this->stripHashtags(trim($value)), self::SUBJECT_LIMIT, '');
+                $value = $this->stripHashtags(trim($value));
+                $changes[$field] = $field === 'subject' ? $value : Str::limit($value, self::FIELD_LIMIT, '');
             }
         }
 

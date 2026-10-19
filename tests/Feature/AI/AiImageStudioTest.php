@@ -490,6 +490,29 @@ class AiImageStudioTest extends TestCase
         $this->assertNull($variant->fresh()->discarded_at);
     }
 
+    public function test_the_post_editor_prefills_the_subject_with_the_whole_caption(): void
+    {
+        $caption = "Autumn is finally here at the bakery.\n\n".str_repeat('Our pumpkin pastry is baked fresh every morning with local butter. ', 10).'#autumn';
+        $post = Post::factory()->for($this->client)->create(['org_id' => $this->org->id, 'master_caption' => $caption]);
+
+        $this->actingAs($this->owner)->get(route('posts.edit', $post))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where(
+                'imageStudio.brandDefaults.subject',
+                trim(str_replace('#autumn', '', $caption)),
+            ));
+    }
+
+    public function test_a_subject_longer_than_400_characters_is_accepted_and_kept_whole(): void
+    {
+        $subject = str_repeat('A pumpkin pastry on a marble counter in warm morning light. ', 12);
+
+        $generation = $this->generateSet(['art_direction' => ['subject' => $subject]]);
+
+        $this->assertGreaterThan(400, mb_strlen($subject));
+        $this->assertSame(trim($subject), $generation->briefDto()?->subject);
+    }
+
     public function test_headline_is_required_when_headline_text_is_on(): void
     {
         $this->actingAs($this->owner)

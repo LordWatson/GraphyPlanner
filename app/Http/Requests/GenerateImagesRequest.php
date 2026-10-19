@@ -40,7 +40,7 @@ class GenerateImagesRequest extends FormRequest
             'variant_count' => ['required', 'integer', 'min:1', 'max:'.(int) config('ai.images.max_variants', 4)],
             'post_id' => ['nullable', 'integer'],
             'art_direction' => ['nullable', 'array'],
-            'art_direction.subject' => ['nullable', 'string', 'max:400'],
+            'art_direction.subject' => ['nullable', 'string'],
             'art_direction.mood' => ['nullable', 'string', 'max:200'],
             'art_direction.style' => ['nullable', 'string', 'max:300'],
             'art_direction.composition' => ['nullable', 'string', 'max:300'],

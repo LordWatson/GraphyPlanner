@@ -412,7 +412,7 @@ export function ImageStudio({ data }: { data: ImageStudioData }) {
                                 <Textarea
                                     id="studio-subject"
                                     rows={3}
-                                    maxLength={400}
+                                    className="field-sizing-content max-h-96"
                                     value={fields.subject}
                                     onChange={(event) =>
                                         setField('subject', event.target.value)
