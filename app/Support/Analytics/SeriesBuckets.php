@@ -16,7 +16,7 @@ use Illuminate\Database\Query\Expression;
  * Timestamps are stored in UTC, so every instant is converted into the range's timezone *before*
  * its key is formatted — a post published at 23:30 UTC on 31 March belongs to 1 April in Dubai.
  * Calendar dates (`invoices.issue_date`) have no timezone and are bucketed as-is
- * (`calendarDates: true`). Bucketing happens in PHP so it behaves the same on Postgres
+ * (`calendarDates: true`). Bucketing happens in PHP so it behaves the same on MySQL
  * (production) and SQLite (tests).
  */
 final readonly class SeriesBuckets

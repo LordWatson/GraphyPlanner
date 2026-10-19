@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\MusicProvider;
 use App\Enums\Platform;
 use App\Enums\Role;
 use App\Models\Client;
@@ -46,7 +47,7 @@ class MetaAudioSelectionAcceptanceTest extends TestCase
 
         // Use the real MetaGraphMusicProvider — only the outbound Graph HTTP call is faked.
         $this->app->instance(
-            \App\Contracts\MusicProvider::class,
+            MusicProvider::class,
             new MetaGraphMusicProvider(new UploadPostMusicProvider),
         );
 

@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services\Publishing;
 
 use App\Contracts\MusicProvider;
+use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
@@ -84,7 +85,7 @@ class MetaGraphMusicProviderTest extends TestCase
         $owner = User::factory()->for($organization, 'organization')->role(Role::Owner)->create();
         SocialAccount::factory()->for($organization, 'organization')->create([
             'platform' => Platform::TikTok,
-            'connection_status' => \App\Enums\ConnectionStatus::Connected,
+            'connection_status' => ConnectionStatus::Connected,
             'external_account_id' => 'tiktok-profile-1',
         ]);
         $this->actingAs($owner);

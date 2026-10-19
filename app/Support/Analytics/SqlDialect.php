@@ -24,7 +24,6 @@ final class SqlDialect
     {
         return match (DB::connection()->getDriverName()) {
             'sqlite' => "CAST(ROUND((julianday({$to}) - julianday({$from})) * 86400) AS INTEGER)",
-            'pgsql' => "CAST(EXTRACT(EPOCH FROM ({$to} - {$from})) AS INTEGER)",
             default => "TIMESTAMPDIFF(SECOND, {$from}, {$to})",
         };
     }
@@ -42,7 +41,6 @@ final class SqlDialect
         $seconds = self::secondsBetween($from, $to);
         $days = match (DB::connection()->getDriverName()) {
             'mysql', 'mariadb' => "({$seconds}) DIV 86400",
-            'pgsql' => "TRUNC(({$seconds}) / 86400.0)",
             default => "({$seconds}) / 86400",
         };
 
