@@ -89,8 +89,8 @@ export function NewPostDialog({
                 })),
             }),
         );
+        // The server redirects to the new post's editor on success.
         form.post(storePost.url(clientId), {
-            preserveScroll: true,
             onSuccess: () => {
                 setOpen(false);
                 form.reset();

@@ -44,13 +44,16 @@ use Inertia\Response;
 class PostController extends Controller
 {
     /**
-     * Create a new post (with its per-account targets) for the given client.
+     * Create a new post (with its per-account targets) for the given client, then open it in the
+     * editor so media, hashtags and per-target times can be added straight away.
      */
     public function store(StorePostRequest $request, Client $client, CreatePostAction $action): RedirectResponse
     {
-        $action($client, $request->validated());
+        $post = $action($client, $request->validated());
 
-        return to_route('clients.posts.index', $client);
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post created.')]);
+
+        return to_route('posts.edit', $post);
     }
 
     /**

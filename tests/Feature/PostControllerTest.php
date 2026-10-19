@@ -54,9 +54,10 @@ class PostControllerTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('clients.posts.index', $client));
-
         $post = Post::firstOrFail();
+
+        // Creating a post opens it straight in the editor.
+        $response->assertRedirect(route('posts.edit', $post));
         $londonTarget = $post->targets()->where('social_account_id', $london->id)->firstOrFail();
         $dubaiTarget = $post->targets()->where('social_account_id', $dubai->id)->firstOrFail();
 
