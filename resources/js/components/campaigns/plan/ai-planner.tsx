@@ -15,9 +15,11 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
-import { postJson } from '@/lib/campaigns';
+import { getJson, postJson } from '@/lib/campaigns';
+import type { JsonResult } from '@/lib/campaigns';
 import { formatSchedule } from '@/lib/dates';
 import { plan as aiPlan } from '@/routes/campaigns/ai';
+import { status as planStatus } from '@/routes/campaigns/ai/plan';
 import { accept as acceptPlan } from '@/routes/campaigns/plan';
 
 type Suggestion = {
@@ -32,6 +34,52 @@ type Suggestion = {
     flags: string[];
     warnings: string[];
 };
+
+type PlanRun =
+    | { status: 'pending' }
+    | { status: 'done'; suggestions: Suggestion[] }
+    | { status: 'failed'; message: string };
+
+const POLL_MS = 2000;
+const GIVE_UP_MS = 5 * 60 * 1000;
+
+/**
+ * Planning runs on the queue (a reasoning model can take over a minute, longer than a request may
+ * wait), so start the run, then poll its status until it settles.
+ */
+async function runPlan(campaignId: number): Promise<JsonResult<Suggestion[]>> {
+    const started = await postJson<{ run: string }>(aiPlan.url(campaignId));
+
+    if (!started.ok) {
+        return started;
+    }
+
+    const deadline = Date.now() + GIVE_UP_MS;
+
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, POLL_MS));
+        const result = await getJson<PlanRun>(
+            planStatus.url({ campaign: campaignId, run: started.data.run }),
+        );
+
+        if (!result.ok) {
+            return result;
+        }
+
+        if (result.data.status === 'done') {
+            return { ok: true, data: result.data.suggestions };
+        }
+
+        if (result.data.status === 'failed') {
+            return { ok: false, message: result.data.message };
+        }
+    }
+
+    return {
+        ok: false,
+        message: 'The AI is taking longer than usual. Try again in a moment.',
+    };
+}
 
 /**
  * Step C-3.3 — "Plan with AI": suggestions open in a review sheet; the person ticks what to keep
@@ -55,9 +103,7 @@ export function AiPlanner({
 
     const fetchPlan = async () => {
         setLoading(true);
-        const result = await postJson<{ suggestions: Suggestion[] }>(
-            aiPlan.url(campaignId),
-        );
+        const result = await runPlan(campaignId);
         setLoading(false);
 
         if (!result.ok) {
@@ -66,10 +112,10 @@ export function AiPlanner({
             return;
         }
 
-        setSuggestions(result.data.suggestions);
+        setSuggestions(result.data);
         setPicked(
             new Set(
-                result.data.suggestions
+                result.data
                     .map((suggestion, index) =>
                         suggestion.flags.length === 0 ? index : -1,
                     )

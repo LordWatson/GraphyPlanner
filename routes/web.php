@@ -309,6 +309,8 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         Route::post('campaigns/{campaign}/ai/plan', [CampaignAiController::class, 'suggestPlan'])->middleware('campaign.feature:ai_planner')->name('campaigns.ai.plan');
         Route::post('campaigns/{campaign}/ai/wrap', [CampaignAiController::class, 'draftWrap'])->middleware('campaign.feature:wrap_reports')->name('campaigns.ai.wrap');
     });
+    // Polled by the planner while PlanCampaignJob works, so outside `throttle:ai`.
+    Route::get('campaigns/{campaign}/ai/plan/{run}', [CampaignAiController::class, 'planStatus'])->middleware('campaign.feature:ai_planner')->whereUuid('run')->name('campaigns.ai.plan.status');
     Route::post('campaigns/{campaign}/plan/accept', [CampaignAiController::class, 'acceptPlan'])->middleware('campaign.feature:ai_planner')->name('campaigns.plan.accept');
     Route::post('campaigns/{campaign}/posts/bulk', CampaignPostBulkController::class)->name('campaigns.posts.bulk');
     Route::post('campaigns/{campaign}/share-links', [CampaignShareLinkController::class, 'store'])->name('campaigns.share-links.store');

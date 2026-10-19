@@ -115,7 +115,11 @@ class CampaignPlatformsTest extends TestCase
             }
         });
 
-        $this->actingAs($this->strategist())->postJson(route('campaigns.ai.plan', $this->campaign))
+        $run = $this->actingAs($this->strategist())->postJson(route('campaigns.ai.plan', $this->campaign))
+            ->assertAccepted()
+            ->json('run');
+
+        $this->getJson(route('campaigns.ai.plan.status', [$this->campaign, $run]))
             ->assertOk()
             ->assertJsonCount(1, 'suggestions')
             ->assertJsonPath('suggestions.0.platform', 'instagram');

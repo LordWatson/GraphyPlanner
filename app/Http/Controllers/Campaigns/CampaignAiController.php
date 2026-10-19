@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Campaigns;
 use App\Actions\Campaigns\AcceptCampaignPlanAction;
 use App\Actions\Campaigns\DraftCampaignBriefAction;
 use App\Actions\Campaigns\DraftCampaignWrapAction;
-use App\Actions\Campaigns\PlanCampaignAction;
+use App\Actions\Campaigns\StartCampaignPlanAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Campaigns\AcceptCampaignPlanRequest;
 use App\Models\Campaign;
+use App\Services\Campaigns\CampaignPlanRuns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,11 +30,25 @@ class CampaignAiController extends Controller
         return response()->json(['draft' => $action($campaign, $request->user())]);
     }
 
-    public function suggestPlan(Request $request, Campaign $campaign, PlanCampaignAction $action): JsonResponse
+    /**
+     * Planning can outlast a web request (a reasoning model takes 60s+), so this only queues the
+     * run and answers 202 with its id; the planner polls `planStatus` for the suggestions.
+     */
+    public function suggestPlan(Request $request, Campaign $campaign, StartCampaignPlanAction $action): JsonResponse
     {
         $this->guard($request, $campaign);
 
-        return response()->json(['suggestions' => $action($campaign, $request->user())]);
+        return response()->json(['run' => $action($campaign, $request->user())], 202);
+    }
+
+    public function planStatus(Request $request, Campaign $campaign, string $run, CampaignPlanRuns $runs): JsonResponse
+    {
+        $this->guard($request, $campaign);
+
+        $status = $runs->find($campaign, $request->user(), $run);
+        abort_if($status === null, 404);
+
+        return response()->json($status);
     }
 
     public function acceptPlan(AcceptCampaignPlanRequest $request, Campaign $campaign, AcceptCampaignPlanAction $action): RedirectResponse

@@ -101,8 +101,13 @@ class CampaignOperationsTest extends TestCase
             new AiDeliverableSuggestion('Out of range', 'instagram', 'post', null, null, '2027-01-04', null, null),
         ]));
 
-        $this->actingAs($this->strategist())->postJson(route('campaigns.ai.plan', $campaign))
+        $run = $this->actingAs($this->strategist())->postJson(route('campaigns.ai.plan', $campaign))
+            ->assertAccepted()
+            ->json('run');
+
+        $this->getJson(route('campaigns.ai.plan.status', [$campaign, $run]))
             ->assertOk()
+            ->assertJsonPath('status', 'done')
             ->assertJsonCount(1, 'suggestions')
             ->assertJsonPath('suggestions.0.platform', 'instagram')
             ->assertJsonPath('suggestions.0.flags', ['cheap']);
