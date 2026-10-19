@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Models\BrandBrain;
 use App\Models\Client;
+use App\Policies\BrandBrainPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateBrandBrainRequest extends FormRequest
@@ -16,7 +16,7 @@ class UpdateBrandBrainRequest extends FormRequest
         /** @var Client $client */
         $client = $this->route('client');
 
-        return app(\App\Policies\BrandBrainPolicy::class)->update($this->user(), $client);
+        return app(BrandBrainPolicy::class)->update($this->user(), $client);
     }
 
     /**

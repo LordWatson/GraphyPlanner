@@ -75,7 +75,7 @@ class InvoiceLedgerService
             ->where('paid_at', '>=', Carbon::now()->startOfMonth());
 
         // Average time from sending to payment over the last year — computed in PHP so it
-        // behaves identically on Postgres (production) and SQLite (tests).
+        // behaves identically on MySQL (production) and SQLite (tests).
         $paidDurations = $base()
             ->where('status', InvoiceStatus::Paid)
             ->whereNotNull('sent_at')

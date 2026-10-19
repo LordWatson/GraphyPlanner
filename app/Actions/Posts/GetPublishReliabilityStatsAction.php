@@ -16,7 +16,7 @@ class GetPublishReliabilityStatsAction
      * "publish reliability" chart.
      *
      * Grouping is done in PHP (rather than a driver-specific SQL date function) so the
-     * query behaves the same on Postgres (production) and SQLite (tests).
+     * query behaves the same on MySQL (production) and SQLite (tests).
      *
      * @return array{
      *     monthly: array<int, array{month: string, label: string, failed: int, published: int}>,

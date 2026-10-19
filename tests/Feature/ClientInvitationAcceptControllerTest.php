@@ -8,6 +8,7 @@ use App\Models\ClientInvitation;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class ClientInvitationAcceptControllerTest extends TestCase
@@ -47,7 +48,7 @@ class ClientInvitationAcceptControllerTest extends TestCase
         $this->assertSame($client->id, $user->client_id);
         $this->assertSame($org->id, $user->org_id);
         $this->assertSame('Ada Contact', $user->name);
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('password123', $user->password));
+        $this->assertTrue(Hash::check('password123', $user->password));
     }
 
     public function test_accepting_reuses_an_existing_client_reviewer_user_for_the_same_email(): void

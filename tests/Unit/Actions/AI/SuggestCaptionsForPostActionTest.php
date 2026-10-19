@@ -28,7 +28,7 @@ class SuggestCaptionsForPostActionTest extends TestCase
             ->withArgs(fn (Post $p) => $p->is($post))
             ->andReturn($suggestions);
 
-        $result = (new SuggestCaptionsForPostAction($ai, new AiGuardrailService()))($post);
+        $result = (new SuggestCaptionsForPostAction($ai, new AiGuardrailService))($post);
 
         $this->assertEquals($suggestions, $result);
     }
@@ -41,7 +41,7 @@ class SuggestCaptionsForPostActionTest extends TestCase
         $ai = Mockery::mock(AiProvider::class);
         $ai->shouldNotReceive('suggestCaptions');
 
-        $updated = (new SuggestCaptionsForPostAction($ai, new AiGuardrailService()))->apply($post, $suggestion);
+        $updated = (new SuggestCaptionsForPostAction($ai, new AiGuardrailService))->apply($post, $suggestion);
 
         $this->assertSame('New caption', $updated->master_caption);
         $this->assertSame(['launch', 'new'], $updated->hashtags);
@@ -59,7 +59,7 @@ class SuggestCaptionsForPostActionTest extends TestCase
         $ai = Mockery::mock(AiProvider::class);
         $ai->shouldReceive('suggestCaptions')->once()->andReturn($suggestions);
 
-        (new SuggestCaptionsForPostAction($ai, new AiGuardrailService()))($post);
+        (new SuggestCaptionsForPostAction($ai, new AiGuardrailService))($post);
 
         $this->assertSame('Old caption', $post->refresh()->master_caption);
     }

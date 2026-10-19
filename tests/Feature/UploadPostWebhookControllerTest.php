@@ -8,6 +8,7 @@ use App\Enums\PostTargetStatus;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -17,7 +18,7 @@ class UploadPostWebhookControllerTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * @return array{0: Post, 1: \App\Models\PostTarget, 2: Organization}
+     * @return array{0: Post, 1: PostTarget, 2: Organization}
      */
     private function createPendingTarget(PostStatus $postStatus = PostStatus::Publishing): array
     {
