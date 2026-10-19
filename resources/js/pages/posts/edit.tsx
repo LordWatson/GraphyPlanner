@@ -480,6 +480,17 @@ export default function PostEdit({
                 },
                 body: formData,
             });
+
+            // The web server rejects oversized bodies (HTTP 413) with an HTML page before
+            // Laravel runs, so there is no JSON message to show.
+            if (response.status === 413) {
+                toast.error(
+                    'This file is larger than the server accepts. Ask an admin to raise the upload limit.',
+                );
+
+                return;
+            }
+
             const data = await response.json();
 
             if (!response.ok || !data.asset) {
