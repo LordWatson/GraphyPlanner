@@ -28,6 +28,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\ClientTabController;
+use App\Http\Controllers\ConnectInviteController;
 use App\Http\Controllers\DailyBriefController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Organizations\RegistrationController;
+use App\Http\Controllers\Portal\PortalAccountConnectController;
 use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
@@ -42,6 +44,7 @@ use App\Http\Controllers\Portal\PortalDashboardController;
 use App\Http\Controllers\Portal\PortalInvoiceController;
 use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\PostController;
+use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
@@ -78,6 +81,11 @@ Route::middleware('throttle:public-token')->group(function () {
     // invitation flow above.
     Route::get('staff-invite/{token}', [StaffInvitationAcceptController::class, 'show'])->name('staff-invite.show');
     Route::post('staff-invite/{token}', [StaffInvitationAcceptController::class, 'store'])->name('staff-invite.store');
+
+    // Step M-2.8: a client connects their own social accounts from a self-connect link — access
+    // is possession of a live `ConnectInvite` token, scoped to its one client's account slots.
+    Route::get('connect/{token}', [PublicConnectController::class, 'show'])->name('connect.show');
+    Route::post('connect/{token}/accounts/{socialAccount}', [PublicConnectController::class, 'connect'])->name('connect.account');
 });
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
@@ -196,6 +204,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
 
     Route::post('clients/{client}/social-accounts', [SocialAccountController::class, 'store'])
         ->name('clients.social-accounts.store');
+    // Step M-2.8: client self-connect links.
+    Route::post('clients/{client}/connect-invites', [ConnectInviteController::class, 'store'])->name('clients.connect-invites.store');
+    Route::delete('connect-invites/{connectInvite}', [ConnectInviteController::class, 'destroy'])->name('connect-invites.destroy');
     Route::put('social-accounts/{socialAccount}', [SocialAccountController::class, 'update'])
         ->name('social-accounts.update');
     Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
@@ -323,6 +334,8 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('posts.destroy');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
+    // Step I-3.8 / M-2.9: Owner-only approval override (with a reason).
+    Route::post('posts/{post}/override-approval', [PostController::class, 'overrideApproval'])->name('posts.override-approval');
     Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])
         ->name('posts.reschedule');
     // Step I-1.3: resend only the failed targets of a failed/partially published post.
@@ -436,6 +449,8 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
     Route::get('invoices/{invoice}/pdf', [PortalInvoiceController::class, 'pdf'])->name('invoices.pdf');
+    // Step M-2.8: "Connect your accounts" — the client's own accounts only.
+    Route::post('accounts/{socialAccount}/connect', [PortalAccountConnectController::class, 'connect'])->name('accounts.connect');
 });
 
 // Phase 15: the platform super admin console — org-less platform staff only (`super_admin`

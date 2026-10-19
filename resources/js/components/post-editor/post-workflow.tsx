@@ -3,6 +3,7 @@ import {
     ArrowRight,
     Check,
     Ellipsis,
+    ShieldCheck,
     Mail,
     RefreshCw,
     Trash2,
@@ -50,6 +51,7 @@ import { cn } from '@/lib/utils';
 import { confirmDialog } from '@/components/confirm-dialog';
 import {
     destroy as destroyPost,
+    overrideApproval,
     retryFailedTargets,
     transition as transitionPost,
 } from '@/routes/posts';
@@ -343,6 +345,77 @@ function TransitionDialog({
 }
 
 /**
+ * Step I-3.8 / M-2.9 — an Owner approves a post that needs the client's sign-off without it. The
+ * reason is required and goes on the approval and the activity log.
+ */
+function OverrideApprovalDialog({
+    postId,
+    clientName,
+    open,
+    onOpenChange,
+}: {
+    postId: number;
+    clientName: string;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <Form
+                    {...overrideApproval.form(postId)}
+                    options={{ preserveScroll: true, preserveState: 'errors' }}
+                    onSuccess={() => onOpenChange(false)}
+                    className="grid gap-5"
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <ShieldCheck className="text-muted-foreground size-5" />
+                                    Approve without {clientName}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    This post is set to need the client’s
+                                    approval. As an Owner you can approve it
+                                    anyway — the reason is recorded on the
+                                    activity log for everyone to see.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="override-reason">Reason</Label>
+                                <textarea
+                                    id="override-reason"
+                                    name="reason"
+                                    rows={3}
+                                    required
+                                    minLength={5}
+                                    placeholder="e.g. Approved on our call this morning."
+                                    className={textareaClass}
+                                />
+                                <InputError message={errors.reason} />
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? 'Approving…' : 'Approve post'}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
  * Step I-1.3 — shown on a `failed`/`partially_published` post: which channels failed, and one
  * button that resends only those (channels that already went out are never touched).
  */
@@ -403,6 +476,7 @@ export function PostWorkflow({
     canResendReviewEmail,
     canRetryFailedTargets = false,
     canDelete = false,
+    canOverrideApproval = false,
 }: {
     post: {
         id: number;
@@ -418,8 +492,11 @@ export function PostWorkflow({
     canResendReviewEmail: boolean;
     canRetryFailedTargets?: boolean;
     canDelete?: boolean;
+    /** Step M-2.9: Owner may approve a client-required post without the client. */
+    canOverrideApproval?: boolean;
 }) {
     const [pending, setPending] = useState<TransitionAction | null>(null);
+    const [overriding, setOverriding] = useState(false);
 
     const allowed = allowedTransitions.map((option) => option.value);
     const actions = allowed.map((to) =>
@@ -486,7 +563,7 @@ export function PostWorkflow({
                     </p>
                 </div>
 
-                {actions.length > 0 && (
+                {(actions.length > 0 || canOverrideApproval) && (
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {(overflow.length > 0 || canDelete) && (
                             <DropdownMenu>
@@ -552,6 +629,16 @@ export function PostWorkflow({
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
+                        {canOverrideApproval && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOverriding(true)}
+                            >
+                                <ShieldCheck />
+                                Approve without client
+                            </Button>
+                        )}
                         {secondary.map((action) => {
                             const Icon = action.icon;
 
@@ -598,6 +685,15 @@ export function PostWorkflow({
                         canResend={canResendReviewEmail}
                     />
                 </div>
+            )}
+
+            {canOverrideApproval && (
+                <OverrideApprovalDialog
+                    postId={post.id}
+                    clientName={clientName}
+                    open={overriding}
+                    onOpenChange={setOverriding}
+                />
             )}
 
             <TransitionDialog

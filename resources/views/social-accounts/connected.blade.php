@@ -33,7 +33,9 @@
                 We couldn't find the account you were connecting. You can close this window and try again from AlimaPlanner.
             @endif
         </p>
-        <p><a href="{{ $clientUrl }}">Go back to AlimaPlanner</a></p>
+        @if ($clientUrl)
+            <p><a href="{{ $clientUrl }}">Go back to AlimaPlanner</a></p>
+        @endif
     </div>
     <script>
         (function () {

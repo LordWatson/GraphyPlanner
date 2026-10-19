@@ -4,8 +4,10 @@ namespace App\Http\Middleware;
 
 use App\Enums\Role;
 use App\Models\User;
+use App\Services\Publishing\PlatformCapabilities;
 use App\Services\SharedPropsCache;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -82,6 +84,10 @@ class HandleInertiaRequests extends Middleware
             // The organization's default currency (ISO 4217 code), shared so every page can
             // format currency fields consistently without re-fetching the organization.
             'currency' => fn (): string => $user()?->organization->default_currency ?? 'USD',
+            // Step I-3.3 / M-2.1: the platform capability registry (`config/platforms.php`) — the
+            // one source the editor counters, checklist mirror and previews read. Sent once per
+            // page load and kept by the client across visits.
+            'platforms' => Inertia::once(fn (): array => app(PlatformCapabilities::class)->toFrontend()),
         ];
     }
 

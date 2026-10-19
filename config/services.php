@@ -41,6 +41,8 @@ return [
     // `upload_post_webhook_secret` — Upload-Post issues one secret per account, not a single
     // app-wide one, so there's no env var/config key for it here.
     'upload_post' => [
+        // Step M-2.5: the notifications (webhook registration) endpoint lives on the app host.
+        'app_base_url' => env('UPLOAD_POST_APP_BASE_URL', 'https://app.upload-post.com/api'),
         'base_url' => env('UPLOAD_POST_BASE_URL', 'https://api.upload-post.com/api'),
     ],
 

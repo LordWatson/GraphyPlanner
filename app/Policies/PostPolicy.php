@@ -59,6 +59,12 @@ class PostPolicy
             return false;
         }
 
+        // Step I-3.6 / M-2.5: a post that's going out is locked too, unless nothing has gone out
+        // yet — then an edit recalls the vendor-held channels and re-submits them.
+        if ($post->status === PostStatus::Publishing && ! $post->canBeRecalled()) {
+            return false;
+        }
+
         return $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
     }
@@ -74,7 +80,9 @@ class PostPolicy
      */
     public function reschedule(User $user, Post $post): bool
     {
-        if (in_array($post->status, self::NON_RESCHEDULABLE_STATUSES, true)) {
+        // Step I-3.6 / M-2.5: a post the vendor is still holding for later can move — its held
+        // channels are recalled and re-submitted at the new times.
+        if (in_array($post->status, self::NON_RESCHEDULABLE_STATUSES, true) && ! $post->canBeRecalled()) {
             return false;
         }
 
@@ -145,8 +153,24 @@ class PostPolicy
                 && in_array($to, [PostStatus::Approved, PostStatus::ChangesRequested], true);
         }
 
+        // Step I-3.6 / M-2.5: only while nothing has gone out yet.
+        if (PostStatusTransitionMap::isRecallMove($post->status, $to) && ! $post->canBeRecalled()) {
+            return false;
+        }
+
         return $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
+     * Step I-3.8 / M-2.9: approve a `client_required` post without the client — Owners only, from
+     * internal review, with a reason (`TransitionPostStatusAction::overrideApproval()`).
+     */
+    public function overrideApproval(User $user, Post $post): bool
+    {
+        return $user->role === Role::Owner
+            && $user->org_id === $post->org_id
+            && PostStatusTransitionMap::needsClientApproval($post, $post->status, PostStatus::Approved);
     }
 
     /**

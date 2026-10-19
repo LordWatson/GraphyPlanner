@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
 use App\Contracts\ImageProvider;
+use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
 use App\Contracts\PublishAdapter;
 use App\Models\AiImageGeneration;
@@ -44,6 +45,7 @@ use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\LocalAssetStorage;
+use App\Services\Media\FfprobeMediaProber;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
@@ -70,6 +72,9 @@ class AppServiceProvider extends ServiceProvider
         // binding for an S3-backed implementation once Phase 1/2 needs signed-URL
         // uploads (spec §10) — no caller of App\Contracts\AssetStorage needs to change.
         $this->app->bind(AssetStorage::class, LocalAssetStorage::class);
+
+        // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
+        $this->app->bind(MediaProber::class, FfprobeMediaProber::class);
 
         // Upload-Post adapter (Step 1.2) bound against the PublishAdapter contract (Step 1.1).
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule

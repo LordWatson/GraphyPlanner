@@ -104,7 +104,9 @@ export function describeTransition(
                 to,
                 label: 'Back to draft',
                 description:
-                    'Pulls the post back to draft so it can be reworked. It will need to go through review again.',
+                    from === 'publishing'
+                        ? 'Cancels the channels still waiting on the platform and pulls the post back to draft. It will need to go through review again.'
+                        : 'Pulls the post back to draft so it can be reworked. It will need to go through review again.',
                 intent: 'back',
                 icon: Undo2,
                 notePlaceholder: 'What needs reworking?',
@@ -132,6 +134,19 @@ export function describeTransition(
                 notePlaceholder: 'Internal note for the activity log…',
             };
         case 'approved':
+            // Step M-2.5: a post the platform is still holding for later.
+            if (from === 'publishing') {
+                return {
+                    to,
+                    label: 'Unschedule',
+                    description:
+                        'Cancels the channels still waiting on the platform and keeps the approval. Nothing has gone out yet.',
+                    intent: 'back',
+                    icon: Undo2,
+                    notePlaceholder: 'Why is it coming off the schedule?',
+                };
+            }
+
             if (from === 'scheduled') {
                 return {
                     to,
@@ -155,12 +170,13 @@ export function describeTransition(
                   }
                 : {
                       to,
-                      label: 'Approve without client',
+                      // Step M-2.9: only offered when the post doesn't need the client's sign-off.
+                      label: 'Approve',
                       description:
-                          'Skips client review and marks the post approved by the studio.',
+                          'Marks the post approved by the studio — this post doesn’t need client sign-off.',
                       intent: 'forward',
                       icon: CheckCircle2,
-                      notePlaceholder: 'Why is client review being skipped?',
+                      notePlaceholder: 'Anything to note for the activity log?',
                   };
         case 'changes_requested':
             return {

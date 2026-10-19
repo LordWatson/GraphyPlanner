@@ -4,11 +4,18 @@ namespace App\Http\Requests;
 
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
+use App\Http\Requests\Concerns\ValidatesPlatformSettings;
+use App\Models\SocialAccount;
+use App\Services\Publishing\PlatformCapabilities;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 class UpdateSocialAccountRequest extends FormRequest
 {
+    use ValidatesPlatformSettings;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -23,7 +30,11 @@ class UpdateSocialAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'platform' => ['required', new Enum(Platform::class)],
+            // Step M-2.6: a new platform must be switched on; an account may keep its own.
+            'platform' => ['required', new Enum(Platform::class), Rule::in([
+                ...array_map(fn (Platform $platform) => $platform->value, app(PlatformCapabilities::class)->enabledPlatforms()),
+                $this->route('socialAccount') instanceof SocialAccount ? $this->route('socialAccount')->platform->value : null,
+            ])],
             'handle' => ['required', 'string', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
             'timezone' => ['required', 'timezone:all'],
@@ -36,6 +47,23 @@ class UpdateSocialAccountRequest extends FormRequest
             'posting_windows.*.end' => ['required', 'string', 'max:5'],
             'persona_override' => ['nullable', 'string'],
             'connection_status' => ['nullable', new Enum(ConnectionStatus::class)],
+            ...$this->platformSettingsRules(),
         ];
+    }
+
+    /**
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [fn (Validator $validator) => $this->validatePlatformSettings($validator)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function validatedAccount(): array
+    {
+        return self::cleanPlatformSettings($this->validated());
     }
 }

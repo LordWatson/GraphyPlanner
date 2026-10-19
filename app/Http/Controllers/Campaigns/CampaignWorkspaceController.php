@@ -129,6 +129,7 @@ class CampaignWorkspaceController extends Controller
                 ->through(fn (Asset $asset) => [
                     'id' => $asset->id,
                     'url' => $asset->url,
+                    'thumbnail_url' => $asset->thumbnailUrl(),
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
                     'mime_type' => $asset->mime_type,

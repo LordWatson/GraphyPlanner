@@ -10,9 +10,11 @@ use App\Models\CampaignPhase;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\User;
+use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Step C-6.2 — move a whole campaign by N days: its dates, phases, planned deliverables and every
@@ -30,7 +32,10 @@ class ShiftCampaignAction
      */
     private const FIXED = [PostStatus::Publishing, PostStatus::Published, PostStatus::PartiallyPublished, PostStatus::Archived];
 
-    public function __construct(private readonly ReschedulePostAction $reschedule) {}
+    public function __construct(
+        private readonly ReschedulePostAction $reschedule,
+        private readonly VendorScheduleService $vendor,
+    ) {}
 
     /**
      * @return array{days: int, campaign: array{from: string|null, to: string|null}, phases: int, deliverables: int, posts: list<array{id: int, caption: string|null}>, blocked: list<array{id: int, caption: string|null, reason: string}>}
@@ -73,7 +78,21 @@ class ShiftCampaignAction
         $plan = $this->preview($campaign, $days);
         $movableIds = array_column($plan['posts'], 'id');
 
-        DB::transaction(function () use ($campaign, $days, $user, $movableIds, $plan) {
+        // Step I-3.6 / M-2.5: posts the vendor is holding for later are recalled *before* the
+        // transaction (a rollback can't un-cancel a vendor job), and re-submitted at their new
+        // times after it commits. One the vendor won't release stays put, reported as blocked.
+        $recalled = [];
+
+        foreach (Post::query()->whereIn('id', $movableIds)->where('status', PostStatus::Publishing)->get() as $post) {
+            try {
+                $recalled[$post->id] = $this->vendor->recall($post);
+            } catch (ValidationException $e) {
+                $movableIds = array_values(array_diff($movableIds, [$post->id]));
+                $plan['blocked'][] = ['id' => $post->id, 'caption' => $post->master_caption, 'reason' => 'Already publishing on the platform.'];
+            }
+        }
+
+        DB::transaction(function () use ($campaign, $days, $user, $movableIds, $plan, $recalled) {
             $campaign->update([
                 'start_date' => $campaign->start_date?->copy()->addDays($days),
                 'end_date' => $campaign->end_date?->copy()->addDays($days),
@@ -95,6 +114,10 @@ class ShiftCampaignAction
 
             foreach (Post::query()->whereIn('id', $movableIds)->get() as $post) {
                 ($this->reschedule)($post, $days, $user);
+
+                if (isset($recalled[$post->id])) {
+                    DB::afterCommit(fn () => $this->vendor->resubmit($post, $recalled[$post->id]));
+                }
             }
 
             $campaign->recordActivity('campaign.shifted', $user, meta: [
@@ -117,7 +140,9 @@ class ShiftCampaignAction
 
     private function blocker(Post $post, int $days): ?string
     {
-        if (in_array($post->status, self::FIXED, true)) {
+        // Step I-3.6 / M-2.5: still held by the vendor for later — `ReschedulePostAction` recalls
+        // and re-submits it.
+        if (in_array($post->status, self::FIXED, true) && ! $post->canBeRecalled()) {
             return $post->status === PostStatus::Archived ? 'Archived.' : 'Already out, so it stays put.';
         }
 

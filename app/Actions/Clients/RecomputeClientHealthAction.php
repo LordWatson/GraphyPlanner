@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Fired from the events the rules depend on: the client's own attributes (`Client::saved`), a
  * social account's connection status (`SocialAccount` saved/deleted/restored), and the nightly
- * `clients:recompute-health` sweep. The write is quiet and leaves `updated_at` alone, so a
+ * `clients:recompute-health` sweep (which also catches a token crossing into its expiry window). The write is quiet and leaves `updated_at` alone, so a
  * recompute never looks like a user edit and never re-triggers itself.
  */
 class RecomputeClientHealthAction
@@ -33,7 +33,8 @@ class RecomputeClientHealthAction
         // Fresh accounts, unscoped: this can run for a job/webhook or after an account change.
         $client->setRelation('socialAccounts', $client->socialAccounts()
             ->withoutGlobalScope(OrganizationScope::class)
-            ->get(['id', 'client_id', 'connection_status']));
+            // Step M-2.7: plus what the token-expiry rule reads.
+            ->get(['id', 'client_id', 'platform', 'handle', 'connection_status', 'meta_access_token', 'meta_access_token_expires_at']));
 
         $result = $this->health->compute($client);
         $changed = $client->health_status !== $result['status'] || $client->health_reason !== $result['reason'];

@@ -4,6 +4,7 @@ namespace Tests\Unit\Services\Publishing;
 
 use App\Contracts\PublishAdapter;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Services\Publishing\NullPublishAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,11 +58,9 @@ class NullPublishAdapterTest extends TestCase
         });
     }
 
-    public function test_cancel_does_not_throw(): void
+    public function test_cancel_reports_nothing_left_to_publish(): void
     {
-        (new NullPublishAdapter)->cancel('external-post-id');
-
-        $this->assertTrue(true);
+        $this->assertTrue((new NullPublishAdapter)->cancel(new PostTarget)->cancelled);
     }
 
     public function test_health_reports_unhealthy(): void

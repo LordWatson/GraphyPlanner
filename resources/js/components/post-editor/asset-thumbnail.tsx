@@ -17,8 +17,27 @@ function isImage(asset: AssetData): boolean {
     return /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(asset.url ?? '');
 }
 
-/** Square-fill preview of an asset: image, first video frame, or a file glyph + name. */
+/**
+ * Square-fill preview of an asset: its thumbnail (Step M-2.4 — lists never load the original
+ * when one exists), else the image, the first video frame, or a file glyph + name.
+ */
 export function AssetThumbnail({ asset }: { asset: AssetData }) {
+    if (asset.thumbnail_url && (isImage(asset) || isVideo(asset))) {
+        return (
+            <>
+                <img
+                    src={asset.thumbnail_url}
+                    alt={asset.original_filename ?? ''}
+                    loading="lazy"
+                    className="size-full object-cover"
+                />
+                {isVideo(asset) && (
+                    <Film className="text-ink-foreground absolute bottom-2 left-2 size-4 drop-shadow" />
+                )}
+            </>
+        );
+    }
+
     if (asset.url && isImage(asset)) {
         return (
             <img

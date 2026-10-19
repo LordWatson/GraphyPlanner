@@ -104,7 +104,11 @@ class OrganizationAnalyticsSummaryTest extends TestCase
         $this->assertSame(1, $pipeline['scheduled']);
         $this->assertSame(0, $pipeline['draft']);
 
-        $this->assertSame(['instagram' => 2, 'tiktok' => 0, 'facebook' => 0, 'linkedin' => 0], array_column($posts['by_platform'], 'published', 'platform'));
+        $byPlatform = array_column($posts['by_platform'], 'published', 'platform');
+        // Step M-2.6: every registry platform is listed, zeros included.
+        $this->assertSame(2, $byPlatform['instagram']);
+        $this->assertSame(0, array_sum($byPlatform) - 2);
+        $this->assertSame(array_map(fn (Platform $platform) => $platform->value, Platform::cases()), array_keys($byPlatform));
         $this->assertSame([[
             'id' => $this->launch->id,
             'name' => 'Autumn launch',

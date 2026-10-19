@@ -13,6 +13,10 @@ use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Services\Media\PublishImageCropper;
+use App\Support\Publishing\CancelResult;
+use App\Support\Publishing\CaptionComposer;
+use App\Support\Publishing\FormatSpec;
+use App\Support\Publishing\PlatformSpec;
 use App\Support\Publishing\TargetResult;
 use App\Support\Publishing\VendorHttp;
 use Illuminate\Http\Client\PendingRequest;
@@ -55,13 +59,17 @@ class UploadPostAdapter implements PublishAdapter
         Log::info('Requesting Upload-Post connect link', ['social_account_id' => $account->id]);
 
         try {
-            $response = $this->client($account)->post('/uploadposts/users/generate-jwt', [
+            $spec = $account->platform->spec();
+            $response = $this->client($account)->post('/uploadposts/users/generate-jwt', array_filter([
                 'username' => $username,
                 'redirect_url' => route('social-accounts.callback', array_filter([
                     'social_account_id' => $account->id,
                     'state' => $state,
                 ])),
-            ]);
+                // Step M-2.6: show only this account's network on the hosted page, where the vendor
+                // supports narrowing it (the registry's `hosted_connect`).
+                'platforms' => $spec->hostedConnect ? [$spec->vendor] : null,
+            ]));
         } catch (Throwable $e) {
             Log::error('Upload-Post connect request failed', [
                 'social_account_id' => $account->id,
@@ -171,11 +179,103 @@ class UploadPostAdapter implements PublishAdapter
         return $targets->map(fn (SocialAccount $account): TargetResult => $this->publishToTarget($post, $account));
     }
 
-    public function cancel(string $externalPostId): void
+    /**
+     * Step I-3.6 / M-2.5: `DELETE /uploadposts/schedule/{job_id}`
+     * (https://docs.upload-post.com/api/schedule-posts). Only a 2xx with `success` counts as
+     * cancelled. A 404 means the vendor no longer holds the job — it may already have published —
+     * and a 409 means it's publishing now; both are reported as too late, never as success.
+     */
+    public function cancel(PostTarget $target): CancelResult
     {
-        // No SocialAccount/org context is available from this signature to authenticate the
-        // request — real cancellation is wired up alongside the schedule endpoint (Step 1.4/1.5).
-        Log::info('Upload-Post cancel requested (not yet implemented)', ['external_post_id' => $externalPostId]);
+        $jobId = $target->external_post_id;
+        $account = $target->socialAccount;
+
+        if (blank($jobId)) {
+            return CancelResult::cancelled();
+        }
+
+        if ($account === null) {
+            return CancelResult::failed('This channel’s account no longer exists.');
+        }
+
+        Log::info('Cancelling Upload-Post scheduled publish', ['post_id' => $target->post_id, 'post_target_id' => $target->id]);
+
+        try {
+            $response = $this->client($account)->delete('/uploadposts/schedule/'.rawurlencode((string) $jobId));
+        } catch (Throwable $e) {
+            Log::warning('Upload-Post cancel request failed', ['post_target_id' => $target->id, 'error' => $e->getMessage()]);
+
+            return CancelResult::failed('Couldn’t reach the publishing service to cancel: '.$e->getMessage());
+        }
+
+        if ($response->successful() && $response->json('success') !== false) {
+            Log::info('Upload-Post scheduled publish cancelled', [
+                'post_id' => $target->post_id,
+                'post_target_id' => $target->id,
+                'credits_refunded' => $response->json('credits_refunded'),
+            ]);
+
+            return CancelResult::cancelled();
+        }
+
+        Log::warning('Upload-Post cancel rejected', [
+            'post_target_id' => $target->id,
+            'status' => $response->status(),
+            'body' => mb_substr($response->body(), 0, 500),
+        ]);
+
+        return in_array($response->status(), [404, 409], true)
+            ? CancelResult::failed('It’s already publishing (or has gone out) on the platform.', tooLate: true)
+            : CancelResult::failed((string) ($response->json('error') ?? 'The publishing service refused to cancel it.'));
+    }
+
+    /**
+     * Step I-3.6 / M-2.5: `POST /uploadposts/users/notifications` on the vendor's app host
+     * (https://docs.upload-post.com/api/webhooks) with the webhook enabled for every event. The
+     * signing secret comes back in the response (or, if not, from a follow-up GET). The secret is
+     * returned, never logged.
+     */
+    public function registerWebhook(Organization $organization, string $url): ?string
+    {
+        $request = VendorHttp::forReads(
+            Http::baseUrl((string) config('services.upload_post.app_base_url', 'https://app.upload-post.com/api'))
+                ->withHeaders(['Authorization' => 'Apikey '.($organization->upload_post_key ?? '')])
+                ->acceptJson(),
+        );
+
+        try {
+            $response = $request->post('/uploadposts/users/notifications', [
+                'channels' => ['webhook' => true],
+                'webhook_url' => $url,
+                'webhook_events' => [
+                    'upload_completed' => true,
+                    'social_account_connected' => true,
+                    'social_account_disconnected' => true,
+                    'social_account_reauth_required' => true,
+                ],
+            ]);
+
+            $secret = $response->json('notifications.webhook_secret');
+
+            if ($response->successful() && blank($secret)) {
+                $current = $request->get('/uploadposts/users/notifications');
+                $secret = $current->json('notifications.webhook_secret') ?? $current->json('webhook_secret');
+            }
+        } catch (Throwable $e) {
+            Log::warning('Upload-Post webhook registration failed', ['org_id' => $organization->id, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (! $response->successful() || blank($secret)) {
+            Log::warning('Upload-Post webhook registration rejected', ['org_id' => $organization->id, 'status' => $response->status()]);
+
+            return null;
+        }
+
+        Log::info('Upload-Post webhook registered', ['org_id' => $organization->id]);
+
+        return (string) $secret;
     }
 
     public function health(SocialAccount $account): bool
@@ -448,16 +548,20 @@ class UploadPostAdapter implements PublishAdapter
         ])->all();
 
         // A carousel only sends images when there's no video, so only then does the format apply.
+        $target = $post->targets->firstWhere('social_account_id', $account->id);
+        $target?->setRelation('post', $post)->setRelation('socialAccount', $account);
         $ratio = $videoAsset ? null : $this->cropper->targetRatio(
             $post,
             $account->platform,
             $this->imageSize($imageAssets->first(), $bytes),
+            $target?->resolvedFormat(),
         );
+        $keepAiOriginals = $account->platform->spec()->keepAiOriginals;
 
         foreach ($localImages as $asset) {
             $contents = $bytes[$asset->id];
 
-            if ($ratio !== null && ! ($account->platform === Platform::LinkedIn && $asset->is_ai_generated)) {
+            if ($ratio !== null && ! ($keepAiOriginals && $asset->is_ai_generated)) {
                 $contents = $this->cropper->crop($asset, $contents, $ratio, $post) ?? $contents;
             }
 
@@ -557,22 +661,50 @@ class UploadPostAdapter implements PublishAdapter
      * Build the Upload-Post request payload for a single target, tracking which fields were
      * actually sent vs. skipped (missing source data) per spec §7's `TargetResult` shape.
      *
+     * Everything platform-specific comes from the capability registry (`config/platforms.php`):
+     * the vendor platform value and field prefix, whether `description` is rendered, link and
+     * first-comment support, alt text, the format's media type, and the cover fields.
+     *
+     * Step I-3.1 / M-2.2: the caption is the *target's* — its override or the master — composed
+     * with its hashtags and link exactly as the checklist counted it (`CaptionComposer`). Upload-Post
+     * has no working `hashtags` parameter, so tags travel as literal `#tag` text in the caption
+     * (below the dot-dash spacer where the platform folds captions). The generic `title` carries
+     * the same text, and so does the platform's own `{prefix}_title`, which some platforms
+     * (Instagram) render instead of `title`/`description`.
+     *
      * @return array{0: array<string, mixed>, 1: array<int, string>, 2: array<int, string>}
      */
     private function buildFields(Post $post, SocialAccount $account): array
     {
         $sent = [];
         $skipped = [];
-
-        $fields = [
-            'user' => $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id,
-            'title' => (string) $post->master_caption,
-            'platform' => [$account->platform->value],
-        ];
-        $sent = [...$sent, 'user', 'title', 'platform'];
+        $spec = $account->platform->spec();
 
         /** @var PostTarget|null $target */
         $target = $post->targets->firstWhere('social_account_id', $account->id);
+        $target?->setRelation('post', $post)->setRelation('socialAccount', $account);
+
+        $format = $target?->resolvedFormat()
+            ?? app(PlatformCapabilities::class)->resolveFormat($account->platform, null, $post->mediaKinds());
+        $caption = $target?->effectiveCaption() ?? (string) $post->master_caption;
+        $hashtags = $target?->effectiveHashtags() ?? array_values($post->hashtags ?? []);
+        $link = $target?->effectiveLink() ?? (filled($post->link_url) ? $post->link_url : null);
+        $published = CaptionComposer::compose($spec, $caption, $hashtags, $link);
+
+        $fields = [
+            'user' => $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id,
+            'title' => $published,
+            'platform' => [$spec->vendor],
+        ];
+        $sent = [...$sent, 'user', 'title', 'platform'];
+
+        $fields[$spec->vendorField('title')] = $published;
+        $sent[] = $spec->vendorField('title');
+
+        if ($spec->vendorDescription) {
+            $fields['description'] = $published;
+            $sent[] = 'description';
+        }
 
         // Step I-1.3: only a future time is a schedule — a retried or past-due target is sent for
         // immediate publishing instead of with a `scheduled_date` the vendor would reject.
@@ -583,35 +715,50 @@ class UploadPostAdapter implements PublishAdapter
             $skipped[] = 'scheduled_date';
         }
 
-        $videoAsset = $post->assets->firstWhere('type', AssetType::Video);
-        $videoUrl = $videoAsset ? $this->vendorUrl($videoAsset) : null;
-        $imageUrls = $post->assets->where('type', AssetType::Image)
-            ->map(fn (Asset $asset) => $this->vendorUrl($asset))
-            ->filter()->values()->all();
+        $media = $post->publishableMedia();
+        $videoAsset = $media->first(fn (Asset $asset) => $asset->type === AssetType::Video);
 
-        if ($videoUrl) {
+        if ($videoAsset !== null && ($videoUrl = $this->vendorUrl($videoAsset))) {
             $fields['video'] = $videoUrl;
             $sent[] = 'video';
-        } elseif ($imageUrls !== []) {
+        } elseif ($videoAsset === null && ($imageUrls = $media->map(fn (Asset $asset) => $this->vendorUrl($asset))->filter()->values()->all()) !== []) {
             $fields['photos'] = $imageUrls;
             $sent[] = 'photos';
         } else {
             $skipped[] = 'media';
         }
 
-        if (! empty($post->hashtags)) {
-            $fields['hashtags'] = $post->hashtags;
+        // Kept for compatibility; the vendor ignores it (tags are in the caption, see above).
+        if ($hashtags !== [] && $spec->hashtags) {
+            $fields['hashtags'] = $hashtags;
             $sent[] = 'hashtags';
         } else {
             $skipped[] = 'hashtags';
         }
 
-        $this->applyHashtagCaptionOverride($account->platform, $post, $fields, $sent);
+        $firstComment = $target?->effectiveFirstComment() ?? (filled($post->first_comment) ? trim((string) $post->first_comment) : null);
+
+        if ($firstComment !== null && $spec->firstComment) {
+            $fields[$spec->vendorField('first_comment')] = $firstComment;
+            $sent[] = $spec->vendorField('first_comment');
+        } else {
+            $skipped[] = 'first_comment';
+        }
+
+        if ($link !== null && $spec->linkField !== null) {
+            $fields[$spec->linkField] = $link;
+            $sent[] = $spec->linkField;
+        }
+
+        $this->applyAltText($spec, $videoAsset === null ? array_values($media->all()) : [], $fields, $sent, $skipped);
+        $this->applyFormat($format, $videoAsset !== null, $fields, $sent, $skipped);
+        $this->applyCover($spec, $post, $videoAsset, $fields, $sent);
 
         // Step 16.13 AI disclosure: Upload-Post's `is_ai_generated` alias maps to each platform's
-        // native label (TikTok `is_aigc`, Instagram, Facebook Reels). LinkedIn has no API label;
-        // it reads the C2PA credentials embedded in the vendor original, which we never re-encode.
-        // See https://docs.upload-post.com/guides/ai-content-labeling and publishing.md.
+        // native label (TikTok `is_aigc`, Instagram, Facebook Reels, YouTube synthetic media).
+        // LinkedIn has no API label; it reads the C2PA credentials embedded in the vendor
+        // original, which we never re-encode (`keep_ai_originals`). See
+        // https://docs.upload-post.com/guides/ai-content-labeling and publishing.md.
         if ($post->hasAiGeneratedMedia()) {
             $fields['is_ai_generated'] = 'true';
             $sent[] = 'is_ai_generated';
@@ -622,77 +769,137 @@ class UploadPostAdapter implements PublishAdapter
         match ($account->platform) {
             Platform::Instagram => $this->applyInstagramFields($post, $fields, $sent, $skipped),
             Platform::TikTok => $this->applyTikTokFields($post, $fields, $sent, $skipped),
-            // LinkedIn/Facebook: caption + media + schedule only (plus the hashtag-carrying
-            // title override applied above), per spec §7.1.
-            Platform::LinkedIn, Platform::Facebook => null,
+            default => $this->applyPlatformExtras($spec, $account, $caption, $link, $fields, $sent, $skipped),
         };
 
         return [$fields, $sent, $skipped];
     }
 
     /**
-     * Upload-Post has no generic `hashtags` upload parameter for *any* platform (confirmed
-     * against https://docs.upload-post.com/api/reference — the only `hashtags` field that exists
-     * anywhere in the API is on the unrelated TikTok hashtag-suggestions endpoint), so the plain
-     * `hashtags`/`hashtags[]` field built above is silently ignored by the vendor everywhere, and
-     * tags never show up on the published post regardless of platform. Every platform's caption
-     * carries hashtags as literal `#tag` text instead, appended (bare tags re-prefixed with `#`,
-     * per `Post::booted()`'s normalization) to the caption, separated by the common "dot-dash"
-     * spacer (eight lines each containing a single `-`) so the hashtag block is visually pushed
-     * below the caption's "more" fold instead of cluttering it.
+     * Alt text per image, in publish order, for platforms that accept it (`{prefix}_alt_text`, a
+     * JSON list). Only sent when at least one image has some.
      *
-     * Per the user's follow-up report and the vendor's own `-F 'title="Check out our new launch!
-     * #tech #startup #launch"'` example (https://docs.upload-post.com/api/reference), the plain
-     * `title` field — the one always sent to every platform, and the one every `[platform]_title`
-     * override documented-ly falls back to when absent — is itself expected to carry inline
-     * hashtags directly, no separate override/description field required. The generic `title`
-     * field built in `buildFields()` is therefore overwritten here (in place, so every downstream
-     * consumer — including the per-platform `[platform]_title` overrides below, which still exist
-     * for platforms that otherwise ignore `title`/`description`, e.g. Instagram) with the caption +
-     * spacer + hashtag text, instead of only ever touching a secondary override field.
+     * @param  list<Asset>  $images
+     * @param  array<string, mixed>  $fields
+     * @param  array<int, string>  $sent
+     * @param  array<int, string>  $skipped
+     */
+    private function applyAltText(PlatformSpec $spec, array $images, array &$fields, array &$sent, array &$skipped): void
+    {
+        $texts = array_map(fn (Asset $asset) => trim((string) ($asset->getRelationValue('pivot')->alt_text ?? '')), $images);
+
+        if (! $spec->altText || collect($texts)->every(fn (string $text) => $text === '')) {
+            $skipped[] = 'alt_text';
+
+            return;
+        }
+
+        $field = $spec->vendorField('alt_text');
+        $fields[$field] = (string) json_encode($texts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $sent[] = $field;
+    }
+
+    /**
+     * Step I-3.2 / M-2.3: the target's format as the vendor's media type (Instagram `media_type`
+     * IMAGE / REELS / STORIES, Facebook `facebook_media_type` POSTS / VIDEO / REELS / STORIES).
      *
-     * The per-platform overrides are still sent alongside it (same caption+hashtags text) since
-     * some platforms (Instagram in particular) are documented to render `[platform]_title` as the
-     * real caption instead of the generic `title`/`description` — see the per-platform tables in
-     * https://docs.upload-post.com/api/upload-video and https://docs.upload-post.com/api/upload-photo.
-     * Instagram explicitly ignores the generic `description` field, so it is deliberately not sent
-     * there; TikTok/Facebook/LinkedIn do render `description` as their body text, so it's sent too.
+     * @param  array<string, mixed>  $fields
+     * @param  array<int, string>  $sent
+     * @param  array<int, string>  $skipped
+     */
+    private function applyFormat(FormatSpec $format, bool $isVideo, array &$fields, array &$sent, array &$skipped): void
+    {
+        $mediaType = $isVideo && $format->vendorMediaTypeVideo !== null ? $format->vendorMediaTypeVideo : $format->vendorMediaType;
+
+        if ($mediaType === null) {
+            $skipped[] = 'media_type';
+
+            return;
+        }
+
+        $fields[$format->vendorMediaTypeField] = $mediaType;
+        $sent[] = $format->vendorMediaTypeField;
+    }
+
+    /**
+     * Step I-3.2 / M-2.3: a video's cover image (as a URL the vendor fetches) and frame offset,
+     * where the platform takes them.
      *
      * @param  array<string, mixed>  $fields
      * @param  array<int, string>  $sent
      */
-    private function applyHashtagCaptionOverride(Platform $platform, Post $post, array &$fields, array &$sent): void
+    private function applyCover(PlatformSpec $spec, Post $post, ?Asset $videoAsset, array &$fields, array &$sent): void
     {
-        if (empty($post->hashtags)) {
+        if ($videoAsset === null) {
             return;
         }
 
-        $hashtagText = collect($post->hashtags)->map(fn ($tag) => '#'.$tag)->implode(' ');
-        $spacer = implode("\n", array_fill(0, 8, '-'));
-        $caption = trim($fields['title'])."\n".$spacer."\n".$hashtagText;
+        if ($spec->coverField !== null && $post->cover_asset_id !== null) {
+            $cover = $post->relationLoaded('coverAsset') ? $post->coverAsset : $post->coverAsset()->first();
 
-        // The generic `title` field itself must carry the hashtags — per the vendor's own docs
-        // example, this is the documented, expected way to get hashtags onto a post, and it's
-        // also what every `[platform]_title` override falls back to when not explicitly set.
-        $fields['title'] = $caption;
-
-        $titleField = match ($platform) {
-            Platform::Instagram => 'instagram_title',
-            Platform::TikTok => 'tiktok_title',
-            Platform::Facebook => 'facebook_title',
-            Platform::LinkedIn => 'linkedin_title',
-        };
-
-        $fields[$titleField] = $caption;
-        $sent[] = $titleField;
-
-        // Instagram explicitly ignores `description` (docs: "The global description field is
-        // ignored for Instagram uploads") — skip sending it there. Every other platform actually
-        // renders `description` as the post's body text, so it must carry the same caption.
-        if ($platform !== Platform::Instagram) {
-            $fields['description'] = $caption;
-            $sent[] = 'description';
+            if ($cover !== null && ($url = $this->vendorUrl($cover))) {
+                $fields[$spec->coverField] = $url;
+                $sent[] = $spec->coverField;
+            }
         }
+
+        if ($spec->thumbOffsetField !== null && $post->thumb_offset_ms !== null) {
+            $fields[$spec->thumbOffsetField] = (string) $post->thumb_offset_ms;
+            $sent[] = $spec->thumbOffsetField;
+        }
+    }
+
+    /**
+     * Step I-3.4 / M-2.6: what the platforms beyond Instagram/TikTok need besides the common
+     * fields — a short title (YouTube, Pinterest), the account's registry settings (Pinterest
+     * board, Facebook Page, LinkedIn company page, Google location), a Google Business button
+     * for the link.
+     *
+     * @param  array<string, mixed>  $fields
+     * @param  array<int, string>  $sent
+     * @param  array<int, string>  $skipped
+     */
+    private function applyPlatformExtras(PlatformSpec $spec, SocialAccount $account, string $caption, ?string $link, array &$fields, array &$sent, array &$skipped): void
+    {
+        $settings = $account->platform_settings ?? [];
+
+        // A short title from the caption's first line (YouTube and Pinterest show one).
+        if ($spec->titleLimit !== null) {
+            $title = self::shortTitle($caption, $spec->titleLimit);
+            $fields[$spec->vendorField('title')] = $title !== '' ? $title : $spec->label;
+        }
+
+        // Each registry setting is keyed by the vendor field it's sent as.
+        foreach (array_keys($spec->settings) as $setting) {
+            if (filled($settings[$setting] ?? null)) {
+                $fields[$setting] = (string) $settings[$setting];
+                $sent[] = $setting;
+            } else {
+                $skipped[] = $setting;
+            }
+        }
+
+        if ($spec->platform === Platform::GoogleBusiness) {
+            $fields['gbp_topic_type'] = 'STANDARD';
+            $sent[] = 'gbp_topic_type';
+
+            if ($link !== null) {
+                $fields['gbp_cta_type'] = 'LEARN_MORE';
+                $sent[] = 'gbp_cta_type';
+            }
+        }
+
+        if ($spec->platform === Platform::YouTube) {
+            $fields['privacyStatus'] = 'public';
+            $sent[] = 'privacyStatus';
+        }
+    }
+
+    private static function shortTitle(string $caption, int $limit): string
+    {
+        $firstLine = trim((string) strtok(trim($caption), "\n"));
+
+        return mb_strlen($firstLine) > $limit ? rtrim(mb_substr($firstLine, 0, $limit - 1)).'…' : $firstLine;
     }
 
     /**
@@ -702,29 +909,12 @@ class UploadPostAdapter implements PublishAdapter
      */
     private function applyInstagramFields(Post $post, array &$fields, array &$sent, array &$skipped): void
     {
-        // Hashtag handling (via `instagram_title`) is centralized in
-        // applyHashtagCaptionOverride(), called from buildFields() for every platform.
         $locationId = $post->location['id'] ?? null;
         if ($locationId) {
             $fields['location_id'] = $locationId;
             $sent[] = 'location_id';
         } else {
             $skipped[] = 'location_id';
-        }
-
-        // media_type (REELS/IMAGE/STORIES) — STORIES isn't derivable from any existing
-        // flag/field, so only REELS (video) / IMAGE (image) are inferred from the first
-        // attached asset's type. See `.junie/modules/publishing.md` for the open question.
-        $mediaType = match ($post->assets->first()?->type) {
-            AssetType::Video => 'REELS',
-            AssetType::Image => 'IMAGE',
-            default => null,
-        };
-        if ($mediaType) {
-            $fields['media_type'] = $mediaType;
-            $sent[] = 'media_type';
-        } else {
-            $skipped[] = 'media_type';
         }
 
         $audioId = $post->music['id'] ?? null;

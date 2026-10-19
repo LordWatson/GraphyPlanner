@@ -25,6 +25,14 @@ return [
         PlatformRolloutStage::TikTok->value => env('PUBLISH_ROLLOUT_TIKTOK', true),
         PlatformRolloutStage::Facebook->value => env('PUBLISH_ROLLOUT_FACEBOOK', true),
         PlatformRolloutStage::LinkedIn->value => env('PUBLISH_ROLLOUT_LINKEDIN', true),
+        // Step I-3.4 / M-2.6: the MVP's added networks, in its order. Each has a faked-vendor
+        // publish test against the documented Upload-Post fields; switch one off via env if the
+        // live sandbox disagrees. Bluesky is deferred (see publishing.md, Capabilities).
+        PlatformRolloutStage::YouTubeShorts->value => env('PUBLISH_ROLLOUT_YOUTUBE_SHORTS', true),
+        PlatformRolloutStage::GoogleBusiness->value => env('PUBLISH_ROLLOUT_GOOGLE_BUSINESS', true),
+        PlatformRolloutStage::Threads->value => env('PUBLISH_ROLLOUT_THREADS', true),
+        PlatformRolloutStage::Pinterest->value => env('PUBLISH_ROLLOUT_PINTEREST', true),
+        PlatformRolloutStage::X->value => env('PUBLISH_ROLLOUT_X', true),
     ],
 
     /*

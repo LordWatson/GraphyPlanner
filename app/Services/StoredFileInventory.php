@@ -30,6 +30,8 @@ class StoredFileInventory
 
         return collect()
             ->merge($this->pairs(DB::table('assets')->whereIn('client_id', $clientIds), 'disk', 'path'))
+            // Step M-2.4: `ProbeAssetJob` thumbnails live on the asset's disk.
+            ->merge($this->pairs(DB::table('assets')->whereIn('client_id', $clientIds), 'disk', 'thumbnail_path'))
             ->merge($this->pairs(DB::table('brand_brains')->whereIn('client_id', $clientIds), 'persona_disk', 'persona_path'))
             ->merge($this->pairs(DB::table('invoices')->whereIn('client_id', $clientIds), 'pdf_disk', 'pdf_path'))
             ->merge($this->pairs(

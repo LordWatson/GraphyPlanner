@@ -19,6 +19,7 @@ use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
+use App\Http\Requests\OverridePostApprovalRequest;
 use App\Http\Requests\ReschedulePostRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
@@ -30,8 +31,11 @@ use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Models\PostTarget;
+use App\Models\SocialAccount;
 use App\Services\ClientHashtagService;
 use App\Services\PostNotificationService;
+use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
 use App\Support\Posts\PostMediaPresenter;
@@ -70,6 +74,7 @@ class PostController extends Controller
         ImageStudioPresenter $studio,
         ClientHashtagService $hashtags,
         ApplyCampaignDefaultsAction $defaults,
+        PlatformRolloutGate $rollout,
     ): Response {
         $this->authorize('view', $post);
 
@@ -79,6 +84,7 @@ class PostController extends Controller
             'client.brandBrain',
             'targets.socialAccount',
             'assets',
+            'coverAsset',
             'campaign',
             'activityLogs.user',
             'approvals.user',
@@ -88,7 +94,7 @@ class PostController extends Controller
 
         $client = $post->client;
         $allowedTransitions = array_values(array_filter(
-            PostStatusTransitionMap::allowedFrom($post->status),
+            PostStatusTransitionMap::allowedFor($post),
             fn (PostStatus $to) => $user->can('transition', [$post, $to]),
         ));
 
@@ -101,17 +107,30 @@ class PostController extends Controller
             // Per-platform limits travel with every selectable account (not just the post's saved
             // targets) so the editor can show caption/hashtag usage and a live readiness check the
             // moment a new channel is toggled on, before anything is saved.
-            'targetAccounts' => $client->socialAccounts()->get()->map(fn ($account) => [
-                'id' => $account->id,
-                'platform' => $account->platform->value,
-                'platform_label' => $account->platform->label(),
-                'handle' => $account->handle,
-                'display_name' => $account->display_name,
-                'timezone' => $account->timezone,
-                'caption_limit' => $account->platform->captionLimit(),
-                'max_hashtags' => $account->platform->maxHashtags(),
-                'is_text_only_capable' => $account->platform->isTextOnlyCapable(),
-            ]),
+            // Step M-2.6: an account on a platform that isn't switched on for publishing yet is
+            // only listed when the post already targets it, so it can be removed.
+            'targetAccounts' => $client->socialAccounts()->get()
+                ->filter(fn (SocialAccount $account) => $rollout->platformEnabled($account->platform)
+                    || $post->targets->contains('social_account_id', $account->id))
+                ->values()
+                ->map(fn (SocialAccount $account) => [
+                    'id' => $account->id,
+                    'platform' => $account->platform->value,
+                    'platform_label' => $account->platform->label(),
+                    'handle' => $account->handle,
+                    'display_name' => $account->display_name,
+                    'timezone' => $account->timezone,
+                    'caption_limit' => $account->platform->captionLimit(),
+                    'max_hashtags' => $account->platform->maxHashtags(),
+                    'is_text_only_capable' => $account->platform->isTextOnlyCapable(),
+                    'enabled' => $rollout->platformEnabled($account->platform),
+                    'connection_status' => $account->connection_status->value,
+                    // Step M-2.6: registry `required_settings` this account hasn't filled in.
+                    'missing_settings' => array_values(array_filter(
+                        $account->platform->spec()->requiredSettings,
+                        fn (string $setting) => blank($account->platform_settings[$setting] ?? null),
+                    )),
+                ]),
             'allowedTransitions' => array_map(
                 fn (PostStatus $to) => ['value' => $to->value, 'label' => $to->label()],
                 $allowedTransitions,
@@ -121,6 +140,8 @@ class PostController extends Controller
                 'comment' => $user->can('comment', $post),
                 'resend_review_email' => $user->can('resendReviewEmail', $post),
                 'retry_failed_targets' => $user->can('retryFailedTargets', $post),
+                // Step M-2.9: approve without the client (Owner, with a reason).
+                'override_approval' => $user->can('overrideApproval', $post),
                 'delete' => $user->can('delete', $post),
                 'create_asset' => $user->can('create', [Asset::class, $client]),
             ],
@@ -174,6 +195,19 @@ class PostController extends Controller
             'type' => 'success',
             'message' => __('Post moved to :status.', ['status' => $to->label()]),
         ]);
+
+        return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step I-3.8 / M-2.9 — an Owner approves a `client_required` post without the client, with a
+     * reason that's recorded on the approval and the activity log.
+     */
+    public function overrideApproval(OverridePostApprovalRequest $request, Post $post, TransitionPostStatusAction $action): RedirectResponse
+    {
+        $action->overrideApproval($post, $request->user(), $request->validated('reason'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Approved without the client. The reason is on the activity log.')]);
 
         return to_route('posts.edit', $post);
     }
@@ -314,6 +348,10 @@ class PostController extends Controller
     private function campaignOptions(Post $post, ApplyCampaignDefaultsAction $defaults): array
     {
         $platform = $post->targets->first()?->socialAccount?->platform->value;
+        // Step M-2.2: each channel gets the link tagged with its own platform.
+        $platforms = $post->client->socialAccounts()->pluck('platform')
+            ->map(fn ($value) => $value instanceof Platform ? $value->value : (string) $value)
+            ->all();
 
         return array_values(Campaign::query()
             ->where('client_id', $post->client_id)
@@ -325,6 +363,7 @@ class PostController extends Controller
                 'status' => $campaign->status->value,
                 'hashtags' => $campaign->hashtags ?? [],
                 'link' => $defaults->link($campaign, $platform),
+                'links' => (object) $defaults->linksFor($campaign, array_values($platforms)),
             ])
             ->all());
     }
@@ -368,19 +407,16 @@ class PostController extends Controller
             'master_caption' => $post->master_caption,
             'review_message' => $post->review_message,
             'hashtags' => $post->hashtags ?? [],
+            'link_url' => $post->link_url,
+            'first_comment' => $post->first_comment,
+            'cover_asset_id' => $post->cover_asset_id,
+            'thumb_offset_ms' => $post->thumb_offset_ms,
             'music' => $post->music,
             'location' => $post->location,
             'media_format' => PostMediaPresenter::mediaFormat($post),
             'checklist' => $evaluateChecklist($post),
-            'assets' => $post->assets->map(fn ($asset) => [
-                'id' => $asset->id,
-                'url' => $asset->url,
-                'original_filename' => $asset->original_filename,
-                'type' => $asset->type?->value,
-                'is_ai_generated' => $asset->is_ai_generated,
-                ...PostMediaPresenter::framing($asset),
-            ])->values(),
-            'targets' => $post->targets->map(fn ($target) => [
+            'assets' => $post->assets->map(fn ($asset) => PostMediaPresenter::asset($asset))->values(),
+            'targets' => $post->targets->map(fn (PostTarget $target) => [
                 'id' => $target->id,
                 'social_account_id' => $target->social_account_id,
                 'platform' => $target->socialAccount?->platform?->value,
@@ -388,6 +424,7 @@ class PostController extends Controller
                 'display_name' => $target->socialAccount?->display_name,
                 'caption_limit' => $target->socialAccount?->platform?->captionLimit(),
                 'is_text_only_capable' => $target->socialAccount?->platform?->isTextOnlyCapable() ?? false,
+                ...PostMediaPresenter::channel($target->setRelation('post', $post)),
                 'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),
                 'scheduled_local_time' => $target->scheduled_local_time,
                 'scheduled_at_utc' => $target->scheduled_at_utc?->toIso8601String(),

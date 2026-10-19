@@ -2,7 +2,9 @@
 
 namespace App\Actions\Posts;
 
+use App\Enums\ApprovalMode;
 use App\Enums\PostStatus;
+use App\Models\Post;
 
 /**
  * The explicit `Post::status` state machine (spec §4.6 / plan Step 0.9). Kept as a single
@@ -55,6 +57,10 @@ class PostStatusTransitionMap
             PostStatus::Published->value,
             PostStatus::PartiallyPublished->value,
             PostStatus::Failed->value,
+            // Step I-3.6 / M-2.5: "Unschedule" while every channel is still held by the vendor
+            // for later (`Post::canBeRecalled()`); the held publishes are cancelled first.
+            PostStatus::Approved->value,
+            PostStatus::Draft->value,
         ],
         PostStatus::Published->value => [
             PostStatus::Archived->value,
@@ -88,9 +94,48 @@ class PostStatusTransitionMap
             && in_array($from, [PostStatus::Failed, PostStatus::PartiallyPublished], true);
     }
 
+    /**
+     * Step I-3.6 / M-2.5: taking a `publishing` post back off the schedule — only allowed while
+     * nothing has gone out (`Post::canBeRecalled()`), and it cancels the vendor-held channels.
+     */
+    public static function isRecallMove(PostStatus $from, PostStatus $to): bool
+    {
+        return $from === PostStatus::Publishing && in_array($to, [PostStatus::Approved, PostStatus::Draft], true);
+    }
+
     public static function isAllowed(PostStatus $from, PostStatus $to): bool
     {
         return in_array($to->value, self::MAP[$from->value], true);
+    }
+
+    /**
+     * Step I-3.8 / M-2.9: the move for this particular post. A `client_required` post can only be
+     * approved through the client (`waiting_client`); skipping straight from internal review is an
+     * Owner-only override with a reason (`TransitionPostStatusAction::overrideApproval()`).
+     */
+    public static function isAllowedFor(Post $post, PostStatus $to, ?PostStatus $from = null): bool
+    {
+        $from ??= $post->status;
+
+        return self::isAllowed($from, $to) && ! self::needsClientApproval($post, $from, $to);
+    }
+
+    /**
+     * Whether this move would approve a `client_required` post without the client.
+     */
+    public static function needsClientApproval(Post $post, PostStatus $from, PostStatus $to): bool
+    {
+        return $post->approval_mode === ApprovalMode::ClientRequired
+            && $from === PostStatus::InternalReview
+            && $to === PostStatus::Approved;
+    }
+
+    /**
+     * @return array<int, PostStatus>
+     */
+    public static function allowedFor(Post $post): array
+    {
+        return array_values(array_filter(self::allowedFrom($post->status), fn (PostStatus $to) => self::isAllowedFor($post, $to)));
     }
 
     /**

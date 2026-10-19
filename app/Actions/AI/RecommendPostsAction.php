@@ -3,6 +3,7 @@
 namespace App\Actions\AI;
 
 use App\Contracts\AiProvider;
+use App\Enums\ApprovalMode;
 use App\Enums\PostStatus;
 use App\Models\AiPostIdea as PersistedAiPostIdea;
 use App\Models\Client;
@@ -84,6 +85,7 @@ class RecommendPostsAction
                 'org_id' => $client->org_id,
                 'client_id' => $client->id,
                 'status' => PostStatus::Idea,
+                'approval_mode' => $client->default_approval_mode ?? ApprovalMode::ClientRequired,
                 'master_caption' => $caption,
                 'hashtags' => $hashtags === [] ? null : $hashtags,
             ]);

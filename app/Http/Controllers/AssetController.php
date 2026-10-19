@@ -39,6 +39,7 @@ class AssetController extends Controller
             'data' => collect($assets->items())->map(fn (Asset $asset) => [
                 'id' => $asset->id,
                 'url' => $asset->url,
+                'thumbnail_url' => $asset->thumbnailUrl(),
                 'original_filename' => $asset->original_filename,
                 'type' => $asset->type?->value,
                 'is_ai_generated' => $asset->is_ai_generated,
@@ -74,6 +75,7 @@ class AssetController extends Controller
                 'asset' => [
                     'id' => $asset->id,
                     'url' => $asset->url,
+                    'thumbnail_url' => $asset->thumbnailUrl(),
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
                 ],

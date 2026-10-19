@@ -27,6 +27,7 @@ type ClientData = {
     start_date: string | null;
     retainer_amount: string | null;
     billing_cycle: string | null;
+    default_approval_mode: string;
     default_language: string | null;
     approval_email: string | null;
     billing_email: string | null;
@@ -37,12 +38,14 @@ type ClientData = {
 export default function ClientEdit({
     client,
     statuses,
+    approvalModes = [],
     billingCycles,
     languages,
     owners,
 }: {
     client: ClientData;
     statuses: Option[];
+    approvalModes?: Option[];
     billingCycles: Option[];
     languages: Option[];
     owners: Option[];
@@ -137,6 +140,41 @@ export default function ClientEdit({
                                     </SelectContent>
                                 </Select>
                                 <InputError message={errors.status} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="default_approval_mode">
+                                    New posts need
+                                </Label>
+                                <Select
+                                    name="default_approval_mode"
+                                    defaultValue={client.default_approval_mode}
+                                >
+                                    <SelectTrigger
+                                        id="default_approval_mode"
+                                        className="w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {approvalModes.map((mode) => (
+                                            <SelectItem
+                                                key={mode.value}
+                                                value={mode.value}
+                                            >
+                                                {mode.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">
+                                    With client approval required, only the
+                                    client (or an Owner, with a reason) can
+                                    approve a post.
+                                </p>
+                                <InputError
+                                    message={errors.default_approval_mode}
+                                />
                             </div>
 
                             <div className="grid gap-2">

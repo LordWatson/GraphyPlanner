@@ -1,9 +1,9 @@
 import { useForm } from '@inertiajs/react';
-import { Plus, Share2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
-import { platformIcon } from '@/components/clients/client-layout';
+import { platformIcon } from '@/components/platform-icon';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -143,9 +143,9 @@ export function NewPostDialog({
                         ) : (
                             <div className="flex flex-wrap gap-2">
                                 {targetAccounts.map((account) => {
-                                    const AccountIcon =
-                                        platformIcon[account.platform] ??
-                                        Share2;
+                                    const AccountIcon = platformIcon(
+                                        account.platform,
+                                    );
                                     const selected =
                                         form.data.account_ids.includes(
                                             account.id,

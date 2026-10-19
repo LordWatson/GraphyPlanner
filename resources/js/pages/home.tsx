@@ -39,6 +39,8 @@ type DisconnectedAccountRow = {
     handle: string;
     connection_status: string;
     connection_status_label: string;
+    /** Step M-2.7: why a still-connected account is here (its connection is expiring). */
+    reason?: string | null;
 };
 
 /** Step I-2.2: each lane carries a bounded page of rows plus the lane's full count. */
@@ -304,8 +306,8 @@ export default function Home({ items }: HomeProps) {
                         id="lane-accounts"
                         index="02 — Accounts"
                         icon={WifiOff}
-                        title="Disconnected accounts"
-                        description="Social accounts needing reconnection"
+                        title="Accounts to reconnect"
+                        description="Disconnected, or connections about to expire"
                         count={items.disconnectedAccounts.total}
                         shown={items.disconnectedAccounts.items.length}
                         accentClassName="bg-warning/12 text-warning"
@@ -327,11 +329,20 @@ export default function Home({ items }: HomeProps) {
                                             {account.handle}
                                         </span>
                                     </span>
-                                    <StatusPill
-                                        kind="connection"
-                                        value={account.connection_status}
-                                        label={account.connection_status_label}
-                                    />
+                                    {account.reason ? (
+                                        <span className="text-warning flex shrink-0 items-center gap-1.5 text-xs font-medium">
+                                            <Clock className="size-3.5" />
+                                            {account.reason}
+                                        </span>
+                                    ) : (
+                                        <StatusPill
+                                            kind="connection"
+                                            value={account.connection_status}
+                                            label={
+                                                account.connection_status_label
+                                            }
+                                        />
+                                    )}
                                 </Link>
                             </li>
                         ))}

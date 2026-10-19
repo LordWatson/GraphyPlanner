@@ -89,4 +89,19 @@ return [
         'pdf', 'doc', 'docx', 'ppt', 'pptx', 'zip',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Media probing (Step I-3.5 / M-2.4)
+    |--------------------------------------------------------------------------
+    |
+    | `ProbeAssetJob` reads a video's size, length and codec with ffprobe and grabs a thumbnail
+    | frame with ffmpeg. Without the binaries videos stay unprobed and the checklist skips the
+    | length/shape checks it can't make (images are probed with GD either way).
+    |
+    */
+
+    'ffprobe_path' => env('FFPROBE_PATH', 'ffprobe'),
+
+    'ffmpeg_path' => env('FFMPEG_PATH', 'ffmpeg'),
+
 ];

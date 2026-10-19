@@ -18,6 +18,12 @@ enum PlatformRolloutStage: string
     case TikTok = 'tiktok';
     case Facebook = 'facebook';
     case LinkedIn = 'linkedin';
+    // Step I-3.4 / M-2.6, in the MVP's order.
+    case YouTubeShorts = 'youtube_shorts';
+    case GoogleBusiness = 'google_business';
+    case Threads = 'threads';
+    case Pinterest = 'pinterest';
+    case X = 'x';
 
     public function label(): string
     {
@@ -27,6 +33,11 @@ enum PlatformRolloutStage: string
             self::TikTok => 'TikTok',
             self::Facebook => 'Facebook',
             self::LinkedIn => 'LinkedIn',
+            self::YouTubeShorts => 'YouTube Shorts',
+            self::GoogleBusiness => 'Google Business Profile',
+            self::Threads => 'Threads',
+            self::Pinterest => 'Pinterest',
+            self::X => 'X',
         };
     }
 
@@ -38,6 +49,29 @@ enum PlatformRolloutStage: string
      */
     public static function order(): array
     {
-        return [self::InstagramFeed, self::InstagramReels, self::TikTok, self::Facebook, self::LinkedIn];
+        return [
+            self::InstagramFeed, self::InstagramReels, self::TikTok, self::Facebook, self::LinkedIn,
+            self::YouTubeShorts, self::GoogleBusiness, self::Threads, self::Pinterest, self::X,
+        ];
+    }
+
+    /**
+     * The stages that belong to a platform — publishing to it is "on" when any of them is.
+     *
+     * @return list<self>
+     */
+    public static function forPlatform(Platform $platform): array
+    {
+        return match ($platform) {
+            Platform::Instagram => [self::InstagramFeed, self::InstagramReels],
+            Platform::TikTok => [self::TikTok],
+            Platform::Facebook => [self::Facebook],
+            Platform::LinkedIn => [self::LinkedIn],
+            Platform::YouTube => [self::YouTubeShorts],
+            Platform::GoogleBusiness => [self::GoogleBusiness],
+            Platform::Threads => [self::Threads],
+            Platform::Pinterest => [self::Pinterest],
+            Platform::X => [self::X],
+        };
     }
 }

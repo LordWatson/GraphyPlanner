@@ -3,6 +3,7 @@
 namespace App\Actions\SocialAccounts;
 
 use App\Contracts\PublishAdapter;
+use App\Models\ConnectInvite;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\ConnectStateStore;
@@ -24,9 +25,16 @@ class ConnectSocialAccountAction
         private readonly ConnectStateStore $states = new ConnectStateStore,
     ) {}
 
-    public function __invoke(SocialAccount $socialAccount, ?User $user = null): string
+    /**
+     * Step M-2.8: `$via` marks a connection a client started themselves — `invite` (a self-connect
+     * link, `$invite` set) or `portal` — so the callback can record it and tell the agency.
+     */
+    public function __invoke(SocialAccount $socialAccount, ?User $user = null, ?ConnectInvite $invite = null, ?string $via = null): string
     {
-        $state = $this->states->issue($socialAccount, $user, self::STATE_FLOW);
+        $state = $this->states->issue($socialAccount, $user, self::STATE_FLOW, array_filter([
+            'connect_invite_id' => $invite?->id,
+            'via' => $via ?? ($invite !== null ? 'invite' : null),
+        ]));
 
         return $this->adapter->connectAccount($socialAccount, $state);
     }

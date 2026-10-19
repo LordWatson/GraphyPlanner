@@ -8,17 +8,13 @@ import {
     CalendarDays,
     ChevronDown,
     Clapperboard,
-    Facebook,
     FileImage,
     Globe,
-    Instagram,
     Languages,
     Lightbulb,
     LineChart as LineChartIcon,
-    Linkedin,
     Mail,
     MoreHorizontal,
-    Music2,
     NotebookPen,
     Pencil,
     Receipt,
@@ -28,6 +24,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { usePlatforms } from '@/lib/platforms';
 import { useState } from 'react';
 import { PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
@@ -129,19 +126,21 @@ export type ClientPageProps = {
     };
 };
 
-export const platformOptions = [
-    { value: 'instagram', label: 'Instagram' },
-    { value: 'tiktok', label: 'TikTok' },
-    { value: 'facebook', label: 'Facebook' },
-    { value: 'linkedin', label: 'LinkedIn' },
-];
+/**
+ * Step M-2.1: platform choices come from the capability registry (`config/platforms.php`). Pass
+ * `enabledOnly` for anything that creates something new (an account), so a network that isn't
+ * switched on for publishing yet isn't offered; filters keep every platform so old data still
+ * matches.
+ */
+export function usePlatformOptions(
+    enabledOnly = false,
+): { value: string; label: string }[] {
+    const registry = usePlatforms();
 
-export const platformIcon: Record<string, typeof Instagram> = {
-    instagram: Instagram,
-    tiktok: Music2,
-    facebook: Facebook,
-    linkedin: Linkedin,
-};
+    return Object.values(registry)
+        .filter((platform) => !enabledOnly || platform.enabled)
+        .map((platform) => ({ value: platform.value, label: platform.label }));
+}
 
 /**
  * Reads Laravel's `XSRF-TOKEN` cookie so plain `fetch()` calls can authenticate as a normal

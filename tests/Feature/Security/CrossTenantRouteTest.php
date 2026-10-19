@@ -17,6 +17,7 @@ use App\Models\CampaignShareLink;
 use App\Models\CampaignTemplate;
 use App\Models\Client;
 use App\Models\ClientInvitation;
+use App\Models\ConnectInvite;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Organization;
@@ -50,7 +51,7 @@ class CrossTenantRouteTest extends TestCase
      */
     private const SKIPPED_PREFIXES = [
         'preview', 'super-admin', 'email/verify', 'reset-password', 'review/', 'client-invite/',
-        'staff-invite/', 'notifications/', 'user/passkeys', 'files/', 'storage/',
+        'staff-invite/', 'connect/', 'notifications/', 'user/passkeys', 'files/', 'storage/',
     ];
 
     /**
@@ -184,6 +185,7 @@ class CrossTenantRouteTest extends TestCase
             CampaignTemplate::class => CampaignTemplate::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'name' => 'Their template', 'duration_days' => 14, 'phases' => [], 'deliverables' => []]),
             Asset::class => Asset::factory()->for($client)->create(['org_id' => $org->id]),
             SocialAccount::class => SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]),
+            ConnectInvite::class => ConnectInvite::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'client_id' => $client->id, 'token_hash' => hash('sha256', 'foreign-connect'), 'expires_at' => now()->addDay()]),
             Invoice::class => $invoice,
             InvoiceItem::class => InvoiceItem::factory()->create(['invoice_id' => $invoice->id, 'org_id' => $org->id]),
             ClientInvitation::class => ClientInvitation::factory()->create(['client_id' => $client->id]),

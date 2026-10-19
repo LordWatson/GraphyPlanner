@@ -33,6 +33,13 @@ import {
 } from '@/components/social-preview/media';
 import type { Crop, MediaFormat, MediaFrame } from '@/lib/media-format';
 import { describeRatio, frameFor, publishedCaption } from '@/lib/media-format';
+import type { PlatformFormat } from '@/lib/platforms';
+import {
+    capabilityOf,
+    platformLabelOf,
+    resolveFormat,
+    usePlatforms,
+} from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 
 export type PreviewTarget = {
@@ -41,13 +48,15 @@ export type PreviewTarget = {
     handle: string;
     /** The page/profile name Facebook and LinkedIn lead with; falls back to the handle. */
     display_name?: string | null;
-};
-
-const platformLabel: Record<string, string> = {
-    instagram: 'Instagram',
-    tiktok: 'TikTok',
-    facebook: 'Facebook',
-    linkedin: 'LinkedIn',
+    /** Step M-2.2: this channel's own caption / hashtags / link / first comment (null = master). */
+    caption?: string | null;
+    hashtags?: string[] | null;
+    link?: string | null;
+    firstComment?: string | null;
+    /** Step M-2.3: the channel's explicit format (null = Auto, from the media). */
+    format?: string | null;
+    /** The caption exactly as the server will publish it (review link, portal). */
+    publishedCaption?: string | null;
 };
 
 type LayoutProps = {
@@ -61,6 +70,7 @@ type LayoutProps = {
     musicName?: string;
     locationName?: string;
     showSafeZones: boolean;
+    firstComment?: string | null;
 };
 
 function Avatar({ label, className }: { label: string; className?: string }) {
@@ -117,6 +127,7 @@ function InstagramFeed({
     aspects,
     musicName,
     locationName,
+    firstComment,
 }: LayoutProps) {
     const [index, setIndex] = useState(0);
     const subline = musicName ? `♫ ${musicName}` : locationName;
@@ -189,6 +200,7 @@ function InstagramFeed({
                     Just now
                 </span>
             </div>
+            <FirstComment handle={handle} text={firstComment} />
         </div>
     );
 }
@@ -415,12 +427,14 @@ function FeedMedia({
 
 function FacebookPost({
     name,
+    handle,
     caption,
     media,
     frame,
     crops,
     aspects,
     locationName,
+    firstComment,
 }: LayoutProps) {
     return (
         <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
@@ -471,6 +485,7 @@ function FacebookPost({
                     <Share2 className="size-4" /> Share
                 </span>
             </div>
+            <FirstComment handle={name || handle} text={firstComment} />
         </div>
     );
 }
@@ -483,6 +498,7 @@ function LinkedInPost({
     frame,
     crops,
     aspects,
+    firstComment,
 }: LayoutProps) {
     return (
         <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
@@ -535,50 +551,340 @@ function LinkedInPost({
                     </span>
                 ))}
             </div>
+            <FirstComment handle={name} text={firstComment} />
         </div>
     );
 }
 
-/** What the preview is showing, e.g. "Feed · 4:5", "Reel", "Photo mode · 3 slides". */
+/** The first comment, as it appears under the post (Step M-2.2). */
+function FirstComment({
+    handle,
+    text,
+}: {
+    handle: string;
+    text?: string | null;
+}) {
+    if (!text) {
+        return null;
+    }
+
+    return (
+        <div className="border-border/70 flex items-start gap-2 border-t px-3 py-2.5 text-[12px]">
+            <Avatar label={handle} className="size-6 text-[10px]" />
+            <p
+                className="min-w-0 leading-snug break-words whitespace-pre-wrap"
+                dir="auto"
+            >
+                <span className="me-1 font-semibold">
+                    {handle || 'your_handle'}
+                </span>
+                {text}
+                <span className="text-muted-foreground mt-0.5 block font-mono text-[10px] uppercase">
+                    First comment
+                </span>
+            </p>
+        </div>
+    );
+}
+
+/** Instagram / Facebook Stories: full screen, progress bar, no caption on the media. */
+function StoryScreen({
+    handle,
+    media,
+    frame,
+    crops,
+    aspects,
+    showSafeZones,
+    platform,
+}: LayoutProps & { platform: string }) {
+    return (
+        <VerticalScreen showSafeZones={showSafeZones} platform={platform}>
+            <Slides
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+                index={0}
+                fill
+            />
+            <div className="from-ink/60 absolute inset-x-0 top-0 h-24 bg-gradient-to-b to-transparent" />
+            <div className="absolute inset-x-3 top-2.5 grid gap-2">
+                <span className="bg-cream/40 h-0.5 overflow-hidden rounded-full">
+                    <span className="bg-cream block h-full w-1/3" />
+                </span>
+                <span className="flex items-center gap-2 text-[12px] font-semibold">
+                    <Avatar label={handle} className="size-7" />
+                    {handle || 'your_handle'}
+                    <span className="text-cream/70 font-normal">Just now</span>
+                    <X className="ms-auto size-5" />
+                </span>
+            </div>
+            <div className="absolute inset-x-3 bottom-3 flex items-center gap-2">
+                <span className="border-cream/70 text-cream/80 flex-1 rounded-full border px-3 py-1.5 text-[12px]">
+                    Send message
+                </span>
+                <Heart className="size-5" />
+                <Send className="size-5" />
+            </div>
+        </VerticalScreen>
+    );
+}
+
+/** YouTube Shorts: full screen with the title over the bottom and the action rail. */
+function YouTubeShort({
+    handle,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    showSafeZones,
+    title,
+}: LayoutProps & { title: string }) {
+    return (
+        <VerticalScreen showSafeZones={showSafeZones} platform="youtube">
+            <Slides
+                media={media}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+                index={0}
+                fill
+            />
+            <div className="from-ink/85 to-ink/20 absolute inset-0 bg-gradient-to-t via-transparent" />
+            <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3 font-semibold">
+                <span className="text-base">Shorts</span>
+                <Search className="size-5" />
+            </div>
+            <div className="absolute right-2.5 bottom-16 flex flex-col items-center gap-4">
+                <RailAction icon={ThumbsUp} label="Like" />
+                <RailAction icon={MessageSquare} label="Comments" />
+                <RailAction icon={Share2} label="Share" />
+                <RailAction icon={Repeat2} label="Remix" />
+            </div>
+            <div className="absolute right-14 bottom-3 left-3 grid gap-1.5">
+                <span className="flex items-center gap-2 text-[12px] font-semibold">
+                    <Avatar label={handle} className="size-6" />
+                    {handle ? `@${handle.replace(/^@/, '')}` : '@your_channel'}
+                    <span className="bg-cream text-ink rounded-full px-2 py-0.5 text-[10px]">
+                        Subscribe
+                    </span>
+                </span>
+                <p className="line-clamp-2 text-[13px] font-medium" dir="auto">
+                    {title || 'Your Short’s title'}
+                </p>
+                <FoldedCaption
+                    text={caption}
+                    platform="youtube"
+                    onMedia
+                    className="text-cream/80 text-[11px]"
+                />
+            </div>
+        </VerticalScreen>
+    );
+}
+
+/** X and Threads: a text-first post with media below. */
+function MicroPost({
+    name,
+    handle,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    firstComment,
+    platform,
+}: LayoutProps & { platform: string }) {
+    const isX = platform === 'x';
+
+    return (
+        <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
+            <div className="flex gap-2.5 px-3 pt-3 pb-2">
+                <Avatar label={name} className="size-9" />
+                <div className="grid min-w-0 flex-1 gap-1.5">
+                    <span className="flex min-w-0 items-baseline gap-1.5 leading-tight">
+                        <span className="truncate font-semibold">
+                            {name || 'Your account'}
+                        </span>
+                        {isX && (
+                            <span className="text-muted-foreground truncate text-[12px]">
+                                {handle
+                                    ? `@${handle.replace(/^@/, '')}`
+                                    : '@you'}{' '}
+                                · now
+                            </span>
+                        )}
+                        {!isX && (
+                            <span className="text-muted-foreground text-[12px]">
+                                now
+                            </span>
+                        )}
+                        <MoreHorizontal className="text-muted-foreground ms-auto size-4 shrink-0" />
+                    </span>
+                    <FoldedCaption text={caption} platform={platform} />
+                    {media.length > 0 && (
+                        <div className="overflow-hidden rounded-xl">
+                            <FeedMedia
+                                media={media}
+                                frame={frame}
+                                crops={crops}
+                                aspects={aspects}
+                            />
+                        </div>
+                    )}
+                    <span className="text-muted-foreground flex items-center justify-between py-1 pe-6">
+                        <MessageCircle className="size-4" />
+                        <Repeat2 className="size-4" />
+                        <Heart className="size-4" />
+                        {isX ? (
+                            <Bookmark className="size-4" />
+                        ) : (
+                            <Send className="size-4" />
+                        )}
+                    </span>
+                </div>
+            </div>
+            <FirstComment handle={handle} text={firstComment} />
+        </div>
+    );
+}
+
+/** Pinterest: the Pin image, then its title and description. */
+function PinterestPin({
+    name,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    title,
+    link,
+}: LayoutProps & { title: string; link?: string | null }) {
+    return (
+        <div className="bg-card text-foreground w-full max-w-[300px] text-[13px]">
+            <div className="relative overflow-hidden rounded-2xl">
+                <Slides
+                    media={media}
+                    frame={frame}
+                    crops={crops}
+                    aspects={aspects}
+                    index={0}
+                />
+                <span className="bg-destructive text-cream absolute top-2.5 right-2.5 rounded-full px-3 py-1.5 text-xs font-semibold">
+                    Save
+                </span>
+                {link && (
+                    <span className="bg-cream/90 text-ink absolute bottom-2.5 left-2.5 max-w-[80%] truncate rounded-full px-2.5 py-1 text-[11px] font-medium">
+                        {link.replace(/^https?:\/\//, '')}
+                    </span>
+                )}
+            </div>
+            <div className="grid gap-1 px-1 pt-2">
+                <span className="line-clamp-2 font-semibold" dir="auto">
+                    {title || 'Your Pin title'}
+                </span>
+                <FoldedCaption
+                    text={caption}
+                    platform="pinterest"
+                    className="text-muted-foreground text-[12px]"
+                />
+                <span className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+                    <Avatar label={name} className="size-5 text-[9px]" />
+                    {name || 'Your profile'}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+/** Google Business Profile: an update card on the business listing. */
+function GoogleBusinessPost({
+    name,
+    caption,
+    media,
+    frame,
+    crops,
+    aspects,
+    link,
+}: LayoutProps & { link?: string | null }) {
+    return (
+        <div className="border-border bg-card text-foreground w-full overflow-hidden rounded-xl border text-[13px]">
+            <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+                <Avatar label={name} className="size-9" />
+                <div className="grid min-w-0 leading-tight">
+                    <span className="truncate font-semibold">
+                        {name || 'Your business'}
+                    </span>
+                    <span className="text-muted-foreground text-[11px]">
+                        Update · Just now
+                    </span>
+                </div>
+            </div>
+            <FeedMedia
+                media={media.slice(0, 1)}
+                frame={frame}
+                crops={crops}
+                aspects={aspects}
+            />
+            <FoldedCaption
+                text={caption}
+                platform="google_business"
+                className="px-3 pt-2.5 pb-2"
+            />
+            {link && (
+                <div className="px-3 pb-3">
+                    <span className="border-border text-info inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold">
+                        Learn more
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** What the preview is showing, e.g. "Feed post · 4:5", "Reel", "Carousel · 3 slides". */
 function describePlacement(
-    platform: string,
+    format: PlatformFormat | undefined,
     media: PreviewAsset[],
     frame: MediaFrame,
 ): string {
-    const video = media.length > 0 && isVideoAsset(media[0]);
-
-    if (platform === 'tiktok') {
-        if (media.length === 0) {
-            return 'Needs media';
-        }
-
-        return video
-            ? 'Video'
-            : `Photo mode${media.length > 1 ? ` · ${media.length} slides` : ''}`;
-    }
-
-    if (platform === 'instagram' && video) {
-        return 'Reel';
-    }
+    const label = format?.label ?? 'Post';
 
     if (media.length === 0) {
-        return 'Text post';
+        return format && format.min_items > 0
+            ? `${label} · needs media`
+            : 'Text post';
     }
 
-    if (media.length > 1) {
-        return platform === 'instagram'
-            ? `Carousel · ${describeRatio(frame.ratio)}`
-            : `${media.length} images`;
+    if (format?.vertical || isVideoAsset(media[0])) {
+        return media.length > 1 && !isVideoAsset(media[0])
+            ? `${label} · ${media.length} slides`
+            : label;
     }
 
-    return `${video ? 'Video' : 'Image'} · ${describeRatio(frame.ratio)}`;
+    return media.length > 1
+        ? `${label} · ${media.length} slides`
+        : `${label} · ${describeRatio(frame.ratio)}`;
+}
+
+/** First line of a caption, cut to a platform's title limit (YouTube, Pinterest). */
+function shortTitle(caption: string, limit: number | null): string {
+    const first = caption.trim().split('\n')[0]?.trim() ?? '';
+
+    return limit && first.length > limit
+        ? `${first.slice(0, limit - 1).trimEnd()}…`
+        : first;
 }
 
 /**
  * Live, Planable-style preview of how a post renders on one channel. Purely presentational —
  * driven by the editor's own state (caption, hashtags, media, format, framing), so it updates as
- * the user types with no network round-trip. Media is framed by the same rules the publisher
- * crops with (`lib/media-format.ts`), and the caption is the exact text that publishes.
+ * the user types with no network round-trip. Since Step M-2.2 / M-2.3 each channel can carry its
+ * own caption, hashtags, link, first comment and format (`target`), and everything about the
+ * platform (label, caption fold, link and hashtag policy, formats) comes from the capability
+ * registry (`usePlatforms()`). Media is framed by the same rules the publisher crops with
+ * (`lib/media-format.ts`), and the caption is the exact text that publishes.
  */
 export function SocialPostPreview({
     target,
@@ -602,25 +908,42 @@ export function SocialPostPreview({
     mediaFormat?: MediaFormat;
     /** Framing per asset id, overriding each asset's saved `crop` (unsaved editor edits). */
     crops?: Record<number, Crop>;
-    /** Outline where TikTok/Reels chrome covers full-screen media. */
+    /** Outline where full-screen app chrome covers the media. */
     showSafeZones?: boolean;
     className?: string;
 }) {
     const platform = target.platform;
+    const registry = usePlatforms();
+    const capability = capabilityOf(registry, platform);
     const aspects = useMediaAspects();
     const media = publishableMedia(assets);
     const first = media[0];
+    const kinds = media.map((asset) =>
+        isVideoAsset(asset) ? 'video' : 'image',
+    );
+    const format = resolveFormat(capability, target.format, kinds);
     const frame = frameFor(
         platform,
         mediaFormat?.[platform],
         aspects.aspectOf(first),
         first ? isVideoAsset(first) : false,
+        format,
     );
+    const ownCaption = target.caption ?? caption;
+    const published =
+        target.publishedCaption ??
+        publishedCaption(
+            ownCaption,
+            target.hashtags ?? hashtags,
+            capability,
+            target.link,
+        );
+    const firstComment = capability.first_comment ? target.firstComment : null;
 
     const props: LayoutProps = {
         handle: target.handle,
         name: target.display_name || target.handle,
-        caption: publishedCaption(caption, hashtags),
+        caption: published,
         media,
         frame,
         crops,
@@ -628,10 +951,38 @@ export function SocialPostPreview({
         musicName,
         locationName,
         showSafeZones,
+        firstComment,
     };
-
+    const title = shortTitle(ownCaption, capability.title_limit);
     const Icon = platformIcon(platform);
-    const isReel = platform === 'instagram' && first && isVideoAsset(first);
+    const isStory = format?.crop_to === '9:16';
+
+    const layout = (() => {
+        switch (true) {
+            case platform === 'tiktok':
+                return <TikTokPost {...props} />;
+            case platform === 'youtube':
+                return <YouTubeShort {...props} title={title} />;
+            case isStory:
+                return <StoryScreen {...props} platform={platform} />;
+            case Boolean(format?.vertical):
+                return <InstagramReel {...props} />;
+            case platform === 'instagram':
+                return <InstagramFeed {...props} />;
+            case platform === 'linkedin':
+                return <LinkedInPost {...props} />;
+            case platform === 'x' || platform === 'threads':
+                return <MicroPost {...props} platform={platform} />;
+            case platform === 'pinterest':
+                return (
+                    <PinterestPin {...props} title={title} link={target.link} />
+                );
+            case platform === 'google_business':
+                return <GoogleBusinessPost {...props} link={target.link} />;
+            default:
+                return <FacebookPost {...props} />;
+        }
+    })();
 
     return (
         <div
@@ -642,21 +993,11 @@ export function SocialPostPreview({
         >
             <span className="eyebrow text-muted-foreground inline-flex items-center gap-1.5">
                 <Icon className="size-3.5" />
-                {platformLabel[platform] ?? platform}
+                {platformLabelOf(registry, platform)}
                 <span aria-hidden>·</span>
-                <span>{describePlacement(platform, media, frame)}</span>
+                <span>{describePlacement(format, media, frame)}</span>
             </span>
-            {platform === 'tiktok' ? (
-                <TikTokPost {...props} />
-            ) : isReel ? (
-                <InstagramReel {...props} />
-            ) : platform === 'instagram' ? (
-                <InstagramFeed {...props} />
-            ) : platform === 'linkedin' ? (
-                <LinkedInPost {...props} />
-            ) : (
-                <FacebookPost {...props} />
-            )}
+            {layout}
         </div>
     );
 }

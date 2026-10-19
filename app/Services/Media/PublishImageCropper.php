@@ -6,7 +6,9 @@ use App\Enums\MediaRatio;
 use App\Enums\Platform;
 use App\Models\Asset;
 use App\Models\Post;
+use App\Services\Publishing\PlatformCapabilities;
 use App\Support\Media\CropBox;
+use App\Support\Publishing\FormatSpec;
 use Illuminate\Support\Facades\Log;
 use Intervention\Image\Encoders\AutoEncoder;
 use Intervention\Image\ImageManager;
@@ -43,22 +45,30 @@ class PublishImageCropper
      * The width ÷ height every image is cut to on this channel, or null to send them untouched.
      *
      * @param  array{0: int, 1: int}|null  $firstImageSize  the first image's pixel size, when known
+     * @param  FormatSpec|null  $format  the target's format; resolved from the post's media when null
      */
-    public function targetRatio(Post $post, Platform $platform, ?array $firstImageSize): ?float
+    public function targetRatio(Post $post, Platform $platform, ?array $firstImageSize, ?FormatSpec $format = null): ?float
     {
+        $format ??= app(PlatformCapabilities::class)->resolveFormat($platform, null, $post->mediaKinds());
+
+        if ($format->cropTo !== null && ($forced = MediaRatio::tryFrom($format->cropTo)?->quotient()) !== null) {
+            return $forced;
+        }
+
         $ratio = $post->mediaRatioFor($platform);
 
         if ($ratio->quotient() !== null) {
             return $ratio->quotient();
         }
 
-        if ($platform !== Platform::Instagram || $firstImageSize === null || $firstImageSize[1] <= 0) {
+        if ($format->aspect === null || $firstImageSize === null || $firstImageSize[1] <= 0) {
             return null;
         }
 
+        [$min, $max] = $format->aspect;
         $aspect = $firstImageSize[0] / $firstImageSize[1];
 
-        return min(MediaRatio::INSTAGRAM_MAX, max(MediaRatio::INSTAGRAM_MIN, $aspect));
+        return min($max, max($min, $aspect));
     }
 
     /**

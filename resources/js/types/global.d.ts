@@ -1,3 +1,4 @@
+import type { PlatformRegistry } from '@/lib/platforms';
 import type { Auth } from '@/types/auth';
 
 declare module 'react' {
@@ -15,6 +16,8 @@ declare module '@inertiajs/core' {
             preview: boolean;
             unreadNotificationsCount: number;
             currency: string;
+            /** Step M-2.1: the platform capability registry (`usePlatforms()`). */
+            platforms: PlatformRegistry;
             [key: string]: unknown;
         };
     }

@@ -3,12 +3,24 @@ import type { Crop, MediaFormat } from '@/lib/media-format';
 
 /** Prop shapes sent by `PostController::edit` to the `posts/edit` page. */
 
+/** A one-click correction the checklist offers (Step M-2.3 / M-2.4). */
+export type ChecklistFix = {
+    action: 'format' | 'media_format';
+    label: string;
+    value: string;
+    social_account_id?: number;
+    platform?: string;
+};
+
 export type ChecklistItem = {
     key: string;
     label: string;
     passed: boolean;
     /** Campaigns enhancement C-4.2: a warning, never a blocker. */
     soft?: boolean;
+    /** Which channels fail and why, one per line. */
+    detail?: string;
+    fixes?: ChecklistFix[];
 };
 
 export type Checklist = { items: ChecklistItem[]; passed: boolean };
@@ -28,6 +40,16 @@ export type TargetData = {
     status_label: string;
     external_post_id: string | null;
     error: string | null;
+    /** Step M-2.2: this channel's overrides (null = uses the master). */
+    caption_override: string | null;
+    hashtags_override: string[] | null;
+    first_comment: string | null;
+    link_url: string | null;
+    /** Step M-2.3: the explicit format (null = Auto) and what it resolves to. */
+    format: string | null;
+    resolved_format: string | null;
+    published_caption: string;
+    is_customized: boolean;
 };
 
 export type ActivityLogData = {
@@ -61,6 +83,12 @@ export type CommentData = {
 export type AssetData = {
     id: number;
     url: string | null;
+    /** Step M-2.4: a small preview for lists and grids (`ProbeAssetJob`), when made. */
+    thumbnail_url?: string | null;
+    size?: number | null;
+    duration_ms?: number | null;
+    /** Alt text on this post (`post_assets.alt_text`). */
+    alt_text?: string | null;
     original_filename: string | null;
     type: string | null;
     /** Made in the AI Image Studio (Phase 16): shown with an "AI" label tag. */
@@ -83,6 +111,12 @@ export type PostData = {
     master_caption: string | null;
     review_message: string | null;
     hashtags: string[];
+    /** Step M-2.2: the master link and first comment every channel inherits. */
+    link_url: string | null;
+    first_comment: string | null;
+    /** Step M-2.3: a video's cover image and frame offset. */
+    cover_asset_id: number | null;
+    thumb_offset_ms: number | null;
     music: Record<string, unknown> | null;
     location: Record<string, unknown> | null;
     /** Image format per channel, defaults filled in. */
@@ -105,7 +139,42 @@ export type TargetAccountData = {
     caption_limit: number;
     max_hashtags: number;
     is_text_only_capable: boolean;
+    /** Step M-2.6: publishing switched on for this platform (rollout flag). */
+    enabled?: boolean;
+    connection_status?: string;
+    /** Required registry settings this account hasn't filled in (e.g. a Pinterest board). */
+    missing_settings?: string[];
 };
+
+/**
+ * Step M-2.2 / M-2.3 — one channel's own content in the editor. `null` = uses the master; an
+ * empty string / list = deliberately none on this channel.
+ */
+export type ChannelState = {
+    caption: string | null;
+    hashtags: string[] | null;
+    firstComment: string | null;
+    link: string | null;
+    format: string | null;
+};
+
+export const EMPTY_CHANNEL: ChannelState = {
+    caption: null,
+    hashtags: null,
+    firstComment: null,
+    link: null,
+    format: null,
+};
+
+export function isCustomized(channel: ChannelState | undefined): boolean {
+    return Boolean(
+        channel &&
+        (channel.caption !== null ||
+            channel.hashtags !== null ||
+            channel.firstComment !== null ||
+            channel.link !== null),
+    );
+}
 
 export type TransitionOption = { value: string; label: string };
 

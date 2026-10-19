@@ -1,5 +1,16 @@
 import type { LucideIcon } from 'lucide-react';
-import { Facebook, Instagram, Linkedin, Music2, Share2 } from 'lucide-react';
+import {
+    AtSign,
+    Facebook,
+    Instagram,
+    Linkedin,
+    Music2,
+    Pin,
+    Share2,
+    Store,
+    Twitter,
+    Youtube,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const platformIcons: Record<string, LucideIcon> = {
@@ -7,6 +18,11 @@ const platformIcons: Record<string, LucideIcon> = {
     tiktok: Music2,
     facebook: Facebook,
     linkedin: Linkedin,
+    youtube: Youtube,
+    google_business: Store,
+    threads: AtSign,
+    pinterest: Pin,
+    x: Twitter,
 };
 
 export function platformIcon(platform: string | null | undefined): LucideIcon {

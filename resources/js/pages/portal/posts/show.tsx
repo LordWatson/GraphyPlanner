@@ -35,6 +35,10 @@ type TargetData = {
     handle: string | null;
     scheduled_local_date: string | null;
     scheduled_local_time: string | null;
+    /** Step M-2.2 / M-2.3: exactly what publishes on this channel. */
+    published_caption?: string;
+    first_comment?: string | null;
+    format?: string | null;
 };
 
 type CommentData = {
@@ -129,6 +133,9 @@ export default function PortalPostShow({
         id: t.social_account_id ?? i,
         platform: t.platform ?? '',
         handle: t.handle ?? '',
+        publishedCaption: t.published_caption,
+        firstComment: t.first_comment,
+        format: t.format,
     }));
 
     const [previewTargetId, setPreviewTargetId] = useState<

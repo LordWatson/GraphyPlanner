@@ -2,7 +2,6 @@
 
 namespace App\Services\Publishing;
 
-use App\Enums\AssetType;
 use App\Enums\Platform;
 use App\Enums\PlatformRolloutStage;
 use App\Models\Post;
@@ -18,20 +17,18 @@ class PlatformRolloutGate
 {
     /**
      * Instagram feed vs. Reels can't be told apart from `SocialAccount::platform` alone (both
-     * are `Platform::Instagram`) — it depends on the post's first attached asset, mirroring the
-     * same `media_type` inference `UploadPostAdapter::applyInstagramFields()` already uses
-     * (video → Reels, image/no-video → feed).
+     * are `Platform::Instagram`) — a post that sends a video goes out as a Reel (or a video
+     * Story), anything else through the feed stage. Every other platform has one stage.
      */
     public function stageFor(Post $post, SocialAccount $account): PlatformRolloutStage
     {
-        return match ($account->platform) {
-            Platform::Instagram => $post->assets->first()?->type === AssetType::Video
+        if ($account->platform === Platform::Instagram) {
+            return in_array('video', $post->mediaKinds(), true)
                 ? PlatformRolloutStage::InstagramReels
-                : PlatformRolloutStage::InstagramFeed,
-            Platform::TikTok => PlatformRolloutStage::TikTok,
-            Platform::Facebook => PlatformRolloutStage::Facebook,
-            Platform::LinkedIn => PlatformRolloutStage::LinkedIn,
-        };
+                : PlatformRolloutStage::InstagramFeed;
+        }
+
+        return PlatformRolloutStage::forPlatform($account->platform)[0];
     }
 
     public function isEnabled(Post $post, SocialAccount $account): bool
@@ -50,12 +47,7 @@ class PlatformRolloutGate
      */
     public function platformEnabled(Platform $platform): bool
     {
-        return match ($platform) {
-            Platform::Instagram => $this->stageEnabled(PlatformRolloutStage::InstagramFeed)
-                || $this->stageEnabled(PlatformRolloutStage::InstagramReels),
-            Platform::TikTok => $this->stageEnabled(PlatformRolloutStage::TikTok),
-            Platform::Facebook => $this->stageEnabled(PlatformRolloutStage::Facebook),
-            Platform::LinkedIn => $this->stageEnabled(PlatformRolloutStage::LinkedIn),
-        };
+        return collect(PlatformRolloutStage::forPlatform($platform))
+            ->contains(fn (PlatformRolloutStage $stage) => $this->stageEnabled($stage));
     }
 }

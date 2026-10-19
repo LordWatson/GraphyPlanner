@@ -5,6 +5,7 @@ namespace App\Actions\Posts;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\User;
+use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +28,10 @@ class ReschedulePostAction
      * the same transaction and a new `PublishPostJob` is dispatched after commit, so the job still
      * queued for the old time no-ops when it fires and the post publishes at the new time
      * (earlier or later).
+     *
+     * Step I-3.6 / M-2.5: a `publishing` post whose channels are all still held by the vendor
+     * (`Post::canBeRecalled()`) can be moved too: the held publishes are cancelled first, then
+     * re-submitted at the new times.
      */
     public function __invoke(
         Post $post,
@@ -67,7 +72,12 @@ class ReschedulePostAction
             ];
         }
 
-        DB::transaction(function () use ($post, $changes, $transition) {
+        // Step I-3.6 / M-2.5: a post the vendor is holding for later is recalled first (nothing
+        // moves if that's refused), then re-submitted at the new times once saved.
+        $vendor = app(VendorScheduleService::class);
+        $recalled = $post->canBeRecalled() ? $vendor->recall($post, 'days') : [];
+
+        DB::transaction(function () use ($post, $changes, $transition, $vendor, $recalled) {
             foreach ($post->targets as $target) {
                 if (isset($changes[$target->id])) {
                     $target->update($changes[$target->id]);
@@ -75,6 +85,8 @@ class ReschedulePostAction
             }
 
             $this->redispatchIfScheduled($post, $transition);
+
+            DB::afterCommit(fn () => $vendor->resubmit($post, $recalled));
         });
 
         Log::info('Post rescheduled from calendar', [

@@ -41,7 +41,13 @@ class TransitionPostRequest extends FormRequest
                     $post = $this->route('post');
                     $to = PostStatus::tryFrom((string) $value);
 
-                    if ($to !== null && ! PostStatusTransitionMap::isAllowed($post->status, $to)) {
+                    if ($to !== null && PostStatusTransitionMap::needsClientApproval($post, $post->status, $to)) {
+                        $fail(__('This post needs the client’s approval — send it to the client, or an Owner can override.'));
+
+                        return;
+                    }
+
+                    if ($to !== null && ! PostStatusTransitionMap::isAllowedFor($post, $to)) {
                         $fail("Cannot transition this post from {$post->status->value} to {$to->value}.");
 
                         return;

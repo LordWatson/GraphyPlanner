@@ -21,6 +21,10 @@ type TargetData = {
     handle: string | null;
     scheduled_local_date: string | null;
     scheduled_local_time: string | null;
+    /** Step M-2.2 / M-2.3: exactly what publishes on this channel. */
+    published_caption?: string;
+    first_comment?: string | null;
+    format?: string | null;
 };
 
 type CommentData = {
@@ -66,6 +70,9 @@ export default function ReviewShow({
             id: index,
             platform: target.platform ?? '',
             handle: target.handle ?? client.name,
+            publishedCaption: target.published_caption,
+            firstComment: target.first_comment,
+            format: target.format,
         }));
     const [activeTargetId, setActiveTargetId] = useState<number>(
         previewTargets[0]?.id ?? 0,

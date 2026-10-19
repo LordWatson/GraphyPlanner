@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Clients\RecomputeClientHealthAction;
+use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
 use App\Enums\ClientHealth;
 use App\Enums\ClientStatus;
@@ -27,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $industry
  * @property array<int, string>|null $countries
  * @property ClientStatus $status
+ * @property ApprovalMode $default_approval_mode
  * @property int|null $owner_user_id
  * @property Carbon|null $start_date
  * @property string|null $retainer_amount
@@ -49,7 +51,7 @@ use Illuminate\Support\Carbon;
     'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
-    'approval_lead_days',
+    'approval_lead_days', 'default_approval_mode',
 ])]
 class Client extends Model
 {
@@ -65,6 +67,7 @@ class Client extends Model
             'countries' => 'array',
             'tags' => 'array',
             'status' => ClientStatus::class,
+            'default_approval_mode' => ApprovalMode::class,
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
             'retainer_amount' => 'decimal:2',

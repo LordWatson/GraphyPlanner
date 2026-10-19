@@ -5,7 +5,9 @@ namespace App\Services\Publishing;
 use App\Contracts\PublishAdapter;
 use App\Models\Organization;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Support\Publishing\CancelResult;
 use App\Support\Publishing\TargetResult;
 use Illuminate\Support\Collection;
 
@@ -47,9 +49,17 @@ class NullPublishAdapter implements PublishAdapter
         ));
     }
 
-    public function cancel(string $externalPostId): void
+    /**
+     * Nothing was ever sent to a vendor, so there's nothing it could still publish.
+     */
+    public function cancel(PostTarget $target): CancelResult
     {
-        // No-op: nothing was ever published on a vendor.
+        return CancelResult::cancelled();
+    }
+
+    public function registerWebhook(Organization $organization, string $url): ?string
+    {
+        return null;
     }
 
     public function health(SocialAccount $account): bool
