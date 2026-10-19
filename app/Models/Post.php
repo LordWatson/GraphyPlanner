@@ -242,11 +242,15 @@ class Post extends Model
     /**
      * The distinct set of platforms targeted by this post's `PostTarget`s, used by the §6
      * checklist's "media present" rule (text-only-capable platforms don't require media).
+     * Eager-loads `targets.socialAccount` itself since callers (AI captions, checklist, image
+     * briefs) often hold a bare route-bound post and lazy loading is disabled outside production.
      *
      * @return array<int, Platform>
      */
     public function targetPlatforms(): array
     {
+        $this->loadMissing('targets.socialAccount');
+
         return $this->targets
             ->map(fn (PostTarget $target) => $target->socialAccount?->platform)
             ->filter()

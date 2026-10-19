@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Platform;
 use App\Enums\Role;
 use App\Models\AiPostIdea;
 use App\Models\AiTrend;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
+use App\Models\PostTarget;
+use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -65,6 +68,28 @@ class AiControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonStructure(['suggestions']);
+    }
+
+    /**
+     * Regression: with several targets, `Post::targetPlatforms()` walked `targets → socialAccount`
+     * lazily and tripped `Model::preventLazyLoading()` ("Attempted to lazy load [socialAccount]").
+     */
+    public function test_captions_endpoint_works_for_a_post_with_multiple_targets(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        foreach ([Platform::Instagram, Platform::TikTok] as $platform) {
+            $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => $platform]);
+            PostTarget::factory()->create(['post_id' => $post->id, 'social_account_id' => $account->id]);
+        }
+
+        $response = $this->actingAs($owner)->postJson(route('posts.ai.captions', $post));
+
+        $response->assertOk();
+        $response->assertJsonStructure(['suggestions', 'policyWarnings']);
     }
 
     public function test_designer_is_forbidden_from_ai_endpoints(): void
