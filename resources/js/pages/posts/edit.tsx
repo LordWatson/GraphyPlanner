@@ -1,12 +1,20 @@
 import type { FormComponentRef } from '@inertiajs/core';
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Check, Lock, MapPin, Music2, Sparkles } from 'lucide-react';
+import {
+    ArrowLeft,
+    Check,
+    ChevronDown,
+    Lock,
+    MapPin,
+    Music2,
+    Sparkles,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AssetPreviewCarousel } from '@/components/asset-preview-carousel';
 import { confirmDialog } from '@/components/confirm-dialog';
-import { HashtagInput, normalizeTag } from '@/components/hashtag-input';
+import { normalizeTag } from '@/components/hashtag-input';
 import { ImageStudio } from '@/components/image-studio/image-studio';
 import type { ImageStudioData } from '@/components/image-studio/types';
 import InputError from '@/components/input-error';
@@ -20,11 +28,13 @@ import {
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { CampaignField } from '@/components/post-editor/campaign-field';
 import type { CampaignOption } from '@/components/post-editor/campaign-field';
-import {
-    ChannelCustomizer,
-    TargetFields,
-} from '@/components/post-editor/channel-customizer';
+import { TargetFields } from '@/components/post-editor/target-fields';
 import { ChannelSchedule } from '@/components/post-editor/channel-schedule';
+import type {
+    ComposerScope,
+    MasterContent,
+} from '@/components/post-editor/composer';
+import { ChannelScopeBar, Composer } from '@/components/post-editor/composer';
 import { MediaDetails } from '@/components/post-editor/media-details';
 import { MediaPicker } from '@/components/post-editor/media-picker';
 import { MusicField } from '@/components/post-editor/music-field';
@@ -51,6 +61,11 @@ import {
 import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -171,8 +186,29 @@ function mediaKindsOf(assets: AssetData[]): string[] {
     return assets.filter(isImage).map(() => 'image');
 }
 
-const captionClass =
-    'border-input bg-card focus-visible:border-ring focus-visible:ring-ring/40 dark:bg-input/30 placeholder:text-muted-foreground flex min-h-36 w-full resize-y rounded-lg border px-3.5 py-3 text-[15px] leading-relaxed outline-none focus-visible:ring-[3px]';
+type EditorSection = 'compose' | 'channels' | 'media' | 'settings' | 'preview';
+
+/** Which part of the editor fixes each readiness check — the checklist's "jump to" target. */
+const checkSection: Record<string, EditorSection> = {
+    caption: 'compose',
+    caption_length: 'compose',
+    hashtags: 'compose',
+    links: 'compose',
+    first_comment: 'compose',
+    format: 'compose',
+    targets: 'channels',
+    schedule: 'channels',
+    account_settings: 'channels',
+    media: 'media',
+    media_fit: 'media',
+    media_framing: 'preview',
+    campaign_hashtags: 'settings',
+};
+
+const approvalLabels: Record<string, string> = {
+    client_required: 'Client approves',
+    internal_only: 'Internal only',
+};
 
 function ReadOnlyField({
     label,
@@ -186,6 +222,42 @@ function ReadOnlyField({
             <span className="eyebrow text-muted-foreground">{label}</span>
             {children}
         </div>
+    );
+}
+
+/** The folded "Post settings": each value as a ruled spec cell, one click from editing. */
+function SettingsSummary({
+    items,
+    onOpen,
+}: {
+    items: { label: string; value: string; muted: boolean }[];
+    onOpen: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            className="hover:bg-muted/50 focus-visible:ring-ring/50 -m-2 grid w-[calc(100%+1rem)] grid-cols-2 gap-x-6 gap-y-4 rounded-xl p-2 text-start transition-colors outline-none focus-visible:ring-[3px] sm:grid-cols-4"
+        >
+            {items.map((item) => (
+                <span key={item.label} className="grid min-w-0 gap-1">
+                    <span className="eyebrow text-muted-foreground">
+                        {item.label}
+                    </span>
+                    <span
+                        dir="auto"
+                        className={cn(
+                            'truncate text-sm',
+                            item.muted
+                                ? 'text-muted-foreground'
+                                : 'font-medium',
+                        )}
+                    >
+                        {item.value}
+                    </span>
+                </span>
+            ))}
+        </button>
     );
 }
 
@@ -757,6 +829,81 @@ export default function PostEdit({
         ),
     ];
 
+    // One channel context for the whole editor: the composer edits it and the preview shows it.
+    const [scope, setScope] = useState<ComposerScope>('all');
+    const [previewId, setPreviewId] = useState<number | null>(null);
+    const activeScope: ComposerScope =
+        scope !== 'all' && scope in scheduleRows ? scope : 'all';
+    const changeScope = (next: ComposerScope) => {
+        setScope(next);
+
+        if (next !== 'all') {
+            setPreviewId(next);
+        }
+    };
+
+    const master: MasterContent = { caption, hashtags, link, firstComment };
+    const updateMaster = (patch: Partial<MasterContent>) => {
+        if (patch.caption !== undefined) {
+            setCaption(patch.caption);
+        }
+
+        if (patch.hashtags !== undefined) {
+            setHashtags(patch.hashtags);
+        }
+
+        if (patch.link !== undefined) {
+            setLink(patch.link);
+        }
+
+        if (patch.firstComment !== undefined) {
+            setFirstComment(patch.firstComment);
+        }
+    };
+
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [flashed, setFlashed] = useState<EditorSection | null>(null);
+    const captionRef = useRef<HTMLTextAreaElement>(null);
+    const sectionRefs = useRef<Partial<Record<EditorSection, HTMLElement>>>({});
+    const sectionRef = (section: EditorSection) => (el: HTMLElement | null) => {
+        if (el) {
+            sectionRefs.current[section] = el;
+        }
+    };
+
+    // Scrolls to the part of the editor that fixes something, and briefly rings it.
+    const jumpTo = (section: EditorSection) => {
+        if (section === 'settings') {
+            setSettingsOpen(true);
+        }
+
+        requestAnimationFrame(() => {
+            const reduce = window.matchMedia(
+                '(prefers-reduced-motion: reduce)',
+            ).matches;
+            sectionRefs.current[section]?.scrollIntoView({
+                behavior: reduce ? 'auto' : 'smooth',
+                block: 'start',
+            });
+
+            if (section === 'compose') {
+                captionRef.current?.focus({ preventScroll: true });
+            }
+
+            setFlashed(section);
+            window.setTimeout(() => setFlashed(null), 1400);
+        });
+    };
+    const flash = (section: EditorSection) =>
+        cn(
+            'transition-shadow duration-500',
+            flashed === section && 'ring-ring/50 ring-[3px]',
+        );
+
+    const selectedCampaign = campaignOptions.find(
+        (option) => String(option.id) === campaignId,
+    );
+
     return (
         <>
             <Head title={`Edit post — ${client.name}`} />
@@ -790,25 +937,6 @@ export default function PostEdit({
                                     <CampaignChip campaign={post.campaign} />
                                 </Link>
                             )}
-                            {post.targets.map((target) => {
-                                const Icon = platformIcon(target.platform);
-                                const when = formatLocalSchedule(
-                                    target.scheduled_local_date,
-                                    target.scheduled_local_time,
-                                );
-
-                                return (
-                                    <Badge key={target.id} variant="outline">
-                                        <Icon className="size-3" />
-                                        {target.handle}
-                                        {when && (
-                                            <span className="text-muted-foreground font-mono">
-                                                {when}
-                                            </span>
-                                        )}
-                                    </Badge>
-                                );
-                            })}
                         </>
                     }
                 />
@@ -824,7 +952,7 @@ export default function PostEdit({
                     canOverrideApproval={can.override_approval}
                 />
 
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
                     <div className="grid min-w-0 gap-5">
                         {can.update ? (
                             <Form
@@ -838,96 +966,112 @@ export default function PostEdit({
                             >
                                 {({ processing, errors }) => (
                                     <>
-                                        <Panel
-                                            eyebrow="01"
-                                            title="Content"
-                                            actions={
-                                                showAi && (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={
-                                                            fetchAiSuggestions
-                                                        }
-                                                        disabled={aiLoading}
-                                                    >
-                                                        <Sparkles />
-                                                        {aiLoading
-                                                            ? 'Thinking…'
-                                                            : 'Suggest with AI'}
-                                                    </Button>
-                                                )
-                                            }
-                                            bodyClassName="grid gap-5"
+                                        <div
+                                            ref={sectionRef('compose')}
+                                            className="scroll-mt-24"
                                         >
-                                            <div className="grid gap-2">
-                                                <div className="flex items-baseline justify-between">
-                                                    <Label htmlFor="master_caption">
-                                                        Caption
-                                                    </Label>
-                                                    <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
-                                                        {caption.length.toLocaleString()}{' '}
-                                                        chars
-                                                    </span>
-                                                </div>
-                                                <textarea
-                                                    id="master_caption"
-                                                    name="master_caption"
-                                                    rows={6}
-                                                    dir="auto"
-                                                    value={caption}
-                                                    onChange={(e) =>
-                                                        setCaption(
-                                                            e.target.value,
+                                            <Panel
+                                                eyebrow="01"
+                                                title="Write"
+                                                className={flash('compose')}
+                                                actions={
+                                                    showAi &&
+                                                    activeScope === 'all' && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={
+                                                                fetchAiSuggestions
+                                                            }
+                                                            disabled={aiLoading}
+                                                        >
+                                                            <Sparkles />
+                                                            {aiLoading
+                                                                ? 'Thinking…'
+                                                                : 'Suggest with AI'}
+                                                        </Button>
+                                                    )
+                                                }
+                                                bodyClassName="grid gap-5"
+                                            >
+                                                <ChannelScopeBar
+                                                    scope={activeScope}
+                                                    onScopeChange={changeScope}
+                                                    accounts={selectedAccounts}
+                                                    channels={selectedChannels}
+                                                    master={master}
+                                                    onAddChannels={() =>
+                                                        jumpTo('channels')
+                                                    }
+                                                />
+                                                <Composer
+                                                    scope={activeScope}
+                                                    accounts={selectedAccounts}
+                                                    master={master}
+                                                    onMasterChange={
+                                                        updateMaster
+                                                    }
+                                                    channels={selectedChannels}
+                                                    onChannelChange={(
+                                                        accountId,
+                                                        next,
+                                                    ) =>
+                                                        setChannels(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [accountId]:
+                                                                    next,
+                                                            }),
                                                         )
                                                     }
-                                                    placeholder="Write the caption…"
-                                                    className={captionClass}
-                                                />
-                                                <InputError
-                                                    message={
-                                                        errors.master_caption
-                                                    }
-                                                />
-                                                {aiError && (
-                                                    <p className="text-destructive text-xs">
-                                                        {aiError}
-                                                    </p>
-                                                )}
-                                                <AiCaptionSuggestions
-                                                    suggestions={aiSuggestions}
-                                                    policyWarnings={
-                                                        aiPolicyWarnings
-                                                    }
-                                                    appliedIndex={
-                                                        appliedSuggestionIndex
-                                                    }
-                                                    expanded={
-                                                        suggestionsExpanded
-                                                    }
-                                                    onToggleExpanded={() =>
-                                                        setSuggestionsExpanded(
-                                                            (current) =>
-                                                                !current,
-                                                        )
-                                                    }
-                                                    onApply={applyAiSuggestion}
-                                                />
-                                            </div>
-
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="hashtags_text">
-                                                    Hashtags
-                                                </Label>
-                                                <HashtagInput
-                                                    id="hashtags_text"
-                                                    value={hashtags}
-                                                    onChange={setHashtags}
-                                                    suggestions={
+                                                    mediaKinds={mediaKinds}
+                                                    hashtagSuggestions={
                                                         hashtagSuggestions
                                                     }
-                                                    placeholder="Start typing a hashtag…"
+                                                    errors={errors}
+                                                    captionRef={captionRef}
+                                                    aiPanel={
+                                                        <>
+                                                            {aiError && (
+                                                                <p className="text-destructive text-xs">
+                                                                    {aiError}
+                                                                </p>
+                                                            )}
+                                                            <AiCaptionSuggestions
+                                                                suggestions={
+                                                                    aiSuggestions
+                                                                }
+                                                                policyWarnings={
+                                                                    aiPolicyWarnings
+                                                                }
+                                                                appliedIndex={
+                                                                    appliedSuggestionIndex
+                                                                }
+                                                                expanded={
+                                                                    suggestionsExpanded
+                                                                }
+                                                                onToggleExpanded={() =>
+                                                                    setSuggestionsExpanded(
+                                                                        (
+                                                                            current,
+                                                                        ) =>
+                                                                            !current,
+                                                                    )
+                                                                }
+                                                                onApply={
+                                                                    applyAiSuggestion
+                                                                }
+                                                            />
+                                                        </>
+                                                    }
+                                                />
+
+                                                {/* The composer's fields are unnamed: the form sends these. */}
+                                                <input
+                                                    type="hidden"
+                                                    name="master_caption"
+                                                    value={caption}
                                                 />
                                                 {hashtags.map((tag, i) => (
                                                     <input
@@ -937,100 +1081,30 @@ export default function PostEdit({
                                                         value={tag}
                                                     />
                                                 ))}
-                                            </div>
-
-                                            <div className="grid gap-5 sm:grid-cols-2">
-                                                <div className="grid content-start gap-2">
-                                                    <Label htmlFor="link_url">
-                                                        Link
-                                                    </Label>
-                                                    <Input
-                                                        id="link_url"
-                                                        name="link_url"
-                                                        type="url"
-                                                        value={link}
-                                                        onChange={(e) =>
-                                                            setLink(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="https://"
-                                                    />
-                                                    <p className="text-muted-foreground text-xs">
-                                                        Each channel uses it the
-                                                        way it can — see
-                                                        Customize below.
-                                                    </p>
-                                                    <InputError
-                                                        message={
-                                                            errors.link_url
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="grid content-start gap-2">
-                                                    <Label htmlFor="first_comment">
-                                                        First comment
-                                                    </Label>
-                                                    <Input
-                                                        id="first_comment"
-                                                        name="first_comment"
-                                                        dir="auto"
-                                                        value={firstComment}
-                                                        onChange={(e) =>
-                                                            setFirstComment(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Posted as a comment right after"
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.first_comment
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <CampaignField
-                                                postId={post.id}
-                                                value={campaignId}
-                                                options={campaignOptions}
-                                                caption={caption}
-                                                hashtags={hashtags}
-                                                error={errors.campaign_id}
-                                                onChange={setCampaignId}
-                                                onAddHashtags={(tags) =>
-                                                    setHashtags((current) => [
-                                                        ...current,
-                                                        ...tags,
-                                                    ])
-                                                }
-                                                onAddLink={(link) =>
-                                                    setCaption((current) =>
-                                                        current.trim() === ''
-                                                            ? link
-                                                            : `${current.trimEnd()}\n\n${link}`,
-                                                    )
-                                                }
-                                            />
-                                            <input
-                                                type="hidden"
-                                                name="campaign_id"
-                                                value={campaignId}
-                                            />
-                                            {/* Image format + framing are set from the preview rail. */}
-                                            {Object.entries(mediaFormat).map(
-                                                ([platform, ratio]) => (
+                                                <input
+                                                    type="hidden"
+                                                    name="link_url"
+                                                    value={link}
+                                                />
+                                                <input
+                                                    type="hidden"
+                                                    name="first_comment"
+                                                    value={firstComment}
+                                                />
+                                                {/* Image format + framing are set from the preview rail. */}
+                                                {Object.entries(
+                                                    mediaFormat,
+                                                ).map(([platform, ratio]) => (
                                                     <input
                                                         key={platform}
                                                         type="hidden"
                                                         name={`media_format[${platform}]`}
                                                         value={ratio ?? ''}
                                                     />
-                                                ),
-                                            )}
-                                            {Object.entries(selectedCrops).map(
-                                                ([id, crop]) =>
+                                                ))}
+                                                {Object.entries(
+                                                    selectedCrops,
+                                                ).map(([id, crop]) =>
                                                     (
                                                         [
                                                             'x',
@@ -1047,221 +1121,375 @@ export default function PostEdit({
                                                             )}
                                                         />
                                                     )),
-                                            )}
-                                        </Panel>
+                                                )}
+                                            </Panel>
+                                        </div>
 
-                                        <Panel
-                                            eyebrow="02"
-                                            title="Channels & schedule"
-                                            description="Each channel publishes at its own local time."
+                                        <div
+                                            ref={sectionRef('channels')}
+                                            className="scroll-mt-24"
                                         >
-                                            <ChannelSchedule
-                                                accounts={targetAccounts}
-                                                rows={scheduleRows}
-                                                onToggle={toggleChannel}
-                                                onChange={updateSchedule}
-                                                onApplyToAll={
-                                                    applyScheduleToAll
-                                                }
-                                                usage={channelUsage}
-                                                error={
-                                                    errors[
-                                                        'targets.0.social_account_id'
-                                                    ]
-                                                }
-                                            />
-                                        </Panel>
-
-                                        <Panel
-                                            eyebrow="03"
-                                            title="Customize per channel"
-                                            description="Different caption, hashtags, first comment, link or format for one network — everything else follows the main post."
-                                        >
-                                            <ChannelCustomizer
-                                                accounts={selectedAccounts}
-                                                channels={selectedChannels}
-                                                onChange={(accountId, next) =>
-                                                    setChannels((current) => ({
-                                                        ...current,
-                                                        [accountId]: next,
-                                                    }))
-                                                }
-                                                master={{
-                                                    caption,
-                                                    hashtags,
-                                                    firstComment,
-                                                    link,
-                                                }}
-                                                mediaKinds={mediaKinds}
-                                                hashtagSuggestions={
-                                                    hashtagSuggestions
-                                                }
-                                            />
-                                            <TargetFields
-                                                accountIds={Object.keys(
-                                                    scheduleRows,
-                                                ).map(Number)}
-                                                schedule={scheduleRows}
-                                                channels={selectedChannels}
-                                            />
-                                        </Panel>
-
-                                        <Panel
-                                            eyebrow="04"
-                                            title="Media"
-                                            description="Upload something new or pick from the client's library — the number is the order it appears in."
-                                            actions={
-                                                <span className="text-muted-foreground font-mono text-xs">
-                                                    {selectedAssetIds.length}{' '}
-                                                    attached
-                                                </span>
-                                            }
-                                        >
-                                            <MediaPicker
-                                                clientId={client.id}
-                                                campaignId={
-                                                    campaignId
-                                                        ? Number(campaignId)
-                                                        : undefined
-                                                }
-                                                selected={selectedAssets}
-                                                onChange={setAttachedAssets}
-                                                canUpload={can.create_asset}
-                                                uploading={isUploadingAsset}
-                                                onUpload={(file) =>
-                                                    void handleAssetUpload(file)
-                                                }
-                                            />
-                                            <MediaDetails
-                                                assets={selectedAssets}
-                                                altTexts={altTexts}
-                                                onAltTextChange={(id, text) =>
-                                                    setAltTexts((current) => ({
-                                                        ...current,
-                                                        [id]: text,
-                                                    }))
-                                                }
-                                                coverAssetId={coverAssetId}
-                                                onCoverChange={setCoverAssetId}
-                                                thumbOffsetMs={thumbOffsetMs}
-                                                onThumbOffsetChange={
-                                                    setThumbOffsetMs
-                                                }
-                                                altTextPlatforms={
-                                                    altTextPlatforms
-                                                }
-                                            />
-                                            {selectedAssetIds.map((id) => (
-                                                <input
-                                                    key={id}
-                                                    type="hidden"
-                                                    name={`asset_alt_texts[${id}]`}
-                                                    value={altTexts[id] ?? ''}
-                                                />
-                                            ))}
-                                            <input
-                                                type="hidden"
-                                                name="cover_asset_id"
-                                                value={coverAssetId ?? ''}
-                                            />
-                                            <input
-                                                type="hidden"
-                                                name="thumb_offset_ms"
-                                                value={thumbOffsetMs ?? ''}
-                                            />
-                                        </Panel>
-
-                                        <Panel
-                                            eyebrow="05"
-                                            title="Details"
-                                            bodyClassName="grid gap-5 sm:grid-cols-2"
-                                        >
-                                            <div className="grid content-start gap-2 sm:col-span-2 sm:max-w-sm">
-                                                <Label htmlFor="approval_mode">
-                                                    Approval
-                                                </Label>
-                                                <Select
-                                                    value={approvalMode}
-                                                    onValueChange={
-                                                        setApprovalMode
+                                            <Panel
+                                                eyebrow="02"
+                                                title="Where & when"
+                                                description="Tick the channels, then give each its own local time."
+                                                className={flash('channels')}
+                                            >
+                                                <ChannelSchedule
+                                                    accounts={targetAccounts}
+                                                    rows={scheduleRows}
+                                                    onToggle={toggleChannel}
+                                                    onChange={updateSchedule}
+                                                    onApplyToAll={
+                                                        applyScheduleToAll
                                                     }
-                                                >
-                                                    <SelectTrigger id="approval_mode">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="client_required">
-                                                            Client approval
-                                                            required
-                                                        </SelectItem>
-                                                        <SelectItem value="internal_only">
-                                                            Internal approval
-                                                            only
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <input
-                                                    type="hidden"
-                                                    name="approval_mode"
-                                                    value={approvalMode}
-                                                />
-                                                <InputError
-                                                    message={
-                                                        errors.approval_mode
+                                                    usage={channelUsage}
+                                                    error={
+                                                        errors[
+                                                            'targets.0.social_account_id'
+                                                        ]
                                                     }
                                                 />
-                                            </div>
-                                            <div className="grid content-start gap-2">
-                                                <Label
-                                                    htmlFor="music_search"
-                                                    className="flex items-center gap-1.5"
-                                                >
-                                                    <Music2 className="text-muted-foreground size-3.5" />
-                                                    Sound
-                                                </Label>
-                                                <MusicField
-                                                    postId={post.id}
-                                                    clientId={post.client_id}
-                                                    platforms={musicPlatforms}
-                                                    instagramAccountId={
-                                                        selectedAccounts.find(
-                                                            (a) =>
-                                                                a.platform ===
-                                                                'instagram',
-                                                        )?.id ?? null
-                                                    }
-                                                    musicId={musicId}
-                                                    musicName={musicName}
-                                                    onChange={(track) => {
-                                                        setMusicId(track.id);
-                                                        setMusicName(
-                                                            track.name,
-                                                        );
-                                                    }}
+                                                <TargetFields
+                                                    accountIds={Object.keys(
+                                                        scheduleRows,
+                                                    ).map(Number)}
+                                                    schedule={scheduleRows}
+                                                    channels={selectedChannels}
                                                 />
-                                            </div>
-                                            <div className="grid content-start gap-2">
-                                                <Label
-                                                    htmlFor="location_name"
-                                                    className="flex items-center gap-1.5"
-                                                >
-                                                    <MapPin className="text-muted-foreground size-3.5" />
-                                                    Location
-                                                </Label>
-                                                <Input
-                                                    id="location_name"
-                                                    name="location[name]"
-                                                    dir="auto"
-                                                    value={locationName}
-                                                    onChange={(e) =>
-                                                        setLocationName(
-                                                            e.target.value,
+                                            </Panel>
+                                        </div>
+
+                                        <div
+                                            ref={sectionRef('media')}
+                                            className="scroll-mt-24"
+                                        >
+                                            <Panel
+                                                eyebrow="03"
+                                                title="Media"
+                                                description="Upload something new or pick from the client's library — the number is the order it appears in."
+                                                className={flash('media')}
+                                                actions={
+                                                    <span className="text-muted-foreground font-mono text-xs">
+                                                        {
+                                                            selectedAssetIds.length
+                                                        }{' '}
+                                                        attached
+                                                    </span>
+                                                }
+                                            >
+                                                <MediaPicker
+                                                    clientId={client.id}
+                                                    campaignId={
+                                                        campaignId
+                                                            ? Number(campaignId)
+                                                            : undefined
+                                                    }
+                                                    selected={selectedAssets}
+                                                    onChange={setAttachedAssets}
+                                                    canUpload={can.create_asset}
+                                                    uploading={isUploadingAsset}
+                                                    onUpload={(file) =>
+                                                        void handleAssetUpload(
+                                                            file,
                                                         )
                                                     }
-                                                    placeholder="e.g. Shoreditch, London"
                                                 />
-                                            </div>
-                                        </Panel>
+                                                <MediaDetails
+                                                    assets={selectedAssets}
+                                                    altTexts={altTexts}
+                                                    onAltTextChange={(
+                                                        id,
+                                                        text,
+                                                    ) =>
+                                                        setAltTexts(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [id]: text,
+                                                            }),
+                                                        )
+                                                    }
+                                                    coverAssetId={coverAssetId}
+                                                    onCoverChange={
+                                                        setCoverAssetId
+                                                    }
+                                                    thumbOffsetMs={
+                                                        thumbOffsetMs
+                                                    }
+                                                    onThumbOffsetChange={
+                                                        setThumbOffsetMs
+                                                    }
+                                                    altTextPlatforms={
+                                                        altTextPlatforms
+                                                    }
+                                                />
+                                                {selectedAssetIds.map((id) => (
+                                                    <input
+                                                        key={id}
+                                                        type="hidden"
+                                                        name={`asset_alt_texts[${id}]`}
+                                                        value={
+                                                            altTexts[id] ?? ''
+                                                        }
+                                                    />
+                                                ))}
+                                                <input
+                                                    type="hidden"
+                                                    name="cover_asset_id"
+                                                    value={coverAssetId ?? ''}
+                                                />
+                                                <input
+                                                    type="hidden"
+                                                    name="thumb_offset_ms"
+                                                    value={thumbOffsetMs ?? ''}
+                                                />
+                                            </Panel>
+                                        </div>
+
+                                        <Collapsible
+                                            open={settingsOpen}
+                                            onOpenChange={setSettingsOpen}
+                                            ref={sectionRef('settings')}
+                                            className="scroll-mt-24"
+                                        >
+                                            <Panel
+                                                eyebrow="04"
+                                                title="Post settings"
+                                                className={flash('settings')}
+                                                actions={
+                                                    <CollapsibleTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                        >
+                                                            {settingsOpen
+                                                                ? 'Done'
+                                                                : 'Edit'}
+                                                            <ChevronDown
+                                                                className={cn(
+                                                                    'transition-transform',
+                                                                    settingsOpen &&
+                                                                        'rotate-180',
+                                                                )}
+                                                            />
+                                                        </Button>
+                                                    </CollapsibleTrigger>
+                                                }
+                                            >
+                                                {!settingsOpen && (
+                                                    <SettingsSummary
+                                                        onOpen={() =>
+                                                            setSettingsOpen(
+                                                                true,
+                                                            )
+                                                        }
+                                                        items={[
+                                                            {
+                                                                label: 'Campaign',
+                                                                value:
+                                                                    selectedCampaign?.name ??
+                                                                    'No campaign',
+                                                                muted: !selectedCampaign,
+                                                            },
+                                                            {
+                                                                label: 'Approval',
+                                                                value:
+                                                                    approvalLabels[
+                                                                        approvalMode
+                                                                    ] ??
+                                                                    approvalMode,
+                                                                muted: false,
+                                                            },
+                                                            {
+                                                                label: 'Sound',
+                                                                value:
+                                                                    musicName ||
+                                                                    'No sound',
+                                                                muted: !musicName,
+                                                            },
+                                                            {
+                                                                label: 'Location',
+                                                                value:
+                                                                    locationName ||
+                                                                    'No location',
+                                                                muted: !locationName,
+                                                            },
+                                                        ]}
+                                                    />
+                                                )}
+                                                {/* Kept mounted while folded so every field still submits. */}
+                                                <CollapsibleContent
+                                                    forceMount
+                                                    className="data-[state=closed]:hidden"
+                                                >
+                                                    <div className="grid gap-5 sm:grid-cols-2">
+                                                        <div className="grid content-start gap-2">
+                                                            <CampaignField
+                                                                postId={post.id}
+                                                                value={
+                                                                    campaignId
+                                                                }
+                                                                options={
+                                                                    campaignOptions
+                                                                }
+                                                                caption={
+                                                                    caption
+                                                                }
+                                                                hashtags={
+                                                                    hashtags
+                                                                }
+                                                                error={
+                                                                    errors.campaign_id
+                                                                }
+                                                                onChange={
+                                                                    setCampaignId
+                                                                }
+                                                                onAddHashtags={(
+                                                                    tags,
+                                                                ) =>
+                                                                    setHashtags(
+                                                                        (
+                                                                            current,
+                                                                        ) => [
+                                                                            ...current,
+                                                                            ...tags,
+                                                                        ],
+                                                                    )
+                                                                }
+                                                                onAddLink={(
+                                                                    campaignLink,
+                                                                ) =>
+                                                                    setCaption(
+                                                                        (
+                                                                            current,
+                                                                        ) =>
+                                                                            current.trim() ===
+                                                                            ''
+                                                                                ? campaignLink
+                                                                                : `${current.trimEnd()}\n\n${campaignLink}`,
+                                                                    )
+                                                                }
+                                                            />
+                                                            <input
+                                                                type="hidden"
+                                                                name="campaign_id"
+                                                                value={
+                                                                    campaignId
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <div className="grid content-start gap-2">
+                                                            <Label htmlFor="approval_mode">
+                                                                Approval
+                                                            </Label>
+                                                            <Select
+                                                                value={
+                                                                    approvalMode
+                                                                }
+                                                                onValueChange={
+                                                                    setApprovalMode
+                                                                }
+                                                            >
+                                                                <SelectTrigger id="approval_mode">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="client_required">
+                                                                        Client
+                                                                        approval
+                                                                        required
+                                                                    </SelectItem>
+                                                                    <SelectItem value="internal_only">
+                                                                        Internal
+                                                                        approval
+                                                                        only
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <input
+                                                                type="hidden"
+                                                                name="approval_mode"
+                                                                value={
+                                                                    approvalMode
+                                                                }
+                                                            />
+                                                            <InputError
+                                                                message={
+                                                                    errors.approval_mode
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <div className="grid content-start gap-2">
+                                                            <Label
+                                                                htmlFor="music_search"
+                                                                className="flex items-center gap-1.5"
+                                                            >
+                                                                <Music2 className="text-muted-foreground size-3.5" />
+                                                                Sound
+                                                            </Label>
+                                                            <MusicField
+                                                                postId={post.id}
+                                                                clientId={
+                                                                    post.client_id
+                                                                }
+                                                                platforms={
+                                                                    musicPlatforms
+                                                                }
+                                                                instagramAccountId={
+                                                                    selectedAccounts.find(
+                                                                        (a) =>
+                                                                            a.platform ===
+                                                                            'instagram',
+                                                                    )?.id ??
+                                                                    null
+                                                                }
+                                                                musicId={
+                                                                    musicId
+                                                                }
+                                                                musicName={
+                                                                    musicName
+                                                                }
+                                                                onChange={(
+                                                                    track,
+                                                                ) => {
+                                                                    setMusicId(
+                                                                        track.id,
+                                                                    );
+                                                                    setMusicName(
+                                                                        track.name,
+                                                                    );
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="grid content-start gap-2">
+                                                            <Label
+                                                                htmlFor="location_name"
+                                                                className="flex items-center gap-1.5"
+                                                            >
+                                                                <MapPin className="text-muted-foreground size-3.5" />
+                                                                Location
+                                                            </Label>
+                                                            <Input
+                                                                id="location_name"
+                                                                name="location[name]"
+                                                                dir="auto"
+                                                                value={
+                                                                    locationName
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setLocationName(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="e.g. Shoreditch, London"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </CollapsibleContent>
+                                            </Panel>
+                                        </Collapsible>
 
                                         <div
                                             className={cn(
@@ -1332,42 +1560,73 @@ export default function PostEdit({
                         <ReadinessChecklist
                             items={checklistItems}
                             onFix={can.update ? applyFix : undefined}
+                            onJump={
+                                can.update
+                                    ? (key) =>
+                                          jumpTo(checkSection[key] ?? 'compose')
+                                    : undefined
+                            }
                             note={
                                 isDirty
                                     ? 'Reflects your unsaved edits — save before scheduling.'
                                     : undefined
                             }
                         />
-                        <PreviewPanel
-                            targets={previewTargets}
-                            caption={
-                                can.update
-                                    ? caption
-                                    : (post.master_caption ?? '')
-                            }
-                            hashtags={can.update ? hashtags : post.hashtags}
-                            assets={can.update ? selectedAssets : post.assets}
-                            musicName={
-                                can.update
-                                    ? musicName
-                                    : ((post.music?.name as string) ?? '')
-                            }
-                            locationName={
-                                can.update
-                                    ? locationName
-                                    : ((post.location?.name as string) ?? '')
-                            }
-                            mediaFormat={
-                                can.update ? mediaFormat : post.media_format
-                            }
-                            crops={can.update ? selectedCrops : initial.crops}
-                            formatOptions={mediaFormatOptions}
-                            editable={can.update}
-                            onMediaFormatChange={setMediaFormat}
-                            onCropsChange={(next) =>
-                                setCrops((current) => ({ ...current, ...next }))
-                            }
-                        />
+                        <div
+                            ref={sectionRef('preview')}
+                            className={cn(
+                                'scroll-mt-24 rounded-2xl',
+                                flash('preview'),
+                            )}
+                        >
+                            <PreviewPanel
+                                targets={previewTargets}
+                                activeId={can.update ? previewId : undefined}
+                                onActiveChange={(id) => {
+                                    setPreviewId(id);
+
+                                    // While customizing a channel, the preview and composer move together.
+                                    if (activeScope !== 'all') {
+                                        setScope(id);
+                                    }
+                                }}
+                                caption={
+                                    can.update
+                                        ? caption
+                                        : (post.master_caption ?? '')
+                                }
+                                hashtags={can.update ? hashtags : post.hashtags}
+                                assets={
+                                    can.update ? selectedAssets : post.assets
+                                }
+                                musicName={
+                                    can.update
+                                        ? musicName
+                                        : ((post.music?.name as string) ?? '')
+                                }
+                                locationName={
+                                    can.update
+                                        ? locationName
+                                        : ((post.location?.name as string) ??
+                                          '')
+                                }
+                                mediaFormat={
+                                    can.update ? mediaFormat : post.media_format
+                                }
+                                crops={
+                                    can.update ? selectedCrops : initial.crops
+                                }
+                                formatOptions={mediaFormatOptions}
+                                editable={can.update}
+                                onMediaFormatChange={setMediaFormat}
+                                onCropsChange={(next) =>
+                                    setCrops((current) => ({
+                                        ...current,
+                                        ...next,
+                                    }))
+                                }
+                            />
+                        </div>
                     </aside>
                 </div>
 

@@ -213,6 +213,9 @@ type PanelProps = {
     editable: boolean;
     onMediaFormatChange?: (format: MediaFormat) => void;
     onCropsChange?: (crops: Record<number, Crop>) => void;
+    /** Controls which channel shows (the editor's composer scope); omit to let the panel own it. */
+    activeId?: number | null;
+    onActiveChange?: (id: number) => void;
 };
 
 /** The live platform mockup in the editor's right rail, with framing tools and a fullscreen view. */
@@ -229,10 +232,15 @@ export function PreviewPanel({
     editable,
     onMediaFormatChange,
     onCropsChange,
+    activeId: controlledId,
+    onActiveChange,
 }: PanelProps) {
-    const [activeId, setActiveId] = useState<number | null>(
-        targets[0]?.id ?? null,
-    );
+    const [ownId, setOwnId] = useState<number | null>(targets[0]?.id ?? null);
+    const activeId = controlledId ?? ownId;
+    const setActiveId = (id: number) => {
+        setOwnId(id);
+        onActiveChange?.(id);
+    };
     const [fullscreen, setFullscreen] = useState(false);
     const [framing, setFraming] = useState(false);
     const [safeZones, setSafeZones] = useState(false);
