@@ -89,7 +89,7 @@ class OpenAiImageProvider implements ImageProvider
     {
         return match ($ratio) {
             ImageAspectRatio::Square_1_1 => '1024x1024',
-            ImageAspectRatio::Portrait_4_5, ImageAspectRatio::Story_9_16 => '1024x1536',
+            ImageAspectRatio::Portrait_4_5, ImageAspectRatio::Classic_3_4, ImageAspectRatio::Story_9_16 => '1024x1536',
             ImageAspectRatio::Landscape_16_9, ImageAspectRatio::Link_1_91_1 => '1536x1024',
         };
     }

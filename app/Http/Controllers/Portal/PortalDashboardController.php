@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Actions\Portal\GetPortalDashboardItemsAction;
+use App\Enums\GridPlanStatus;
 use App\Http\Controllers\Controller;
+use App\Models\GridPlan;
 use App\Support\Clients\ConnectSlots;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,6 +25,15 @@ class PortalDashboardController extends Controller
         return Inertia::render('portal/dashboard', [
             'client' => ['name' => $client->name],
             'items' => $getPortalDashboardItems($request->user()),
+            // Phase 18: "Grid waiting on you" rows.
+            'waitingGrids' => GridPlan::query()
+                ->where('client_id', $client->id)
+                ->where('status', GridPlanStatus::WaitingClient)
+                ->withCount('tiles')
+                ->latest('updated_at')
+                ->get(['id', 'name', 'updated_at'])
+                ->map(fn (GridPlan $plan) => ['id' => $plan->id, 'name' => $plan->name, 'tile_count' => (int) $plan->getAttribute('tiles_count')])
+                ->values(),
             // Step M-2.8: "Connect your accounts" — only the client's own slots, and only what's
             // needed to connect them.
             'connectAccounts' => ConnectSlots::forList($client->socialAccounts()->orderBy('platform')->get()),

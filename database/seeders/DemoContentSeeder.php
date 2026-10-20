@@ -19,6 +19,7 @@ use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Database\Seeders\Concerns\SeedsCampaignShowcase;
+use Database\Seeders\Concerns\SeedsGridShowcase;
 use Illuminate\Database\Seeder;
 
 /**
@@ -29,7 +30,7 @@ use Illuminate\Database\Seeder;
  */
 class DemoContentSeeder extends Seeder
 {
-    use SeedsCampaignShowcase;
+    use SeedsCampaignShowcase, SeedsGridShowcase;
 
     public function run(): void
     {
@@ -70,6 +71,9 @@ class DemoContentSeeder extends Seeder
 
         // Campaigns enhancement C-9.1: the full campaign story (brief, phases, plan, results).
         $this->seedCampaignShowcase($client, $owner, $socialAccounts, $client->name);
+
+        // Step 18.13: a draft grid per demo client on its Instagram account.
+        $this->seedDraftGrid($client, $owner, $socialAccounts[0]);
 
         $campaigns = collect([
             ['name' => 'Spring Refresh', 'status' => CampaignStatus::Completed, 'offsetStart' => -8, 'offsetEnd' => -4],

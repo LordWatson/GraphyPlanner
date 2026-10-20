@@ -41,6 +41,9 @@ class BuildCalendarOccurrencesAction
                     'campaign_colour' => $post->campaign?->colour?->value,
                     'status' => $post->status->value,
                     'status_label' => $post->status->label(),
+                    // Step 18.11: the grid chip, when the post was made from a grid tile.
+                    'grid_plan_id' => $post->relationLoaded('gridTile') ? $post->gridTile?->grid_plan_id : null,
+                    'grid_tile_position' => $post->relationLoaded('gridTile') ? $post->gridTile?->position : null,
                     'master_caption' => $post->master_caption,
                     'platform' => $account?->platform?->value,
                     'handle' => $account?->handle,

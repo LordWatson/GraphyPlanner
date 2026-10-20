@@ -55,6 +55,8 @@ type PostData = {
     status_label: string;
     master_caption: string | null;
     review_message: string | null;
+    /** Step 18.9: the grid whose look the client already approved. */
+    grid_name?: string | null;
     hashtags: string[];
     music: { name?: string } | null;
     location: { id?: string; name?: string } | null;
@@ -227,6 +229,15 @@ export default function PortalPostShow({
                     </section>
 
                     <div className="flex flex-col gap-5">
+                        {post.grid_name && (
+                            <p className="border-border bg-card text-muted-foreground rounded-xl border px-4 py-3 text-sm">
+                                You approved how this looks in{' '}
+                                <span className="text-foreground font-medium">
+                                    {post.grid_name}
+                                </span>
+                                . This review is about the words.
+                            </p>
+                        )}
                         {post.review_message && (
                             <figure className="bg-ink text-ink-foreground relative rounded-2xl p-6">
                                 <span

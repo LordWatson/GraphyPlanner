@@ -4,8 +4,10 @@ namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
+use App\Contracts\GridAiProvider;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\GridPlan;
 use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
@@ -23,7 +25,7 @@ use Illuminate\Support\Facades\Log;
  * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
-class NullAiProvider implements AiProvider, CampaignAiProvider
+class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
 {
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
@@ -76,6 +78,20 @@ class NullAiProvider implements AiProvider, CampaignAiProvider
         $this->logDisabled('draftCampaignWrap', ['campaign_id' => $campaign->id, 'org_id' => $campaign->org_id]);
 
         return new AiCampaignWrapDraft;
+    }
+
+    public function suggestTileCaptions(GridPlan $plan, array $tiles): array
+    {
+        $this->logDisabled('suggestTileCaptions', ['grid_plan_id' => $plan->id, 'org_id' => $plan->org_id]);
+
+        return [];
+    }
+
+    public function checkGridBalance(GridPlan $plan, array $tiles): array
+    {
+        $this->logDisabled('checkGridBalance', ['grid_plan_id' => $plan->id, 'org_id' => $plan->org_id]);
+
+        return [];
     }
 
     /**

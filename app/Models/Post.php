@@ -12,6 +12,7 @@ use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
 use App\Policies\PostPolicy;
 use App\Services\ClientHashtagService;
+use App\Services\Grids\GridOrderRiskService;
 use App\Services\SharedPropsCache;
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -123,8 +125,17 @@ class Post extends Model
             if ($post->wasChanged('status') || $post->wasRecentlyCreated) {
                 SharedPropsCache::forgetPendingApprovals($post->client_id);
             }
+
+            // Step 18.11: a grid post that fails or leaves the schedule can put the grid's order
+            // at risk — re-check its grid once the change is committed.
+            if ($post->wasChanged('status') && ! $post->wasRecentlyCreated) {
+                DB::afterCommit(fn () => app(GridOrderRiskService::class)->checkForPost($post));
+            }
         });
         static::deleted(fn (self $post) => SharedPropsCache::forgetPendingApprovals($post->client_id));
+        // Step 18.9: a deleted (or soft-deleted) post frees the grid tile it was made from, so
+        // the tile reads "No post yet" again.
+        static::deleted(fn (self $post) => GridTile::query()->where('post_id', $post->id)->update(['post_id' => null]));
         static::restored(fn (self $post) => SharedPropsCache::forgetPendingApprovals($post->client_id));
 
         // Step I-2.6: keep the client's hashtag vocabulary (`client_hashtags`) in step with every
@@ -205,6 +216,17 @@ class Post extends Model
     public function deliverable(): HasOne
     {
         return $this->hasOne(CampaignDeliverable::class);
+    }
+
+    /**
+     * Step 18.9: the grid tile this post was made from, if any — the editor shows a "From grid"
+     * chip and the post's checklist compares it with the approved look (`grid_match`).
+     *
+     * @return HasOne<GridTile, $this>
+     */
+    public function gridTile(): HasOne
+    {
+        return $this->hasOne(GridTile::class);
     }
 
     /**

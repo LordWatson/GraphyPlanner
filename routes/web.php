@@ -31,6 +31,12 @@ use App\Http\Controllers\ClientTabController;
 use App\Http\Controllers\ConnectInviteController;
 use App\Http\Controllers\DailyBriefController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Grids\GridAiController;
+use App\Http\Controllers\Grids\GridPlanController;
+use App\Http\Controllers\Grids\GridPlanIndexController;
+use App\Http\Controllers\Grids\GridProductionController;
+use App\Http\Controllers\Grids\GridTileController;
+use App\Http\Controllers\Grids\GridWorkflowController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
@@ -41,6 +47,7 @@ use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalCampaignController;
 use App\Http\Controllers\Portal\PortalClientController;
 use App\Http\Controllers\Portal\PortalDashboardController;
+use App\Http\Controllers\Portal\PortalGridController;
 use App\Http\Controllers\Portal\PortalInvoiceController;
 use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\PostController;
@@ -66,6 +73,8 @@ Route::inertia('about', 'about')->name('about');
 Route::middleware('throttle:public-token')->group(function () {
     Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
     Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
+    // Step 18.8: a grid review link's decision (approve / request changes, with flagged tiles).
+    Route::post('review/{token}/grid', [ReviewController::class, 'decideGrid'])->name('review.grid.decide');
 
     // Campaigns enhancement C-5.4: a read-only campaign preview for stakeholders without portal access.
     Route::get('share/campaigns/{token}', [CampaignShareLinkController::class, 'show'])->name('campaign-share.show');
@@ -317,6 +326,44 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::delete('campaigns/{campaign}/share-links/{shareLink}', [CampaignShareLinkController::class, 'destroy'])->scopeBindings()->name('campaigns.share-links.destroy');
     Route::post('campaigns/{campaign}/invoice', CampaignInvoiceController::class)->middleware('campaign.feature:invoicing')->name('campaigns.invoice');
 
+    // Phase 18: the Instagram grid planner - plans per client, the planner page, tiles, the
+    // workflow (Step 18.7), turning tiles into posts and scheduling the sequence (18.9-18.11).
+    // The org-wide grids hub (a section of 04 Clients, like the campaigns hub).
+    Route::get('grids', GridPlanIndexController::class)->middleware('portal.redirect')->name('grids.index');
+    Route::get('clients/{client}/grids', [GridPlanController::class, 'index'])->name('clients.grids.index');
+    Route::post('clients/{client}/grids', [GridPlanController::class, 'store'])->name('clients.grids.store');
+    Route::get('grids/{grid}/edit', [GridPlanController::class, 'edit'])->middleware('portal.redirect')->name('grids.edit');
+    Route::put('grids/{grid}', [GridPlanController::class, 'update'])->name('grids.update');
+    Route::delete('grids/{grid}', [GridPlanController::class, 'destroy'])->name('grids.destroy');
+    Route::post('grids/{grid}/duplicate', [GridPlanController::class, 'duplicate'])->name('grids.duplicate');
+    Route::post('grids/{grid}/feed/refresh', [GridPlanController::class, 'refreshFeed'])->middleware('throttle:30,1')->name('grids.feed.refresh');
+    Route::post('grids/{grid}/tiles', [GridTileController::class, 'store'])->name('grids.tiles.store');
+    Route::post('grids/{grid}/tiles/reorder', [GridTileController::class, 'reorder'])->name('grids.tiles.reorder');
+    Route::post('grids/{grid}/split', [GridTileController::class, 'split'])->name('grids.split');
+    Route::scopeBindings()->group(function () {
+        Route::put('grids/{grid}/tiles/{tile}', [GridTileController::class, 'update'])->name('grids.tiles.update');
+        Route::delete('grids/{grid}/tiles/{tile}', [GridTileController::class, 'destroy'])->name('grids.tiles.destroy');
+        Route::post('grids/{grid}/tiles/{tile}/sync-from-post', [GridProductionController::class, 'syncTileFromPost'])->name('grids.tiles.sync-from-post');
+        Route::post('grids/{grid}/tiles/{tile}/restore-post', [GridProductionController::class, 'restorePost'])->name('grids.tiles.restore-post');
+    });
+    Route::post('grids/{grid}/transition', [GridWorkflowController::class, 'transition'])->name('grids.transition');
+    Route::post('grids/{grid}/override-approval', [GridWorkflowController::class, 'overrideApproval'])->name('grids.override-approval');
+    Route::post('grids/{grid}/comments', [GridWorkflowController::class, 'comment'])->name('grids.comments.store');
+    Route::post('grids/{grid}/posts', [GridProductionController::class, 'createPosts'])->name('grids.posts.store');
+    Route::post('grids/{grid}/posts/bulk', [GridProductionController::class, 'bulkMove'])->name('grids.posts.bulk');
+    Route::get('grids/{grid}/schedule', [GridProductionController::class, 'previewSchedule'])->name('grids.schedule.preview');
+    Route::post('grids/{grid}/schedule', [GridProductionController::class, 'applySchedule'])->name('grids.schedule');
+    Route::post('grids/{grid}/schedule-approved', [GridProductionController::class, 'scheduleApproved'])->name('grids.schedule-approved');
+    Route::post('grids/{grid}/hold', [GridProductionController::class, 'holdRest'])->name('grids.hold');
+    Route::post('grids/{grid}/outside-posts/{post}', [GridProductionController::class, 'addOutsidePost'])->name('grids.outside-posts.store');
+    // Step 18.12: AI suggestions for a grid (never saved by themselves).
+    Route::middleware('throttle:ai')->group(function () {
+        Route::post('grids/{grid}/ai/captions', [GridAiController::class, 'captions'])->name('grids.ai.captions');
+        Route::post('grids/{grid}/ai/balance', [GridAiController::class, 'balance'])->name('grids.ai.balance');
+    });
+    Route::post('grids/{grid}/tiles/{tile}/ai/fill', [GridAiController::class, 'fillSlot'])->scopeBindings()->middleware('throttle:ai-images')->name('grids.tiles.ai.fill');
+    Route::post('grids/{grid}/tiles/{tile}/ai/use', [GridAiController::class, 'useVariant'])->scopeBindings()->name('grids.tiles.ai.use');
+
     Route::get('clients/{client}/assets', [AssetController::class, 'index'])
         ->name('clients.assets.index');
     Route::post('clients/{client}/assets', [AssetController::class, 'store'])
@@ -448,6 +495,11 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
     Route::post('posts/{post}/decide', [PortalPostController::class, 'decide'])->name('posts.decide');
     Route::post('posts/{post}/comments', [PortalPostController::class, 'comment'])->name('posts.comments.store');
+    // Phase 18: the client's grids (only once sent to them; see `EnsureClientPortalAccess`).
+    Route::get('grids', [PortalGridController::class, 'index'])->name('grids.index');
+    Route::get('grids/{grid}', [PortalGridController::class, 'show'])->name('grids.show');
+    Route::post('grids/{grid}/decide', [PortalGridController::class, 'decide'])->name('grids.decide');
+    Route::post('grids/{grid}/comments', [PortalGridController::class, 'comment'])->name('grids.comments.store');
     Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
     Route::get('invoices/{invoice}/pdf', [PortalInvoiceController::class, 'pdf'])->name('invoices.pdf');
@@ -574,6 +626,17 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('campaigns.destroy');
     Route::post('campaigns/{campaign}/transition', [CampaignController::class, 'transition'])
         ->name('campaigns.transition');
+
+    // Phase 18: the grid planner, read-only (the writes stay listed so the 403 can be asserted).
+    Route::get('grids', GridPlanIndexController::class)->name('grids.index');
+    Route::get('clients/{client}/grids', [GridPlanController::class, 'index'])->name('clients.grids.index');
+    Route::post('clients/{client}/grids', [GridPlanController::class, 'store'])->name('clients.grids.store');
+    Route::get('grids/{grid}/edit', [GridPlanController::class, 'edit'])->name('grids.edit');
+    Route::put('grids/{grid}', [GridPlanController::class, 'update'])->name('grids.update');
+    Route::post('grids/{grid}/tiles', [GridTileController::class, 'store'])->name('grids.tiles.store');
+    Route::post('grids/{grid}/tiles/reorder', [GridTileController::class, 'reorder'])->name('grids.tiles.reorder');
+    Route::post('grids/{grid}/transition', [GridWorkflowController::class, 'transition'])->name('grids.transition');
+    Route::get('grids/{grid}/schedule', [GridProductionController::class, 'previewSchedule'])->name('grids.schedule.preview');
 
     Route::get('clients/{client}/assets', [AssetController::class, 'index'])
         ->name('clients.assets.index');

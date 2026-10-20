@@ -1,6 +1,6 @@
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { Link, router } from '@inertiajs/react';
-import { CalendarX2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarX2, ChevronLeft, ChevronRight, Grid3x3 } from 'lucide-react';
 import type { DragEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
@@ -45,6 +45,9 @@ export type Occurrence = {
     /** Campaigns enhancement C-1.3: the campaign chip. */
     campaign_code?: string | null;
     campaign_colour?: string | null;
+    /** Step 18.11: the grid chip, when the post was made from a grid tile. */
+    grid_plan_id?: number | null;
+    grid_tile_position?: number | null;
     status: string;
     status_label: string;
     master_caption: string | null;
@@ -60,6 +63,8 @@ export type CalendarFilters = {
     campaign_id: number | null;
     status: string | null;
     platform: string | null;
+    /** Step 18.11: "Show this grid" (internal calendar only). */
+    grid_id?: number | null;
 };
 
 /** Step I-2.3: the date range (inclusive, `Y-m-d`) the server loaded occurrences for. */
@@ -76,6 +81,8 @@ export type CalendarPayload = {
         campaigns: NamedOption[];
         statuses: Option[];
         platforms: Option[];
+        /** Step 18.11: grids with posts (internal calendar only). */
+        grids?: NamedOption[];
     };
     /** Posts the viewer may drag to another day — internal calendar only. */
     reschedulablePostIds?: number[];
@@ -400,6 +407,16 @@ export function ContentCalendar({
                         : (occurrence.master_caption ?? 'Untitled post')}
                 </span>
                 <span className="text-muted-foreground flex min-w-0 items-center gap-1.5">
+                    {occurrence.grid_plan_id && (
+                        <span
+                            className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px]"
+                            title={`From a grid · tile ${occurrence.grid_tile_position}`}
+                        >
+                            <Grid3x3 className="size-2.5" aria-hidden />
+                            <span className="sr-only">Grid tile</span>
+                            {occurrence.grid_tile_position}
+                        </span>
+                    )}
                     {occurrence.campaign_id !== null && (
                         <span
                             className="inline-flex shrink-0 items-center gap-1"
@@ -847,6 +864,35 @@ export function ContentCalendar({
                         ))}
                     </SelectContent>
                 </Select>
+
+                {filterOptions.grids && filterOptions.grids.length > 0 && (
+                    <Select
+                        value={
+                            filters.grid_id ? String(filters.grid_id) : 'all'
+                        }
+                        onValueChange={(value) =>
+                            applyFilter(
+                                'grid_id',
+                                value === 'all' ? null : value,
+                            )
+                        }
+                    >
+                        <SelectTrigger size="sm" className="w-40">
+                            <SelectValue placeholder="Grid" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All posts</SelectItem>
+                            {filterOptions.grids.map((grid) => (
+                                <SelectItem
+                                    key={grid.id}
+                                    value={String(grid.id)}
+                                >
+                                    Show grid: {grid.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
 
                 <Select
                     value={filters.status ?? 'all'}

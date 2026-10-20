@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\GridPlanStatus;
 use App\Enums\PostStatus;
+use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -33,6 +35,37 @@ class SharedPropsCache
             ->count());
     }
 
+    /**
+     * Phase 18: the portal's "Grids" nav item — how many grids the client can see, and how many
+     * are waiting on them. Busted when a grid changes status or is deleted (`GridPlan::booted`).
+     *
+     * @return array{visible: int, waiting: int}
+     */
+    public function portalGrids(int $clientId): array
+    {
+        /** @var array{visible: int, waiting: int} $counts */
+        $counts = Cache::remember(self::portalGridsKey($clientId), self::TTL_SECONDS, function () use ($clientId) {
+            $statuses = GridPlan::query()
+                ->withoutGlobalScopes()
+                ->whereNull('deleted_at')
+                ->where('client_id', $clientId)
+                ->whereIn('status', GridPlanStatus::clientVisible())
+                ->pluck('status');
+
+            return [
+                'visible' => $statuses->count(),
+                'waiting' => $statuses->filter(fn (GridPlanStatus $status) => $status === GridPlanStatus::WaitingClient)->count(),
+            ];
+        });
+
+        return $counts;
+    }
+
+    public static function forgetPortalGrids(int $clientId): void
+    {
+        Cache::forget(self::portalGridsKey($clientId));
+    }
+
     public static function forgetUnreadNotifications(int $userId): void
     {
         Cache::forget(self::unreadKey($userId));
@@ -46,6 +79,11 @@ class SharedPropsCache
     private static function unreadKey(int $userId): string
     {
         return "shared-props:users:{$userId}:unread-notifications";
+    }
+
+    private static function portalGridsKey(int $clientId): string
+    {
+        return "shared-props:clients:{$clientId}:portal-grids";
     }
 
     private static function pendingApprovalsKey(int $clientId): string

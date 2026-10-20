@@ -11,6 +11,8 @@ enum ImageAspectRatio: string
 {
     case Square_1_1 = '1:1';
     case Portrait_4_5 = '4:5';
+    // Step 18.12: the Instagram profile grid's tile shape ("Fill this slot" in the grid planner).
+    case Classic_3_4 = '3:4';
     case Story_9_16 = '9:16';
     case Landscape_16_9 = '16:9';
     case Link_1_91_1 = '1.91:1';
@@ -20,6 +22,7 @@ enum ImageAspectRatio: string
         return match ($this) {
             self::Square_1_1 => 'Square',
             self::Portrait_4_5 => 'Portrait',
+            self::Classic_3_4 => 'Grid tile',
             self::Story_9_16 => 'Story',
             self::Landscape_16_9 => 'Landscape',
             self::Link_1_91_1 => 'Link',
@@ -43,6 +46,7 @@ enum ImageAspectRatio: string
         return match ($this) {
             self::Square_1_1 => 1.0,
             self::Portrait_4_5 => 4 / 5,
+            self::Classic_3_4 => 3 / 4,
             self::Story_9_16 => 9 / 16,
             self::Landscape_16_9 => 16 / 9,
             self::Link_1_91_1 => 1.91,

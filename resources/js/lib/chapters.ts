@@ -91,6 +91,8 @@ export const chapters: Record<ChapterKey, Chapter> = {
             '/campaigns',
             '/campaign-templates',
             '/posts',
+            // Phase 18: the Instagram grid planner.
+            '/grids',
             '/ai-trends',
             '/ai-post-ideas',
         ],

@@ -5,6 +5,7 @@ import {
     CheckCircle2,
     ClipboardCheck,
     Clock,
+    Grid3x3,
     ImageOff,
     Megaphone,
     WifiOff,
@@ -15,6 +16,7 @@ import { StatusPill } from '@/components/status-pill';
 import { needsAttention } from '@/routes';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
+import { edit as editGrid } from '@/routes/grids';
 import { edit as editPost } from '@/routes/posts';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +55,17 @@ type NeedsAttentionItems = {
     missingMedia: Bucket<PostRow>;
     disconnectedAccounts: Bucket<DisconnectedAccountRow>;
     campaigns: Bucket<CampaignRow>;
+    /** Step 18.11: grids whose publish order is at risk. */
+    gridRisks?: Bucket<GridRiskRow>;
+};
+
+type GridRiskRow = {
+    grid_plan_id: number;
+    name: string;
+    client_id: number;
+    client_name: string;
+    reason: string;
+    later_count: number;
 };
 
 /** Campaigns enhancement C-1.4: an open campaign in trouble, with the reason in words. */
@@ -198,7 +211,9 @@ export default function Home({ items }: HomeProps) {
         items.waitingApprovals.total +
         items.missingMedia.total +
         items.disconnectedAccounts.total +
-        items.campaigns.total;
+        items.campaigns.total +
+        (items.gridRisks?.total ?? 0);
+    const gridRisks = items.gridRisks ?? { items: [], total: 0 };
 
     const lanes = [
         {
@@ -287,6 +302,45 @@ export default function Home({ items }: HomeProps) {
                 />
 
                 <div className="animate-rise flex flex-col [animation-delay:80ms]">
+                    {gridRisks.total > 0 && (
+                        <Lane
+                            id="lane-grids"
+                            index="00 — Grids"
+                            icon={Grid3x3}
+                            title="Grid order at risk"
+                            description="A grid post failed or left the schedule while later tiles are still going out"
+                            count={gridRisks.total}
+                            shown={gridRisks.items.length}
+                            accentClassName="bg-destructive/10 text-destructive"
+                            emptyLabel="Every grid is in order."
+                        >
+                            {gridRisks.items.map((row) => (
+                                <li key={row.grid_plan_id}>
+                                    <Link
+                                        href={editGrid(row.grid_plan_id)}
+                                        className="group hover:bg-muted/50 flex items-center justify-between gap-3 px-5 py-3.5 transition-colors"
+                                    >
+                                        <span className="flex min-w-0 flex-col gap-1">
+                                            <span className="group-hover:text-primary truncate text-sm font-medium">
+                                                {row.name}
+                                            </span>
+                                            <span className="text-muted-foreground truncate text-xs">
+                                                {row.client_name} · {row.reason}{' '}
+                                                {row.later_count} later{' '}
+                                                {row.later_count === 1
+                                                    ? 'post is'
+                                                    : 'posts are'}{' '}
+                                                still scheduled.
+                                            </span>
+                                        </span>
+                                        <span className="text-destructive shrink-0 text-xs font-semibold">
+                                            Hold the rest
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </Lane>
+                    )}
                     <Lane
                         id="lane-failed"
                         index="01 — Publishing"

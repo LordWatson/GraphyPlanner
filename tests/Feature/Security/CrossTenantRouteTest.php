@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Security;
 
+use App\Enums\GridPlanStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
@@ -18,6 +19,8 @@ use App\Models\CampaignTemplate;
 use App\Models\Client;
 use App\Models\ClientInvitation;
 use App\Models\ConnectInvite;
+use App\Models\GridPlan;
+use App\Models\GridTile;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Organization;
@@ -171,6 +174,7 @@ class CrossTenantRouteTest extends TestCase
         $trend = AiTrend::create(['org_id' => $org->id, 'client_id' => $client->id, 'title' => 'Trend', 'summary' => 'Summary', 'platforms' => ['instagram'], 'confidence' => 0.5]);
         $idea = AiPostIdea::create(['org_id' => $org->id, 'client_id' => $client->id, 'title' => 'Idea', 'description' => 'Description', 'platforms' => ['instagram']]);
         $campaign = Campaign::factory()->for($client)->create(['org_id' => $org->id]);
+        $grid = GridPlan::factory()->create(['client_id' => $client->id, 'status' => GridPlanStatus::WaitingClient]);
 
         return [
             Organization::class => $org,
@@ -195,6 +199,8 @@ class CrossTenantRouteTest extends TestCase
             AiPostIdea::class => $idea,
             AiImageGeneration::class => $generation,
             AiImageVariant::class => AiImageVariant::factory()->create(['generation_id' => $generation->id, 'org_id' => $org->id]),
+            GridPlan::class => $grid,
+            GridTile::class => GridTile::factory()->create(['grid_plan_id' => $grid->id]),
         ];
     }
 }

@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
+use App\Contracts\GridAiProvider;
 use App\Contracts\ImageProvider;
 use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
+use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
@@ -14,6 +16,7 @@ use App\Models\BrandBrain;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\ClientInvitation;
+use App\Models\GridPlan;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Organization;
@@ -29,6 +32,7 @@ use App\Policies\BrandBrainPolicy;
 use App\Policies\CampaignPolicy;
 use App\Policies\ClientInvitationPolicy;
 use App\Policies\ClientPolicy;
+use App\Policies\GridPlanPolicy;
 use App\Policies\InvoiceItemPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\OrganizationPolicy;
@@ -44,6 +48,7 @@ use App\Services\AI\Images\NullImageProvider;
 use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\Analytics\AnalyticsCache;
+use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
 use App\Services\Publishing\MetaGraphMusicProvider;
@@ -90,6 +95,10 @@ class AppServiceProvider extends ServiceProvider
         // App\Contracts\MusicProvider needs to change.
         $this->app->bind(MusicProvider::class, MetaGraphMusicProvider::class);
 
+        // Step 18.3: the grid preview's live profile feed — Meta's Graph API when the account has
+        // done the Facebook Login connect, else the posts the app published; never throws.
+        $this->app->bind(ProfileFeedSource::class, CompositeProfileFeedSource::class);
+
         // AiProvider contract (Step 2.1) resolves to DeepSeekProvider (Step 2.2) only when
         // AI is enabled (config('ai.enabled'), env AI_ENABLED) AND a non-empty DEEPSEEK_API_KEY
         // is configured; otherwise it safely falls back to NullAiProvider, which never calls an
@@ -103,6 +112,14 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return $this->app->make(NullAiProvider::class);
+        });
+
+        // Step 18.12: the grid planner's AI help — same rule as AiProvider (DeepSeek only when AI is
+        // enabled and a key is set; otherwise the Null provider, which never calls a vendor).
+        $this->app->bind(GridAiProvider::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
         });
 
         // ImageProvider contract (Step 16.1) resolves to the configured vendor (Gemini, Step 16.6,
@@ -161,6 +178,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Asset::class, AssetPolicy::class);
         Gate::policy(AiImageGeneration::class, AiImageGenerationPolicy::class);
         Gate::policy(Post::class, PostPolicy::class);
+        // Phase 18: Instagram grid plans.
+        Gate::policy(GridPlan::class, GridPlanPolicy::class);
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(StaffInvitation::class, StaffInvitationPolicy::class);
         Gate::policy(User::class, StaffPolicy::class);

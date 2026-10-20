@@ -3,12 +3,14 @@
 namespace App\Actions\Clients;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\Platform;
 use App\Enums\Role;
 use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\ClientInvitation;
 use App\Models\DailyBrief;
+use App\Models\GridPlan;
 use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
@@ -47,6 +49,12 @@ class BuildClientPageHeaderAction
             'createInvitation' => $user->can('create', [ClientInvitation::class, $client]),
         ];
 
+        // Phase 18: the Grid tab always shows for staff; a new grid needs one of the client's
+        // Instagram accounts (the tab explains when there isn't one).
+        $hasInstagram = $client->socialAccounts()->where('platform', Platform::Instagram)->exists();
+        $can['viewGrids'] = $user->can('viewAny', [GridPlan::class, $client]);
+        $can['createGrid'] = $hasInstagram && $user->can('create', [GridPlan::class, $client]);
+
         $counts = Client::query()
             ->whereKey($client->id)
             ->withCount([
@@ -61,6 +69,7 @@ class BuildClientPageHeaderAction
                     ->whereNull('revoked_at'),
                 'aiTrends',
                 'aiPostIdeas',
+                'gridPlans',
             ])
             ->firstOrFail();
 
@@ -73,6 +82,7 @@ class BuildClientPageHeaderAction
                 'campaigns' => $can['viewCampaigns'] ? (int) $counts->campaigns_count : 0,
                 'posts' => $can['viewPosts'] ? (int) $counts->posts_count : 0,
                 'assets' => $can['viewAssets'] ? (int) $counts->assets_count : 0,
+                'grids' => $can['viewGrids'] ? (int) $counts->grid_plans_count : 0,
                 'billing' => $can['viewBilling'] ? [
                     'invoices' => (int) $counts->invoices_count,
                     'outstanding' => $this->outstanding($client),

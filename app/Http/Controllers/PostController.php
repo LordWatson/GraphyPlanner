@@ -34,10 +34,12 @@ use App\Models\PostActivityLog;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Services\ClientHashtagService;
+use App\Services\Grids\GridPlanService;
 use App\Services\PostNotificationService;
 use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
+use App\Support\Grids\GridLibrary;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -75,6 +77,7 @@ class PostController extends Controller
         ClientHashtagService $hashtags,
         ApplyCampaignDefaultsAction $defaults,
         PlatformRolloutGate $rollout,
+        GridPlanService $grids,
     ): Response {
         $this->authorize('view', $post);
 
@@ -161,6 +164,8 @@ class PostController extends Controller
             ],
             // Phase 16: the AI Image Studio tab (Owner/Strategist generate, Designer read-only).
             // A closure so the studio's partial reloads (`only: ['imageStudio']`) skip the rest.
+            // Step 18.9: "From grid: {name} · Tile 4 · Goes out 3rd", for a post made from a tile.
+            'grid' => GridLibrary::postChip($post, $grids),
             'imageStudio' => fn () => (bool) config('ai.enabled', false) && $user->can('viewAnyForClient', [AiImageGeneration::class, $client])
                 ? $studio->forPost($post, $user)
                 : null,

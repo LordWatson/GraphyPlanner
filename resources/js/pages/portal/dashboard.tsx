@@ -9,6 +9,7 @@ import {
     ArrowRight,
     CalendarDays,
     CheckCircle2,
+    Grid3x3,
     MessageSquareWarning,
 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ import { PlatformIcon } from '@/components/platform-icon';
 import { PortalPostRow } from '@/components/portal-post-row';
 import { Button } from '@/components/ui/button';
 import { calendar as portalCalendar } from '@/routes/portal';
+import { show as portalGridsShow } from '@/routes/portal/grids';
 import {
     index as portalPostsIndex,
     show as portalPostsShow,
@@ -80,9 +82,12 @@ export default function PortalDashboard({
     client,
     items,
     connectAccounts = [],
+    waitingGrids = [],
 }: {
     client: { name: string };
     items: DashboardItems;
+    /** Phase 18: grids sent to the client and waiting on their decision. */
+    waitingGrids?: { id: number; name: string; tile_count: number }[];
     /** Step M-2.8: the client's own account slots, to connect without sharing a password. */
     connectAccounts?: ConnectSlot[];
 }) {
@@ -149,6 +154,49 @@ export default function PortalDashboard({
                         )
                     }
                 />
+
+                {waitingGrids.length > 0 && (
+                    <Panel
+                        eyebrow="Your sign-off"
+                        title={
+                            waitingGrids.length === 1
+                                ? 'Grid waiting on you'
+                                : 'Grids waiting on you'
+                        }
+                        bodyClassName="p-2"
+                    >
+                        <ul className="flex flex-col">
+                            {waitingGrids.map((grid) => (
+                                <li key={grid.id}>
+                                    <Link
+                                        href={portalGridsShow(grid.id)}
+                                        className="group hover:bg-muted/60 flex items-center gap-3.5 rounded-xl px-3 py-3 transition-colors"
+                                    >
+                                        <span className="bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
+                                            <Grid3x3 className="size-4" />
+                                        </span>
+                                        <span className="flex min-w-0 flex-1 flex-col">
+                                            <span className="group-hover:text-primary truncate text-sm font-medium">
+                                                {grid.name}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {grid.tile_count}{' '}
+                                                {grid.tile_count === 1
+                                                    ? 'tile'
+                                                    : 'tiles'}{' '}
+                                                · how your profile will look
+                                            </span>
+                                        </span>
+                                        <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-semibold">
+                                            See the grid
+                                            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </Panel>
+                )}
 
                 <div className="animate-rise grid grid-cols-1 gap-5 [animation-delay:80ms] lg:grid-cols-[1.35fr_1fr]">
                     {waiting.length > 0 ? (

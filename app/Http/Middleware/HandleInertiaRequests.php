@@ -73,7 +73,11 @@ class HandleInertiaRequests extends Middleware
                 $current = $user();
 
                 return $current && $current->role === Role::ClientReviewer && $current->client_id
-                    ? ['pendingApprovals' => $cache->pendingApprovals($current->client_id)]
+                    ? [
+                        'pendingApprovals' => $cache->pendingApprovals($current->client_id),
+                        // Phase 18: the "Grids" nav item shows once the client has a grid to see.
+                        'grids' => $cache->portalGrids($current->client_id),
+                    ]
                     : null;
             },
             // Shared on every Inertia response so the notification bell's unread badge is always

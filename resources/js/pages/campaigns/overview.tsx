@@ -1,4 +1,7 @@
 import { Deferred, Link, router, usePage } from '@inertiajs/react';
+import { GridCard } from '@/components/grids/grid-card';
+import type { GridSummary } from '@/components/grids/types';
+import { edit as editGrid } from '@/routes/grids';
 import {
     Activity,
     CalendarClock,
@@ -6,6 +9,7 @@ import {
     Circle,
     CircleAlert,
     FileText,
+    Grid3x3,
     HeartPulse,
     MessagesSquare,
     Receipt,
@@ -65,6 +69,8 @@ type OverviewProps = CampaignWorkspaceProps & {
     } | null;
     comments?: CampaignComment[];
     recentActivity?: ActivityItem[];
+    /** Phase 18: the campaign's Instagram grid plans. */
+    grids?: GridSummary[];
     mentionables: MentionableUser[];
 };
 
@@ -107,6 +113,7 @@ export default function CampaignOverview(props: OverviewProps) {
         brief,
         comments,
         recentActivity,
+        grids,
         mentionables,
         launchChecklist,
     } = props;
@@ -457,6 +464,27 @@ export default function CampaignOverview(props: OverviewProps) {
                             )}
                         </Panel>
                     )}
+
+                    <Deferred data="grids" fallback={null}>
+                        {(grids ?? []).length > 0 && (
+                            <Panel
+                                icon={Grid3x3}
+                                eyebrow="Instagram"
+                                title="Grids"
+                            >
+                                <ul className="grid gap-3">
+                                    {(grids ?? []).map((grid) => (
+                                        <li key={grid.id}>
+                                            <GridCard
+                                                grid={grid}
+                                                href={editGrid(grid.id)}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Panel>
+                        )}
+                    </Deferred>
 
                     <Panel
                         icon={Activity}

@@ -4,9 +4,11 @@ namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
+use App\Contracts\GridAiProvider;
 use App\Enums\Platform;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\GridPlan;
 use App\Models\Post;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
@@ -35,7 +37,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider
+class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -248,6 +250,98 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider
         );
 
         return $payload === null ? new AiCampaignWrapDraft : AiCampaignWrapDraft::fromArray($payload);
+    }
+
+    /**
+     * Step 18.12: two caption ideas per grid tile, in the brand voice. The grid is about the
+     * look, so these are starting points the team picks from ("Use") — never applied here.
+     */
+    public function suggestTileCaptions(GridPlan $plan, array $tiles): array
+    {
+        $plan->loadMissing('client');
+        $lines = [
+            'Suggest 2 short Instagram caption ideas for each tile of this planned profile grid, in the brand voice.',
+            'Each idea is a starting point for a human; keep it under 300 characters, no hashtags.',
+            'Tiles (position 1 is top-left, the newest post):',
+        ];
+
+        foreach ($tiles as $tile) {
+            $lines[] = "- tile_id {$tile['tile_id']} (position {$tile['position']}, {$tile['kind']}): ".$this->guardrail->scrub($tile['description']);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"tiles": [{"tile_id": number, "captions": string[]}]}';
+
+        $payload = $this->requestStructured(
+            method: 'suggestTileCaptions',
+            systemPrompt: $this->buildSystemPrompt($plan->client),
+            userPrompt: implode("\n", $lines),
+            validator: fn (array $data): ?string => is_array($data['tiles'] ?? null) ? null : 'tiles must be an array',
+            context: ['org_id' => $plan->org_id, 'client_id' => $plan->client_id, 'grid_plan_id' => $plan->id],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $known = array_column($tiles, 'tile_id');
+        $result = [];
+
+        foreach ((array) $payload['tiles'] as $row) {
+            $id = is_array($row) ? (int) ($row['tile_id'] ?? 0) : 0;
+
+            if (! in_array($id, $known, true)) {
+                continue;
+            }
+
+            $result[$id] = array_values(array_slice(array_filter(array_map(
+                fn ($caption) => is_string($caption) ? mb_substr(trim($caption), 0, Platform::Instagram->captionLimit()) : '',
+                (array) ($row['captions'] ?? []),
+            ), fn (string $caption) => $caption !== ''), 0, 2));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Step 18.12: a few plain notes on the grid's balance against the Brand Brain's palette and
+     * pillars. Suggestions only; the team reorders by hand.
+     */
+    public function checkGridBalance(GridPlan $plan, array $tiles): array
+    {
+        $plan->loadMissing('client');
+        $lines = [
+            'Review the balance of this planned Instagram profile grid (3 tiles per row, position 1 top-left).',
+            'Look for repetition (similar shots side by side or in a row), colour runs that clash or crowd, and the mix of content pillars.',
+            'Compare against the brand palette and pillars in the company context. Give at most 5 short, specific notes a designer can act on, naming tiles by number, e.g. "Three product shots in a row on row 2. Try moving tile 5 up."',
+            'If the grid already looks balanced, say so in one note.',
+            'Tiles:',
+        ];
+
+        foreach ($tiles as $tile) {
+            $lines[] = "- tile {$tile['position']} (row {$tile['row']}, {$tile['kind']}; colours: ".implode(', ', $tile['colours']).'): '.$this->guardrail->scrub($tile['description']);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"notes": string[]}';
+
+        $payload = $this->requestStructured(
+            method: 'checkGridBalance',
+            systemPrompt: $this->buildSystemPrompt($plan->client),
+            userPrompt: implode("\n", $lines),
+            validator: fn (array $data): ?string => is_array($data['notes'] ?? null) ? null : 'notes must be an array',
+            context: ['org_id' => $plan->org_id, 'client_id' => $plan->client_id, 'grid_plan_id' => $plan->id],
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        return array_values(array_slice(array_filter(array_map(
+            fn ($note) => is_string($note) ? mb_substr(trim($note), 0, 300) : '',
+            (array) $payload['notes'],
+        ), fn (string $note) => $note !== ''), 0, 5));
     }
 
     private function buildCampaignBriefUserPrompt(Campaign $campaign): string

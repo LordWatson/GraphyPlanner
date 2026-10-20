@@ -15,9 +15,12 @@ use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\CampaignBriefRevision;
 use App\Models\CampaignComment;
+use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\User;
+use App\Services\Grids\GridPlanService;
 use App\Support\Campaigns\CampaignPresenter;
+use App\Support\Grids\GridLibrary;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -34,7 +37,7 @@ class CampaignWorkspaceController extends Controller
 
     public function __construct(private readonly BuildCampaignWorkspaceHeaderAction $header) {}
 
-    public function show(Request $request, Campaign $campaign, GetCampaignOverviewAction $overview, ListCampaignActivityAction $activity): Response
+    public function show(Request $request, Campaign $campaign, GetCampaignOverviewAction $overview, ListCampaignActivityAction $activity, GridPlanService $grids): Response
     {
         $this->authorize('view', $campaign);
 
@@ -43,6 +46,15 @@ class CampaignWorkspaceController extends Controller
             ...$overview($campaign),
             'comments' => Inertia::defer(fn () => $this->comments($campaign)),
             'recentActivity' => Inertia::defer(fn () => $activity($campaign, 6)->items()),
+            // Phase 18: the campaign's Instagram grid plans.
+            'grids' => Inertia::defer(fn () => GridPlan::query()
+                ->where('campaign_id', $campaign->id)
+                ->with(['socialAccount', 'campaign', 'tiles.assets', 'tiles.coverAsset', 'tiles.post.targets'])
+                ->latest('updated_at')
+                ->get()
+                ->map(fn (GridPlan $plan) => GridLibrary::summary($plan, $grids))
+                ->values()
+                ->all()),
             // Step C-5.3: only staff can be @-mentioned.
             'mentionables' => User::query()
                 ->where('org_id', $campaign->org_id)

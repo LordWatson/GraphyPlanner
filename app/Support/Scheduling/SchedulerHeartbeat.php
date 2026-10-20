@@ -30,6 +30,8 @@ final class SchedulerHeartbeat
         'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 1440],
         'analytics:send-scheduled-reports' => ['label' => 'Scheduled reports', 'interval_minutes' => 1440],
         'campaigns:send-due-reminders' => ['label' => 'Campaign due reminders', 'interval_minutes' => 1440],
+        // Phase 18: weekly.
+        'grids:prune' => ['label' => 'Grid plan prune', 'interval_minutes' => 10080],
     ];
 
     public static function record(string $command): void

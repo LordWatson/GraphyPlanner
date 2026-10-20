@@ -18,6 +18,7 @@ use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Database\Seeders\Concerns\SeedsCampaignShowcase;
+use Database\Seeders\Concerns\SeedsGridShowcase;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -29,7 +30,7 @@ use Illuminate\Support\Facades\Hash;
  */
 class PreviewSeeder extends Seeder
 {
-    use SeedsCampaignShowcase;
+    use SeedsCampaignShowcase, SeedsGridShowcase;
 
     public function run(): void
     {
@@ -122,5 +123,8 @@ class PreviewSeeder extends Seeder
 
         // Campaigns enhancement C-9.1: every campaign tab has something real to show in preview.
         $this->seedCampaignShowcase($client, $owner, collect([$socialAccount]), 'Fixture');
+
+        // Step 18.13: an approved nine-tile grid so `/preview` shows the grid planner off.
+        $this->seedApprovedGrid($client, $owner, $socialAccount, 'Fixture');
     }
 }

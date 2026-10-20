@@ -11,12 +11,15 @@
 const MIRRORED_PATHS: RegExp[] = [
     /^\/(dashboard|calendar|home)$/,
     /^\/clients(\/create)?$/,
-    /^\/clients\/\d+(\/(edit|brand-brain|assets|analytics|posts|media|campaigns|billing|portal-access|ai|briefs))?$/,
+    /^\/clients\/\d+(\/(edit|brand-brain|assets|analytics|posts|media|campaigns|grids|billing|portal-access|ai|briefs))?$/,
     /^\/invoices(\/export)?$/,
     /^\/invoices\/\d+(\/edit)?$/,
     /^\/campaigns$/,
     /^\/campaigns\/\d+(\/(edit|brief|plan|board|assets|approvals|results|activity))?$/,
     /^\/posts\/\d+\/(edit|music-search)$/,
+    // Phase 18: the grid planner and its schedule preview.
+    /^\/grids$/,
+    /^\/grids\/\d+\/(edit|schedule)$/,
     /^\/analytics(\/(export|pdf|reports))?$/,
     /^\/analytics\/reports\/\d+(\/(export|pdf))?$/,
 ];

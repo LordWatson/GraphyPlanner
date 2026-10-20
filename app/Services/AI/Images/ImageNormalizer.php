@@ -81,6 +81,37 @@ class ImageNormalizer
     }
 
     /**
+     * Step 18.12 — the image's most common colours, worked out locally (a 24×24 sample, each pixel
+     * snapped to a coarse colour cube), as `#rrggbb`, most common first. Empty when unreadable.
+     *
+     * @return list<string>
+     */
+    public function dominantColours(string $bytes, int $count = 2): array
+    {
+        try {
+            $image = $this->manager->read($bytes);
+            $image->resize(24, 24);
+        } catch (Throwable) {
+            return [];
+        }
+
+        $buckets = [];
+
+        for ($x = 0; $x < 24; $x++) {
+            for ($y = 0; $y < 24; $y++) {
+                [$r, $g, $b] = $image->pickColor($x, $y)->convertTo('rgb')->toArray();
+                // 4 levels per channel: close shades count as one colour.
+                $key = sprintf('#%02x%02x%02x', intdiv((int) $r, 64) * 64 + 32, intdiv((int) $g, 64) * 64 + 32, intdiv((int) $b, 64) * 64 + 32);
+                $buckets[$key] = ($buckets[$key] ?? 0) + 1;
+            }
+        }
+
+        arsort($buckets);
+
+        return array_slice(array_map('strval', array_keys($buckets)), 0, max(1, $count));
+    }
+
+    /**
      * A solid-colour PNG placeholder of exact dimensions (NullImageProvider).
      */
     public function solidPng(int $width, int $height, string $hex): string

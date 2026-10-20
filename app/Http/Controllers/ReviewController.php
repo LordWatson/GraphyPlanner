@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Grids\DecideGridPlanAction;
 use App\Actions\Posts\TransitionPostStatusAction;
+use App\Enums\GridPlanStatus;
 use App\Enums\PostStatus;
+use App\Http\Requests\Grids\GridDecisionRequest;
 use App\Http\Requests\ReviewDecisionRequest;
+use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\ReviewToken;
+use App\Support\Grids\GridPlanPresenter;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -18,15 +23,24 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * strictly to the token's client/post, with no money fields and only Approve / Request changes
  * actions. Access is granted purely by possession of a valid, unexpired, unrevoked `ReviewToken`
  * — never by a logged-in session — per spec §10/§12.
+ *
+ * Step 18.8: a token carrying a grid plan shows that grid instead (`review/grid`), checked the
+ * same way (hash, expiry, revoked, client scope → 404).
  */
 class ReviewController extends Controller
 {
     /**
-     * Show the post waiting on this token's client for review.
+     * Show the post (or grid) waiting on this token's client for review.
      */
-    public function show(string $token): Response
+    public function show(string $token, GridPlanPresenter $grids): Response
     {
-        $post = $this->resolvePost($token);
+        $reviewToken = $this->resolveToken($token);
+
+        if ($reviewToken->grid_plan_id !== null) {
+            return $this->showGrid($token, $this->resolveGrid($reviewToken), $grids);
+        }
+
+        $post = $this->resolvePost($reviewToken);
 
         return Inertia::render('review/show', [
             'token' => $token,
@@ -47,7 +61,7 @@ class ReviewController extends Controller
                     'thumbnail_url' => $asset->thumbnailUrl(),
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
-                    'source' => $asset->source?->value,
+                    'source' => $asset->source->value,
                     'mime_type' => $asset->mime_type,
                     ...PostMediaPresenter::framing($asset),
                 ])->values(),
@@ -59,6 +73,8 @@ class ReviewController extends Controller
                     ...PostMediaPresenter::channelPreview($target->setRelation('post', $post)),
                 ])->values(),
                 'can_decide' => $post->status === PostStatus::WaitingClient,
+                // Step 18.9: the look was already approved in a grid, so the client only signs off the words.
+                'grid_name' => $post->gridTile?->plan?->name,
                 'comments' => $post->comments
                     ->where('internal_only', false)
                     ->sortByDesc('created_at')
@@ -81,7 +97,11 @@ class ReviewController extends Controller
         string $token,
         TransitionPostStatusAction $action,
     ): RedirectResponse {
-        $post = $this->resolvePost($token);
+        $reviewToken = $this->resolveToken($token);
+
+        abort_if($reviewToken->grid_plan_id !== null, 404);
+
+        $post = $this->resolvePost($reviewToken);
 
         $action(
             $post,
@@ -94,10 +114,45 @@ class ReviewController extends Controller
     }
 
     /**
-     * Resolve the post scoped strictly to a valid token's `client_id` (and `post_id`, when the
-     * token was issued for a single post) — never any other client's data (spec §12).
+     * Step 18.8 — approve the grid or ask for changes (with flagged tiles) through the link.
      */
-    private function resolvePost(string $token): Post
+    public function decideGrid(GridDecisionRequest $request, string $token, DecideGridPlanAction $action): RedirectResponse
+    {
+        $reviewToken = $this->resolveToken($token);
+
+        abort_if($reviewToken->grid_plan_id === null, 404);
+
+        $plan = $this->resolveGrid($reviewToken);
+
+        // A grid that's no longer waiting on the client is refused by the transition itself.
+        $action(
+            $plan,
+            null,
+            GridPlanStatus::from((string) $request->validated('decision')),
+            (int) $request->validated('version'),
+            $request->validated('comment'),
+            $request->flaggedTiles($plan),
+        );
+
+        return to_route('review.show', $token);
+    }
+
+    private function showGrid(string $token, GridPlan $plan, GridPlanPresenter $grids): Response
+    {
+        return Inertia::render('review/grid', [
+            'token' => $token,
+            'client' => ['name' => $plan->client->name],
+            'grid' => $grids->plan($plan, forClient: true),
+            'feed' => $grids->feed($plan),
+            'comments' => $grids->comments($plan, forClient: true),
+            'canDecide' => $plan->status === GridPlanStatus::WaitingClient,
+        ]);
+    }
+
+    /**
+     * A valid, unexpired, unrevoked token whose client isn't archived — else a 404 (spec §12).
+     */
+    private function resolveToken(string $token): ReviewToken
     {
         $reviewToken = ReviewToken::query()
             ->where('token_hash', hash('sha256', $token))
@@ -108,10 +163,35 @@ class ReviewController extends Controller
             throw new NotFoundHttpException;
         }
 
+        return $reviewToken;
+    }
+
+    /**
+     * The token's grid, only while it belongs to the token's client and has been sent to them.
+     */
+    private function resolveGrid(ReviewToken $reviewToken): GridPlan
+    {
+        $plan = GridPlan::query()->withoutGlobalScopes()->whereNull('deleted_at')->with('client')->find($reviewToken->grid_plan_id);
+
+        if ($plan === null || $plan->client_id !== $reviewToken->client_id || ! $plan->status->isClientVisible()) {
+            throw new NotFoundHttpException;
+        }
+
+        return $plan;
+    }
+
+    /**
+     * Resolve the post scoped strictly to the token's `client_id` (and `post_id`, when the token
+     * was issued for a single post) — never any other client's data (spec §12).
+     */
+    private function resolvePost(ReviewToken $reviewToken): Post
+    {
+        $with = ['client', 'targets.socialAccount', 'assets', 'comments.user', 'gridTile.plan'];
+
         $post = $reviewToken->post_id
-            ? $reviewToken->post()->with(['client', 'targets.socialAccount', 'assets', 'comments.user'])->first()
+            ? $reviewToken->post()->with($with)->first()
             : $reviewToken->client->posts()
-                ->with(['client', 'targets.socialAccount', 'assets', 'comments.user'])
+                ->with($with)
                 ->where('status', PostStatus::WaitingClient)
                 ->latest()
                 ->first();
