@@ -2,6 +2,7 @@
 
 namespace App\Services\AI\Images;
 
+use Intervention\Image\Colors\Rgb\Colorspace as RgbColorspace;
 use Intervention\Image\ImageManager;
 use Throwable;
 
@@ -99,7 +100,7 @@ class ImageNormalizer
 
         for ($x = 0; $x < 24; $x++) {
             for ($y = 0; $y < 24; $y++) {
-                [$r, $g, $b] = $image->pickColor($x, $y)->convertTo('rgb')->toArray();
+                [$r, $g, $b] = $image->pickColor($x, $y)->convertTo(RgbColorspace::class)->toArray();
                 // 4 levels per channel: close shades count as one colour.
                 $key = sprintf('#%02x%02x%02x', intdiv((int) $r, 64) * 64 + 32, intdiv((int) $g, 64) * 64 + 32, intdiv((int) $b, 64) * 64 + 32);
                 $buckets[$key] = ($buckets[$key] ?? 0) + 1;

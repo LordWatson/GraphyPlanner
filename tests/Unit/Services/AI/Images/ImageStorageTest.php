@@ -60,4 +60,18 @@ class ImageStorageTest extends TestCase
         $this->assertSame([12, 34], (new ImageNormalizer)->dimensions($this->png(12, 34)));
         $this->assertSame([0, 0], (new ImageNormalizer)->dimensions('not an image'));
     }
+
+    public function test_dominant_colours_reads_real_pixels_most_common_first(): void
+    {
+        // Left two-thirds red, right third blue.
+        $image = imagecreatetruecolor(30, 30);
+        imagefilledrectangle($image, 0, 0, 19, 29, (int) imagecolorallocate($image, 250, 10, 10));
+        imagefilledrectangle($image, 20, 0, 29, 29, (int) imagecolorallocate($image, 10, 10, 250));
+        ob_start();
+        imagejpeg($image, null, 95);
+        $jpeg = (string) ob_get_clean();
+
+        $this->assertSame(['#e02020', '#2020e0'], (new ImageNormalizer)->dominantColours($jpeg));
+        $this->assertSame([], (new ImageNormalizer)->dominantColours('not an image'));
+    }
 }
