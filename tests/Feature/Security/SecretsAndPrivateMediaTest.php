@@ -43,6 +43,9 @@ class SecretsAndPrivateMediaTest extends TestCase
     {
         parent::setUp();
 
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+
         // The real private disk (not `Storage::fake()`, which replaces signed URLs with plain
         // ones), pointed at a throwaway root so the test never touches real files.
         config(['filesystems.disks.local.root' => storage_path('framework/testing/private-files')]);

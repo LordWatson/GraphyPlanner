@@ -6,7 +6,6 @@ import { confirmDialog } from '@/components/confirm-dialog';
 import type { ClientPageProps } from '@/components/clients/client-layout';
 import {
     ClientLayout,
-    getXsrfTokenFromCookie,
     TabHeading,
     TabPanel,
 } from '@/components/clients/client-layout';
@@ -18,15 +17,10 @@ import {
     UploadTile,
 } from '@/components/post-editor/media-picker';
 import type { AssetData } from '@/components/post-editor/types';
+import { http } from '@/lib/http';
 import { index } from '@/routes/clients';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { destroy as destroyAsset } from '@/routes/assets';
-
-const jsonHeaders = () => ({
-    Accept: 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
-    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-});
 
 /**
  * Step I-2.4 — Assets tab (`clients.media`). Uses the post editor's Upload / Browse library
@@ -45,48 +39,28 @@ export default function ClientMediaTab(page: ClientPageProps) {
     const handleUpload = async (file: File) => {
         setUploading(true);
 
-        try {
-            const formData = new FormData();
-            formData.append('source', 'upload');
-            formData.append('file', file);
+        const formData = new FormData();
+        formData.append('source', 'upload');
+        formData.append('file', file);
 
-            const response = await fetch(storeAsset.url(client.id), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: jsonHeaders(),
-                body: formData,
-            });
+        const result = await http.post<{ asset?: AssetData }>(
+            storeAsset.url(client.id),
+            formData,
+        );
+        setUploading(false);
 
-            // The web server rejects oversized bodies (HTTP 413) with an HTML page before
-            // Laravel runs, so there is no JSON message to show.
-            if (response.status === 413) {
-                toast.error(
-                    'This file is larger than the server accepts. Ask an admin to raise the upload limit.',
-                );
+        if (!result.ok || !result.data.asset) {
+            toast.error(
+                result.ok ? 'Unable to upload the asset.' : result.message,
+            );
 
-                return;
-            }
-
-            const data = await response.json();
-
-            if (!response.ok || !data.asset) {
-                toast.error(
-                    typeof data?.message === 'string'
-                        ? data.message
-                        : 'Unable to upload the asset.',
-                );
-
-                return;
-            }
-
-            setUploaded((current) => [data.asset as AssetData, ...current]);
-            toast.success('Uploaded to the library.');
-            refreshCount();
-        } catch {
-            toast.error('Unable to upload the asset.');
-        } finally {
-            setUploading(false);
+            return;
         }
+
+        const asset = result.data.asset;
+        setUploaded((current) => [asset, ...current]);
+        toast.success('Uploaded to the library.');
+        refreshCount();
     };
 
     const handleDelete = async (asset: LibraryAsset): Promise<boolean> => {
@@ -101,19 +75,9 @@ export default function ClientMediaTab(page: ClientPageProps) {
             return false;
         }
 
-        try {
-            const response = await fetch(destroyAsset.url(asset.id), {
-                method: 'DELETE',
-                credentials: 'same-origin',
-                headers: jsonHeaders(),
-            });
+        const result = await http.delete(destroyAsset.url(asset.id));
 
-            if (!response.ok) {
-                toast.error('Unable to remove the asset.');
-
-                return false;
-            }
-        } catch {
+        if (!result.ok) {
             toast.error('Unable to remove the asset.');
 
             return false;

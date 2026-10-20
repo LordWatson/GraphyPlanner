@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Dialog,
     DialogContent,
@@ -26,7 +28,10 @@ export type ConfirmOptions = {
     tone?: 'default' | 'destructive';
 };
 
-type PendingConfirm = ConfirmOptions & { resolve: (ok: boolean) => void };
+type PendingConfirm = ConfirmOptions & {
+    withPassword?: boolean;
+    resolve: (ok: boolean, password?: string) => void;
+};
 
 let pushConfirm: ((pending: PendingConfirm) => void) | null = null;
 
@@ -43,9 +48,33 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
     });
 }
 
+/**
+ * Step I-16.2 / M-1.2 — the same dialog with a password field, for irreversible actions the
+ * server re-checks (`current_password`). Resolves the typed password, or `null` on cancel. The
+ * password is only held long enough to send with the request.
+ */
+export function confirmWithPassword(
+    options: ConfirmOptions,
+): Promise<string | null> {
+    return new Promise((resolve) => {
+        if (!pushConfirm) {
+            resolve(null);
+
+            return;
+        }
+
+        pushConfirm({
+            ...options,
+            withPassword: true,
+            resolve: (ok, password) => resolve(ok ? (password ?? '') : null),
+        });
+    });
+}
+
 export function ConfirmDialogHost() {
     const [pending, setPending] = useState<PendingConfirm | null>(null);
     const [open, setOpen] = useState(false);
+    const [password, setPassword] = useState('');
 
     useEffect(() => {
         pushConfirm = (next) => {
@@ -55,6 +84,7 @@ export function ConfirmDialogHost() {
 
                 return next;
             });
+            setPassword('');
             setOpen(true);
         };
 
@@ -64,10 +94,13 @@ export function ConfirmDialogHost() {
     }, []);
 
     const settle = (ok: boolean) => {
-        pending?.resolve(ok);
+        pending?.resolve(ok, ok ? password : undefined);
         setPending((current) => (current === pending ? null : current));
+        setPassword('');
         setOpen(false);
     };
+
+    const blocked = pending?.withPassword === true && password === '';
 
     return (
         <Dialog open={open} onOpenChange={(next) => !next && settle(false)}>
@@ -82,6 +115,33 @@ export function ConfirmDialogHost() {
                                 </DialogDescription>
                             )}
                         </DialogHeader>
+                        {pending.withPassword && (
+                            <form
+                                id="confirm-dialog-password"
+                                className="grid gap-2"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+
+                                    if (!blocked) {
+                                        settle(true);
+                                    }
+                                }}
+                            >
+                                <Label htmlFor="confirm-dialog-password-input">
+                                    Your password
+                                </Label>
+                                <Input
+                                    id="confirm-dialog-password-input"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    autoFocus
+                                    value={password}
+                                    onChange={(event) =>
+                                        setPassword(event.target.value)
+                                    }
+                                />
+                            </form>
+                        )}
                         <DialogFooter>
                             <Button
                                 type="button"
@@ -92,7 +152,8 @@ export function ConfirmDialogHost() {
                             </Button>
                             <Button
                                 type="button"
-                                autoFocus
+                                autoFocus={!pending.withPassword}
+                                disabled={blocked}
                                 variant={
                                     pending.tone === 'destructive'
                                         ? 'destructive'

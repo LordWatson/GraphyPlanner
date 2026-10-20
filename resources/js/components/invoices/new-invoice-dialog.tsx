@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { store as storeInvoice } from '@/routes/clients/invoices';
 import type { CurrencyOption } from './types';
 import { todayIso } from './types';
+import { DatePicker } from '@/components/date-picker';
 
 type Option = { value: string; label: string };
 
@@ -163,29 +164,23 @@ export function NewInvoiceDialog({
                             <Label htmlFor="new-invoice-issue">
                                 Issue date
                             </Label>
-                            <Input
+                            <DatePicker
                                 id="new-invoice-issue"
-                                type="date"
-                                required
                                 value={form.data.issue_date}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'issue_date',
-                                        event.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('issue_date', value ?? '')
                                 }
                             />
                             <InputError message={form.errors.issue_date} />
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="new-invoice-due">Due date</Label>
-                            <Input
+                            <DatePicker
                                 id="new-invoice-due"
-                                type="date"
                                 min={form.data.issue_date}
                                 value={form.data.due_date}
-                                onChange={(event) =>
-                                    form.setData('due_date', event.target.value)
+                                onChange={(value) =>
+                                    form.setData('due_date', value ?? '')
                                 }
                             />
                             <p className="text-muted-foreground text-xs">

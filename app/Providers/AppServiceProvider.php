@@ -10,6 +10,7 @@ use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
+use App\Contracts\VirusScanner;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
 use App\Models\BrandBrain;
@@ -54,6 +55,8 @@ use App\Services\Media\FfprobeMediaProber;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Services\Security\ClamAvVirusScanner;
+use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
 use App\Support\Queues;
 use App\Support\RateLimits;
@@ -82,6 +85,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);
+
+        // Step I-16.2 / M-1.2: upload virus scanning — ClamAV when configured, otherwise none.
+        $this->app->bind(VirusScanner::class, fn () => config('security.uploads.virus_scanner') === 'clamav'
+            ? $this->app->make(ClamAvVirusScanner::class)
+            : $this->app->make(NullVirusScanner::class));
 
         // Upload-Post adapter (Step 1.2) bound against the PublishAdapter contract (Step 1.1).
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule

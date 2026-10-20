@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { getXsrfTokenFromCookie } from '@/components/clients/client-layout';
 import { placeholderClasses } from '@/components/grids/grid-tile-image';
 import type { StudioImage } from '@/components/grids/types';
 import { EmptyState } from '@/components/page';
@@ -31,6 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { http } from '@/lib/http';
 import { cn } from '@/lib/utils';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { split as splitImage } from '@/routes/grids';
@@ -131,30 +131,21 @@ export function AddTilesDialog({
                     body.append('campaign_id', String(campaignId));
                 }
 
-                const response = await fetch(storeAsset.url(clientId), {
-                    method: 'POST',
+                const result = await http.post<{ asset: { id: number } }>(
+                    storeAsset.url(clientId),
                     body,
-                    headers: {
-                        Accept: 'application/json',
-                        'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-                    },
-                    credentials: 'same-origin',
-                });
+                );
 
-                if (!response.ok) {
-                    const json = (await response.json().catch(() => null)) as {
-                        message?: string;
-                    } | null;
+                if (!result.ok) {
                     toast.error(
-                        json?.message ?? `We couldn’t upload ${file.name}.`,
+                        result.status === 422
+                            ? result.message
+                            : `We couldn’t upload ${file.name}.`,
                     );
                     continue;
                 }
 
-                const json = (await response.json()) as {
-                    asset: { id: number };
-                };
-                ids.push(json.asset.id);
+                ids.push(result.data.asset.id);
             }
         } finally {
             setUploading(false);

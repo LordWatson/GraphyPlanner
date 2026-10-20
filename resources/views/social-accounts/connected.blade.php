@@ -37,7 +37,7 @@
             <p><a href="{{ $clientUrl }}">Go back to AlimaPlanner</a></p>
         @endif
     </div>
-    <script>
+    <script nonce="{{ Vite::cspNonce() }}">
         (function () {
             try {
                 if (window.opener) {

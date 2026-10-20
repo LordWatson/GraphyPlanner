@@ -8,6 +8,7 @@ use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Support\Observability\TraceContext;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -17,6 +18,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -81,6 +83,9 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(TransitionPostStatusAction $transition, ResolvePostPublishOutcomeAction $resolve): void
     {
+        // Step I-16.1: the post id rides on every log line, error report and target job from here.
+        Context::add(TraceContext::POST_ID, $this->postId);
+
         $claimed = DB::transaction(fn (): ?Post => $this->claim($transition));
 
         if ($claimed === null) {
@@ -134,6 +139,8 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
      */
     public function failed(?Throwable $exception): void
     {
+        Context::add(TraceContext::POST_ID, $this->postId);
+
         $error = 'Publishing crashed before it reached the platform: '.($exception?->getMessage() ?? 'unknown error');
 
         Log::error('PublishPostJob failed', [

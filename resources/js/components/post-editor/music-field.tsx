@@ -2,6 +2,7 @@ import { Music2, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { http } from '@/lib/http';
 import { cn } from '@/lib/utils';
 import { musicSearch as musicSearchRoute } from '@/routes/posts';
 
@@ -51,37 +52,34 @@ export function MusicField({
         setError(null);
         setErrorCode(null);
 
-        try {
-            const response = await fetch(
-                musicSearchRoute.url(postId, {
-                    query: { query, platform: activePlatform },
-                }),
-                { headers: { Accept: 'application/json' } },
-            );
-            const data = await response.json();
+        const result = await http.get<{
+            tracks?: MusicTrackResult[];
+            error?: string;
+            error_code?: string | null;
+        }>(
+            musicSearchRoute.url(postId, {
+                query: { query, platform: activePlatform },
+            }),
+        );
 
-            if (!response.ok) {
-                setError('Unable to search music right now.');
-                setResults([]);
+        setSearching(false);
 
-                return;
-            }
-
-            if (data.error) {
-                setError(data.error);
-                setErrorCode(data.error_code ?? null);
-                setResults([]);
-
-                return;
-            }
-
-            setResults(data.tracks ?? []);
-        } catch {
+        if (!result.ok) {
             setError('Unable to search music right now.');
             setResults([]);
-        } finally {
-            setSearching(false);
+
+            return;
         }
+
+        if (result.data.error) {
+            setError(result.data.error);
+            setErrorCode(result.data.error_code ?? null);
+            setResults([]);
+
+            return;
+        }
+
+        setResults(result.data.tracks ?? []);
     };
 
     const hidden = (

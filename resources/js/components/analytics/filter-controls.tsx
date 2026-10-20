@@ -10,10 +10,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { RangeKey } from './format';
 import { rangeLabels } from './format';
+import { DatePicker } from '@/components/date-picker';
 
 const ranges = Object.keys(rangeLabels) as RangeKey[];
 
@@ -71,29 +71,25 @@ export function RangePicker({
 
             {range === 'custom' && (
                 <div className="flex items-center gap-1.5">
-                    <Input
-                        type="date"
+                    <DatePicker
                         aria-label="From"
                         className="w-full sm:w-38"
                         value={from}
                         max={to || undefined}
-                        onChange={(event) =>
-                            event.target.value &&
-                            onChange({ range, from: event.target.value, to })
+                        onChange={(value) =>
+                            value && onChange({ range, from: value, to })
                         }
                     />
                     <span className="text-muted-foreground font-mono text-xs">
                         →
                     </span>
-                    <Input
-                        type="date"
+                    <DatePicker
                         aria-label="To"
                         className="w-full sm:w-38"
                         value={to}
                         min={from || undefined}
-                        onChange={(event) =>
-                            event.target.value &&
-                            onChange({ range, from, to: event.target.value })
+                        onChange={(value) =>
+                            value && onChange({ range, from, to: value })
                         }
                     />
                 </div>

@@ -7,6 +7,7 @@ use App\Contracts\PublishAdapter;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Support\Observability\TraceContext;
 use App\Support\Publishing\TargetResult;
 use App\Support\Queues;
 use Illuminate\Bus\Batchable;
@@ -15,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -66,11 +68,17 @@ class PublishPostTargetJob implements ShouldQueue
             return;
         }
 
+        // Step I-16.1: trace ids for logs/error tracking (the post id usually arrives with the
+        // dispatching job's `Context`; set it here too for targets dispatched on their own).
+        Context::add(TraceContext::POST_TARGET_ID, $this->targetId);
+
         $target = $this->claim();
 
         if ($target === null) {
             return;
         }
+
+        Context::add(TraceContext::POST_ID, $target->post_id);
 
         /** @var Post $post */
         $post = Post::with('targets.socialAccount', 'assets', 'coverAsset', 'organization', 'client')->findOrFail($target->post_id);
@@ -119,7 +127,13 @@ class PublishPostTargetJob implements ShouldQueue
      */
     public function failed(?Throwable $exception): void
     {
+        Context::add(TraceContext::POST_TARGET_ID, $this->targetId);
+
         $target = PostTarget::find($this->targetId);
+
+        if ($target) {
+            Context::add(TraceContext::POST_ID, $target->post_id);
+        }
 
         if (! $target || $target->publish_attempt_id !== $this->attemptId
             || $target->status !== PostTargetStatus::Pending || $target->external_post_id !== null) {
@@ -184,7 +198,11 @@ class PublishPostTargetJob implements ShouldQueue
                 return $target;
             }
 
-            $target->update(['publish_requested_at' => now()]);
+            // Step I-16.1: remember which request/job sent it, so the webhook can be joined back.
+            $target->update([
+                'publish_requested_at' => now(),
+                'publish_correlation_id' => TraceContext::correlationId(),
+            ]);
 
             return $target;
         });

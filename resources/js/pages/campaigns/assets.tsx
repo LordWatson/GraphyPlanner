@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { AssetPreview } from '@/components/asset-preview';
 import { CampaignLayout } from '@/components/campaigns/campaign-layout';
 import type { CampaignWorkspaceProps } from '@/components/campaigns/types';
-import { getXsrfTokenFromCookie } from '@/components/clients/client-layout';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
@@ -14,6 +13,7 @@ import { AssetLibraryDialog } from '@/components/post-editor/asset-library-dialo
 import { UploadTile } from '@/components/post-editor/media-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { http } from '@/lib/http';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import {
     destroy as removeFromKit,
@@ -51,35 +51,24 @@ export default function CampaignAssets(
         body.append('campaign_id', String(campaign.id));
         setUploading(true);
 
-        try {
-            const response = await fetch(storeAsset.url(campaign.client.id), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-                },
-                body,
-            });
+        const result = await http.post(
+            storeAsset.url(campaign.client.id),
+            body,
+        );
+        setUploading(false);
 
-            if (!response.ok) {
-                const payload = (await response.json().catch(() => null)) as {
-                    message?: string;
-                } | null;
-                toast.error(
-                    payload?.message ??
-                        'That file didn’t upload. Check its size and type.',
-                );
+        if (!result.ok) {
+            toast.error(
+                result.status === 422
+                    ? result.message
+                    : 'That file didn’t upload. Check its size and type.',
+            );
 
-                return;
-            }
-
-            toast.success('Added to the kit.');
-            router.reload({ only: ['assets', 'counts'] });
-        } finally {
-            setUploading(false);
+            return;
         }
+
+        toast.success('Added to the kit.');
+        router.reload({ only: ['assets', 'counts'] });
     };
 
     const remove = async (asset: KitAsset) => {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\SafeUpload;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UploadInvoicePdfRequest extends FormRequest
@@ -20,7 +21,7 @@ class UploadInvoicePdfRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'pdf' => ['required', 'file', 'mimes:pdf', 'max:'.config('assets.max_upload_size_kb')],
+            'pdf' => ['required', 'file', 'mimes:pdf', 'max:'.config('assets.max_upload_size_kb'), new SafeUpload(['pdf'])],
         ];
     }
 }

@@ -7,6 +7,7 @@ use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Exceptions\Posts\InvalidPostTransitionException;
 use App\Mail\ClientReviewRequestedMail;
+use App\Mail\OpsAlertMail;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
@@ -120,6 +121,12 @@ class TransitionAtomicityTest extends TestCase
     {
         foreach (glob(app_path('Mail/*.php')) ?: [] as $file) {
             $class = 'App\\Mail\\'.basename($file, '.php');
+
+            // Step M-1.1: the on-call alert is sent inline on purpose — it may be about the queue.
+            if ($class === OpsAlertMail::class) {
+                continue;
+            }
+
             $this->assertContains(ShouldQueue::class, class_implements($class), $class);
         }
 

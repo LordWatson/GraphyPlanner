@@ -31,6 +31,8 @@ import {
     store as storeDeliverable,
     update as updateDeliverable,
 } from '@/routes/campaigns/deliverables';
+import { DatePicker } from '@/components/date-picker';
+import { TimeField } from '@/components/time-field';
 
 const NONE = '__none';
 
@@ -288,30 +290,22 @@ export function DeliverableDialog({
                                 <Label htmlFor="deliverable-date">
                                     Goes out
                                 </Label>
-                                <Input
+                                <DatePicker
                                     id="deliverable-date"
-                                    type="date"
                                     value={form.data.planned_for}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'planned_for',
-                                            event.target.value,
-                                        )
+                                    onChange={(value) =>
+                                        form.setData('planned_for', value ?? '')
                                     }
                                 />
                                 <InputError message={form.errors.planned_for} />
                             </div>
                             <div className="grid gap-1.5">
                                 <Label htmlFor="deliverable-time">At</Label>
-                                <Input
+                                <TimeField
                                     id="deliverable-time"
-                                    type="time"
                                     value={form.data.planned_time}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'planned_time',
-                                            event.target.value,
-                                        )
+                                    onChange={(value) =>
+                                        form.setData('planned_time', value)
                                     }
                                 />
                                 <InputError

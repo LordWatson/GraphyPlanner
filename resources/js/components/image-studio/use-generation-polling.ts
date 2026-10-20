@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StudioGeneration } from '@/components/image-studio/types';
+import { http } from '@/lib/http';
 import { show as showGeneration } from '@/routes/ai-image-generations';
 
 const POLL_MS = 2000;
@@ -52,30 +53,17 @@ export function useGenerationPolling(generations: StudioGeneration[]) {
 
             await Promise.all(
                 pendingIds.map(async (id) => {
-                    try {
-                        const response = await fetch(showGeneration.url(id), {
-                            signal: controller.signal,
-                            credentials: 'same-origin',
-                            headers: {
-                                Accept: 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                        });
+                    // Aborted or offline: the next tick tries again.
+                    const result = await http.get<{
+                        generation: StudioGeneration;
+                    }>(showGeneration.url(id), { signal: controller.signal });
 
-                        if (!response.ok) {
-                            return;
-                        }
-
-                        const { generation } = (await response.json()) as {
-                            generation: StudioGeneration;
-                        };
-
+                    if (result.ok) {
+                        const { generation } = result.data;
                         setLive((current) => ({
                             ...current,
                             [generation.id]: generation,
                         }));
-                    } catch {
-                        // Aborted or offline: the next tick tries again.
                     }
                 }),
             );

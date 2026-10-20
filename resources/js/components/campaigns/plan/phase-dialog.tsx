@@ -18,6 +18,7 @@ import {
     store as storePhase,
     update as updatePhase,
 } from '@/routes/campaigns/phases';
+import { DatePicker } from '@/components/date-picker';
 
 const COLOURS = Object.keys(campaignColourClass);
 
@@ -101,26 +102,21 @@ export function PhaseDialog({
                     <div className="grid grid-cols-2 gap-3">
                         <div className="grid gap-1.5">
                             <Label htmlFor="phase-start">Starts</Label>
-                            <Input
+                            <DatePicker
                                 id="phase-start"
-                                type="date"
                                 min={bounds.start ?? undefined}
                                 max={bounds.end ?? undefined}
                                 value={form.data.starts_on}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'starts_on',
-                                        event.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('starts_on', value ?? '')
                                 }
                             />
                             <InputError message={form.errors.starts_on} />
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="phase-end">Ends</Label>
-                            <Input
+                            <DatePicker
                                 id="phase-end"
-                                type="date"
                                 min={
                                     form.data.starts_on ||
                                     bounds.start ||
@@ -128,8 +124,8 @@ export function PhaseDialog({
                                 }
                                 max={bounds.end ?? undefined}
                                 value={form.data.ends_on}
-                                onChange={(event) =>
-                                    form.setData('ends_on', event.target.value)
+                                onChange={(value) =>
+                                    form.setData('ends_on', value ?? '')
                                 }
                             />
                             <InputError message={form.errors.ends_on} />

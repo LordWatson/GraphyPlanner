@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
 
 permissions:
@@ -13,16 +14,28 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    # `.env.example` is production-shaped (MySQL, Redis); the runner has neither, so setup and
+    # the checks run on SQLite and in-process drivers. PHPUnit and the Playwright journeys set
+    # their own environments on top of this.
+    env:
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      CACHE_STORE: array
+      CACHE_LIMITER: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      # Symfony 8 (via Laravel 13) needs PHP >= 8.4.1; 8.5 matches local development (Herd).
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           tools: composer:v2
           coverage: none
 
@@ -34,5 +47,28 @@ jobs:
       - name: Setup Application
         run: composer setup
 
+      # Step I-16.2 / M-1.2: fail the build on high or critical advisories.
+      - name: Audit PHP dependencies
+        run: composer audit --locked --abandoned=report --ignore-severity=low --ignore-severity=medium
+
+      - name: Audit JS dependencies
+        run: npm audit --audit-level=high
+
       - name: Run CI Checks
         run: composer ci:check
+
+      # Step I-14.6 / M-1.5: component, hook and helper tests. These and the journeys below run
+      # even when an earlier check failed, so every PR reports all of its gates.
+      - name: Run frontend tests
+        if: ${{ !cancelled() }}
+        run: npm test
+
+      # Step I-14.6 / M-1.5: critical journeys against the built app (isolated SQLite database,
+      # mail to the log, no queue worker — nothing reaches a publishing vendor).
+      - name: Install Playwright browser
+        if: ${{ !cancelled() }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Run end-to-end journeys
+        if: ${{ !cancelled() }}
+        run: npm run test:e2e

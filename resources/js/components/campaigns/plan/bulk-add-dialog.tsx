@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { bulk as bulkDeliverables } from '@/routes/campaigns/deliverables';
+import { TimeField } from '@/components/time-field';
 
 const WHOLE = '__whole';
 
@@ -153,15 +154,11 @@ export function BulkAddDialog({
                         <div className="grid grid-cols-2 gap-3">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="bulk-time">At</Label>
-                                <Input
+                                <TimeField
                                     id="bulk-time"
-                                    type="time"
                                     value={form.data.planned_time}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'planned_time',
-                                            event.target.value,
-                                        )
+                                    onChange={(value) =>
+                                        form.setData('planned_time', value)
                                     }
                                 />
                             </div>

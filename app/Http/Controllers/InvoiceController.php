@@ -57,6 +57,8 @@ class InvoiceController extends Controller
                 'search' => $filters['search'] ?? null,
                 'from' => $filters['from'] ?? null,
                 'to' => $filters['to'] ?? null,
+                'sort' => $filters['sort'] ?? null,
+                'direction' => $filters['direction'] ?? null,
             ],
             'clients' => Client::query()
                 ->where('org_id', $orgId)

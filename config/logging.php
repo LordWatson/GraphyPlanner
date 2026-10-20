@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -98,6 +99,24 @@ return [
                 'host' => env('PAPERTRAIL_URL'),
                 'port' => env('PAPERTRAIL_PORT'),
                 'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        // Step I-16.1 / M-1.1: structured logs for production (`LOG_STACK=json`). One JSON
+        // object per line; `Context` (correlation id, user, org, post) lands under `extra`, so a
+        // log shipper can index and join on it. Point `LOG_JSON_PATH` at `php://stderr` on
+        // container hosts.
+        'json' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'handler_with' => [
+                'stream' => env('LOG_JSON_PATH', storage_path('logs/laravel.json.log')),
+            ],
+            'formatter' => JsonFormatter::class,
+            'formatter_with' => [
+                'includeStacktraces' => true,
             ],
             'processors' => [PsrLogMessageProcessor::class],
         ],

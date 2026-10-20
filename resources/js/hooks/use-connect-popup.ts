@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-function xsrfToken(): string {
-    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
-
-    return match ? decodeURIComponent(match[1]) : '';
-}
+import { http } from '@/lib/http';
 
 /**
  * Step M-2.8 — the vendor's hosted connect page, opened in a popup so the current page stays put.
@@ -39,46 +34,33 @@ export function useConnectPopup(onDone: () => void): {
         setConnectingId(id);
         const popup = window.open('about:blank', `graphy-connect-${id}`);
 
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-XSRF-TOKEN': xsrfToken(),
-                },
-            });
-            const data = await response.json().catch(() => ({}));
+        const result = await http.post<{ url?: string }>(endpoint);
+        setConnectingId(null);
 
-            if (!response.ok || !data.url) {
-                popup?.close();
-                toast.error(
-                    typeof data.message === 'string'
-                        ? data.message
-                        : 'We couldn’t start the connection. Please try again.',
-                );
-
-                return;
-            }
-
-            if (popup) {
-                popup.location.href = data.url;
-                const interval = window.setInterval(() => {
-                    if (popup.closed) {
-                        window.clearInterval(interval);
-                        onDone();
-                    }
-                }, 1000);
-            } else {
-                // Popup blocked — fall back to a plain new tab.
-                window.open(data.url, '_blank');
-            }
-        } catch {
+        if (!result.ok || !result.data.url) {
             popup?.close();
-            toast.error('We couldn’t start the connection. Please try again.');
-        } finally {
-            setConnectingId(null);
+            toast.error(
+                result.ok || result.status === 0
+                    ? 'We couldn’t start the connection. Please try again.'
+                    : result.message,
+            );
+
+            return;
+        }
+
+        const url = result.data.url;
+
+        if (popup) {
+            popup.location.href = url;
+            const interval = window.setInterval(() => {
+                if (popup.closed) {
+                    window.clearInterval(interval);
+                    onDone();
+                }
+            }, 1000);
+        } else {
+            // Popup blocked — fall back to a plain new tab.
+            window.open(url, '_blank');
         }
     };
 

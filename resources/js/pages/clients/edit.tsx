@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { index, update } from '@/routes/clients';
 import { PageHeader } from '@/components/page';
+import { DatePicker } from '@/components/date-picker';
 
 type Option = { value: string; label: string };
 
@@ -212,10 +213,9 @@ export default function ClientEdit({
 
                             <div className="grid gap-2">
                                 <Label htmlFor="start_date">Start date</Label>
-                                <Input
+                                <DatePicker
                                     id="start_date"
                                     name="start_date"
-                                    type="date"
                                     defaultValue={client.start_date ?? ''}
                                 />
                                 <InputError message={errors.start_date} />

@@ -28,9 +28,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatGridMoment } from '@/lib/grid-layout';
+import { http } from '@/lib/http';
 import { hold, schedule, scheduleApproved } from '@/routes/grids';
 import gridPosts from '@/routes/grids/posts';
 import { preview as previewSchedule } from '@/routes/grids/schedule';
+import { DatePicker } from '@/components/date-picker';
+import { TimeField } from '@/components/time-field';
 
 type Cadence = 'daily' | 'weekdays' | 'every_n_days';
 
@@ -106,33 +109,17 @@ function ScheduleDialog({
         const controller = new AbortController();
         setError(null);
 
-        fetch(previewSchedule.url(grid.id, { query }), {
-            headers: { Accept: 'application/json' },
-            signal: controller.signal,
-            credentials: 'same-origin',
-        })
-            .then(async (response) => {
-                const json = (await response.json()) as {
-                    rows?: PreviewRow[];
-                    message?: string;
-                };
-
-                if (!response.ok) {
-                    throw new Error(
-                        json.message ?? 'That cadence doesn’t work.',
-                    );
-                }
-
-                setRows(json.rows ?? []);
-            })
-            .catch((reason: unknown) => {
-                if (!controller.signal.aborted) {
+        void http
+            .get<{ rows?: PreviewRow[] }>(
+                previewSchedule.url(grid.id, { query }),
+                { signal: controller.signal },
+            )
+            .then((result) => {
+                if (result.ok) {
+                    setRows(result.data.rows ?? []);
+                } else if (!result.aborted) {
                     setRows(null);
-                    setError(
-                        reason instanceof Error
-                            ? reason.message
-                            : 'Couldn’t preview those dates.',
-                    );
+                    setError(result.message);
                 }
             });
 
@@ -154,24 +141,18 @@ function ScheduleDialog({
                     <div className="grid grid-cols-2 gap-3">
                         <div className="grid gap-1.5">
                             <Label htmlFor="schedule-start">First post</Label>
-                            <Input
+                            <DatePicker
                                 id="schedule-start"
-                                type="date"
                                 value={start}
-                                onChange={(event) =>
-                                    setStart(event.target.value)
-                                }
+                                onChange={(value) => setStart(value ?? '')}
                             />
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="schedule-time">At</Label>
-                            <Input
+                            <TimeField
                                 id="schedule-time"
-                                type="time"
                                 value={time}
-                                onChange={(event) =>
-                                    setTime(event.target.value)
-                                }
+                                onChange={(value) => setTime(value)}
                             />
                         </div>
                     </div>

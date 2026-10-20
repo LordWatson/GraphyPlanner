@@ -14,6 +14,7 @@ use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Enums\Role;
 use App\Http\Requests\ClientIndexRequest;
+use App\Http\Requests\PurgeClientRequest;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
@@ -179,10 +180,8 @@ class ClientController extends Controller
     /**
      * Step I-1.5 — permanently purge an archived client (blocked while it has invoices).
      */
-    public function purge(Request $request, Client $client, PurgeClientAction $purge): RedirectResponse
+    public function purge(PurgeClientRequest $request, Client $client, PurgeClientAction $purge): RedirectResponse
     {
-        $this->authorize('forceDelete', $client);
-
         $name = $client->name;
         $purge($client, $request->user());
 

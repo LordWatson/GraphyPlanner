@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { formatDateRange } from '@/lib/dates';
+import { http } from '@/lib/http';
 import { cn } from '@/lib/utils';
 import {
     resume as resumeCampaign,
@@ -158,20 +159,12 @@ export function ShiftDialog({
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             setLoading(true);
-            fetch(previewShift.url(campaignId, { query: { days: value } }), {
-                signal: controller.signal,
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            })
-                .then(async (response) =>
-                    response.ok
-                        ? setPreview((await response.json()) as ShiftPreview)
-                        : setPreview(null),
+            void http
+                .get<ShiftPreview>(
+                    previewShift.url(campaignId, { query: { days: value } }),
+                    { signal: controller.signal },
                 )
-                .catch(() => undefined)
+                .then((result) => setPreview(result.ok ? result.data : null))
                 .finally(() => setLoading(false));
         }, 250);
 

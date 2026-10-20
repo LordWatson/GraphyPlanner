@@ -1,6 +1,7 @@
 import { CalendarDays } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { http } from '@/lib/http';
 import { index } from '@/routes/clients';
 import dailyBriefs from '@/routes/clients/daily-briefs';
 import type { ClientPageProps } from '@/components/clients/client-layout';
@@ -30,33 +31,18 @@ export default function ClientBriefsTab({ ...page }: ClientPageProps) {
         setBriefsError(null);
         setBriefsLoading(true);
 
-        try {
-            const res = await fetch(dailyBriefs.index.url(client.id), {
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-            const data = await res.json();
+        const result = await http.get<{ briefs?: typeof briefs }>(
+            dailyBriefs.index.url(client.id),
+        );
+        setBriefsLoading(false);
 
-            if (!res.ok)
-                throw new Error(
-                    typeof data?.message === 'string'
-                        ? data.message
-                        : 'Unable to fetch daily briefs.',
-                );
+        if (!result.ok) {
+            setBriefsError(result.message);
 
-            setBriefs(Array.isArray(data?.briefs) ? data.briefs : []);
-        } catch (e) {
-            setBriefsError(
-                e instanceof Error
-                    ? e.message
-                    : 'Unable to fetch daily briefs.',
-            );
-        } finally {
-            setBriefsLoading(false);
+            return;
         }
+
+        setBriefs(Array.isArray(result.data.briefs) ? result.data.briefs : []);
     };
 
     useEffect(() => {

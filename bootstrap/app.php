@@ -1,5 +1,7 @@
 <?php
 
+use App\Contracts\ErrorTracker;
+use App\Http\Middleware\AssignCorrelationId;
 use App\Http\Middleware\EnsureCampaignFeature;
 use App\Http\Middleware\EnsureClientPortalAccess;
 use App\Http\Middleware\EnsureOrganizationNotSuspended;
@@ -10,6 +12,8 @@ use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectClientReviewersToPortal;
 use App\Http\Middleware\RejectPreviewUserOutsidePreview;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ShareRequestContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,6 +27,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Step I-16.1 / M-1.1: first in line, so every log line and error from here on carries
+        // the request's correlation id.
+        $middleware->prepend(AssignCorrelationId::class);
+
+        // Step I-16.2 / M-1.2: CSP (nonce scripts), HSTS, framing, nosniff, referrer and
+        // permissions policies on every response — global, so webhooks, files and errors get them.
+        $middleware->append(SecurityHeaders::class);
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         // Step 1.5: the Upload-Post webhook is a server-to-server call with no session/CSRF
@@ -33,6 +45,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             // Step I-1.1: the preview owner is never a real session outside `/preview/*`.
             RejectPreviewUserOutsidePreview::class,
+            // Step I-16.1 / M-1.1: user + org ids into `Context` (logs, jobs, error tracking).
+            ShareRequestContext::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
@@ -53,6 +67,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Step I-16.1 / M-1.1: every reported exception goes to error tracking (Sentry when
+        // configured), tagged from `Context`. The same exception object is only reported once,
+        // so the failed-publishing-job listener and the queue worker don't double-send it.
+        $exceptions->dontReportDuplicates();
+        $exceptions->reportable(function (Throwable $e): void {
+            app(ErrorTracker::class)->capture($e);
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

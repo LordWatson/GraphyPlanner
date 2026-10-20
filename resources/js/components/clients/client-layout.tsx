@@ -148,16 +148,6 @@ export function usePlatformOptions(
         .map((platform) => ({ value: platform.value, label: platform.label }));
 }
 
-/**
- * Reads Laravel's `XSRF-TOKEN` cookie so plain `fetch()` calls can authenticate as a normal
- * stateful request, mirroring what Inertia's own `<Form>`/`router` calls do automatically.
- */
-export function getXsrfTokenFromCookie(): string {
-    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
-
-    return match ? decodeURIComponent(match[1]) : '';
-}
-
 export function TabHeading({
     icon: Icon,
     title,
