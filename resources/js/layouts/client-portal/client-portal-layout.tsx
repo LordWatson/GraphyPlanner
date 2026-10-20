@@ -5,6 +5,7 @@ import {
     CheckSquare,
     ChevronDown,
     Clapperboard,
+    Grid3x3,
     LayoutGrid,
     Receipt,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ import {
     dashboard as portalDashboard,
 } from '@/routes/portal';
 import { index as portalCampaignsIndex } from '@/routes/portal/campaigns';
+import { index as portalGridsIndex } from '@/routes/portal/grids';
 import { index as portalInvoicesIndex } from '@/routes/portal/invoices';
 import { index as portalPostsIndex } from '@/routes/portal/posts';
 import type { Auth } from '@/types';
@@ -35,7 +37,10 @@ import type { Auth } from '@/types';
 type PortalSharedProps = {
     auth: Auth;
     client: { name: string } | null;
-    portal: { pendingApprovals: number } | null;
+    portal: {
+        pendingApprovals: number;
+        grids?: { visible: number; waiting: number };
+    } | null;
 };
 
 /**
@@ -69,6 +74,17 @@ export default function ClientPortalLayout({
             href: portalCampaignsIndex(),
             icon: Clapperboard,
         },
+        // Phase 18: only once the studio has sent the client a grid.
+        ...((portal?.grids?.visible ?? 0) > 0
+            ? [
+                  {
+                      title: 'Grids',
+                      href: portalGridsIndex(),
+                      icon: Grid3x3,
+                      badge: portal?.grids?.waiting ?? 0,
+                  },
+              ]
+            : []),
         { title: 'Invoices', href: portalInvoicesIndex(), icon: Receipt },
         { title: 'Company', href: portalCompany(), icon: Building2 },
     ];

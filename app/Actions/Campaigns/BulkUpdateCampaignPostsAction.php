@@ -2,16 +2,11 @@
 
 namespace App\Actions\Campaigns;
 
-use App\Actions\Posts\PostStatusTransitionMap;
-use App\Actions\Posts\SendClientReviewRequestedEmailAction;
-use App\Actions\Posts\TransitionPostStatusAction;
-use App\Actions\ReviewTokens\CreateReviewTokenAction;
+use App\Actions\Posts\BulkTransitionPostsAction;
 use App\Enums\PostStatus;
-use App\Exceptions\Posts\InvalidPostTransitionException;
 use App\Mail\CampaignPostsReadyMail;
 use App\Models\Campaign;
 use App\Models\Post;
-use App\Models\ReviewToken;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,7 +35,7 @@ class BulkUpdateCampaignPostsAction
 
     public const ACTIONS = [self::SUBMIT, self::SEND_TO_CLIENT, self::APPROVE, self::PHASE, self::ASSIGN];
 
-    public function __construct(private readonly TransitionPostStatusAction $transition) {}
+    public function __construct(private readonly BulkTransitionPostsAction $bulkTransition) {}
 
     /**
      * @param  list<int>  $postIds
@@ -63,7 +58,7 @@ class BulkUpdateCampaignPostsAction
 
             $reason = match ($action) {
                 self::PHASE, self::ASSIGN => $this->updateDeliverable($post, $action, $value),
-                default => $this->move($post, $this->target($action), $user),
+                default => $this->move($post, $this->target($action), $user, $action === self::SEND_TO_CLIENT),
             };
 
             if ($reason === null) {
@@ -101,43 +96,15 @@ class BulkUpdateCampaignPostsAction
         };
     }
 
-    private function move(Post $post, PostStatus $to, User $user): ?string
+    /**
+     * One post through the shared bulk mover (Step 18.9 extracted it so grids reuse it). "Send to
+     * client" suppresses the per-post email; `emailClientOnce` sends one for the batch.
+     */
+    private function move(Post $post, PostStatus $to, User $user, bool $oneClientEmail): ?string
     {
-        if ($post->status === $to) {
-            return 'Already '.mb_strtolower($to->label()).'.';
-        }
+        $result = ($this->bulkTransition)([$post], $to, $user, $oneClientEmail);
 
-        if (PostStatusTransitionMap::needsClientApproval($post, $post->status, $to)) {
-            return 'Needs the client’s approval.';
-        }
-
-        if (! PostStatusTransitionMap::isAllowedFor($post, $to)) {
-            return 'A '.mb_strtolower($post->status->label()).' post can’t move to '.mb_strtolower($to->label()).'.';
-        }
-
-        if (! $user->can('transition', [$post, $to])) {
-            return 'You can’t make that move.';
-        }
-
-        try {
-            ($this->transition)(
-                $post,
-                $to,
-                $user,
-                sendClientReviewRequestedEmail: new class extends SendClientReviewRequestedEmailAction
-                {
-                    // The batch sends one email instead (see `emailClientOnce`).
-                    public function __invoke(Post $post, CreateReviewTokenAction $createReviewToken = new CreateReviewTokenAction): ?ReviewToken
-                    {
-                        return null;
-                    }
-                },
-            );
-        } catch (InvalidPostTransitionException) {
-            return 'It changed while you were working on it.';
-        }
-
-        return null;
+        return $result['skipped'][0]['reason'] ?? null;
     }
 
     private function updateDeliverable(Post $post, string $action, ?int $value): ?string

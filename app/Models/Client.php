@@ -167,6 +167,16 @@ class Client extends Model
     }
 
     /**
+     * Phase 18: the client's Instagram grid plans.
+     *
+     * @return HasMany<GridPlan, $this>
+     */
+    public function gridPlans(): HasMany
+    {
+        return $this->hasMany(GridPlan::class);
+    }
+
+    /**
      * @return HasMany<ClientInvitation, $this>
      */
     public function invitations(): HasMany

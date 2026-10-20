@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $probed_at
  * @property string|null $rights
  * @property string|null $variant_group_id
+ * @property int|null $source_asset_id
  * @property int|null $ai_image_variant_id
  * @property bool $is_ai_generated
  * @property Carbon|null $created_at
@@ -48,7 +49,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'uploaded_by', 'source', 'type', 'disk', 'path', 'url',
-    'original_filename', 'mime_type', 'size', 'width', 'height', 'rights', 'variant_group_id',
+    'original_filename', 'mime_type', 'size', 'width', 'height', 'rights', 'variant_group_id', 'source_asset_id',
     'ai_image_variant_id', 'is_ai_generated', 'duration_ms', 'video_codec', 'thumbnail_path', 'probed_at',
 ])]
 class Asset extends Model
@@ -143,6 +144,16 @@ class Asset extends Model
     public function aiImageVariant(): BelongsTo
     {
         return $this->belongsTo(AiImageVariant::class)->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * Step 18.4: the image this one was sliced from by a grid split (the source is never changed).
+     *
+     * @return BelongsTo<Asset, $this>
+     */
+    public function sourceAsset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'source_asset_id')->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

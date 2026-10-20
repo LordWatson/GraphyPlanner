@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
     CornerDownLeft,
+    LayoutGrid,
     Megaphone,
     Moon,
     Plus,
@@ -35,6 +36,7 @@ import {
 } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
+import { index as gridsIndex } from '@/routes/grids';
 import { create as createAnalyticsReport } from '@/routes/analytics/reports';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
@@ -149,6 +151,16 @@ function useCommands(close: () => void): Command[] {
                 icon: Megaphone,
                 chapter: chapters.clients,
                 run: visit(campaignsIndex()),
+            },
+            {
+                id: 'section-grids',
+                group: 'Chapters',
+                label: 'Grids',
+                hint: 'Plan each client’s Instagram grid.',
+                keywords: 'instagram grid profile plan preview',
+                icon: LayoutGrid,
+                chapter: chapters.clients,
+                run: visit(gridsIndex()),
             },
             ...(isBilling
                 ? [chapterCommand(chapters.invoices, invoicesIndex())]

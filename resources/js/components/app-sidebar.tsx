@@ -19,6 +19,7 @@ import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as clientsIndex } from '@/routes/clients';
+import { index as gridsIndex } from '@/routes/grids';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
@@ -157,7 +158,11 @@ function studioGroups(
                 {
                     ...navItem(chapters.clients, clientsIndex()),
                     // Campaigns enhancement C-1.1: the hub is a section of 04 Clients (no renumber).
-                    subItems: [{ title: 'Campaigns', href: campaignsIndex() }],
+                    // Phase 18: the grids hub is another section of 04 Clients.
+                    subItems: [
+                        { title: 'Campaigns', href: campaignsIndex() },
+                        { title: 'Grids', href: gridsIndex() },
+                    ],
                 },
                 ...(canViewLedger
                     ? [navItem(chapters.invoices, invoicesIndex())]

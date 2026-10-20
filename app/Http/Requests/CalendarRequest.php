@@ -39,7 +39,7 @@ class CalendarRequest extends FormRequest
     }
 
     /**
-     * @return array{client_id: int|null, campaign_id: int|null, status: string|null, platform: string|null}
+     * @return array{client_id: int|null, campaign_id: int|null, status: string|null, platform: string|null, grid_id: int|null}
      */
     public function filters(): array
     {
@@ -48,6 +48,8 @@ class CalendarRequest extends FormRequest
             'campaign_id' => $this->integer('campaign_id') ?: null,
             'status' => $this->string('status')->toString() ?: null,
             'platform' => $this->string('platform')->toString() ?: null,
+            // Step 18.11: the internal calendar's "Show this grid" filter.
+            'grid_id' => $this->integer('grid_id') ?: null,
         ];
     }
 }

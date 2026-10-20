@@ -9,10 +9,12 @@ use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\Campaigns\Health\LaunchingWithUnapprovedWorkRule;
+use App\Services\Grids\GridOrderRiskService;
 use App\Support\Campaigns\CampaignClock;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -57,6 +59,7 @@ class GetNeedsAttentionItemsAction
      *     waitingApprovals: array{items: list<array<string, mixed>>, total: int},
      *     missingMedia: array{items: list<array<string, mixed>>, total: int},
      *     campaigns: array{items: list<array<string, mixed>>, total: int},
+     *     gridRisks: array{items: list<array<string, mixed>>, total: int},
      *     disconnectedAccounts: array{items: list<array<string, mixed>>, total: int},
      * }
      */
@@ -110,6 +113,11 @@ class GetNeedsAttentionItemsAction
             'campaigns' => $user->role === Role::ClientReviewer
                 ? ['items' => [], 'total' => 0]
                 : $this->campaigns($user, $limit),
+            // Step 18.11: grids whose order is at risk (a post failed or left the schedule while
+            // later tiles are still scheduled). Flagged by `GridOrderRiskService`, re-checked here.
+            'gridRisks' => $user->role === Role::ClientReviewer
+                ? ['items' => [], 'total' => 0]
+                : $this->gridRisks($user, $limit),
             'disconnectedAccounts' => [
                 'items' => array_values((clone $accountsQuery)
                     ->with('client:id,name')
@@ -135,6 +143,40 @@ class GetNeedsAttentionItemsAction
                 'total' => $accountsQuery->count(),
             ],
         ];
+    }
+
+    /**
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    private function gridRisks(User $user, int $limit): array
+    {
+        $risk = app(GridOrderRiskService::class);
+
+        $items = GridPlan::query()
+            ->where('org_id', $user->org_id)
+            ->whereNotNull('order_risk_notified_at')
+            ->whereIn('client_id', Client::query()->select('id'))
+            ->with('client:id,name')
+            ->orderBy('order_risk_notified_at')
+            ->limit($limit)
+            ->get()
+            ->map(function (GridPlan $plan) use ($risk) {
+                $atRisk = $risk->atRisk($plan);
+
+                return $atRisk === null ? null : [
+                    'grid_plan_id' => $plan->id,
+                    'name' => $plan->name,
+                    'client_id' => $plan->client_id,
+                    'client_name' => $plan->client->name,
+                    'reason' => $atRisk['reason'],
+                    'later_count' => count($atRisk['later_post_ids']),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return ['items' => array_values($items), 'total' => count($items)];
     }
 
     /**

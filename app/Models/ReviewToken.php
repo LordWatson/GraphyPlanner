@@ -19,12 +19,13 @@ use Illuminate\Support\Carbon;
  * @property string $token_hash
  * @property int|null $client_id
  * @property int|null $post_id
+ * @property int|null $grid_plan_id
  * @property Carbon $expires_at
  * @property Carbon|null $revoked_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['token_hash', 'client_id', 'post_id', 'expires_at', 'revoked_at'])]
+#[Fillable(['token_hash', 'client_id', 'post_id', 'grid_plan_id', 'expires_at', 'revoked_at'])]
 class ReviewToken extends Model
 {
     /** @use HasFactory<ReviewTokenFactory> */
@@ -56,6 +57,16 @@ class ReviewToken extends Model
     public function post(): BelongsTo
     {
         return $this->belongsTo(Post::class)->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * Step 18.8: a token issued for a grid plan's client review (never also a post).
+     *
+     * @return BelongsTo<GridPlan, $this>
+     */
+    public function gridPlan(): BelongsTo
+    {
+        return $this->belongsTo(GridPlan::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

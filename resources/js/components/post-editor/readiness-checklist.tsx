@@ -303,9 +303,12 @@ export function ReadinessChecklist({
     note,
     onFix,
     onJump,
+    title = 'Ready to schedule',
 }: {
     items: ChecklistItem[];
     note?: string;
+    /** The heading (the grid planner says "Ready for the client"). */
+    title?: string;
     /** Applies a one-click fix to the unsaved editor state (omit when read-only). */
     onFix?: (fix: ChecklistFix) => void;
     /** Takes the user to the part of the editor an item is about (omit when read-only). */
@@ -325,7 +328,7 @@ export function ReadinessChecklist({
         <section className="border-border bg-card rounded-2xl border p-5">
             <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-[15px] font-semibold">
-                    {allPassed ? 'Ready to schedule.' : 'Ready to schedule'}
+                    {allPassed ? `${title}.` : title}
                 </h2>
                 <span
                     className={cn(

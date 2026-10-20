@@ -1,5 +1,6 @@
 import { Form } from '@inertiajs/react';
 import { ArrowRight, Eye, Lock, Mail } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import {
@@ -20,23 +21,28 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useInitials } from '@/hooks/use-initials';
+import type { StatusKind } from '@/lib/status';
 import { resolveStatus, toneBgClass } from '@/lib/status';
 import { cn } from '@/lib/utils';
 import postActivityLogs from '@/routes/posts/activity-logs';
 import { store as storeComment } from '@/routes/posts/comments';
+import type { RouteFormDefinition } from '@/wayfinder';
 
 function CommentComposer({
-    postId,
+    form,
     mentionableUsers,
+    extra,
 }: {
-    postId: number;
+    form: RouteFormDefinition<'post'>;
     mentionableUsers: MentionableUser[];
+    /** Extra fields inside the form (the grid's "About tile" picker). */
+    extra?: ReactNode;
 }) {
     const [internal, setInternal] = useState(false);
 
     return (
         <Form
-            {...storeComment.form(postId)}
+            {...form}
             // Keep the editor's unsaved state intact — only the comment list refreshes.
             options={{ preserveScroll: true, preserveState: true }}
             resetOnSuccess
@@ -57,6 +63,7 @@ function CommentComposer({
                         users={mentionableUsers}
                     />
                     <InputError message={errors.body} />
+                    {extra}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <label className="flex cursor-pointer items-center gap-2 text-xs">
                             <Checkbox
@@ -96,12 +103,24 @@ function CommentComposer({
     );
 }
 
-function CommentItem({ comment }: { comment: CommentData }) {
+function CommentItem({
+    comment,
+    chip,
+    onHover,
+}: {
+    comment: CommentData;
+    chip?: ReactNode;
+    onHover?: (hovering: boolean) => void;
+}) {
     const getInitials = useInitials();
     const name = comment.user_name ?? 'Unknown';
 
     return (
-        <li className="flex gap-3">
+        <li
+            className="flex gap-3"
+            onMouseEnter={onHover ? () => onHover(true) : undefined}
+            onMouseLeave={onHover ? () => onHover(false) : undefined}
+        >
             <Avatar className="size-8 shrink-0">
                 <AvatarFallback className="text-xs">
                     {getInitials(name)}
@@ -110,6 +129,7 @@ function CommentItem({ comment }: { comment: CommentData }) {
             <div className="grid min-w-0 flex-1 gap-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{name}</span>
+                    {chip}
                     {comment.internal_only && (
                         <Badge variant="warning">
                             <Lock className="size-3" />
@@ -133,13 +153,15 @@ function ActivityItem({
     postId,
     canResend,
     isLast,
+    statusKind,
 }: {
     log: ActivityLogData;
     postId: number;
     canResend: boolean;
     isLast: boolean;
+    statusKind: StatusKind;
 }) {
-    const tone = resolveStatus('post', log.to_status).tone;
+    const tone = resolveStatus(statusKind, log.to_status).tone;
 
     return (
         <li className="relative flex gap-3 pb-5 last:pb-0">
@@ -164,11 +186,14 @@ function ActivityItem({
                     <span className="text-muted-foreground">moved it</span>
                     {log.from_status && (
                         <>
-                            <StatusPill kind="post" value={log.from_status} />
+                            <StatusPill
+                                kind={statusKind}
+                                value={log.from_status}
+                            />
                             <ArrowRight className="text-muted-foreground size-3.5" />
                         </>
                     )}
-                    <StatusPill kind="post" value={log.to_status} />
+                    <StatusPill kind={statusKind} value={log.to_status} />
                     <span className="text-muted-foreground font-mono text-[11px]">
                         {formatTimestamp(log.created_at)}
                     </span>
@@ -216,21 +241,35 @@ function ActivityItem({
     );
 }
 
-/** Comments and the status history, side by side as tabs under the editor. */
-export function PostDiscussion({
+/**
+ * Comments and the status history, side by side as tabs under the editor. Phase 18 reuses it for
+ * grid plans: pass the grid's `commentForm` and `statusKind`, a `renderChip` ("Tile 4") and
+ * `onCommentHover` to light up the tile a comment is about.
+ */
+export function PostDiscussion<C extends CommentData = CommentData>({
     postId,
     comments,
     activityLogs,
     canComment,
     canResendReviewEmail,
     mentionableUsers,
+    commentForm,
+    composerExtra,
+    statusKind = 'post',
+    renderChip,
+    onCommentHover,
 }: {
     postId: number;
-    comments: CommentData[];
+    comments: C[];
     activityLogs: ActivityLogData[];
     canComment: boolean;
     canResendReviewEmail: boolean;
     mentionableUsers: MentionableUser[];
+    commentForm?: RouteFormDefinition<'post'>;
+    composerExtra?: ReactNode;
+    statusKind?: StatusKind;
+    renderChip?: (comment: C) => ReactNode;
+    onCommentHover?: (comment: C | null) => void;
 }) {
     return (
         <section className="border-border bg-card rounded-2xl border">
@@ -256,8 +295,9 @@ export function PostDiscussion({
                 <TabsContent value="comments" className="grid gap-5 p-5">
                     {canComment && (
                         <CommentComposer
-                            postId={postId}
+                            form={commentForm ?? storeComment.form(postId)}
                             mentionableUsers={mentionableUsers}
+                            extra={composerExtra}
                         />
                     )}
                     {comments.length === 0 ? (
@@ -272,6 +312,15 @@ export function PostDiscussion({
                                 <CommentItem
                                     key={comment.id}
                                     comment={comment}
+                                    chip={renderChip?.(comment)}
+                                    onHover={
+                                        onCommentHover
+                                            ? (hovering) =>
+                                                  onCommentHover(
+                                                      hovering ? comment : null,
+                                                  )
+                                            : undefined
+                                    }
                                 />
                             ))}
                         </ul>
@@ -294,6 +343,7 @@ export function PostDiscussion({
                                     postId={postId}
                                     canResend={canResendReviewEmail}
                                     isLast={index === activityLogs.length - 1}
+                                    statusKind={statusKind}
                                 />
                             ))}
                         </ol>

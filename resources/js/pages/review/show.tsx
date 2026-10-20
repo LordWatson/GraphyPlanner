@@ -47,6 +47,8 @@ type PostData = {
     assets: AssetData[];
     targets: TargetData[];
     can_decide: boolean;
+    /** Step 18.9: the grid whose look the client already approved. */
+    grid_name?: string | null;
     comments: CommentData[];
 };
 
@@ -106,6 +108,16 @@ export default function ReviewShow({
                         label={post.status_label}
                     />
                 </PublicTitle>
+
+                {post.grid_name && (
+                    <p className="border-border bg-card text-muted-foreground -mt-2 rounded-xl border px-4 py-3 text-sm">
+                        You approved how this looks in{' '}
+                        <span className="text-foreground font-medium">
+                            {post.grid_name}
+                        </span>
+                        . This review is about the words.
+                    </p>
+                )}
 
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
                     {post.review_message && (

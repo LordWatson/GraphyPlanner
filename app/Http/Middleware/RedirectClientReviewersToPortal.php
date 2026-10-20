@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\Role;
 use App\Models\Campaign;
+use App\Models\GridPlan;
 use App\Models\Post;
 use Closure;
 use Illuminate\Http\Request;
@@ -33,6 +34,9 @@ class RedirectClientReviewersToPortal
             // Step C-1.1/C-1.2: the campaigns hub and workspace have portal counterparts.
             'campaigns.index', 'campaigns.compare' => to_route('portal.campaigns.index'),
             'campaigns.show' => $this->redirectForCampaign($request->route('campaign'), $user->client_id),
+            // Phase 18: the grid planner's portal counterpart.
+            'grids.edit' => $this->redirectForGrid($request->route('grid'), $user->client_id),
+            'grids.index' => to_route('portal.grids.index'),
             default => to_route('portal.dashboard'),
         };
     }
@@ -44,6 +48,15 @@ class RedirectClientReviewersToPortal
         }
 
         return to_route('portal.campaigns.index');
+    }
+
+    private function redirectForGrid(mixed $grid, ?int $clientId): Response
+    {
+        if ($grid instanceof GridPlan && $grid->client_id === $clientId && $grid->status->isClientVisible()) {
+            return to_route('portal.grids.show', $grid);
+        }
+
+        return to_route('portal.grids.index');
     }
 
     /**

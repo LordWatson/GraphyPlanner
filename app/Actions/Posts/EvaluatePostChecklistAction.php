@@ -7,6 +7,8 @@ use App\Enums\MediaRatio;
 use App\Models\Asset;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Services\Grids\GridDriftService;
+use App\Services\Grids\GridSequenceValidator;
 use App\Support\Publishing\FormatSpec;
 use App\Support\Publishing\PlatformSpec;
 
@@ -68,6 +70,10 @@ class EvaluatePostChecklistAction
             $this->item('first_comment', 'First comments are supported', $checks['first_comment'], soft: true),
             $this->item('media_framing', 'Media is framed for each channel', $checks['media_framing'], soft: true, fixes: $checks['framing_fixes']),
         ];
+
+        // Step 18.10 / 18.11: a post made from a grid tile is checked against the approved look
+        // and its place in the sequence — warnings, never blockers.
+        array_push($items, ...$this->gridItems($post));
 
         // Campaigns enhancement C-4.2: a soft check — a warning in the editor, never a blocker.
         $campaignTags = $post->campaign->hashtags ?? [];
@@ -257,6 +263,32 @@ class EvaluatePostChecklistAction
                 'label' => "Crop {$spec->label} images to {$format->fillScreen}",
             ];
         }
+    }
+
+    /**
+     * `grid_match` (the media, framing and format still match the tile the client approved) and
+     * `grid_order` (it still goes out in its place in the grid's sequence), for a post made from a
+     * grid tile.
+     *
+     * @return list<array{key: string, label: string, passed: bool, soft?: bool, detail?: string, fixes?: list<array<string, mixed>>}>
+     */
+    private function gridItems(Post $post): array
+    {
+        $post->loadMissing('gridTile.plan');
+        $tile = $post->gridTile;
+        $plan = $tile?->plan;
+
+        if ($tile === null || $plan === null) {
+            return [];
+        }
+
+        $drift = (new GridDriftService)->changes($plan, $tile, $post);
+        $order = GridSequenceValidator::forTile($plan, $tile);
+
+        return [
+            $this->item('grid_match', 'Matches the approved grid', $drift === [] ? [] : ['Changed since the client approved the grid. '.implode(' ', $drift)], soft: true),
+            $this->item('grid_order', 'Goes out in grid order', $order, soft: true),
+        ];
     }
 
     /**

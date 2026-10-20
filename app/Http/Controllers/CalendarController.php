@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Actions\Campaigns\GetCalendarCampaignLayerAction;
 use App\Actions\Posts\BuildCalendarOccurrencesAction;
 use App\Actions\Posts\GetCalendarPostsAction;
+use App\Enums\GridPlanStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Http\Requests\CalendarRequest;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\GridPlan;
 use App\Models\Post;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -76,6 +78,13 @@ class CalendarController extends Controller
                 'campaigns' => Campaign::query()
                     ->where('org_id', $user->org_id)
                     ->when($user->role === Role::ClientReviewer, fn ($q) => $q->where('client_id', $user->client_id))
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
+                // Step 18.11: grids with posts, for "Show this grid".
+                'grids' => $user->role === Role::ClientReviewer ? [] : GridPlan::query()
+                    ->where('org_id', $user->org_id)
+                    ->where('status', '!=', GridPlanStatus::Archived)
+                    ->whereHas('tiles', fn ($tiles) => $tiles->whereNotNull('post_id'))
                     ->orderBy('name')
                     ->get(['id', 'name']),
                 'statuses' => array_map(

@@ -41,6 +41,10 @@ $safely(Schedule::command('ai:generate-daily-briefs')->dailyAt('06:00'), 'ai:gen
 // `ai.images.prune_after_days` (30 by default). Images attached to a post are always kept.
 $safely(Schedule::command('ai-images:prune')->dailyAt('03:30'), 'ai-images:prune');
 
+// Step 18.13: soft-deletes archived grid plans untouched for 12 months (and the split slices
+// nothing else uses) — see PruneGridPlansAction.
+$safely(Schedule::command('grids:prune')->weeklyOn(0, '03:45'), 'grids:prune');
+
 // Step 17.8: emails saved organization reports on their weekly (Monday) / monthly (1st) schedule,
 // at most once per period per report, skipping suspended orgs — see
 // SendScheduledOrganizationReportsAction.

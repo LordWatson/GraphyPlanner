@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\Role;
 use App\Models\Campaign;
+use App\Models\GridPlan;
 use App\Models\Invoice;
 use App\Models\Post;
 use Closure;
@@ -34,10 +35,15 @@ class EnsureClientPortalAccess
             abort(403, 'This client account has been archived.');
         }
 
-        foreach (['post', 'invoice', 'campaign'] as $parameter) {
+        foreach (['post', 'invoice', 'campaign', 'grid'] as $parameter) {
             $model = $request->route($parameter);
 
-            if (($model instanceof Post || $model instanceof Invoice || $model instanceof Campaign) && $model->client_id !== $user->client_id) {
+            if (($model instanceof Post || $model instanceof Invoice || $model instanceof Campaign || $model instanceof GridPlan) && $model->client_id !== $user->client_id) {
+                abort(404);
+            }
+
+            // Phase 18: a grid reaches the portal only once it's been sent to the client.
+            if ($model instanceof GridPlan && ! $model->status->isClientVisible()) {
                 abort(404);
             }
 

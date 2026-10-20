@@ -25,7 +25,7 @@ class GetCalendarPostsAction
     public const UNSCHEDULED_PER_PAGE = 20;
 
     /**
-     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null}  $filters
+     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null, grid_id?: int|null}  $filters
      * @return Collection<int, Post>
      */
     public function __invoke(User $user, array $filters, CalendarWindow $window): Collection
@@ -40,6 +40,7 @@ class GetCalendarPostsAction
                     ->select(['id', 'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc'])
                     ->orderBy('id'),
                 'targets.socialAccount:id,platform,handle,timezone',
+                'gridTile:id,grid_plan_id,post_id,position',
             ])
             ->orderBy('posts.id')
             ->get(['posts.id', 'posts.org_id', 'posts.client_id', 'posts.campaign_id', 'posts.status', 'posts.master_caption']);
@@ -72,7 +73,7 @@ class GetCalendarPostsAction
      * Posts with no dated target (or no targets at all) — invisible on the grid, so the calendar
      * lists them in a drawer.
      *
-     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null}  $filters
+     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null, grid_id?: int|null}  $filters
      * @return LengthAwarePaginator<int, Post>
      */
     public function unscheduled(User $user, array $filters, int $page = 1): LengthAwarePaginator
@@ -85,7 +86,7 @@ class GetCalendarPostsAction
     }
 
     /**
-     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null}  $filters
+     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null, grid_id?: int|null}  $filters
      */
     public function unscheduledCount(User $user, array $filters): int
     {
@@ -93,7 +94,7 @@ class GetCalendarPostsAction
     }
 
     /**
-     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null}  $filters
+     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null, grid_id?: int|null}  $filters
      * @return Builder<Post>
      */
     private function undated(User $user, array $filters): Builder
@@ -103,7 +104,7 @@ class GetCalendarPostsAction
     }
 
     /**
-     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null}  $filters
+     * @param  array{client_id?: int|null, campaign_id?: int|null, status?: string|null, platform?: string|null, grid_id?: int|null}  $filters
      * @return Builder<Post>
      */
     private function filtered(User $user, array $filters): Builder
@@ -124,6 +125,12 @@ class GetCalendarPostsAction
 
         if (! empty($filters['status'])) {
             $query->where('posts.status', $filters['status']);
+        }
+
+        // Step 18.11: "Show this grid".
+        if (! empty($filters['grid_id'])) {
+            $gridId = $filters['grid_id'];
+            $query->whereHas('gridTile', fn (Builder $tile) => $tile->where('grid_plan_id', $gridId));
         }
 
         if (! empty($filters['platform'])) {

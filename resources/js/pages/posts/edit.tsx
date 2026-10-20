@@ -4,6 +4,7 @@ import {
     ArrowLeft,
     Check,
     ChevronDown,
+    Grid3x3,
     Lock,
     MapPin,
     Music2,
@@ -82,9 +83,11 @@ import {
     normalizeCrop,
     publishedCaption,
 } from '@/lib/media-format';
+import { ordinal } from '@/lib/grid-layout';
 import { capabilityOf, usePlatforms } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import { show as showCampaign } from '@/routes/campaigns';
+import { edit as editGrid } from '@/routes/grids';
 import { show as showClient } from '@/routes/clients';
 import { store as storeAsset } from '@/routes/clients/assets';
 import { update as updatePost } from '@/routes/posts';
@@ -402,6 +405,7 @@ export default function PostEdit({
     ai,
     imageStudio,
     mediaFormatOptions,
+    grid = null,
 }: {
     post: PostData;
     client: { id: number; name: string };
@@ -422,6 +426,16 @@ export default function PostEdit({
     ai?: { enabled: boolean; canUse: boolean };
     imageStudio?: ImageStudioData | null;
     mediaFormatOptions: MediaFormatOptions;
+    /** Step 18.9: the grid tile this post was made from. */
+    grid?: {
+        id: number;
+        name: string;
+        status: string;
+        tile_id: number;
+        tile_position: number;
+        sequence: number | null;
+        tile_count: number;
+    } | null;
 }) {
     // The page remounts with fresh props after every successful save/transition, so this snapshot
     // is always "what's on the server" — the baseline for unsaved-changes tracking.
@@ -945,6 +959,20 @@ export default function PostEdit({
                             {post.campaign && (
                                 <Link href={showCampaign(post.campaign.id)}>
                                     <CampaignChip campaign={post.campaign} />
+                                </Link>
+                            )}
+                            {grid && (
+                                <Link
+                                    href={editGrid(grid.id, {
+                                        query: { tile: grid.tile_id },
+                                    })}
+                                    className="border-border hover:border-primary/40 hover:text-primary inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors"
+                                >
+                                    <Grid3x3 className="size-3.5" />
+                                    From grid: {grid.name} · Tile{' '}
+                                    {grid.tile_position}
+                                    {grid.sequence !== null &&
+                                        ` · Goes out ${ordinal(grid.sequence)}`}
                                 </Link>
                             )}
                         </>

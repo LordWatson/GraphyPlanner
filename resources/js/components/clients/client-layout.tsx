@@ -10,6 +10,7 @@ import {
     Clapperboard,
     FileImage,
     Globe,
+    LayoutGrid,
     Languages,
     Lightbulb,
     LineChart as LineChartIcon,
@@ -61,6 +62,7 @@ import {
 import { index as clientAi } from '@/routes/clients/ai';
 import { edit as editBrandBrain } from '@/routes/clients/brand-brain';
 import { index as clientCampaigns } from '@/routes/clients/campaigns';
+import { index as clientGrids } from '@/routes/clients/grids';
 import { index as clientPosts } from '@/routes/clients/posts';
 
 export type ClientData = {
@@ -88,6 +90,7 @@ export type ClientTab =
     | 'accounts'
     | 'campaigns'
     | 'posts'
+    | 'grids'
     | 'media'
     | 'billing'
     | 'portal-access'
@@ -114,12 +117,15 @@ export type ClientPageProps = {
         createAsset: boolean;
         createPost: boolean;
         createInvitation: boolean;
+        viewGrids: boolean;
+        createGrid: boolean;
     };
     stats: {
         socialAccounts: number;
         campaigns: number;
         posts: number;
         assets: number;
+        grids: number;
         billing: { invoices: number; outstanding: CurrencyTotal[] } | null;
         portalAccess: { invitations: number; active: number } | null;
         ai: { trends: number; ideas: number; briefs: number } | null;
@@ -355,9 +361,24 @@ export function ClientLayout({
         },
     ];
 
-    // The rest share one "More" box so the row stays on a single line. Each is gated by the
-    // same permission as its route (the stats are null when the viewer can't open them).
+    // The rest share one "More" box so the row stays on a single line (four primary boxes +
+    // More = five). Each is gated by the same permission as its route (the stats are null
+    // when the viewer can't open them).
     const moreCards: SectionCard[] = [
+        // Phase 18: the Instagram grid planner (only when the client has an Instagram account).
+        ...(can.viewGrids
+            ? [
+                  {
+                      key: 'grids',
+                      label: 'Grid',
+                      icon: LayoutGrid,
+                      value: stats.grids,
+                      hint: 'Instagram grid plans',
+                      href: clientGrids(client.id),
+                      active: tab === 'grids',
+                  },
+              ]
+            : []),
         ...(stats.billing
             ? [
                   {

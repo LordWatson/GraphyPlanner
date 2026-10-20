@@ -59,7 +59,7 @@ class PortalPostController extends Controller
     public function show(Request $request, Post $post, PostNotificationService $notifications): Response
     {
         $user = $request->user();
-        $post->load(['targets.socialAccount', 'assets', 'comments.user', 'comments.mentionedUsers']);
+        $post->load(['targets.socialAccount', 'assets', 'comments.user', 'comments.mentionedUsers', 'gridTile.plan']);
 
         return Inertia::render('portal/posts/show', [
             'post' => [
@@ -68,6 +68,8 @@ class PortalPostController extends Controller
                 'status_label' => $post->status->label(),
                 'master_caption' => $post->master_caption,
                 'review_message' => $post->review_message,
+                // Step 18.9: the look was approved in a grid; this review is about the words.
+                'grid_name' => $post->gridTile?->plan?->name,
                 'hashtags' => $post->hashtags ?? [],
                 'music' => $post->music,
                 'location' => $post->location,

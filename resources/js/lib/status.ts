@@ -16,6 +16,7 @@ export type StatusTone =
 
 export type StatusKind =
     | 'post'
+    | 'gridPlan'
     | 'postTarget'
     | 'client'
     | 'health'
@@ -48,6 +49,18 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         published: { tone: 'success', label: 'Published' },
         partially_published: { tone: 'warning', label: 'Partially published' },
         failed: { tone: 'danger', label: 'Failed' },
+        archived: { tone: 'muted', label: 'Archived' },
+    },
+    // Phase 18: a grid plan's approval stage — the post tones for the same-named statuses, so a
+    // grid and a post "Waiting on client" read identically. `in_production`/`live` are derived.
+    gridPlan: {
+        draft: { tone: 'neutral', label: 'Draft' },
+        internal_review: { tone: 'info', label: 'Internal review' },
+        waiting_client: { tone: 'info', label: 'Waiting on client' },
+        changes_requested: { tone: 'warning', label: 'Changes requested' },
+        approved: { tone: 'success', label: 'Approved' },
+        in_production: { tone: 'brand', label: 'In production' },
+        live: { tone: 'success', label: 'Live' },
         archived: { tone: 'muted', label: 'Archived' },
     },
     postTarget: {
