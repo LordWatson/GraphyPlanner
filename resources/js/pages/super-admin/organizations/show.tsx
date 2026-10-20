@@ -736,6 +736,19 @@ function DeleteDialog({ organization }: { organization: OrganizationDetail }) {
                                     }
                                 />
                             </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="delete_org_password">
+                                    Your password
+                                </Label>
+                                <Input
+                                    id="delete_org_password"
+                                    name="password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    required
+                                />
+                                <InputError message={errors.password} />
+                            </div>
                             <DialogFooter>
                                 <Button
                                     type="button"

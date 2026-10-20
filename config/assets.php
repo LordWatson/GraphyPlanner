@@ -80,9 +80,11 @@ return [
     |
     */
 
+    // Step I-16.2 / M-1.2: no SVG — it can carry script. `SafeUpload` also checks each file's
+    // content matches its extension (see that rule for the per-extension types).
     'allowed_upload_extensions' => [
         // Images
-        'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'heic',
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic',
         // Video
         'mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v',
         // Documents / other

@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import invoices from '@/routes/invoices';
 import { todayIso } from './types';
+import { DatePicker } from '@/components/date-picker';
 
 type InvoiceRef = {
     id: number;
@@ -296,10 +297,9 @@ export function MarkPaidDialog({
                                     <Label htmlFor={`paid-at-${invoice.id}`}>
                                         Payment date
                                     </Label>
-                                    <Input
+                                    <DatePicker
                                         id={`paid-at-${invoice.id}`}
                                         name="paid_at"
-                                        type="date"
                                         max={todayIso()}
                                         defaultValue={todayIso()}
                                     />

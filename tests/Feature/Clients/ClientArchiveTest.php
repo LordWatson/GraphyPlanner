@@ -95,7 +95,7 @@ class ClientArchiveTest extends TestCase
         $this->client->delete();
 
         $this->actingAs($this->owner)
-            ->delete(route('clients.purge', $this->client))
+            ->delete(route('clients.purge', $this->client), ['password' => 'password'])
             ->assertSessionHasErrors('client');
 
         $this->assertNotNull(Client::withTrashed()->find($this->client->id));
@@ -120,7 +120,7 @@ class ClientArchiveTest extends TestCase
         $this->client->delete();
 
         $this->actingAs($this->owner)
-            ->delete(route('clients.purge', $this->client))
+            ->delete(route('clients.purge', $this->client), ['password' => 'password'])
             ->assertRedirect(route('clients.index', ['archived' => 1]));
 
         $this->assertNull(Client::withTrashed()->find($this->client->id));

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Client;
 use App\Policies\BrandBrainPolicy;
+use App\Rules\SafeUpload;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UploadBrandPersonaRequest extends FormRequest
@@ -25,7 +26,7 @@ class UploadBrandPersonaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'persona' => ['required', 'file', 'mimes:pdf', 'max:'.config('assets.max_upload_size_kb')],
+            'persona' => ['required', 'file', 'mimes:pdf', 'max:'.config('assets.max_upload_size_kb'), new SafeUpload(['pdf'])],
         ];
     }
 }

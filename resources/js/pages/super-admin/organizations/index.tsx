@@ -1,15 +1,9 @@
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    ArrowUpRight,
-    Building2,
-    ChevronLeft,
-    ChevronRight,
-    Plus,
-    Search,
-    X,
-} from 'lucide-react';
+import { Building2, Plus, Search, X } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import { DataTable } from '@/components/data-table';
 import { EmptyState, Page, PageHeader, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -44,6 +38,7 @@ type OrganizationRow = {
 
 type Paginated<T> = {
     data: T[];
+    current_page: number;
     from: number | null;
     to: number | null;
     total: number;
@@ -79,6 +74,94 @@ function organizationStatus(organization: OrganizationRow): string {
 
     return organization.is_preview ? 'preview' : 'active';
 }
+
+/** Step M-1.4: ruled rows on the shared `DataTable`; sorting stays on the preset sort menu. */
+const organizationColumns: ColumnDef<OrganizationRow, unknown>[] = [
+    {
+        id: 'name',
+        header: 'Organization',
+        enableHiding: false,
+        cell: ({ row }) => (
+            <span className="flex min-w-0 items-center gap-2.5">
+                <Link
+                    href={showOrganization(row.original.id)}
+                    className="truncate font-medium hover:underline"
+                >
+                    {row.original.name}
+                </Link>
+                <StatusPill
+                    kind="organization"
+                    value={organizationStatus(row.original)}
+                    className="shrink-0"
+                />
+            </span>
+        ),
+    },
+    {
+        id: 'owner',
+        header: 'Owner',
+        meta: {
+            label: 'Owner',
+            hideBelow: 'md',
+            className: 'text-muted-foreground max-w-72 truncate text-sm',
+        },
+        cell: ({ row }) =>
+            row.original.owner ? (
+                <>
+                    <span className="text-foreground">
+                        {row.original.owner.name}
+                    </span>{' '}
+                    · {row.original.owner.email}
+                </>
+            ) : (
+                'No owner'
+            ),
+    },
+    {
+        id: 'people',
+        header: 'People',
+        meta: {
+            label: 'People',
+            hideBelow: 'lg',
+            align: 'right',
+            className: 'font-mono',
+        },
+        cell: ({ row }) => row.original.users_count,
+    },
+    {
+        id: 'clients',
+        header: 'Clients',
+        meta: {
+            label: 'Clients',
+            hideBelow: 'sm',
+            align: 'right',
+            className: 'font-mono',
+        },
+        cell: ({ row }) => row.original.clients_count,
+    },
+    {
+        id: 'live',
+        header: 'Live',
+        meta: {
+            label: 'Published posts',
+            hideBelow: 'lg',
+            align: 'right',
+            className: 'font-mono',
+        },
+        cell: ({ row }) => row.original.published_posts_count,
+    },
+    {
+        id: 'created',
+        header: 'Created',
+        meta: {
+            label: 'Created',
+            hideBelow: 'md',
+            align: 'right',
+            className: 'text-muted-foreground font-mono text-xs',
+        },
+        cell: ({ row }) => formatDate(row.original.created_at),
+    },
+];
 
 /**
  * Step 15.3 — every organization on the platform: search by org or any member, filter by
@@ -287,165 +370,41 @@ export default function OrganizationsIndex({
                             }
                         />
                     ) : (
-                        <>
-                            <div className="border-border/80 bg-card overflow-hidden rounded-2xl border shadow-sm">
-                                <div className="text-muted-foreground border-border/70 hidden grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_repeat(3,5rem)_7rem] gap-4 border-b px-6 py-3 lg:grid">
-                                    <span className="eyebrow">
-                                        Organization
-                                    </span>
-                                    <span className="eyebrow">Owner</span>
-                                    <span className="eyebrow text-right">
-                                        People
-                                    </span>
-                                    <span className="eyebrow text-right">
-                                        Clients
-                                    </span>
-                                    <span className="eyebrow text-right">
-                                        Live
-                                    </span>
-                                    <span className="eyebrow text-right">
-                                        Created
-                                    </span>
-                                </div>
-                                <ul className="divide-border/70 divide-y">
-                                    {organizations.data.map((organization) => (
-                                        <li key={organization.id}>
-                                            <Link
-                                                href={showOrganization(
-                                                    organization.id,
-                                                )}
-                                                className="group hover:bg-muted/50 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-4 transition-colors sm:px-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_repeat(3,5rem)_7rem]"
-                                            >
-                                                <span className="flex min-w-0 items-center gap-2.5">
-                                                    <span className="truncate font-medium group-hover:underline">
-                                                        {organization.name}
-                                                    </span>
-                                                    <StatusPill
-                                                        kind="organization"
-                                                        value={organizationStatus(
-                                                            organization,
-                                                        )}
-                                                        className="shrink-0"
-                                                    />
-                                                </span>
-                                                <ArrowUpRight className="text-muted-foreground size-4 justify-self-end opacity-60 lg:hidden" />
-                                                <span className="text-muted-foreground col-span-2 min-w-0 truncate text-xs lg:col-span-1 lg:text-sm">
-                                                    {organization.owner ? (
-                                                        <>
-                                                            <span className="text-foreground">
-                                                                {
-                                                                    organization
-                                                                        .owner
-                                                                        .name
-                                                                }
-                                                            </span>{' '}
-                                                            ·{' '}
-                                                            {
-                                                                organization
-                                                                    .owner.email
-                                                            }
-                                                        </>
-                                                    ) : (
-                                                        'No owner'
-                                                    )}
-                                                </span>
-                                                <span className="text-muted-foreground col-span-2 font-mono text-xs tabular-nums lg:hidden">
-                                                    {organization.users_count}{' '}
-                                                    people ·{' '}
-                                                    {organization.clients_count}{' '}
-                                                    clients ·{' '}
-                                                    {
-                                                        organization.published_posts_count
-                                                    }{' '}
-                                                    live · since{' '}
-                                                    {formatDate(
-                                                        organization.created_at,
-                                                    )}
-                                                </span>
-                                                <span className="hidden text-right font-mono text-sm tabular-nums lg:block">
-                                                    {organization.users_count}
-                                                </span>
-                                                <span className="hidden text-right font-mono text-sm tabular-nums lg:block">
-                                                    {organization.clients_count}
-                                                </span>
-                                                <span className="hidden text-right font-mono text-sm tabular-nums lg:block">
-                                                    {
-                                                        organization.published_posts_count
-                                                    }
-                                                </span>
-                                                <span className="text-muted-foreground hidden text-right font-mono text-xs lg:block">
-                                                    {formatDate(
-                                                        organization.created_at,
-                                                    )}
-                                                </span>
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-
-                            {organizations.last_page > 1 && (
-                                <nav
-                                    aria-label="Pagination"
-                                    className="flex items-center justify-between gap-3"
-                                >
-                                    <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                                        {organizations.from}–{organizations.to}{' '}
-                                        of {organizations.total}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        <PageLink
-                                            href={organizations.prev_page_url}
-                                            label="Previous"
-                                            icon="prev"
-                                        />
-                                        <PageLink
-                                            href={organizations.next_page_url}
-                                            label="Next"
-                                            icon="next"
-                                        />
-                                    </div>
-                                </nav>
-                            )}
-                        </>
+                        <DataTable
+                            caption="Organizations"
+                            columns={organizationColumns}
+                            data={organizations.data}
+                            getRowId={(organization) => String(organization.id)}
+                            rowHref={(organization) =>
+                                showOrganization.url(organization.id)
+                            }
+                            storageKey="super-admin-organizations"
+                            pagination={organizations}
+                            paginationLabel="organizations"
+                            onPageChange={(page) =>
+                                router.get(
+                                    organizationsIndex.url({
+                                        query: {
+                                            ...Object.fromEntries(
+                                                Object.entries(filters).filter(
+                                                    ([, value]) => value !== '',
+                                                ),
+                                            ),
+                                            page,
+                                        },
+                                    }),
+                                    undefined,
+                                    {
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    },
+                                )
+                            }
+                        />
                     )}
                 </section>
             </Page>
         </>
-    );
-}
-
-function PageLink({
-    href,
-    label,
-    icon,
-}: {
-    href: string | null;
-    label: string;
-    icon: 'prev' | 'next';
-}) {
-    const content = (
-        <>
-            {icon === 'prev' && <ChevronLeft />}
-            {label}
-            {icon === 'next' && <ChevronRight />}
-        </>
-    );
-
-    if (!href) {
-        return (
-            <Button variant="outline" size="sm" disabled>
-                {content}
-            </Button>
-        );
-    }
-
-    return (
-        <Button variant="outline" size="sm" asChild>
-            <Link href={href} preserveScroll preserveState>
-                {content}
-            </Link>
-        </Button>
     );
 }
 

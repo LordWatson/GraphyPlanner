@@ -465,7 +465,7 @@ export default function CampaignOverview(props: OverviewProps) {
                         </Panel>
                     )}
 
-                    <Deferred data="grids" fallback={null}>
+                    <Deferred data="grids" fallback={<></>}>
                         {(grids ?? []).length > 0 && (
                             <Panel
                                 icon={Grid3x3}

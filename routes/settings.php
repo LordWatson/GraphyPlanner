@@ -32,8 +32,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Organization-level settings need an organization: `org.member` (Step 15.1) sends org-less
 // super admins to `/super-admin` (they keep profile/security/appearance above).
 Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
-    Route::get('settings/organization', [OrganizationController::class, 'edit'])->name('organization.edit');
-    Route::put('settings/organization', [OrganizationController::class, 'update'])->name('organization.update');
+    // Step I-16.2 / M-1.2: this page holds the org's API keys and webhook secret, so viewing and
+    // changing it re-checks the password (`password.confirm`, 3 h window).
+    Route::get('settings/organization', [OrganizationController::class, 'edit'])
+        ->middleware(RequirePassword::class)
+        ->name('organization.edit');
+    Route::put('settings/organization', [OrganizationController::class, 'update'])
+        ->middleware(RequirePassword::class)
+        ->name('organization.update');
     // Step I-1.6: "Test connection" for the stored Upload-Post key.
     Route::post('settings/organization/test-upload-post', [OrganizationController::class, 'testUploadPost'])
         ->middleware('throttle:6,1')

@@ -15,6 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
+import { DatePicker } from '@/components/date-picker';
 
 export const NONE = '__none';
 
@@ -167,12 +168,11 @@ export function CampaignCoreFields({
                 htmlFor="campaign-start"
                 error={form.errors.start_date}
             >
-                <Input
+                <DatePicker
                     id="campaign-start"
-                    type="date"
                     value={form.data.start_date}
-                    onChange={(event) =>
-                        form.setData('start_date', event.target.value)
+                    onChange={(value) =>
+                        form.setData('start_date', value ?? '')
                     }
                 />
             </Field>
@@ -181,14 +181,11 @@ export function CampaignCoreFields({
                 htmlFor="campaign-end"
                 error={form.errors.end_date}
             >
-                <Input
+                <DatePicker
                     id="campaign-end"
-                    type="date"
                     min={form.data.start_date || undefined}
                     value={form.data.end_date}
-                    onChange={(event) =>
-                        form.setData('end_date', event.target.value)
-                    }
+                    onChange={(value) => form.setData('end_date', value ?? '')}
                 />
             </Field>
             <Field label="Objective" error={form.errors.objective}>

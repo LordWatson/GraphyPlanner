@@ -27,6 +27,7 @@ import {
     update as updateInvoice,
 } from '@/routes/invoices';
 import { store as storePdf } from '@/routes/invoices/pdf';
+import { DatePicker } from '@/components/date-picker';
 
 export default function InvoiceEdit({
     invoice,
@@ -91,12 +92,10 @@ export default function InvoiceEdit({
                                         <Label htmlFor="issue_date">
                                             Issue date
                                         </Label>
-                                        <Input
+                                        <DatePicker
                                             id="issue_date"
                                             name="issue_date"
-                                            type="date"
                                             defaultValue={invoice.issue_date}
-                                            required
                                         />
                                         <InputError
                                             message={errors.issue_date}
@@ -106,10 +105,9 @@ export default function InvoiceEdit({
                                         <Label htmlFor="due_date">
                                             Due date
                                         </Label>
-                                        <Input
+                                        <DatePicker
                                             id="due_date"
                                             name="due_date"
-                                            type="date"
                                             defaultValue={
                                                 invoice.due_date ?? ''
                                             }

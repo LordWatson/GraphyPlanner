@@ -1,8 +1,6 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ChevronLeft,
-    ChevronRight,
     Clock,
     Download,
     Receipt,
@@ -12,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import { DatePicker } from '@/components/date-picker';
 import { InvoiceLedgerList } from '@/components/invoices/invoice-ledger-list';
 import { NewInvoiceDialog } from '@/components/invoices/new-invoice-dialog';
 import type { CurrencyOption, InvoiceRow } from '@/components/invoices/types';
@@ -36,6 +35,8 @@ type Filters = {
     search: string | null;
     from: string | null;
     to: string | null;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
 };
 
 /** Money totals are split per currency (org default first) — see `InvoiceLedgerService::summary()`. */
@@ -114,7 +115,9 @@ export default function InvoicesIndex({
         applyFilters({ search: search.trim() || null });
     };
 
-    const hasFilters = Object.values(filters).some((value) => value);
+    const hasFilters = Object.entries(filters).some(
+        ([key, value]) => value && key !== 'sort' && key !== 'direction',
+    );
     const exportQuery = Object.fromEntries(
         Object.entries(filters).filter(([, value]) => value),
     ) as Record<string, string>;
@@ -277,31 +280,26 @@ export default function InvoicesIndex({
                                 </SelectContent>
                             </Select>
                             <div className="flex items-center gap-1.5">
-                                <Input
-                                    type="date"
+                                <DatePicker
                                     aria-label="Issued from"
-                                    className="w-full sm:w-36"
-                                    value={filters.from ?? ''}
-                                    onChange={(event) =>
-                                        applyFilters({
-                                            from: event.target.value || null,
-                                        })
-                                    }
+                                    placeholder="Issued from"
+                                    className="w-full sm:w-40"
+                                    clearable
+                                    value={filters.from}
+                                    max={filters.to ?? undefined}
+                                    onChange={(from) => applyFilters({ from })}
                                 />
                                 <span className="text-muted-foreground font-mono text-xs">
                                     →
                                 </span>
-                                <Input
-                                    type="date"
+                                <DatePicker
                                     aria-label="Issued to"
-                                    className="w-full sm:w-36"
+                                    placeholder="Issued to"
+                                    className="w-full sm:w-40"
+                                    clearable
+                                    value={filters.to}
                                     min={filters.from ?? undefined}
-                                    value={filters.to ?? ''}
-                                    onChange={(event) =>
-                                        applyFilters({
-                                            to: event.target.value || null,
-                                        })
-                                    }
+                                    onChange={(to) => applyFilters({ to })}
                                 />
                             </div>
                             <form
@@ -367,70 +365,36 @@ export default function InvoicesIndex({
                             }
                         />
                     ) : (
-                        <>
-                            <InvoiceLedgerList invoices={invoices.data} />
-                            {invoices.last_page > 1 && (
-                                <nav
-                                    aria-label="Pagination"
-                                    className="flex items-center justify-between gap-3"
-                                >
-                                    <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                                        {invoices.from}–{invoices.to} of{' '}
-                                        {invoices.total}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        <PageLink
-                                            href={invoices.prev_page_url}
-                                            label="Previous"
-                                            icon="prev"
-                                        />
-                                        <PageLink
-                                            href={invoices.next_page_url}
-                                            label="Next"
-                                            icon="next"
-                                        />
-                                    </div>
-                                </nav>
-                            )}
-                        </>
+                        <InvoiceLedgerList
+                            invoices={invoices.data}
+                            sort={{
+                                sort: filters.sort,
+                                direction: filters.direction ?? 'desc',
+                            }}
+                            onSortChange={({ sort, direction }) =>
+                                applyFilters({
+                                    sort,
+                                    direction: sort ? direction : null,
+                                })
+                            }
+                            pagination={invoices}
+                            onPageChange={(page) =>
+                                router.get(
+                                    invoicesIndex.url({
+                                        query: { ...exportQuery, page },
+                                    }),
+                                    undefined,
+                                    {
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    },
+                                )
+                            }
+                        />
                     )}
                 </section>
             </Page>
         </>
-    );
-}
-
-function PageLink({
-    href,
-    label,
-    icon,
-}: {
-    href: string | null;
-    label: string;
-    icon: 'prev' | 'next';
-}) {
-    const content = (
-        <>
-            {icon === 'prev' && <ChevronLeft />}
-            {label}
-            {icon === 'next' && <ChevronRight />}
-        </>
-    );
-
-    if (!href) {
-        return (
-            <Button variant="outline" size="sm" disabled>
-                {content}
-            </Button>
-        );
-    }
-
-    return (
-        <Button variant="outline" size="sm" asChild>
-            <Link href={href} preserveScroll preserveState>
-                {content}
-            </Link>
-        </Button>
     );
 }
 

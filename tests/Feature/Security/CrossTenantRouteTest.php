@@ -47,6 +47,14 @@ class CrossTenantRouteTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+    }
+
     /**
      * Prefixes outside the org workspace, or bound by token/identity rather than an org-owned
      * model: preview (frozen fixture, read-only), the super admin console (cross-org on purpose),

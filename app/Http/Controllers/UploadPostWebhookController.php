@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Publishing\SyncPublishStatusAction;
+use App\Contracts\OpsAlerter;
 use App\Enums\Platform;
 use App\Enums\PostTargetStatus;
 use App\Models\PostTarget;
+use App\Support\Observability\TraceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,9 +31,9 @@ class UploadPostWebhookController extends Controller
      */
     private const MAX_TIMESTAMP_SKEW_SECONDS = 300;
 
-    public function handle(Request $request): JsonResponse
+    public function handle(Request $request, OpsAlerter $alerter): JsonResponse
     {
-        $event = (string) $request->header('X-Upload-Post-Event', $request->input('event'));
+        $event = $request->headers->get('X-Upload-Post-Event') ?? $request->string('event')->toString();
 
         if ($event !== 'upload_completed') {
             Log::info('Upload-Post webhook: ignoring non-publish event', ['event' => $event]);
@@ -64,10 +67,25 @@ class UploadPostWebhookController extends Controller
             return response()->json(['received' => true]);
         }
 
+        // Step I-16.1: join this webhook to the request/job that sent the target.
+        Context::add(array_filter([
+            TraceContext::POST_ID => $target->post_id,
+            TraceContext::POST_TARGET_ID => $target->id,
+            TraceContext::PUBLISH_CORRELATION_ID => $target->publish_correlation_id,
+        ], fn ($value) => $value !== null));
+
         if (! $this->hasValidSignature($request, $target)) {
             Log::warning('Upload-Post webhook: invalid or missing signature', [
                 'job_id' => $jobId,
                 'platform' => $platform,
+            ]);
+
+            // Never the signature itself — only which target it claimed to be for.
+            $alerter->alert('webhooks.upload_post.signature_failed', 'An Upload-Post webhook failed signature verification', [
+                'post_id' => $target->post_id,
+                'post_target_id' => $target->id,
+                'platform' => $platform,
+                'ip' => $request->ip(),
             ]);
 
             return response()->json(['message' => 'Invalid signature'], 401);
@@ -99,7 +117,7 @@ class UploadPostWebhookController extends Controller
      */
     private function hasValidSignature(Request $request, PostTarget $target): bool
     {
-        $secret = (string) ($target->socialAccount?->organization?->upload_post_webhook_secret ?? '');
+        $secret = (string) ($target->socialAccount?->organization->upload_post_webhook_secret ?? '');
 
         if ($secret === '') {
             Log::warning('Upload-Post webhook: no webhook secret configured for this organization, skipping signature verification', [

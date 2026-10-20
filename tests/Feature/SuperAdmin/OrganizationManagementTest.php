@@ -193,7 +193,7 @@ class OrganizationManagementTest extends TestCase
         $organization = Organization::factory()->create(['name' => 'Northlight Studio']);
 
         $this->actingAs($this->superAdmin)
-            ->delete(route('super-admin.organizations.destroy', $organization), ['confirm_name' => 'Wrong name'])
+            ->delete(route('super-admin.organizations.destroy', $organization), ['confirm_name' => 'Wrong name', 'password' => 'password'])
             ->assertSessionHasErrors('confirm_name');
 
         $this->assertModelExists($organization);
@@ -210,7 +210,7 @@ class OrganizationManagementTest extends TestCase
         $survivingMember = User::factory()->for($survivor, 'organization')->create();
 
         $this->actingAs($this->superAdmin)
-            ->delete(route('super-admin.organizations.destroy', $organization), ['confirm_name' => ' northlight studio '])
+            ->delete(route('super-admin.organizations.destroy', $organization), ['confirm_name' => ' northlight studio ', 'password' => 'password'])
             ->assertRedirect(route('super-admin.organizations.index'));
 
         $this->assertModelMissing($organization);
@@ -234,7 +234,7 @@ class OrganizationManagementTest extends TestCase
             ->assertSessionHasErrors('organization');
 
         $this->actingAs($this->superAdmin)
-            ->delete(route('super-admin.organizations.destroy', $preview), ['confirm_name' => 'Preview Studio'])
+            ->delete(route('super-admin.organizations.destroy', $preview), ['confirm_name' => 'Preview Studio', 'password' => 'password'])
             ->assertSessionHasErrors('organization');
 
         $this->assertNull($preview->fresh()->suspended_at);

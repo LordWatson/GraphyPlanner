@@ -31,6 +31,9 @@ class ReportControllerTest extends TestCase
     {
         parent::setUp();
 
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+
         Carbon::setTestNow('2026-10-17 12:00:00');
 
         $this->superAdmin = User::factory()->superAdmin()->create();

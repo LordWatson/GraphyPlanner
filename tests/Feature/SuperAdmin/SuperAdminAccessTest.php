@@ -17,6 +17,14 @@ class SuperAdminAccessTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+    }
+
     /**
      * Every GET page in the `super-admin/*` group.
      *

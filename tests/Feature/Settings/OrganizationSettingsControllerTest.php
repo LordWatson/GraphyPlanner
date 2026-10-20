@@ -13,6 +13,14 @@ class OrganizationSettingsControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+    }
+
     public function test_guests_are_redirected_to_the_login_page()
     {
         $response = $this->get(route('organization.edit'));

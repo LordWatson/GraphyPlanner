@@ -16,6 +16,7 @@ import {
 import { router, usePage } from '@inertiajs/react';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { http } from '@/lib/http';
 
 interface NotificationItem {
     id: string;
@@ -49,13 +50,13 @@ export function NotificationBell() {
 
         setLoading(true);
 
-        void fetch(indexNotifications.url(), {
-            headers: { Accept: 'application/json' },
-            credentials: 'same-origin',
-        })
-            .then((response) => response.json())
-            .then((data: { notifications: NotificationItem[] }) =>
-                setNotifications(data.notifications),
+        void http
+            .get<{ notifications: NotificationItem[] }>(
+                indexNotifications.url(),
+                { toastOnError: true },
+            )
+            .then((result) =>
+                setNotifications(result.ok ? result.data.notifications : []),
             )
             .finally(() => setLoading(false));
     }, [open, notifications]);

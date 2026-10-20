@@ -2,7 +2,6 @@ import { router } from '@inertiajs/react';
 import { Check, Loader2, Scale, Sparkles, Wand2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { getXsrfTokenFromCookie } from '@/components/clients/client-layout';
 import type { GridPlanData, GridTileData } from '@/components/grids/types';
 import { Panel } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -14,35 +13,23 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { http } from '@/lib/http';
 import gridAi from '@/routes/grids/ai';
 import gridTiles from '@/routes/grids/tiles';
 import { show as showGeneration } from '@/routes/ai-image-generations';
 
+/** POST via the shared `http` helper; throws the readable message so callers can `catch`. */
 async function postJson<T>(
     url: string,
     body: Record<string, unknown> = {},
 ): Promise<T> {
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-    });
-    const json = (await response.json().catch(() => ({}))) as T & {
-        message?: string;
-    };
+    const result = await http.post<T>(url, body);
 
-    if (!response.ok) {
-        throw new Error(
-            json.message ?? 'Something went wrong. Try again in a moment.',
-        );
+    if (!result.ok) {
+        throw new Error(result.message);
     }
 
-    return json;
+    return result.data;
 }
 
 type StudioVariant = {
@@ -94,13 +81,10 @@ function FillSlotDialog({
 
         let stopped = false;
         const poll = async () => {
-            const response = await fetch(showGeneration.url(generationId), {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            const json = (await response.json()) as {
+            const result = await http.get<{
                 generation?: { settled: boolean; variants: StudioVariant[] };
-            };
+            }>(showGeneration.url(generationId));
+            const json = result.ok ? result.data : {};
 
             if (stopped || !json.generation) {
                 return;

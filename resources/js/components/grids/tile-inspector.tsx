@@ -47,6 +47,8 @@ import { DEFAULT_CROP, ratioLabels } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
 import { edit as editPost } from '@/routes/posts';
 import gridTiles from '@/routes/grids/tiles';
+import { DatePicker } from '@/components/date-picker';
+import { TimeField } from '@/components/time-field';
 
 export type TileDraft = {
     kind: GridTileKind;
@@ -687,20 +689,18 @@ export function TileInspector({
                 <div className="grid gap-1.5">
                     <Label>Planned for</Label>
                     <div className="flex gap-2">
-                        <Input
-                            type="date"
+                        <DatePicker
                             aria-label="Planned date"
                             value={draft.planned_local_date}
-                            onChange={(event) =>
-                                set({ planned_local_date: event.target.value })
+                            onChange={(value) =>
+                                set({ planned_local_date: value ?? '' })
                             }
                         />
-                        <Input
-                            type="time"
+                        <TimeField
                             aria-label="Planned time"
                             value={draft.planned_local_time}
-                            onChange={(event) =>
-                                set({ planned_local_time: event.target.value })
+                            onChange={(value) =>
+                                set({ planned_local_time: value })
                             }
                             className="w-32"
                         />

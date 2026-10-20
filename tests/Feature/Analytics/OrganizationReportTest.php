@@ -26,6 +26,9 @@ class OrganizationReportTest extends TestCase
     {
         parent::setUp();
 
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+
         $this->buildAnalyticsFixtures();
     }
 

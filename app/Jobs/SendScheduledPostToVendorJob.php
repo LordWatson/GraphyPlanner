@@ -6,6 +6,7 @@ use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Support\Observability\TraceContext;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -64,6 +66,8 @@ class SendScheduledPostToVendorJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+        Context::add(TraceContext::POST_ID, $this->postId);
+
         /** @var array{0: Post, 1: Collection<int, PostTarget>}|null $claimed */
         $claimed = DB::transaction(fn (): ?array => $this->claim());
 

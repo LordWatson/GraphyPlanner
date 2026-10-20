@@ -1,4 +1,5 @@
-import { CopyCheck } from 'lucide-react';
+import { Clock4, CopyCheck } from 'lucide-react';
+import { DateTimePicker } from '@/components/date-time-picker';
 import { PlatformIcon } from '@/components/platform-icon';
 import type {
     ScheduleRows,
@@ -6,7 +7,6 @@ import type {
 } from '@/components/post-editor/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 function Usage({
@@ -34,8 +34,11 @@ function Usage({
 
 /**
  * One row per client social account: tick it to publish there, then give it its own local date
- * and time. A channel with required settings missing (e.g. a Pinterest board) says so. Times are never shared implicitly (spec §4.6) — "Use for all" is an explicit, per-click
- * copy of one row's values into the other selected rows, each still stored independently.
+ * and time. A channel with required settings missing (e.g. a Pinterest board) says so. Times are
+ * never shared implicitly (spec §4.6). Two explicit, per-click shortcuts: "Same local time" copies
+ * one row's date and wall-clock time to the others; "Same moment" (only when the channels are on
+ * different clocks) gives each the local time of that one instant. Each row is still stored
+ * independently.
  */
 export function ChannelSchedule({
     accounts,
@@ -43,6 +46,7 @@ export function ChannelSchedule({
     onToggle,
     onChange,
     onApplyToAll,
+    onSameInstant,
     usage,
     error,
 }: {
@@ -55,11 +59,19 @@ export function ChannelSchedule({
         value: string,
     ) => void;
     onApplyToAll: (accountId: number) => void;
+    /** Spec §4.6's explicit "same instant" opt-in: converts this row's moment into every other channel's own timezone. */
+    onSameInstant: (accountId: number) => void;
     /** Step M-2.2: the caption length (as it publishes there) and hashtag count per channel. */
     usage: Record<number, { chars: number; tags: number }>;
     error?: string;
 }) {
     const selectedIds = Object.keys(rows).map(Number);
+    const mixedZones =
+        new Set(
+            accounts
+                .filter((account) => selectedIds.includes(account.id))
+                .map((account) => account.timezone),
+        ).size > 1;
 
     if (accounts.length === 0) {
         return (
@@ -129,46 +141,57 @@ export function ChannelSchedule({
 
                             {selected && (
                                 <div className="flex flex-col gap-1.5 sm:items-end">
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="date"
-                                            aria-label={`Local date for ${account.handle}`}
-                                            value={row.date}
-                                            onChange={(e) =>
+                                    <DateTimePicker
+                                        size="sm"
+                                        label={account.handle}
+                                        timeZone={account.timezone}
+                                        value={row}
+                                        onChange={(next) => {
+                                            if (next.date !== row.date) {
                                                 onChange(
                                                     account.id,
                                                     'date',
-                                                    e.target.value,
-                                                )
+                                                    next.date,
+                                                );
                                             }
-                                            className="h-8 w-[9.5rem] font-mono text-xs"
-                                        />
-                                        <Input
-                                            type="time"
-                                            aria-label={`Local time for ${account.handle}`}
-                                            value={row.time}
-                                            onChange={(e) =>
+
+                                            if (next.time !== row.time) {
                                                 onChange(
                                                     account.id,
                                                     'time',
-                                                    e.target.value,
-                                                )
+                                                    next.time,
+                                                );
                                             }
-                                            className="h-8 w-[6.5rem] font-mono text-xs"
-                                        />
-                                    </div>
+                                        }}
+                                        className="sm:items-end"
+                                    />
                                     <div className="flex items-center gap-3 text-[11px]">
                                         {canApplyToAll && (
                                             <Button
                                                 type="button"
                                                 variant="link"
                                                 className="h-auto text-[11px]"
+                                                title="Copy this date and local time to every channel — each keeps its own clock."
                                                 onClick={() =>
                                                     onApplyToAll(account.id)
                                                 }
                                             >
                                                 <CopyCheck className="size-3" />
-                                                Use for all channels
+                                                Same local time
+                                            </Button>
+                                        )}
+                                        {canApplyToAll && mixedZones && (
+                                            <Button
+                                                type="button"
+                                                variant="link"
+                                                className="h-auto text-[11px]"
+                                                title="Go out at this exact moment everywhere: other channels get the matching time on their own clock."
+                                                onClick={() =>
+                                                    onSameInstant(account.id)
+                                                }
+                                            >
+                                                <Clock4 className="size-3" />
+                                                Same moment
                                             </Button>
                                         )}
                                         <Usage

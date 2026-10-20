@@ -1,8 +1,10 @@
 import { Form, Head, Link, router } from '@inertiajs/react';
-import { ArrowUpRight, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import StaffInvitationController from '@/actions/App/Http/Controllers/StaffInvitationController';
 import { confirmDialog } from '@/components/confirm-dialog';
+import { DataTable } from '@/components/data-table';
 import InputError from '@/components/input-error';
 import { EmptyState, PageHeader, Panel, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
@@ -58,35 +60,60 @@ function invitationState(invitation: Invitation): string {
     return invitation.revoked_at ? 'revoked' : 'expired';
 }
 
-function MemberCard({ member }: { member: Member }) {
-    return (
-        <Link
-            href={show(member.id)}
-            className="group border-border/80 bg-card hover:bg-muted/40 flex items-center gap-3.5 rounded-2xl border p-3.5 shadow-sm transition-colors"
-        >
-            <span className="bg-accent text-accent-foreground group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-11 shrink-0 items-center justify-center rounded-full text-lg transition-colors">
-                {member.name.charAt(0).toUpperCase()}
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[15px] font-semibold">
-                    {member.name}
+/** Step M-1.4: the roster on the shared `DataTable`, sortable by name and role in place. */
+const memberColumns: ColumnDef<Member, unknown>[] = [
+    {
+        id: 'name',
+        accessorKey: 'name',
+        header: 'Name',
+        enableSorting: true,
+        enableHiding: false,
+        cell: ({ row }) => (
+            <Link
+                href={show(row.original.id)}
+                className="group flex min-w-0 items-center gap-3"
+            >
+                <span className="bg-accent text-accent-foreground group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-10 shrink-0 items-center justify-center rounded-full text-lg transition-colors">
+                    {row.original.name.charAt(0).toUpperCase()}
                 </span>
-                <span className="text-muted-foreground truncate text-xs">
-                    {member.email}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="group-hover:text-primary truncate text-[15px] font-semibold transition-colors">
+                        {row.original.name}
+                    </span>
+                    <span className="text-muted-foreground truncate text-xs sm:hidden">
+                        {row.original.email}
+                    </span>
                 </span>
-            </span>
-            {member.role && (
+            </Link>
+        ),
+    },
+    {
+        id: 'email',
+        accessorKey: 'email',
+        header: 'Email',
+        enableSorting: true,
+        meta: {
+            label: 'Email',
+            hideBelow: 'sm',
+            className: 'text-muted-foreground max-w-64 truncate text-sm',
+        },
+    },
+    {
+        id: 'role',
+        accessorFn: (member) => member.role_label ?? '',
+        header: 'Role',
+        enableSorting: true,
+        enableHiding: false,
+        cell: ({ row }) =>
+            row.original.role && (
                 <StatusPill
                     kind="role"
-                    value={member.role}
-                    label={member.role_label}
-                    className="shrink-0"
+                    value={row.original.role}
+                    label={row.original.role_label}
                 />
-            )}
-            <ArrowUpRight className="text-muted-foreground size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-        </Link>
-    );
-}
+            ),
+    },
+];
 
 function RosterGroup({
     title,
@@ -105,11 +132,15 @@ function RosterGroup({
                 </h2>
                 <span className="eyebrow text-muted-foreground">{caption}</span>
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {members.map((member) => (
-                    <MemberCard key={member.id} member={member} />
-                ))}
-            </div>
+            <DataTable
+                caption={title}
+                columns={memberColumns}
+                data={members}
+                getRowId={(member) => String(member.id)}
+                rowHref={(member) => show.url(member.id)}
+                pageSize={25}
+                paginationLabel="people"
+            />
         </section>
     );
 }
@@ -290,51 +321,72 @@ export default function StaffIndex({
                                 {pendingInvitations.length} pending
                             </span>
                         </div>
-                        <ul className="border-border/80 bg-card divide-border/70 flex flex-col divide-y overflow-hidden rounded-2xl border shadow-sm">
-                            {[...pendingInvitations, ...otherInvitations].map(
-                                (invitation) => (
-                                    <li
-                                        key={invitation.id}
-                                        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5"
-                                    >
-                                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <DataTable
+                            caption="Invitations"
+                            data={[...pendingInvitations, ...otherInvitations]}
+                            getRowId={(invitation) => String(invitation.id)}
+                            pageSize={25}
+                            paginationLabel="invitations"
+                            columns={[
+                                {
+                                    id: 'email',
+                                    header: 'Invitee',
+                                    cell: ({ row }) => (
+                                        <span className="flex min-w-0 flex-col gap-0.5">
                                             <span className="truncate text-sm font-medium">
-                                                {invitation.email}
+                                                {row.original.email}
                                             </span>
                                             <span className="text-muted-foreground text-xs">
-                                                {invitation.role_label}
-                                                {invitation.is_pending &&
-                                                    ` · expires ${formatDate(invitation.expires_at)}`}
+                                                {row.original.role_label}
+                                                {row.original.is_pending &&
+                                                    ` · expires ${formatDate(row.original.expires_at)}`}
                                             </span>
                                         </span>
+                                    ),
+                                },
+                                {
+                                    id: 'state',
+                                    header: 'Status',
+                                    cell: ({ row }) => (
                                         <StatusPill
                                             kind="invitation"
-                                            value={invitationState(invitation)}
-                                            className="shrink-0"
-                                        />
-                                        {invitation.is_pending &&
-                                            invitation.can.delete && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="text-destructive hover:bg-destructive/8 hover:text-destructive"
-                                                    disabled={
-                                                        revokingId ===
-                                                        invitation.id
-                                                    }
-                                                    onClick={() =>
-                                                        revoke(invitation)
-                                                    }
-                                                >
-                                                    <Trash2 />
-                                                    Revoke
-                                                </Button>
+                                            value={invitationState(
+                                                row.original,
                                             )}
-                                    </li>
-                                ),
-                            )}
-                        </ul>
+                                        />
+                                    ),
+                                },
+                                {
+                                    id: 'actions',
+                                    header: () => (
+                                        <span className="sr-only">Actions</span>
+                                    ),
+                                    meta: {
+                                        className: 'w-0 whitespace-nowrap',
+                                    },
+                                    cell: ({ row }) =>
+                                        row.original.is_pending &&
+                                        row.original.can.delete && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-destructive hover:bg-destructive/8 hover:text-destructive"
+                                                disabled={
+                                                    revokingId ===
+                                                    row.original.id
+                                                }
+                                                onClick={() =>
+                                                    void revoke(row.original)
+                                                }
+                                            >
+                                                <Trash2 />
+                                                Revoke
+                                            </Button>
+                                        ),
+                                },
+                            ]}
+                        />
                     </section>
                 )}
             </div>

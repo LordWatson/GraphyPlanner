@@ -31,6 +31,15 @@ export default defineConfig({
             formVariants: true,
         }),
     ]),
+    // Step I-14.6 / M-1.5: component, hook and helper tests (`npm test`). E2E journeys live in
+    // `tests/e2e` and run under Playwright instead.
+    test: {
+        environment: 'jsdom',
+        include: ['resources/js/**/*.test.{ts,tsx}'],
+        setupFiles: ['resources/js/test/setup.ts'],
+        restoreMocks: true,
+        css: false,
+    },
     server: {
         watch: {
             ignored: [

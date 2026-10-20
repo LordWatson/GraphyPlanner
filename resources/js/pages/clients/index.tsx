@@ -2,17 +2,18 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     Archive,
     ArchiveRestore,
-    ArrowUpRight,
     Building2,
     Plus,
     Search,
     Trash2,
 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useRef, useState } from 'react';
-import { confirmDialog } from '@/components/confirm-dialog';
+import { toast } from 'sonner';
+import { confirmWithPassword } from '@/components/confirm-dialog';
+import { DataTable } from '@/components/data-table';
 import { EmptyState, Page, PageHeader } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
-import { Pagination } from '@/components/pagination';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +73,95 @@ const sortLabels: Record<string, string> = {
     start_date: 'Start date',
     retainer: 'Retainer',
 };
+
+/** Step M-1.4: the roster on the shared `DataTable`; name, owner and health sort server-side. */
+function rosterColumns(firstNumber: number): ColumnDef<ClientRow, unknown>[] {
+    return [
+        {
+            id: 'number',
+            header: 'No.',
+            enableHiding: false,
+            meta: {
+                hideBelow: 'sm',
+                className:
+                    'text-muted-foreground w-12 font-mono text-xs tabular-nums',
+            },
+            cell: ({ row }) => String(firstNumber + row.index).padStart(2, '0'),
+        },
+        {
+            id: 'name',
+            header: 'Client',
+            enableSorting: true,
+            enableHiding: false,
+            cell: ({ row }) => (
+                <Link
+                    href={show(row.original.id)}
+                    className="group flex min-w-0 items-center gap-3"
+                >
+                    <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-9 shrink-0 items-center justify-center rounded-full border text-lg leading-none transition-colors">
+                        {row.original.name.charAt(0)}
+                    </span>
+                    <span className="group-hover:text-primary font-display truncate text-xl leading-tight transition-colors">
+                        {row.original.name}
+                    </span>
+                </Link>
+            ),
+        },
+        {
+            id: 'owner',
+            header: 'Industry · owner',
+            enableSorting: true,
+            meta: {
+                label: 'Industry & owner',
+                hideBelow: 'md',
+                className: 'text-muted-foreground max-w-56 text-sm',
+            },
+            cell: ({ row }) => (
+                <>
+                    <span className="block truncate">
+                        {row.original.industry ?? '—'}
+                    </span>
+                    {row.original.owner_name && (
+                        <span className="block truncate text-xs">
+                            {row.original.owner_name}
+                        </span>
+                    )}
+                </>
+            ),
+        },
+        {
+            id: 'language',
+            header: 'Lang',
+            meta: {
+                label: 'Language',
+                hideBelow: 'lg',
+                className: 'text-muted-foreground font-mono text-xs uppercase',
+            },
+            cell: ({ row }) => row.original.default_language ?? '—',
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            meta: { label: 'Status', hideBelow: 'sm' },
+            cell: ({ row }) => (
+                <StatusPill kind="client" value={row.original.status} />
+            ),
+        },
+        {
+            id: 'health',
+            header: 'Health',
+            enableSorting: true,
+            enableHiding: false,
+            cell: ({ row }) => (
+                <StatusPill
+                    kind="health"
+                    value={row.original.health}
+                    title={row.original.health_reason}
+                />
+            ),
+        },
+    ];
+}
 
 /** Step I-2.5: every roster change is a server round-trip — search, filter, sort, page. */
 function visitRoster(
@@ -252,75 +342,29 @@ export default function ClientsIndex({
                         }
                     />
                 ) : (
-                    <div className="animate-rise border-border bg-card overflow-hidden rounded-2xl border">
-                        <div className="eyebrow border-border text-muted-foreground hidden grid-cols-[3rem_minmax(0,2fr)_minmax(0,1.2fr)_5rem_8rem_7rem_2rem] items-center gap-4 border-b px-5 py-3 md:grid">
-                            <span>No.</span>
-                            <span>Client</span>
-                            <span>Industry</span>
-                            <span>Lang</span>
-                            <span>Status</span>
-                            <span>Health</span>
-                            <span />
-                        </div>
-                        <ul className="divide-border/70 divide-y">
-                            {clients.data.map((client, i) => (
-                                <li key={client.id}>
-                                    <Link
-                                        href={show(client.id)}
-                                        className="group hover:bg-muted/50 grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors md:grid-cols-[3rem_minmax(0,2fr)_minmax(0,1.2fr)_5rem_8rem_7rem_2rem]"
-                                    >
-                                        <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                                            {String(
-                                                (clients.from ?? 1) + i,
-                                            ).padStart(2, '0')}
-                                        </span>
-                                        <span className="flex min-w-0 items-center gap-3">
-                                            <span className="border-border bg-background group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground font-display flex size-9 shrink-0 items-center justify-center rounded-full border text-lg leading-none transition-colors">
-                                                {client.name.charAt(0)}
-                                            </span>
-                                            <span className="group-hover:text-primary font-display truncate text-xl leading-tight transition-colors">
-                                                {client.name}
-                                            </span>
-                                        </span>
-                                        <ArrowUpRight className="text-muted-foreground group-hover:text-primary size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:hidden" />
-                                        <span className="text-muted-foreground col-start-2 truncate text-sm md:col-start-auto">
-                                            {client.industry ?? '—'}
-                                            {client.owner_name && (
-                                                <span className="block truncate text-xs">
-                                                    {client.owner_name}
-                                                </span>
-                                            )}
-                                        </span>
-                                        <span className="text-muted-foreground hidden font-mono text-xs uppercase md:inline">
-                                            {client.default_language ?? '—'}
-                                        </span>
-                                        <span className="col-start-2 flex flex-wrap gap-1.5 md:col-start-auto md:contents">
-                                            <span>
-                                                <StatusPill
-                                                    kind="client"
-                                                    value={client.status}
-                                                />
-                                            </span>
-                                            <span>
-                                                <StatusPill
-                                                    kind="health"
-                                                    value={client.health}
-                                                    title={client.health_reason}
-                                                />
-                                            </span>
-                                        </span>
-                                        <ArrowUpRight className="text-muted-foreground group-hover:text-primary hidden size-4 justify-self-end transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 md:block" />
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                    <DataTable
+                        caption="Clients"
+                        className="animate-rise"
+                        columns={rosterColumns(clients.from ?? 1)}
+                        data={clients.data}
+                        getRowId={(client) => String(client.id)}
+                        rowHref={(client) => show.url(client.id)}
+                        storageKey="clients"
+                        sort={{
+                            sort: filters.sort,
+                            direction: filters.direction,
+                        }}
+                        onSortChange={({ sort, direction }) =>
+                            visitRoster(filters, {
+                                sort: sort ?? 'name',
+                                direction: sort ? direction : 'asc',
+                            })
+                        }
+                        pagination={clients}
+                        paginationLabel="clients"
+                        onPageChange={(page) => visitRoster(filters, { page })}
+                    />
                 )}
-                <Pagination
-                    page={clients}
-                    label="clients"
-                    onPageChange={(page) => visitRoster(filters, { page })}
-                />
             </Page>
         </>
     );
@@ -493,16 +537,25 @@ function ArchivedClients({
         router.post(restore.url(client.id), {}, { preserveScroll: true });
 
     const purgeClient = async (client: ClientRow) => {
-        const confirmed = await confirmDialog({
+        // Step M-1.2: an irreversible purge re-checks the password server-side.
+        const password = await confirmWithPassword({
             title: `Delete ${client.name} for good?`,
             description:
-                'Its posts, assets, campaigns and history are removed permanently, along with its stored files. This can’t be undone.',
+                'Its posts, assets, campaigns and history are removed permanently, along with its stored files. This can’t be undone. Enter your password to confirm.',
             confirmLabel: 'Delete permanently',
             tone: 'destructive',
         });
 
-        if (confirmed) {
-            router.delete(purge.url(client.id), { preserveScroll: true });
+        if (password !== null) {
+            router.delete(purge.url(client.id), {
+                data: { password },
+                preserveScroll: true,
+                onError: (errors) =>
+                    toast.error(
+                        errors.password ??
+                            'The client couldn’t be deleted. Try again.',
+                    ),
+            });
         }
     };
 
@@ -528,43 +581,77 @@ function ArchivedClients({
                         description="Archived clients show up here, ready to restore."
                     />
                 ) : (
-                    <div className="animate-rise border-border bg-card overflow-hidden rounded-2xl border">
-                        <ul className="divide-border/70 divide-y">
-                            {clients.data.map((client) => (
-                                <li
-                                    key={client.id}
-                                    className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4"
-                                >
-                                    <span className="flex min-w-0 flex-1 flex-col">
-                                        <span className="font-display truncate text-xl leading-tight">
-                                            {client.name}
-                                        </span>
-                                        <span className="text-muted-foreground text-sm">
-                                            {client.archived_at
-                                                ? `Archived ${formatDate(client.archived_at.slice(0, 10))}`
-                                                : 'Archived'}
-                                            {client.has_invoices &&
-                                                ' · has invoices, so it can only be restored'}
-                                        </span>
+                    <DataTable
+                        caption="Archived clients"
+                        className="animate-rise"
+                        data={clients.data}
+                        getRowId={(client) => String(client.id)}
+                        pagination={clients}
+                        paginationLabel="archived clients"
+                        onPageChange={(page) => visitRoster(filters, { page })}
+                        columns={[
+                            {
+                                id: 'name',
+                                header: 'Client',
+                                cell: ({ row }) => (
+                                    <span className="font-display text-xl leading-tight">
+                                        {row.original.name}
                                     </span>
-                                    {can.manageArchive && (
-                                        <span className="flex gap-2">
+                                ),
+                            },
+                            {
+                                id: 'archived',
+                                header: 'Archived',
+                                meta: {
+                                    hideBelow: 'sm',
+                                    className: 'text-muted-foreground text-sm',
+                                },
+                                cell: ({ row }) => (
+                                    <>
+                                        {row.original.archived_at
+                                            ? formatDate(
+                                                  row.original.archived_at.slice(
+                                                      0,
+                                                      10,
+                                                  ),
+                                              )
+                                            : '—'}
+                                        {row.original.has_invoices && (
+                                            <span className="block text-xs">
+                                                Has invoices, so it can only be
+                                                restored
+                                            </span>
+                                        )}
+                                    </>
+                                ),
+                            },
+                            {
+                                id: 'actions',
+                                header: () => (
+                                    <span className="sr-only">Actions</span>
+                                ),
+                                meta: { className: 'w-0 whitespace-nowrap' },
+                                cell: ({ row }) =>
+                                    can.manageArchive && (
+                                        <span className="flex justify-end gap-2">
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() =>
-                                                    restoreClient(client)
+                                                    restoreClient(row.original)
                                                 }
                                             >
                                                 <ArchiveRestore />
                                                 Restore
                                             </Button>
-                                            {!client.has_invoices && (
+                                            {!row.original.has_invoices && (
                                                 <Button
                                                     variant="destructive"
                                                     size="sm"
                                                     onClick={() =>
-                                                        void purgeClient(client)
+                                                        void purgeClient(
+                                                            row.original,
+                                                        )
                                                     }
                                                 >
                                                     <Trash2 />
@@ -572,17 +659,11 @@ function ArchivedClients({
                                                 </Button>
                                             )}
                                         </span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                                    ),
+                            },
+                        ]}
+                    />
                 )}
-                <Pagination
-                    page={clients}
-                    label="archived clients"
-                    onPageChange={(page) => visitRoster(filters, { page })}
-                />
             </Page>
         </>
     );

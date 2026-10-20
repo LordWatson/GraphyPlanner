@@ -7,7 +7,8 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Hard delete is irreversible, so the super admin must type the organization's name to confirm.
+ * Hard delete is irreversible, so the super admin must type the organization's name to confirm,
+ * and re-enter their password (Step I-16.2 / M-1.2).
  */
 class DeleteOrganizationRequest extends FormRequest
 {
@@ -37,6 +38,8 @@ class DeleteOrganizationRequest extends FormRequest
                     }
                 },
             ],
+            // Step I-16.2 / M-1.2: an irreversible purge re-checks who is at the keyboard.
+            'password' => ['required', 'string', 'current_password'],
         ];
     }
 }

@@ -38,3 +38,9 @@ yarn-error.log
 /public/fonts-manifest.dev.json
 /CLAUDE.md
 /.claude/
+/test-results/
+
+# Step M-1.5: Playwright
+/test-results
+/playwright-report
+/database/e2e.sqlite

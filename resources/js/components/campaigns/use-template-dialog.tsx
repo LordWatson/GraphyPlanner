@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { use as useTemplate } from '@/routes/campaign-templates';
+import { DatePicker } from '@/components/date-picker';
 
 export type TemplateSummary = {
     id: number;
@@ -119,17 +120,12 @@ export function UseTemplateDialog({
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="template-start">Starts</Label>
-                            <Input
+                            <DatePicker
                                 id="template-start"
-                                type="date"
                                 value={form.data.start_date}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'start_date',
-                                        event.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('start_date', value ?? '')
                                 }
-                                required
                             />
                             <InputError message={form.errors.start_date} />
                         </div>

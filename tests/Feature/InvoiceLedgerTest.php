@@ -18,6 +18,14 @@ class InvoiceLedgerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
+        $this->confirmPassword();
+    }
+
     public function test_owner_sees_the_org_ledger_with_summary_figures(): void
     {
         $org = Organization::factory()->create();
@@ -46,6 +54,31 @@ class InvoiceLedgerTest extends TestCase
                 ->where('summary.average_days_to_pay', 10)
                 ->has('clients', 1)
             );
+    }
+
+    public function test_the_ledger_sorts_by_a_whitelisted_column_and_rejects_others(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        foreach ([300, 100, 200] as $amount) {
+            Invoice::factory()->for($client)->create(['org_id' => $org->id, 'status' => InvoiceStatus::Sent, 'amount' => $amount, 'sent_at' => now()]);
+        }
+
+        $this->actingAs($owner)->get(route('invoices.index', ['sort' => 'amount', 'direction' => 'asc']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('invoices.data.0.amount', '100.00')
+                ->where('invoices.data.2.amount', '300.00')
+                ->where('filters.sort', 'amount')
+                ->where('filters.direction', 'asc')
+            );
+
+        $this->actingAs($owner)->get(route('invoices.index', ['sort' => 'amount', 'direction' => 'desc']))
+            ->assertInertia(fn ($page) => $page->where('invoices.data.0.amount', '300.00'));
+
+        $this->actingAs($owner)->get(route('invoices.index', ['sort' => 'client_id; drop table invoices']))
+            ->assertSessionHasErrors('sort');
     }
 
     public function test_summary_totals_are_split_per_currency_with_the_org_default_first(): void

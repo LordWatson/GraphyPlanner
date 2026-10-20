@@ -6,6 +6,7 @@ use App\Enums\AssetSource;
 use App\Enums\AssetType;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Rules\SafeUpload;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
@@ -41,6 +42,8 @@ class StoreAssetRequest extends FormRequest
                 'file',
                 'mimes:'.implode(',', config('assets.allowed_upload_extensions')),
                 $this->maxFileSizeRule(),
+                // Step I-16.2 / M-1.2: content must match the extension, no SVG, virus scan.
+                new SafeUpload(config('assets.allowed_upload_extensions')),
             ],
             'url' => ['required_if:source,figma,url', 'nullable', 'url', 'max:2048'],
             'rights' => ['nullable', 'string'],

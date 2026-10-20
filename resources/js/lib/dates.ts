@@ -8,6 +8,13 @@ function parseCalendarDate(value: string): Date {
     return new Date(year, month - 1, day);
 }
 
+/** A local `Date` → "2026-10-07" (the form/API value; never via `toISOString`, which is UTC). */
+export function toDateValue(date: Date): string {
+    const pad = (part: number) => String(part).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /** "2026-10-07" → "7 Oct 2026". `fallback` for a missing date. */
 export function formatDate(
     value: string | null | undefined,

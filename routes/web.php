@@ -173,7 +173,7 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index');
     Route::get('invoices/export', [InvoiceController::class, 'export'])
-        ->middleware('throttle:exports')
+        ->middleware(['throttle:exports', 'password.confirm'])
         ->name('invoices.export');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
@@ -459,13 +459,14 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Phase 17: chapter 06 Analytics — every staff role (sections gated per role inside, see
     // `AnalyticsAccess`); client reviewers get a 403 from `OrganizationAnalyticsFilterRequest`.
     Route::get('analytics', [OrganizationAnalyticsController::class, 'index'])->name('analytics.index');
-    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware('throttle:exports')->name('analytics.export');
+    // Step I-16.2 / M-1.2: raw data exports re-check the password (`password.confirm`, 3 h window).
+    Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('analytics.export');
     Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.pdf');
     Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
     Route::resource('analytics/reports', OrganizationReportController::class)
         ->names('analytics.reports')
         ->parameters(['reports' => 'report']);
-    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->middleware('throttle:exports')->name('analytics.reports.export');
+    Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('analytics.reports.export');
     Route::get('analytics/reports/{report}/pdf', [OrganizationReportController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.reports.pdf');
 
     // The Staff module (Owner-only, see StaffPolicy): a real CRUD resource over the org's
@@ -525,7 +526,7 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
 
     Route::resource('reports', ReportController::class);
-    Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware('throttle:exports')->name('reports.export');
+    Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('reports.export');
 });
 
 // Step 0.14: preview mode mirrors the authenticated app routes above, but scoped to the frozen

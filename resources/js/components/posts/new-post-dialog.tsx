@@ -14,7 +14,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -25,6 +24,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { store as storePost } from '@/routes/clients/posts';
+import { DatePicker } from '@/components/date-picker';
+import { TimeField } from '@/components/time-field';
 
 export type PostTargetAccount = {
     id: number;
@@ -182,14 +183,13 @@ export function NewPostDialog({
                             <Label htmlFor="new-post-date">
                                 Scheduled date
                             </Label>
-                            <Input
+                            <DatePicker
                                 id="new-post-date"
-                                type="date"
                                 value={form.data.scheduled_local_date}
-                                onChange={(event) =>
+                                onChange={(value) =>
                                     form.setData(
                                         'scheduled_local_date',
-                                        event.target.value,
+                                        value ?? '',
                                     )
                                 }
                             />
@@ -203,15 +203,11 @@ export function NewPostDialog({
                             <Label htmlFor="new-post-time">
                                 Scheduled time (local)
                             </Label>
-                            <Input
+                            <TimeField
                                 id="new-post-time"
-                                type="time"
                                 value={form.data.scheduled_local_time}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'scheduled_local_time',
-                                        event.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('scheduled_local_time', value)
                                 }
                             />
                             <InputError

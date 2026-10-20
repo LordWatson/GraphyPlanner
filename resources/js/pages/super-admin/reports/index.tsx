@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
-import { ArrowUpRight, FileBarChart, Plus } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { FileBarChart, Plus } from 'lucide-react';
+import { DataTable } from '@/components/data-table';
 import { EmptyState, Page, PageHeader } from '@/components/page';
 import type { ResolvedFilters } from '@/components/super-admin/types';
 import { describeRange, metricLabels } from '@/components/super-admin/types';
@@ -22,6 +24,78 @@ type Report = {
     updated_at: string | null;
     organization_names: string[];
 };
+
+/** Step M-1.4: saved reports on the shared `DataTable` (short list: sorted in place). */
+const reportColumns: ColumnDef<Report, unknown>[] = [
+    {
+        id: 'name',
+        accessorKey: 'name',
+        header: 'Report',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const report = row.original;
+            const orgs = report.organization_names;
+
+            return (
+                <span className="flex min-w-0 flex-col gap-2 py-1">
+                    <Link
+                        href={showReport(report.id)}
+                        className="text-[17px] font-semibold tracking-[-0.01em] hover:underline"
+                    >
+                        {report.name}
+                    </Link>
+                    {report.description && (
+                        <span className="text-muted-foreground text-sm text-pretty whitespace-normal">
+                            {report.description}
+                        </span>
+                    )}
+                    <span className="flex flex-wrap gap-1.5">
+                        <Badge variant="electric">
+                            {describeRange(report.filters)}
+                        </Badge>
+                        <Badge variant="lilac">
+                            {orgs.length === 0
+                                ? 'All organizations'
+                                : orgs.length === 1
+                                  ? orgs[0]
+                                  : `${orgs.length} organizations`}
+                        </Badge>
+                        {(report.filters.metrics.length === 0
+                            ? ['All metrics']
+                            : report.filters.metrics.map(
+                                  (metric) => metricLabels[metric],
+                              )
+                        ).map((label) => (
+                            <Badge key={label} variant="lime">
+                                {label}
+                            </Badge>
+                        ))}
+                    </span>
+                </span>
+            );
+        },
+    },
+    {
+        id: 'last_run_at',
+        accessorFn: (report) => report.last_run_at ?? '',
+        header: 'Last run',
+        enableSorting: true,
+        meta: {
+            hideBelow: 'sm',
+            className: 'text-muted-foreground font-mono text-[11px]',
+        },
+        cell: ({ row }) => (
+            <>
+                {row.original.last_run_at
+                    ? formatDateTime(row.original.last_run_at)
+                    : 'Never run'}
+                {row.original.creator && (
+                    <span className="block">By {row.original.creator}</span>
+                )}
+            </>
+        ),
+    },
+];
 
 /**
  * Step 15.5 — saved report configurations. Each row reads like a spec line: the range, the
@@ -65,74 +139,15 @@ export default function ReportsIndex({ reports }: { reports: Report[] }) {
                         }
                     />
                 ) : (
-                    <ul className="border-foreground/85 flex flex-col border-t">
-                        {reports.map((report, index) => (
-                            <li
-                                key={report.id}
-                                className="border-border border-b"
-                            >
-                                <Link
-                                    href={showReport(report.id)}
-                                    className="group hover:bg-muted/50 grid gap-3 px-1 py-5 transition-colors sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-start sm:px-3"
-                                >
-                                    <span className="text-muted-foreground font-mono text-[11px] tabular-nums sm:pt-1">
-                                        {String(index + 1).padStart(2, '0')}
-                                    </span>
-                                    <span className="flex min-w-0 flex-col gap-2">
-                                        <span className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.01em] group-hover:underline">
-                                            {report.name}
-                                            <ArrowUpRight className="text-muted-foreground size-4 opacity-0 transition-opacity group-hover:opacity-100" />
-                                        </span>
-                                        {report.description && (
-                                            <span className="text-muted-foreground text-sm text-pretty">
-                                                {report.description}
-                                            </span>
-                                        )}
-                                        <span className="flex flex-wrap gap-1.5">
-                                            <Badge variant="electric">
-                                                {describeRange(report.filters)}
-                                            </Badge>
-                                            <Badge variant="lilac">
-                                                {report.organization_names
-                                                    .length === 0
-                                                    ? 'All organizations'
-                                                    : report.organization_names
-                                                            .length === 1
-                                                      ? report
-                                                            .organization_names[0]
-                                                      : `${report.organization_names.length} organizations`}
-                                            </Badge>
-                                            {(report.filters.metrics.length ===
-                                            0
-                                                ? ['All metrics']
-                                                : report.filters.metrics.map(
-                                                      (metric) =>
-                                                          metricLabels[metric],
-                                                  )
-                                            ).map((label) => (
-                                                <Badge
-                                                    key={label}
-                                                    variant="lime"
-                                                >
-                                                    {label}
-                                                </Badge>
-                                            ))}
-                                        </span>
-                                    </span>
-                                    <span className="text-muted-foreground flex flex-col gap-0.5 font-mono text-[11px] sm:items-end sm:text-right">
-                                        <span>
-                                            {report.last_run_at
-                                                ? `Run ${formatDateTime(report.last_run_at)}`
-                                                : 'Never run'}
-                                        </span>
-                                        {report.creator && (
-                                            <span>By {report.creator}</span>
-                                        )}
-                                    </span>
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
+                    <DataTable
+                        caption="Saved reports"
+                        columns={reportColumns}
+                        data={reports}
+                        getRowId={(report) => String(report.id)}
+                        rowHref={(report) => showReport.url(report.id)}
+                        pageSize={25}
+                        paginationLabel="reports"
+                    />
                 )}
             </Page>
         </>

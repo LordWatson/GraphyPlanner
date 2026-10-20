@@ -22,13 +22,20 @@ class InvoiceLedgerService
     public const STATUS_FILTERS = ['draft', 'sent', 'overdue', 'outstanding', 'paid', 'void'];
 
     /**
-     * @param  array{status?: string|null, client_id?: int|string|null, search?: string|null, from?: string|null, to?: string|null}  $filters
+     * Step M-1.4: columns the ledger table can sort by (newest issued first by default).
+     */
+    public const SORTS = ['invoice_number', 'issue_date', 'due_date', 'amount'];
+
+    /**
+     * @param  array{status?: string|null, client_id?: int|string|null, search?: string|null, from?: string|null, to?: string|null, sort?: string|null, direction?: string|null}  $filters
      * @return Builder<Invoice>
      */
     public function query(int $orgId, array $filters = []): Builder
     {
         $status = $filters['status'] ?? null;
         $search = trim((string) ($filters['search'] ?? ''));
+        $sort = in_array($filters['sort'] ?? null, self::SORTS, true) ? $filters['sort'] : 'issue_date';
+        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         return Invoice::query()
             ->where('invoices.org_id', $orgId)
@@ -51,8 +58,8 @@ class InvoiceLedgerService
             })
             ->when(filled($filters['from'] ?? null), fn (Builder $query) => $query->whereDate('issue_date', '>=', $filters['from']))
             ->when(filled($filters['to'] ?? null), fn (Builder $query) => $query->whereDate('issue_date', '<=', $filters['to']))
-            ->orderByDesc('issue_date')
-            ->orderByDesc('id');
+            ->orderBy('invoices.'.$sort, $direction)
+            ->orderBy('invoices.id', $direction);
     }
 
     /**

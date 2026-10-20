@@ -2,7 +2,6 @@ import { Form } from '@inertiajs/react';
 import { Copy, Link2, Send, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { getXsrfTokenFromCookie } from '@/components/clients/client-layout';
 import InputError from '@/components/input-error';
 import { Panel } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { useClipboard } from '@/hooks/use-clipboard';
 import { formatDate, formatDateTime } from '@/lib/dates';
+import { firstErrors, http } from '@/lib/http';
 import { store as storeInvite } from '@/routes/clients/connect-invites';
 import { destroy as revokeInvite } from '@/routes/connect-invites';
 
@@ -78,53 +78,31 @@ export function ConnectInvitePanel({
         setSending(true);
         setErrors({});
 
-        try {
-            const response = await fetch(storeInvite.url(clientId), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-                },
-                body: JSON.stringify({
-                    email: email || null,
-                    platforms: chosen,
-                    expires_in_days: Number(days),
-                }),
-            });
-            const data = await response.json();
+        const result = await http.post<{ url: string }>(
+            storeInvite.url(clientId),
+            {
+                email: email || null,
+                platforms: chosen,
+                expires_in_days: Number(days),
+            },
+        );
 
-            if (response.status === 422) {
-                setErrors(
-                    Object.fromEntries(
-                        Object.entries(data.errors ?? {}).map(
-                            ([key, value]) => [key, (value as string[])[0]],
-                        ),
-                    ),
-                );
+        setSending(false);
 
-                return;
+        if (!result.ok) {
+            if (result.status === 422) {
+                setErrors(firstErrors(result.errors));
+            } else {
+                toast.error(result.message);
             }
 
-            if (!response.ok) {
-                toast.error(data.message ?? 'We couldn’t create the link.');
-
-                return;
-            }
-
-            setLink(data.url);
-            toast.success(
-                email
-                    ? `Link created and emailed to ${email}.`
-                    : 'Link created.',
-            );
-        } catch {
-            toast.error('We couldn’t create the link.');
-        } finally {
-            setSending(false);
+            return;
         }
+
+        setLink(result.data.url);
+        toast.success(
+            email ? `Link created and emailed to ${email}.` : 'Link created.',
+        );
     };
 
     return (

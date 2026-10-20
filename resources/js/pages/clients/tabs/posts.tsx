@@ -1,7 +1,8 @@
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import type { CampaignChipData } from '@/components/campaigns/types';
-import { Link, router } from '@inertiajs/react';
-import { Pencil, Plus, Send } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Plus, Send } from 'lucide-react';
 import type { PostTargetAccount } from '@/components/posts/new-post-dialog';
 import { NewPostDialog } from '@/components/posts/new-post-dialog';
 import { StatusPill } from '@/components/status-pill';
@@ -26,7 +27,7 @@ import {
     visitClientTab,
 } from '@/components/clients/tab-filters';
 import type { Paginated } from '@/components/pagination';
-import { Pagination } from '@/components/pagination';
+import { DataTable } from '@/components/data-table';
 
 type PostTargetData = {
     id: number;
@@ -58,6 +59,74 @@ type PostFilters = {
     campaign: number | null;
     platform: string | null;
 };
+
+/** Step M-1.4: the client's posts on the shared `DataTable`; each row opens the editor. */
+const postColumns: ColumnDef<PostData, unknown>[] = [
+    {
+        id: 'status',
+        header: 'Status',
+        enableHiding: false,
+        meta: { className: 'w-0' },
+        cell: ({ row }) => (
+            <StatusPill kind="post" value={row.original.status} />
+        ),
+    },
+    {
+        id: 'caption',
+        header: 'Caption',
+        enableHiding: false,
+        cell: ({ row }) => (
+            <Link
+                href={editPost(row.original.id)}
+                className="hover:text-primary line-clamp-2 max-w-xl text-sm whitespace-normal transition-colors"
+            >
+                {row.original.master_caption || (
+                    <span className="text-muted-foreground">
+                        No caption yet
+                    </span>
+                )}
+            </Link>
+        ),
+    },
+    {
+        id: 'campaign',
+        header: 'Campaign',
+        meta: { label: 'Campaign', hideBelow: 'lg' },
+        cell: ({ row }) =>
+            row.original.campaign ? (
+                <CampaignChip campaign={row.original.campaign} />
+            ) : (
+                <span className="text-muted-foreground">—</span>
+            ),
+    },
+    {
+        id: 'channels',
+        header: 'Channels',
+        meta: { label: 'Channels', hideBelow: 'md' },
+        cell: ({ row }) => (
+            <div className="flex flex-wrap gap-1.5">
+                {row.original.targets.map((target) => {
+                    const AccountIcon = platformIcon(target.platform);
+
+                    return (
+                        <span
+                            key={target.id}
+                            className="border-border bg-background text-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs whitespace-nowrap"
+                        >
+                            <AccountIcon className="text-primary size-3.5" />
+                            {target.handle} ·{' '}
+                            {formatSchedule(
+                                target.scheduled_local_date,
+                                target.scheduled_local_time,
+                                '—',
+                            )}
+                        </span>
+                    );
+                })}
+            </div>
+        ),
+    },
+];
 
 /**
  * Step I-2.4 — Posts tab (`clients.posts.index`), paginated newest first and filtered server-side
@@ -173,91 +242,23 @@ export default function ClientPostsTab({
                             />
                         </div>
 
-                        {posts.length === 0 ? (
-                            <p className="text-muted-foreground text-sm">
-                                {filtered
-                                    ? 'No posts match the current filters.'
-                                    : 'No posts yet.'}
-                            </p>
-                        ) : (
-                            <div className="grid gap-3">
-                                {posts.map((post) => (
-                                    <div
-                                        key={post.id}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() =>
-                                            router.visit(editPost(post.id).url)
-                                        }
-                                        onKeyDown={(e) => {
-                                            if (
-                                                e.key === 'Enter' ||
-                                                e.key === ' '
-                                            ) {
-                                                e.preventDefault();
-                                                router.visit(
-                                                    editPost(post.id).url,
-                                                );
-                                            }
-                                        }}
-                                        className="border-border bg-card hover:border-primary/30 hover:bg-muted/40 flex cursor-pointer flex-col gap-2 rounded-xl border p-3 shadow-sm transition-colors"
-                                    >
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <StatusPill
-                                                    kind="post"
-                                                    value={post.status}
-                                                />
-                                                {post.campaign && (
-                                                    <CampaignChip
-                                                        campaign={post.campaign}
-                                                    />
-                                                )}
-                                            </div>
-                                            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-                                                <Pencil className="size-3.5" />
-                                                Open editor
-                                            </span>
-                                        </div>
-                                        {post.master_caption && (
-                                            <p className="text-sm">
-                                                {post.master_caption}
-                                            </p>
-                                        )}
-                                        {post.targets.length > 0 && (
-                                            <div className="flex flex-wrap gap-2">
-                                                {post.targets.map((target) => {
-                                                    const AccountIcon =
-                                                        platformIcon(
-                                                            target.platform,
-                                                        );
-                                                    return (
-                                                        <span
-                                                            key={target.id}
-                                                            className="border-border bg-background text-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
-                                                        >
-                                                            <AccountIcon className="text-primary size-3.5" />
-                                                            {target.handle} ·{' '}
-                                                            {formatSchedule(
-                                                                target.scheduled_local_date,
-                                                                target.scheduled_local_time,
-                                                                '—',
-                                                            )}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <Pagination
-                            className="pt-2"
-                            page={postPage}
-                            label="posts"
+                        <DataTable
+                            caption="Posts"
+                            columns={postColumns}
+                            data={posts}
+                            getRowId={(post) => String(post.id)}
+                            rowHref={(post) => editPost.url(post.id)}
+                            storageKey="client-posts"
+                            pagination={postPage}
+                            paginationLabel="posts"
                             onPageChange={(page) => visit({ page })}
+                            empty={
+                                <p className="text-muted-foreground text-sm">
+                                    {filtered
+                                        ? 'No posts match the current filters.'
+                                        : 'No posts yet.'}
+                                </p>
+                            }
                         />
                     </>
                 </>

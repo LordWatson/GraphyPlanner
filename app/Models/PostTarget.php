@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $error
  * @property string|null $publish_attempt_id
  * @property Carbon|null $publish_requested_at
+ * @property string|null $publish_correlation_id
  * @property string|null $caption_override
  * @property array<int, string>|null $hashtags_override
  * @property string|null $first_comment
@@ -37,7 +38,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc',
-    'reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at',
+    'reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at', 'publish_correlation_id',
     'caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format',
 ])]
 class PostTarget extends Model

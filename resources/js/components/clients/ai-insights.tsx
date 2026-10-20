@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { Lightbulb, TrendingUp } from 'lucide-react';
-import { getXsrfTokenFromCookie } from '@/components/clients/client-layout';
 import { Badge } from '@/components/ui/badge';
+import { http } from '@/lib/http';
 import { show as showAiPostIdea } from '@/routes/ai-post-ideas';
 import { show as showAiTrend } from '@/routes/ai-trends';
 import aiClients from '@/routes/clients/ai';
@@ -36,42 +36,17 @@ export async function requestAiInsights(
     clientId: number,
     platforms: string[],
 ): Promise<void> {
-    const headers = {
-        Accept: 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
-    };
-
-    const [trendsRes, ideasRes] = await Promise.all([
-        fetch(aiClients.trends.url(clientId), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platforms }),
-        }),
-        fetch(aiClients.ideas.url(clientId), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers,
-        }),
+    const [trends, ideas] = await Promise.all([
+        http.post(aiClients.trends.url(clientId), { platforms }),
+        http.post(aiClients.ideas.url(clientId)),
     ]);
-    const trendsData = await trendsRes.json();
-    const ideasData = await ideasRes.json();
 
-    if (!trendsRes.ok) {
-        throw new Error(
-            typeof trendsData?.message === 'string'
-                ? trendsData.message
-                : 'Unable to fetch trends.',
-        );
+    if (!trends.ok) {
+        throw new Error(trends.message);
     }
 
-    if (!ideasRes.ok) {
-        throw new Error(
-            typeof ideasData?.message === 'string'
-                ? ideasData.message
-                : 'Unable to fetch ideas.',
-        );
+    if (!ideas.ok) {
+        throw new Error(ideas.message);
     }
 }
 
