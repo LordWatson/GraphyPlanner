@@ -50,9 +50,11 @@ use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
 use App\Services\SharedPropsCache;
+use App\Support\Queues;
 use App\Support\RateLimits;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -142,6 +144,8 @@ class AppServiceProvider extends ServiceProvider
         // Step I-1.7: named rate limiters (`throttle:ai`, `throttle:exports`, …) — see RateLimits.
         RateLimits::register();
 
+        $this->registerDevQueueWorker();
+
         // Step 15.1: platform super admins bypass every per-org policy. They never reach the org
         // workspace itself (`org.member` sends them to `/super-admin`), so in practice this grants
         // the platform-level abilities on `OrganizationPolicy`/`SuperAdminReportPolicy`.
@@ -162,6 +166,23 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, StaffPolicy::class);
         Gate::policy(SuperAdminReport::class, SuperAdminReportPolicy::class);
         Gate::policy(OrganizationReport::class, OrganizationReportPolicy::class);
+    }
+
+    /**
+     * `php artisan dev` runs Horizon in place of a queue worker (Horizon swaps its own command in).
+     * Horizon needs `ext-pcntl` and only works the `redis` connection, so on the Windows /
+     * database-queue dev box it never processed anything — scheduled posts never reached
+     * Upload-Post and mail/notifications piled up, with nothing in the log. There, run a plain
+     * `queue:listen` on every named queue instead (a bare one would only work `default`).
+     */
+    protected function registerDevQueueWorker(): void
+    {
+        if (config('queue.default') === 'redis' && extension_loaded('pcntl')) {
+            return;
+        }
+
+        DevCommands::except('horizon');
+        DevCommands::artisan('queue:listen --queue='.implode(',', Queues::all()).' --tries=1 --timeout=0', 'queue');
     }
 
     /**

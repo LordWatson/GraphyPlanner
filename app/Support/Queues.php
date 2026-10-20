@@ -28,4 +28,26 @@ final class Queues
     public const REPORTS = 'reports';
 
     public const DEFAULT = 'default';
+
+    /**
+     * Every queue a job can land on, highest priority first — what a single worker has to listen
+     * to when Horizon isn't running (`php artisan dev`, a database-queue box). A worker started
+     * without `--queue` only works `default`, so publishes, mail and notifications would sit
+     * unprocessed with no error anywhere.
+     *
+     * @return list<string>
+     */
+    public static function all(): array
+    {
+        return array_values(array_unique([
+            self::PUBLISHING,
+            self::WEBHOOKS,
+            self::NOTIFICATIONS,
+            self::MAIL,
+            self::AI,
+            (string) config('ai.images.queue', 'ai-images'),
+            self::REPORTS,
+            self::DEFAULT,
+        ]));
+    }
 }

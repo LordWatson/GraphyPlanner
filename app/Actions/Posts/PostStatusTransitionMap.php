@@ -103,6 +103,16 @@ class PostStatusTransitionMap
         return $from === PostStatus::Publishing && in_array($to, [PostStatus::Approved, PostStatus::Draft], true);
     }
 
+    /**
+     * Taking a `scheduled` post off the schedule (unschedule, back to draft, archive) — anything
+     * but it going out. Its channels may already be held by the vendor
+     * (`SendScheduledPostToVendorJob`), so they're cancelled there first.
+     */
+    public static function leavesSchedule(PostStatus $from, PostStatus $to): bool
+    {
+        return $from === PostStatus::Scheduled && $to !== PostStatus::Publishing;
+    }
+
     public static function isAllowed(PostStatus $from, PostStatus $to): bool
     {
         return in_array($to->value, self::MAP[$from->value], true);

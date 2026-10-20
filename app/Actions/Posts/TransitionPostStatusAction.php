@@ -9,6 +9,7 @@ use App\Enums\PostTargetStatus;
 use App\Enums\Role;
 use App\Exceptions\Posts\InvalidPostTransitionException;
 use App\Jobs\PublishPostJob;
+use App\Jobs\SendScheduledPostToVendorJob;
 use App\Models\Post;
 use App\Models\User;
 use App\Notifications\PostApprovalDecided;
@@ -86,7 +87,9 @@ class TransitionPostStatusAction
      *
      * Step I-3.6 / M-2.5: `publishing → approved/draft` ("Unschedule" while every channel is still
      * held by the vendor) cancels those vendor-held publishes first, through
-     * `VendorScheduleService::recall()`, and resets every channel to unsent.
+     * `VendorScheduleService::recall()`, and resets every channel to unsent. A `scheduled` post is
+     * handed to the vendor as soon as it's scheduled, so leaving `scheduled` (other than for
+     * `publishing`) does the same.
      */
     public function __invoke(
         Post $post,
@@ -110,6 +113,12 @@ class TransitionPostStatusAction
                 ]);
             }
 
+            app(VendorScheduleService::class)->recall($post, 'to');
+        }
+
+        // A `scheduled` post is already with the vendor (`SendScheduledPostToVendorJob`), so
+        // taking it off the schedule cancels those channels there first, the same way.
+        if (PostStatusTransitionMap::leavesSchedule($post->status, $to) && $post->isHeldByVendor()) {
             app(VendorScheduleService::class)->recall($post, 'to');
         }
 
@@ -147,8 +156,9 @@ class TransitionPostStatusAction
             // otherwise the old vendor error/external id would keep showing next to the target
             // even though a fresh publish attempt is about to run (the error itself is preserved
             // on the activity log entry created below instead).
-            if (($from === PostStatus::Failed && $to === PostStatus::Scheduled) || PostStatusTransitionMap::isRecallMove($from, $to)) {
-                $locked->targets()->update([
+            if (($from === PostStatus::Failed && $to === PostStatus::Scheduled) || PostStatusTransitionMap::isRecallMove($from, $to)
+                || PostStatusTransitionMap::leavesSchedule($from, $to)) {
+                $locked->targets()->where('status', '!=', PostTargetStatus::Published)->update([
                     'status' => PostTargetStatus::Pending,
                     'external_post_id' => null,
                     'error' => null,
@@ -274,8 +284,9 @@ class TransitionPostStatusAction
     /**
      * Enqueue `PublishPostJob` for this schedule (its `publish_dispatch_id`), delayed until the
      * earliest target's `scheduled_at_utc` if that instant is still in the future (immediate
-     * dispatch otherwise, e.g. a past-due reschedule). Also used by `ReschedulePostAction` and
-     * `UpdatePostAction` after they move a `scheduled` post's times.
+     * dispatch otherwise, e.g. a past-due reschedule), and `SendScheduledPostToVendorJob` right
+     * away so the vendor holds every channel that's due later. Also used by
+     * `ReschedulePostAction` and `UpdatePostAction` after they move a `scheduled` post's times.
      */
     public function dispatchPublishJob(Post $post): void
     {
@@ -286,6 +297,8 @@ class TransitionPostStatusAction
         }
 
         $publishAt = $post->targets()->whereNotNull('scheduled_at_utc')->min('scheduled_at_utc');
+
+        SendScheduledPostToVendorJob::dispatch($post->id, $post->publish_dispatch_id);
 
         $job = PublishPostJob::dispatch($post->id, $post->publish_dispatch_id);
 

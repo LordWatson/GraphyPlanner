@@ -91,6 +91,7 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
         $targets = $claimed->targets()
             ->where('status', PostTargetStatus::Pending)
             ->whereNull('external_post_id')
+            ->whereNull('publish_requested_at')
             ->get();
 
         Log::info('PublishPostJob: publishing post', [
@@ -172,6 +173,26 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
+     * Why this post's publishing is on hold, or null when it may go out. The post stays
+     * `scheduled` either way, so nothing is lost when the hold lifts. Shared with
+     * `SendScheduledPostToVendorJob`.
+     */
+    public static function pausedReason(Post $post): ?string
+    {
+        // Step I-1.5: an archived client (or a deleted organization) pauses publishing.
+        if ($post->organization === null || $post->client?->trashed()) {
+            return 'client archived or organization deleted';
+        }
+
+        // Step 15.3: a suspended organization's content never goes out.
+        if ($post->organization->isSuspended()) {
+            return 'organization is suspended';
+        }
+
+        return null;
+    }
+
+    /**
      * Inside a transaction: lock the post, make sure this job still owns its schedule, move it to
      * `publishing` and give every not-yet-published target a fresh attempt id.
      */
@@ -207,10 +228,8 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
             return null;
         }
 
-        // Step I-1.5: an archived client (or a deleted organization) pauses publishing; the post
-        // stays `scheduled`, so restoring the client picks it back up.
-        if ($post->organization === null || $post->client?->trashed()) {
-            Log::warning('PublishPostJob: client archived or organization deleted, skipping', [
+        if ($reason = self::pausedReason($post)) {
+            Log::warning('PublishPostJob: '.$reason.', skipping', [
                 'post_id' => $post->id,
                 'org_id' => $post->org_id,
                 'client_id' => $post->client_id,
@@ -219,20 +238,18 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
             return null;
         }
 
-        // Step 15.3: a suspended organization's content never goes out. The post stays
-        // `scheduled`, so nothing is lost if the org is reinstated.
-        if ($post->organization->isSuspended()) {
-            Log::warning('PublishPostJob: organization is suspended, skipping', [
-                'post_id' => $post->id,
-                'org_id' => $post->org_id,
-            ]);
-
-            return null;
-        }
-
         $post = $transition($post, PostStatus::Publishing, null);
 
-        foreach ($post->targets()->where('status', '!=', PostTargetStatus::Published)->get() as $target) {
+        // Channels `SendScheduledPostToVendorJob` already handed over (accepted, or a request in
+        // flight) stay as they are — resetting them would send the post twice.
+        $unsent = $post->targets()
+            ->where('status', '!=', PostTargetStatus::Published)
+            ->where(fn ($query) => $query
+                ->where('status', '!=', PostTargetStatus::Pending)
+                ->orWhere(fn ($query) => $query->whereNull('external_post_id')->whereNull('publish_requested_at')))
+            ->get();
+
+        foreach ($unsent as $target) {
             $target->update([
                 'status' => PostTargetStatus::Pending,
                 'external_post_id' => null,

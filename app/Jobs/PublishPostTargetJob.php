@@ -99,6 +99,17 @@ class PublishPostTargetJob implements ShouldQueue
             'accepted' => $result->ok,
         ]);
 
+        if (! $result->ok) {
+            // A `scheduled` post stays `scheduled` (and is retried when it's due); the error shows
+            // on the channel in the meantime.
+            Log::warning('PublishPostTargetJob: vendor rejected the channel', [
+                'post_id' => $post->id,
+                'post_target_id' => $target->id,
+                'post_status' => $post->status->value,
+                'error' => $result->error,
+            ]);
+        }
+
         $resolve($post);
     }
 

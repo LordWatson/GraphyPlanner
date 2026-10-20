@@ -8,6 +8,7 @@ use App\Enums\PostTargetStatus;
 use App\Jobs\PublishPostJob;
 use App\Models\Post;
 use App\Models\PostTarget;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -47,6 +48,10 @@ class VendorScheduleService
         /** @var Collection<int, PostTarget> $held */
         $held = $post->targets->filter(fn (PostTarget $target) => $target->isVendorHeld())->values();
 
+        if ($held->isEmpty()) {
+            return [];
+        }
+
         $recalled = [];
         $refused = [];
 
@@ -85,6 +90,42 @@ class VendorScheduleService
         }
 
         return $recalled;
+    }
+
+    /**
+     * Best-effort `recall()` for every `scheduled` post in the query that the vendor is holding —
+     * for actions that must not be blocked by the vendor (archiving a client, suspending or
+     * deleting an organization). A refusal is logged as an error, since that channel will still
+     * go out. Returns how many posts were released.
+     *
+     * @param  Builder<Post>  $posts
+     */
+    public function releaseScheduled(Builder $posts): int
+    {
+        $released = 0;
+
+        $held = $posts->clone()
+            ->where('status', PostStatus::Scheduled)
+            ->whereHas('targets', fn (Builder $query) => $query
+                ->where('status', PostTargetStatus::Pending)
+                ->whereNotNull('external_post_id')
+                ->where('scheduled_at_utc', '>', now()))
+            ->get();
+
+        foreach ($held as $post) {
+            try {
+                $this->recall($post);
+                $released++;
+            } catch (ValidationException $e) {
+                Log::error('Vendor refused to release a held post; it may still go out', [
+                    'post_id' => $post->id,
+                    'org_id' => $post->org_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $released;
     }
 
     /**

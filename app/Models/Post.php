@@ -264,6 +264,19 @@ class Post extends Model
     }
 
     /**
+     * A `scheduled` post with at least one channel the vendor is already holding for later
+     * (`SendScheduledPostToVendorJob`) — those must be cancelled there before it's unscheduled,
+     * moved, edited or deleted.
+     */
+    public function isHeldByVendor(): bool
+    {
+        $this->loadMissing('targets');
+
+        return $this->status === PostStatus::Scheduled
+            && $this->targets->contains(fn (PostTarget $target) => $target->isVendorHeld());
+    }
+
+    /**
      * Step I-3.6 / M-2.5: a `publishing` post that hasn't actually gone out anywhere — every
      * channel is either held by the vendor for a later time or failed before reaching it — so it
      * can still be unscheduled, moved or edited (its held channels are cancelled first).

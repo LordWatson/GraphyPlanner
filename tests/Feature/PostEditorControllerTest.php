@@ -118,6 +118,44 @@ class PostEditorControllerTest extends TestCase
     }
 
     /**
+     * Regression: a target whose account was disconnected (soft-deleted) isn't offered to the
+     * editor, so the editor leaves it out on save — that save must succeed and drop the dead
+     * target, while re-sending its account id is still rejected.
+     */
+    public function test_update_drops_a_target_whose_account_was_disconnected(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $live = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]);
+        $disconnected = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::TikTok]);
+        $post->targets()->create(['social_account_id' => $live->id]);
+        $post->targets()->create(['social_account_id' => $disconnected->id]);
+        $disconnected->delete();
+
+        $this->actingAs($owner)->get(route('posts.edit', $post))
+            ->assertInertia(fn ($page) => $page
+                ->has('targetAccounts', 1)
+                ->where('targetAccounts.0.id', $live->id)
+            );
+
+        $this->actingAs($owner)->put(route('posts.update', $post), [
+            'targets' => [
+                ['social_account_id' => $live->id],
+                ['social_account_id' => $disconnected->id],
+            ],
+        ])->assertSessionHasErrors('targets.1.social_account_id');
+
+        $this->actingAs($owner)->put(route('posts.update', $post), [
+            'targets' => [['social_account_id' => $live->id]],
+        ])->assertSessionHasNoErrors()->assertRedirect(route('posts.edit', $post));
+
+        $this->assertSame([$live->id], $post->targets()->pluck('social_account_id')->all());
+    }
+
+    /**
      * The editor supports right-to-left captions: Arabic text (including mixed Arabic/English,
      * emoji and line breaks) and Arabic hashtags must round-trip byte-for-byte, and come back
      * unchanged in the editor payload.

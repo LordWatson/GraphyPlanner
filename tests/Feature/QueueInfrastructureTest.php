@@ -11,6 +11,7 @@ use App\Models\StaffInvitation;
 use App\Models\User;
 use App\Notifications\PostPublishFailed;
 use App\Support\Queues;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -54,6 +55,29 @@ class QueueInfrastructureTest extends TestCase
             // A worker must never be killed mid-job while Redis still thinks the job is running.
             $this->assertLessThan(config('queue.connections.redis.retry_after'), $supervisor['timeout'], $name);
         }
+    }
+
+    public function test_every_horizon_queue_is_in_the_all_queues_list(): void
+    {
+        foreach (config('horizon.defaults') as $name => $supervisor) {
+            foreach ($supervisor['queue'] as $queue) {
+                $this->assertContains($queue, Queues::all(), "{$name} works {$queue}, which Queues::all() misses");
+            }
+        }
+
+        $this->assertSame(Queues::PUBLISHING, Queues::all()[0]);
+    }
+
+    public function test_the_dev_queue_worker_listens_to_every_queue(): void
+    {
+        // phpunit.xml runs on the `sync` connection, which Horizon can't work, so `dev` must fall
+        // back to a plain worker.
+        $commands = collect(DevCommands::commands());
+        $worker = $commands->firstWhere('name', 'queue');
+
+        $this->assertNull($commands->firstWhere('name', 'horizon'));
+        $this->assertNotNull($worker);
+        $this->assertStringContainsString('queue:listen --queue='.implode(',', Queues::all()), $worker['command']);
     }
 
     public function test_horizon_is_for_super_admins_only(): void

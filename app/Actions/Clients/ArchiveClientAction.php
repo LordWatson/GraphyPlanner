@@ -4,7 +4,9 @@ namespace App\Actions\Clients;
 
 use App\Enums\ClientStatus;
 use App\Models\Client;
+use App\Models\Post;
 use App\Models\User;
+use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -16,8 +18,14 @@ use Illuminate\Support\Facades\Log;
  */
 class ArchiveClientAction
 {
+    public function __construct(private readonly VendorScheduleService $vendor) {}
+
     public function __invoke(Client $client, User $actor): Client
     {
+        // Archiving pauses publishing (`PublishPostJob::pausedReason()`), so scheduled posts the
+        // vendor is already holding are cancelled there; restoring re-sends them at their time.
+        $released = $this->vendor->releaseScheduled(Post::query()->withoutOrgScope()->where('client_id', $client->id));
+
         DB::transaction(function () use ($client) {
             $client->update(['status' => ClientStatus::Archived]);
             $client->delete();
@@ -27,6 +35,7 @@ class ArchiveClientAction
             'org_id' => $client->org_id,
             'client_id' => $client->id,
             'user_id' => $actor->id,
+            'released_scheduled_posts' => $released,
         ]);
 
         return $client;

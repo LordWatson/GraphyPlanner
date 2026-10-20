@@ -55,7 +55,7 @@ class UpdatePostAction
         // channels first (the edit is refused if the vendor says it's too late), and re-submits
         // them with the new content once saved — the old version never goes out.
         $vendor = app(VendorScheduleService::class);
-        $recalled = $post->canBeRecalled() ? $vendor->recall($post, 'targets') : [];
+        $recalled = $post->canBeRecalled() || $post->isHeldByVendor() ? $vendor->recall($post, 'targets') : [];
 
         return DB::transaction(function () use ($post, $data, $evaluateChecklist, $transition, $vendor, $recalled) {
             DB::afterCommit(fn () => $vendor->resubmit($post, $recalled));
@@ -84,7 +84,8 @@ class UpdatePostAction
             $post->refresh();
             $post->update(['checklist_snapshot' => $evaluateChecklist($post)]);
 
-            if (array_key_exists('targets', $data)) {
+            // Recalled channels of a `scheduled` post go back to the vendor with the new schedule.
+            if (array_key_exists('targets', $data) || $recalled !== []) {
                 ReschedulePostAction::redispatchIfScheduled($post, $transition);
             }
 

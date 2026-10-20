@@ -83,7 +83,7 @@ class ShiftCampaignAction
         // times after it commits. One the vendor won't release stays put, reported as blocked.
         $recalled = [];
 
-        foreach (Post::query()->whereIn('id', $movableIds)->where('status', PostStatus::Publishing)->get() as $post) {
+        foreach (Post::query()->whereIn('id', $movableIds)->whereIn('status', [PostStatus::Scheduled, PostStatus::Publishing])->get() as $post) {
             try {
                 $recalled[$post->id] = $this->vendor->recall($post);
             } catch (ValidationException $e) {

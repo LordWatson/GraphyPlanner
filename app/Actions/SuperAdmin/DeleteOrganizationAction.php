@@ -4,7 +4,9 @@ namespace App\Actions\SuperAdmin;
 
 use App\Jobs\PurgeOrganizationJob;
 use App\Models\Organization;
+use App\Models\Post;
 use App\Models\User;
+use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +23,8 @@ use Illuminate\Validation\ValidationException;
  */
 class DeleteOrganizationAction
 {
+    public function __construct(private readonly VendorScheduleService $vendor) {}
+
     public function __invoke(Organization $organization, User $actor): void
     {
         if ($organization->isPreviewFixture()) {
@@ -30,6 +34,9 @@ class DeleteOrganizationAction
         }
 
         $orgId = $organization->id;
+
+        // Cancel what the vendor is holding while the org (and its API key) still exists.
+        $this->vendor->releaseScheduled(Post::query()->withoutOrgScope()->where('org_id', $orgId));
 
         $memberCount = DB::transaction(function () use ($organization) {
             $memberIds = $organization->users()->pluck('id');

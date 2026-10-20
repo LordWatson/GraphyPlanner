@@ -75,7 +75,7 @@ class ReschedulePostAction
         // Step I-3.6 / M-2.5: a post the vendor is holding for later is recalled first (nothing
         // moves if that's refused), then re-submitted at the new times once saved.
         $vendor = app(VendorScheduleService::class);
-        $recalled = $post->canBeRecalled() ? $vendor->recall($post, 'days') : [];
+        $recalled = $post->canBeRecalled() || $post->isHeldByVendor() ? $vendor->recall($post, 'days') : [];
 
         DB::transaction(function () use ($post, $changes, $transition, $vendor, $recalled) {
             foreach ($post->targets as $target) {

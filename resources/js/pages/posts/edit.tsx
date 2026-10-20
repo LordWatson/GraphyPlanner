@@ -125,14 +125,24 @@ type EditorState = {
     approvalMode: string;
 };
 
-function initialEditorState(post: PostData): EditorState {
+function initialEditorState(
+    post: PostData,
+    targetAccounts: TargetAccountData[],
+): EditorState {
+    // A target whose account was disconnected (soft-deleted) isn't selectable, so it's left out
+    // of the editable channels — otherwise it would be re-sent, invisibly, and fail validation.
+    // Saving drops it.
+    const targets = post.targets.filter((target) =>
+        targetAccounts.some((a) => a.id === target.social_account_id),
+    );
+
     return {
         campaignId: post.campaign_id ? String(post.campaign_id) : '',
         caption: post.master_caption ?? '',
         hashtags: post.hashtags ?? [],
         assetIds: post.assets.map((asset) => asset.id),
         schedule: Object.fromEntries(
-            post.targets.map((target) => [
+            targets.map((target) => [
                 target.social_account_id,
                 {
                     date: target.scheduled_local_date ?? '',
@@ -150,7 +160,7 @@ function initialEditorState(post: PostData): EditorState {
         link: post.link_url ?? '',
         firstComment: post.first_comment ?? '',
         channels: Object.fromEntries(
-            post.targets.map((target) => [
+            targets.map((target) => [
                 target.social_account_id,
                 {
                     caption: target.caption_override,
@@ -415,7 +425,7 @@ export default function PostEdit({
 }) {
     // The page remounts with fresh props after every successful save/transition, so this snapshot
     // is always "what's on the server" — the baseline for unsaved-changes tracking.
-    const [initial] = useState(() => initialEditorState(post));
+    const [initial] = useState(() => initialEditorState(post, targetAccounts));
     const [campaignId, setCampaignId] = useState(initial.campaignId);
     const [caption, setCaption] = useState(initial.caption);
     const [hashtags, setHashtags] = useState(initial.hashtags);

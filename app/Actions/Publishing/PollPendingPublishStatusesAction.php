@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Step I-1.3: a target still `pending` past `publishing.delivery_timeout_hours` (accepted but never
  * confirmed, or never sent at all) is failed with "No delivery confirmation after N hours", so a
- * post can't sit in `publishing` forever — it lands on Home as failed/partially published.
+ * post can't sit in `publishing` forever — it lands on Home as failed/partially published. A
+ * channel the vendor holds for a later time is skipped until it's due, and its timeout counts
+ * from then.
  * Step I-1.8: rows are walked with `lazyById()` instead of loaded all at once.
  */
 class PollPendingPublishStatusesAction
@@ -38,7 +40,17 @@ class PollPendingPublishStatusesAction
             ->lazyById(200);
 
         foreach ($targets as $target) {
-            if ($target->updated_at !== null && $target->updated_at->lessThanOrEqualTo($timedOutBefore)) {
+            // Held by the vendor until a later time: nothing to confirm yet, and the timeout only
+            // starts once it's due.
+            if ($target->scheduled_at_utc !== null && $target->scheduled_at_utc->isFuture()) {
+                continue;
+            }
+
+            $waitingSince = $target->scheduled_at_utc !== null && $target->updated_at !== null
+                ? $target->updated_at->max($target->scheduled_at_utc)
+                : $target->updated_at;
+
+            if ($waitingSince !== null && $waitingSince->lessThanOrEqualTo($timedOutBefore)) {
                 Log::warning('PollPendingPublishStatusesAction: delivery confirmation timed out', [
                     'post_target_id' => $target->id,
                     'post_id' => $target->post_id,
