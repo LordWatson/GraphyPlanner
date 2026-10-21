@@ -20,5 +20,7 @@ final readonly class TargetResult
         public ?string $error = null,
         public array $sentFields = [],
         public array $skippedFields = [],
+        // Step M-3.1: what the vendor said about the live post (status polls).
+        public ?VendorPostRef $ref = null,
     ) {}
 }

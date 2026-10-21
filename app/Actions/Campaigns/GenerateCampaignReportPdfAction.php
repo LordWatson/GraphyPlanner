@@ -28,6 +28,7 @@ class GenerateCampaignReportPdfAction
             'organization' => $campaign->organization,
             'report' => $report,
             'kpis' => $report->kpi_snapshot ?? [],
+            'engagement' => $report->engagement_snapshot,
             'published' => $campaign->posts()->whereIn('status', [PostStatus::Published, PostStatus::PartiallyPublished])->count(),
             'generatedAt' => now()->setTimezone($timezone),
         ])->setPaper('a4')->output();

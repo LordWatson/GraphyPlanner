@@ -37,6 +37,7 @@ type ClientRow = {
     default_language: string | null;
     health: string;
     health_reason: string;
+    health_reasons?: { key: string; tone: string; label: string }[];
     owner_name: string | null;
     tags: string[];
     archived_at: string | null;
@@ -156,7 +157,13 @@ function rosterColumns(firstNumber: number): ColumnDef<ClientRow, unknown>[] {
                 <StatusPill
                     kind="health"
                     value={row.original.health}
-                    title={row.original.health_reason}
+                    title={
+                        (row.original.health_reasons ?? []).length > 1
+                            ? (row.original.health_reasons ?? [])
+                                  .map((reason) => reason.label)
+                                  .join(' · ')
+                            : row.original.health_reason
+                    }
                 />
             ),
         },

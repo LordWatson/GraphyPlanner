@@ -87,7 +87,7 @@ class DashboardController extends Controller
                 : [],
             'needsAttentionItems' => $needsAttention['rows'],
             'clientHealth' => $canViewClients
-                ? $getClientHealthSummary($user->org_id)
+                ? $getClientHealthSummary($user->org_id, viewer: $user)
                 : [],
             'unapprovedDraftsList' => $canViewCalendar
                 ? $getUnapprovedDrafts($user)

@@ -153,6 +153,10 @@ class SocialAccountTokenLifecycleTest extends TestCase
         app(ConnectMetaAudioAccessAction::class)($account->refresh(), 'fresh-token', now()->addDays(60), 'ig-1');
 
         $this->assertNull($account->refresh()->token_expiry_warning);
-        $this->assertSame(ClientHealth::Green, $this->client->refresh()->health_status);
+        // Step M-3.4: the token reason is gone (other v2 signals, e.g. an empty calendar, may remain).
+        $keys = array_column($this->client->refresh()->health_reasons ?? [], 'key');
+        $this->assertNotContains('token_expiring', $keys);
+        $this->assertNotContains('token_expired', $keys);
+        $this->assertNotSame(ClientHealth::Red, $this->client->health_status);
     }
 }

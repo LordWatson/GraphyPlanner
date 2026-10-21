@@ -4,6 +4,7 @@ import {
     convertSlot,
     instantToZoned,
     isValidTimeZone,
+    nextWeeklySlot,
     offsetMinutes,
     zonedToInstant,
 } from '@/lib/timezones';
@@ -83,5 +84,33 @@ describe('timezones', () => {
     it('names a zone by its city', () => {
         expect(cityOf('America/Argentina/Buenos_Aires')).toBe('Buenos Aires');
         expect(cityOf('UTC')).toBe('UTC');
+    });
+
+    it('finds the next best-time slot on the account clock (Step M-3.2)', () => {
+        // Tue 20 Oct 2026 22:30 UTC is already Wed 21 Oct 02:30 in Dubai.
+        const now = Date.UTC(2026, 9, 20, 22, 30);
+
+        expect(nextWeeklySlot(3, 18, 'Asia/Dubai', now)).toEqual({
+            date: '2026-10-21',
+            time: '18:00',
+        });
+        // Same weekday but the hour has passed: next week.
+        expect(nextWeeklySlot(3, 2, 'Asia/Dubai', now)).toEqual({
+            date: '2026-10-28',
+            time: '02:00',
+        });
+        // In London (BST) it's still Tuesday, 23:30: a Wednesday slot is tomorrow, 23:00 has gone.
+        expect(nextWeeklySlot(3, 8, 'Europe/London', now)).toEqual({
+            date: '2026-10-21',
+            time: '08:00',
+        });
+        expect(nextWeeklySlot(2, 23, 'Europe/London', now)).toEqual({
+            date: '2026-10-27',
+            time: '23:00',
+        });
+        expect(nextWeeklySlot(1, 9, 'Europe/London', now)).toEqual({
+            date: '2026-10-26',
+            time: '09:00',
+        });
     });
 });

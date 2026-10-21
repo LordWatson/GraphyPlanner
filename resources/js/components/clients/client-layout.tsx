@@ -27,6 +27,11 @@ import {
 import type { ReactNode } from 'react';
 import { usePlatforms } from '@/lib/platforms';
 import { useState } from 'react';
+import { HealthReasons } from '@/components/clients/health-reasons';
+import type {
+    HealthReason,
+    HealthTrendPoint,
+} from '@/components/clients/health-reasons';
 import { PageHeader } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -84,6 +89,10 @@ export type ClientData = {
     billing_address: string | null;
     health: string;
     health_reason: string;
+    /** Step M-3.4: weighted reasons (viewer-filtered) and the 90-day trend. */
+    health_reasons?: HealthReason[];
+    health_trend?: HealthTrendPoint[];
+    target_posts_per_week?: number | null;
 };
 
 export type ClientTab =
@@ -470,6 +479,10 @@ export function ClientLayout({
                             <span className="text-[13px]">
                                 {client.health_reason}
                             </span>
+                            <HealthReasons
+                                reasons={client.health_reasons ?? []}
+                                trend={client.health_trend ?? []}
+                            />
                         </span>
                     }
                     meta={

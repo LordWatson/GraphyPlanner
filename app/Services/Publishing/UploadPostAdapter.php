@@ -19,6 +19,7 @@ use App\Support\Publishing\FormatSpec;
 use App\Support\Publishing\PlatformSpec;
 use App\Support\Publishing\TargetResult;
 use App\Support\Publishing\VendorHttp;
+use App\Support\Publishing\VendorPostRef;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -375,6 +376,11 @@ class UploadPostAdapter implements PublishAdapter
                 ok: $ok,
                 externalPostId: $externalPostId,
                 error: $ok ? null : ($platformResult['message'] ?? $response->json('message')),
+                ref: $ok ? new VendorPostRef(
+                    $response->json('request_id'),
+                    $platformResult['platform_post_id'] ?? $platformResult['publish_id'] ?? $platformResult['post_id'] ?? null,
+                    $platformResult['url'] ?? $platformResult['post_url'] ?? null,
+                ) : null,
             );
         }
 

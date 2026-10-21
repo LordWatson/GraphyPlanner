@@ -12,6 +12,8 @@ import { campaignSwatch } from '@/components/campaigns/campaign-chip';
 import { CampaignPostRow } from '@/components/campaigns/campaign-post-row';
 import { PortalBriefSection } from '@/components/campaigns/portal-brief';
 import type { PortalBrief } from '@/components/campaigns/portal-brief';
+import { EngagementSnapshotFigures } from '@/components/campaigns/results/engagement-snapshot';
+import type { EngagementSnapshot } from '@/components/campaigns/results/engagement-snapshot';
 import { formatKpi } from '@/components/campaigns/results/kpi-rows';
 import type { KpiResult } from '@/components/campaigns/results/kpi-rows';
 import type {
@@ -73,6 +75,7 @@ type Props = {
         learnings: string | null;
         next_steps: string | null;
         kpi_snapshot: KpiResult[];
+        engagement_snapshot: EngagementSnapshot | null;
         shared_at: string | null;
     } | null;
 };
@@ -255,6 +258,11 @@ export default function PortalCampaignShow({
                                         </li>
                                     ))}
                                 </ul>
+                            )}
+                            {report.engagement_snapshot && (
+                                <EngagementSnapshotFigures
+                                    snapshot={report.engagement_snapshot}
+                                />
                             )}
                             {report.highlights.length > 0 && (
                                 <ul className="flex flex-col gap-1.5">

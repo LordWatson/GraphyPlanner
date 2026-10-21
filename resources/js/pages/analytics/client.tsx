@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     BookmarkPlus,
+    CalendarRange,
     Download,
     FileBarChart,
     FileText,
@@ -41,6 +42,7 @@ import {
     index as clientsIndex,
     show as showClient,
 } from '@/routes/clients';
+import { index as clientReports } from '@/routes/clients/reports';
 
 type Props = {
     client: { id: number; name: string; status: string };
@@ -52,7 +54,7 @@ type Props = {
 
 /**
  * Step 17.5 — one client's analytics: the studio's analytics scoped to this client, with its
- * campaigns in place of the busiest-clients list. Phase 12 adds engagement here.
+ * campaigns in place of the busiest-clients list, plus engagement and best times (M-3.1 / M-3.2).
  */
 export default function ClientAnalytics({
     client,
@@ -94,7 +96,7 @@ export default function ClientAnalytics({
                             {client.name}, in <em>numbers</em>.
                         </>
                     }
-                    description="What went out, where approvals stalled and what was billed — for this client alone."
+                    description="What went out, how people responded, where approvals stalled and what was billed — for this client alone."
                     meta={
                         summary.client && (
                             <>
@@ -116,6 +118,12 @@ export default function ClientAnalytics({
                                 <Link href={showClient(client.id)}>
                                     <ArrowLeft />
                                     Back to client
+                                </Link>
+                            </Button>
+                            <Button variant="outline" asChild>
+                                <Link href={clientReports(client.id)}>
+                                    <CalendarRange />
+                                    Monthly reports
                                 </Link>
                             </Button>
                             <DropdownMenu>

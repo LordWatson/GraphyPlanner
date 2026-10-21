@@ -1,4 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
+import { EngagementSnapshotFigures } from '@/components/campaigns/results/engagement-snapshot';
+import type { EngagementSnapshot } from '@/components/campaigns/results/engagement-snapshot';
 import { Download, FileBarChart, Send, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -30,6 +32,8 @@ export type WrapReport = {
     version: number;
     shared_at: string | null;
     shared_by: string | null;
+    /** Step M-3.1: frozen at the last share; null before engagement existed. */
+    engagement_snapshot?: EngagementSnapshot | null;
 };
 
 type Fields = {
@@ -175,6 +179,12 @@ export function WrapReportPanel({
                         {report.shared_by ? ` by ${report.shared_by}` : ''}.
                         Numbers in that version are frozen.
                     </p>
+                )}
+
+                {report?.engagement_snapshot && (
+                    <EngagementSnapshotFigures
+                        snapshot={report.engagement_snapshot}
+                    />
                 )}
 
                 {(Object.keys(LABELS) as (keyof Fields)[]).map((key) => (

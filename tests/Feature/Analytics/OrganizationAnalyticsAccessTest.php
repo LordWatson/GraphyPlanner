@@ -153,8 +153,8 @@ class OrganizationAnalyticsAccessTest extends TestCase
     {
         $filters = OrganizationAnalyticsFilters::fromArray([], $this->org);
 
-        $this->assertSame(['clients', 'posts', 'approvals', 'team', 'ai'], AnalyticsAccess::visibleMetrics($this->member(Role::Designer), $filters));
-        $this->assertSame(['clients', 'posts', 'approvals', 'team', 'ai'], AnalyticsAccess::visibleMetrics($this->member(Role::Viewer), $filters));
+        $this->assertSame(['clients', 'posts', 'approvals', 'team', 'ai', 'engagement'], AnalyticsAccess::visibleMetrics($this->member(Role::Designer), $filters));
+        $this->assertSame(['clients', 'posts', 'approvals', 'team', 'ai', 'engagement'], AnalyticsAccess::visibleMetrics($this->member(Role::Viewer), $filters));
 
         $strategist = $this->member(Role::Strategist);
         $this->assertSame(OrganizationAnalyticsFilters::METRICS, AnalyticsAccess::visibleMetrics($strategist, $filters));

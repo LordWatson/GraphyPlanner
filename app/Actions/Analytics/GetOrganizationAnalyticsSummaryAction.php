@@ -20,6 +20,7 @@ use App\Services\AI\Images\ImageQuotaGuard;
 use App\Services\Analytics\AiUsageMetrics;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\ApprovalMetrics;
+use App\Services\Analytics\EngagementMetrics;
 use App\Services\Analytics\PostActivityMetrics;
 use App\Services\Analytics\RevenueMetrics;
 use App\Services\Analytics\TeamWorkloadMetrics;
@@ -51,7 +52,8 @@ use Illuminate\Support\Facades\Log;
  *   `primary_currency` (the org's default when it invoiced in it, else the most-invoiced one).
  * - **Snapshots vs. ranges:** client health, the post pipeline, "scheduled" and "waiting on client"
  *   are right-now figures; everything else is bound to the range.
- * - **Engagement** waits on Phase 12 (`PostTargetMetrics`) and is always `null`.
+ * - **Engagement** (Step M-3.1): `EngagementMetrics::summary()` — the latest reading per published
+ *   channel in range, follower growth, top posts. Visible to every analytics role (no money).
  */
 class GetOrganizationAnalyticsSummaryAction
 {
@@ -69,6 +71,7 @@ class GetOrganizationAnalyticsSummaryAction
         private readonly TeamWorkloadMetrics $teamMetrics,
         private readonly ImageQuotaGuard $imageQuota,
         private readonly AnalyticsCache $cache,
+        private readonly EngagementMetrics $engagementMetrics,
     ) {}
 
     /**
@@ -109,7 +112,8 @@ class GetOrganizationAnalyticsSummaryAction
         // Health is read once per client (Step I-2.5: the stored column) and shared by the
         // clients section and the top list.
         $clients = $this->clients($scope);
-        $health = $clients->mapWithKeys(fn (Client $client) => [$client->id => $client->health()]);
+        // Step M-3.4: as the viewer may read it — Owner-only reasons never reach anyone else.
+        $health = $clients->mapWithKeys(fn (Client $client) => [$client->id => $client->healthFor($viewer)]);
 
         $summary = [
             'scope' => $clientId === null ? 'organization' : 'client',
@@ -118,7 +122,7 @@ class GetOrganizationAnalyticsSummaryAction
                 'timezone' => $range->timezone,
                 'default_currency' => $organization->default_currency,
             ],
-            'client' => $clientId === null ? null : $this->clientDetail($clientId, $clients, $health),
+            'client' => $clientId === null ? null : $this->clientDetail($clientId, $clients, $health, $viewer),
             'filters' => $filters->toArray(),
             'metrics' => $metrics,
             'clients' => $has('clients') ? $this->clientsSection($clients, $health, $filters) : null,
@@ -127,7 +131,8 @@ class GetOrganizationAnalyticsSummaryAction
             'team' => $has('team') ? $this->teamMetrics->summary($scope, $range) : null,
             'revenue' => $has('revenue') ? $this->revenueSection($scope, $filters, $organization) : null,
             'ai' => $has('ai') ? $this->aiSection($scope, $filters, $organization, $viewer) : null,
-            'engagement' => null,
+            // Step M-3.1 / I-10.1: Phase 12's slot, from the shared engagement read layer.
+            'engagement' => $has('engagement') ? $this->engagementMetrics->summary($scope, $range, withBestTimes: $clientId !== null) : null,
             'primary_currency' => $primaryCurrency,
             'series' => $this->series($scope, $filters, $canViewRevenue && $has('revenue'), $primaryCurrency),
             'top_clients' => $clientId === null ? $this->topClients($clients, $health, $scope, $filters, $canViewRevenue && $has('revenue'), $primaryCurrency) : null,
@@ -167,10 +172,10 @@ class GetOrganizationAnalyticsSummaryAction
      * The drill-down's client — archived clients included, since their history is still viewable.
      *
      * @param  EloquentCollection<int, Client>  $clients
-     * @param  Collection<int, array{status: ClientHealth, reason: string}>  $health
-     * @return array{id: int, name: string, status: string, health: string, reason: string}|null
+     * @param  Collection<int, array{status: ClientHealth, reason: string, reasons: list<array{key: string, tone: string, weight: int, label: string}>}>  $health
+     * @return array{id: int, name: string, status: string, health: string, reason: string, reasons: list<array{key: string, tone: string, weight: int, label: string}>}|null
      */
-    private function clientDetail(int $clientId, EloquentCollection $clients, Collection $health): ?array
+    private function clientDetail(int $clientId, EloquentCollection $clients, Collection $health, User $viewer): ?array
     {
         $client = $clients->firstWhere('id', $clientId) ?? Client::query()->find($clientId);
 
@@ -178,7 +183,7 @@ class GetOrganizationAnalyticsSummaryAction
             return null;
         }
 
-        $result = $health[$client->id] ?? $client->health();
+        $result = $health[$client->id] ?? $client->healthFor($viewer);
 
         return [
             'id' => $client->id,
@@ -186,6 +191,7 @@ class GetOrganizationAnalyticsSummaryAction
             'status' => $client->status->value,
             'health' => $result['status']->value,
             'reason' => $result['reason'],
+            'reasons' => $result['reasons'],
         ];
     }
 
@@ -193,7 +199,7 @@ class GetOrganizationAnalyticsSummaryAction
      * Roster counts (right now, plus new in range) and the health split — a "right now" snapshot.
      *
      * @param  EloquentCollection<int, Client>  $clients
-     * @param  Collection<int, array{status: ClientHealth, reason: string}>  $health
+     * @param  Collection<int, array{status: ClientHealth, reason: string, reasons: list<array{key: string, tone: string, weight: int, label: string}>}>  $health
      * @return array<string, mixed>
      */
     private function clientsSection(EloquentCollection $clients, Collection $health, OrganizationAnalyticsFilters $filters): array
@@ -493,7 +499,7 @@ class GetOrganizationAnalyticsSummaryAction
      * The busiest clients in the range, by posts published.
      *
      * @param  EloquentCollection<int, Client>  $clients
-     * @param  Collection<int, array{status: ClientHealth, reason: string}>  $health
+     * @param  Collection<int, array{status: ClientHealth, reason: string, reasons: list<array{key: string, tone: string, weight: int, label: string}>}>  $health
      * @return list<array<string, mixed>>
      */
     private function topClients(EloquentCollection $clients, Collection $health, AnalyticsScope $scope, OrganizationAnalyticsFilters $filters, bool $withRevenue, string $currency): array

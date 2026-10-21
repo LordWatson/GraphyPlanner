@@ -115,6 +115,7 @@ class PortalCampaignController extends Controller
                 'learnings' => $report->learnings,
                 'next_steps' => $report->next_steps,
                 'kpi_snapshot' => $report->kpi_snapshot ?? [],
+                'engagement_snapshot' => $report->engagement_snapshot,
                 'shared_at' => $report->shared_at?->toIso8601String(),
             ] : null,
         ]);

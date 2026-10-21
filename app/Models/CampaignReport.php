@@ -10,8 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * Step C-7.3 — the campaign's wrap report. `kpi_snapshot` is frozen when the report is shared so
- * the numbers the client saw never change; `version` counts shares.
+ * Step C-7.3 — the campaign's wrap report. `kpi_snapshot` (and, from M-3.1, `engagement_snapshot`)
+ * are frozen when the report is shared so the numbers the client saw never change; `version`
+ * counts shares.
  *
  * @property int $id
  * @property int $campaign_id
@@ -20,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $learnings
  * @property string|null $next_steps
  * @property list<array<string, mixed>>|null $kpi_snapshot
+ * @property array<string, mixed>|null $engagement_snapshot
  * @property CampaignReportStatus $status
  * @property int $version
  * @property Carbon|null $shared_at
@@ -28,7 +30,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'campaign_id', 'summary', 'highlights', 'learnings', 'next_steps', 'kpi_snapshot', 'status',
+    'campaign_id', 'summary', 'highlights', 'learnings', 'next_steps', 'kpi_snapshot', 'engagement_snapshot', 'status',
     'version', 'shared_at', 'shared_by',
 ])]
 class CampaignReport extends Model
@@ -49,6 +51,7 @@ class CampaignReport extends Model
         return [
             'highlights' => 'array',
             'kpi_snapshot' => 'array',
+            'engagement_snapshot' => 'array',
             'status' => CampaignReportStatus::class,
             'version' => 'integer',
             'shared_at' => 'datetime',

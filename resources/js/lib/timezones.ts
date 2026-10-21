@@ -115,6 +115,33 @@ export function instantToZoned(instant: number, timeZone: string): LocalSlot {
     };
 }
 
+/**
+ * Step M-3.2 — the next local slot in `timeZone` that falls on ISO `weekday` (1 = Monday) at
+ * `hour`:00, strictly after `now`. Used to schedule a channel into one of its best times.
+ */
+export function nextWeeklySlot(
+    weekday: number,
+    hour: number,
+    timeZone: string,
+    now: number = Date.now(),
+): LocalSlot {
+    const today = instantToZoned(now, timeZone);
+    const [year, month, day] = today.date.split('-').map(Number);
+    const base = Date.UTC(year, month - 1, day);
+    const todayIso = ((new Date(base).getUTCDay() + 6) % 7) + 1;
+    const time = `${String(hour).padStart(2, '0')}:00`;
+    let ahead = (weekday - todayIso + 7) % 7;
+
+    if (ahead === 0 && today.time >= time) {
+        ahead = 7;
+    }
+
+    return {
+        date: new Date(base + ahead * 86_400_000).toISOString().slice(0, 10),
+        time,
+    };
+}
+
 /** The same moment as `slot` in `fromZone`, as a local slot in `toZone`. */
 export function convertSlot(
     slot: LocalSlot,

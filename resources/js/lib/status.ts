@@ -32,7 +32,8 @@ export type StatusKind =
     | 'scheduler'
     | 'brief'
     | 'deliverable'
-    | 'timeline';
+    | 'timeline'
+    | 'clientReport';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -162,6 +163,11 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
     scheduler: {
         ok: { tone: 'success', label: 'Running' },
         stale: { tone: 'danger', label: 'Stale' },
+    },
+    // Step M-3.3: a monthly client report.
+    clientReport: {
+        draft: { tone: 'neutral', label: 'Draft' },
+        published: { tone: 'success', label: 'Published' },
     },
     organization: {
         active: { tone: 'success', label: 'Active' },

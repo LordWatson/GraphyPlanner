@@ -26,6 +26,9 @@
 |   the C2PA credentials embedded in the original, which re-encoding would strip);
 |   `hosted_connect`: the vendor's hosted connect page can be limited to this platform (its
 |   `generate-jwt` `platforms` list doesn't include Pinterest).
+| - `account_metrics` / `post_metrics` (Step M-3.1, default true): the vendor reports account-level
+|   (followers, reach) / per-post engagement here. Off → the app shows "not available for
+|   {platform}" instead of zeros (M-0.2 audit: Google Business has no per-post metrics).
 | - `caption_limit`: characters, counted on the caption exactly as it publishes (hashtags and an
 |   appended link included). `title_limit`: for platforms that also need a title (YouTube, Pinterest).
 | - `hashtags`: whether tags are sent at all; `max_hashtags`: the platform's norm (a warning, not a
@@ -319,6 +322,8 @@ return [
         'label' => 'Google Business',
         'vendor' => 'google_business',
         'vendor_prefix' => 'gbp',
+        // M-0.2: Upload-Post reports Google Business at account level only.
+        'post_metrics' => false,
         'vendor_description' => false,
         'cover_field' => null,
         'thumb_offset_field' => null,

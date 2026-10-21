@@ -5,6 +5,7 @@ import {
     CheckSquare,
     ChevronDown,
     Clapperboard,
+    FileBarChart,
     Grid3x3,
     LayoutGrid,
     Receipt,
@@ -32,6 +33,7 @@ import { index as portalCampaignsIndex } from '@/routes/portal/campaigns';
 import { index as portalGridsIndex } from '@/routes/portal/grids';
 import { index as portalInvoicesIndex } from '@/routes/portal/invoices';
 import { index as portalPostsIndex } from '@/routes/portal/posts';
+import { index as portalReportsIndex } from '@/routes/portal/reports';
 import type { Auth } from '@/types';
 
 type PortalSharedProps = {
@@ -85,6 +87,8 @@ export default function ClientPortalLayout({
                   },
               ]
             : []),
+        // Step M-3.3: the studio's monthly reports.
+        { title: 'Reports', href: portalReportsIndex(), icon: FileBarChart },
         { title: 'Invoices', href: portalInvoicesIndex(), icon: Receipt },
         { title: 'Company', href: portalCompany(), icon: Building2 },
     ];

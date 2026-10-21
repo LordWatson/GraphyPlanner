@@ -74,7 +74,7 @@ class BuildClientPageHeaderAction
             ->firstOrFail();
 
         return [
-            'client' => ClientPresenter::detail($client, $can['viewBilling']),
+            'client' => ClientPresenter::detail($client, $can['viewBilling'], $user),
             'can' => $can,
             'tab' => $tab,
             'stats' => [

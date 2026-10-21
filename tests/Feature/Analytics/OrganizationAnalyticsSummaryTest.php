@@ -67,8 +67,10 @@ class OrganizationAnalyticsSummaryTest extends TestCase
             'platforms' => [],
             'metrics' => [],
         ], $summary['filters']);
-        $this->assertSame(['clients', 'posts', 'approvals', 'team', 'revenue', 'ai'], $summary['metrics']);
-        $this->assertNull($summary['engagement']);
+        $this->assertSame(['clients', 'posts', 'approvals', 'team', 'revenue', 'ai', 'engagement'], $summary['metrics']);
+        // Step M-3.1: engagement is filled now; nothing has been measured in this fixture.
+        $this->assertSame(0, $summary['engagement']['measured_channels']);
+        $this->assertNull($summary['engagement']['totals']['engagement']);
         $this->assertSame('GBP', $summary['primary_currency']);
     }
 
@@ -81,9 +83,10 @@ class OrganizationAnalyticsSummaryTest extends TestCase
         $this->assertSame(1, $clients['paused']);
         $this->assertSame(0, $clients['offboarding']);
         $this->assertSame(1, $clients['new']);
-        $this->assertSame(['green' => 1, 'amber' => 1, 'red' => 1], $clients['health']);
-        $this->assertSame(['Crest', 'Bolt'], array_column($clients['attention'], 'name'));
-        $this->assertSame(['red', 'amber'], array_column($clients['attention'], 'health'));
+        // Step M-3.4: Acme's failed post this week makes it amber (health v2).
+        $this->assertSame(['green' => 0, 'amber' => 2, 'red' => 1], $clients['health']);
+        $this->assertSame(['Crest', 'Acme', 'Bolt'], array_column($clients['attention'], 'name'));
+        $this->assertSame(['red', 'amber', 'amber'], array_column($clients['attention'], 'health'));
         $this->assertSame('Active client has no assigned owner.', $clients['attention'][0]['reason']);
     }
 
@@ -207,7 +210,7 @@ class OrganizationAnalyticsSummaryTest extends TestCase
         $this->assertEqualsWithDelta(1500.0, $series->sum('invoiced'), 0.001);
 
         $this->assertSame(['Acme', 'Crest', 'Bolt'], array_column($summary['top_clients'], 'name'));
-        $this->assertEquals(['published' => 1, 'scheduled' => 1, 'waiting_on_client' => 1, 'invoiced' => 1500.0, 'health' => 'green'],
+        $this->assertEquals(['published' => 1, 'scheduled' => 1, 'waiting_on_client' => 1, 'invoiced' => 1500.0, 'health' => 'amber'],
             collect($summary['top_clients'][0])->only(['published', 'scheduled', 'waiting_on_client', 'invoiced', 'health'])->all());
         $this->assertNull($summary['top_campaigns']);
     }
@@ -285,7 +288,8 @@ class OrganizationAnalyticsSummaryTest extends TestCase
         $bolt = $this->summary(['client_ids' => [$this->bolt->id]]);
 
         $this->assertSame('client', $bolt['scope']);
-        $this->assertSame(['id' => $this->bolt->id, 'name' => 'Bolt', 'status' => 'paused', 'health' => 'amber', 'reason' => 'Client is paused.'], $bolt['client']);
+        $this->assertSame(['id' => $this->bolt->id, 'name' => 'Bolt', 'status' => 'paused', 'health' => 'amber', 'reason' => 'Client is paused.'], array_diff_key($bolt['client'], ['reasons' => true]));
+        $this->assertSame('paused', $bolt['client']['reasons'][0]['key']);
         $this->assertSame(1, $bolt['clients']['total']);
         $this->assertSame(0, $bolt['posts']['published']);
         $this->assertSame(1, $bolt['approvals']['sent_to_client']);

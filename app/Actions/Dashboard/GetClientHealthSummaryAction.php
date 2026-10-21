@@ -4,6 +4,7 @@ namespace App\Actions\Dashboard;
 
 use App\Enums\ClientHealth;
 use App\Models\Client;
+use App\Models\User;
 
 class GetClientHealthSummaryAction
 {
@@ -11,10 +12,11 @@ class GetClientHealthSummaryAction
      * Build the dashboard's "Client health" card: every org client's computed health status
      * (`Client::health()`, backed by `ClientHealthService`), post count, and retainer, ranked
      * Red first, then Amber, then Green, so the riskiest clients surface at the top.
+     * Step M-3.4: reasons as `$viewer` may read them (`Client::healthFor()`).
      *
      * @return array<int, array<string, mixed>>
      */
-    public function __invoke(int $orgId, int $limit = 8): array
+    public function __invoke(int $orgId, int $limit = 8, ?User $viewer = null): array
     {
         // Step I-2.5: health is materialized, so the ranking and the limit happen in SQL.
         $clients = Client::query()
@@ -28,8 +30,8 @@ class GetClientHealthSummaryAction
             ->limit($limit)
             ->get();
 
-        $rows = $clients->map(function (Client $client) {
-            $health = $client->health();
+        $rows = $clients->map(function (Client $client) use ($viewer) {
+            $health = $client->healthFor($viewer);
 
             return [
                 'id' => $client->id,
@@ -40,6 +42,7 @@ class GetClientHealthSummaryAction
                 'status' => $health['status']->value,
                 'status_label' => $health['status']->label(),
                 'reason' => $health['reason'],
+                'reasons' => $health['reasons'],
             ];
         });
 
