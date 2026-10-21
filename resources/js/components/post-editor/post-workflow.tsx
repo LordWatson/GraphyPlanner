@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { ArrowRight, Ellipsis, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { confirmDialog } from '@/components/confirm-dialog';
+import type { MentionableUser } from '@/components/mention-textarea';
 import type {
     ActivityLogData,
     Checklist,
@@ -45,6 +46,7 @@ export function PostWorkflow({
     clientName,
     allowedTransitions,
     isDirty,
+    mentionableUsers,
     canResendReviewEmail,
     canRetryFailedTargets = false,
     canDelete = false,
@@ -61,6 +63,8 @@ export function PostWorkflow({
     clientName: string;
     allowedTransitions: TransitionOption[];
     isDirty: boolean;
+    /** Teammates who can be `@`-tagged in a transition note. */
+    mentionableUsers: MentionableUser[];
     canResendReviewEmail: boolean;
     canRetryFailedTargets?: boolean;
     canDelete?: boolean;
@@ -276,6 +280,7 @@ export function PostWorkflow({
                     postId={post.id}
                     clientName={clientName}
                     open={overriding}
+                    mentionableUsers={mentionableUsers}
                     onOpenChange={setOverriding}
                 />
             )}
@@ -286,6 +291,7 @@ export function PostWorkflow({
                 action={pending}
                 checklist={post.checklist}
                 isDirty={isDirty}
+                mentionableUsers={mentionableUsers}
                 onOpenChange={(open) => !open && setPending(null)}
             />
         </section>

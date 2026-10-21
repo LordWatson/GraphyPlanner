@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\ApprovalDecision;
+use App\Enums\ApprovalMode;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Client;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostCommentAdded;
 use App\Notifications\PostCommentMentioned;
+use App\Notifications\PostNoteMentioned;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -213,6 +215,124 @@ class NotificationTest extends TestCase
         ])->assertRedirect(route('posts.edit', $post));
 
         Notification::assertNotSentTo($strategist, PostWaitingForInternalReview::class);
+    }
+
+    public function test_tagging_a_teammate_in_a_transition_note_notifies_them(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::InternalReview->value,
+            'comment' => "@[{$strategist->name}]({$strategist->id}) please take this one",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertSentTo($strategist, PostNoteMentioned::class);
+    }
+
+    public function test_a_teammate_tagged_in_a_transition_note_is_not_also_sent_the_broad_status_notification(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $otherStrategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::InternalReview->value,
+            'comment' => "@[{$strategist->name}]({$strategist->id}) please take this one",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        // The tagged user gets the personal tag, not the duplicate "waiting for internal review".
+        Notification::assertSentTo($strategist, PostNoteMentioned::class);
+        Notification::assertNotSentTo($strategist, PostWaitingForInternalReview::class);
+        // Everyone else in the studio still gets the broad status notification as before.
+        Notification::assertSentTo($otherStrategist, PostWaitingForInternalReview::class);
+    }
+
+    public function test_a_client_reviewer_cannot_be_tagged_in_a_transition_note(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
+            'client_id' => $client->id,
+        ]);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        // Status-dialog tags are internal — a client-portal user is never pulled in this way.
+        $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::InternalReview->value,
+            'comment' => "@[{$reviewer->name}]({$reviewer->id}) internal only, shouldn't reach you",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertNotSentTo($reviewer, PostNoteMentioned::class);
+    }
+
+    public function test_an_unmentionable_user_id_in_a_transition_note_is_ignored(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $otherOrg = Organization::factory()->create();
+        $outsider = User::factory()->for($otherOrg, 'organization')->role(Role::Owner)->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        $this->actingAs($owner)->post(route('posts.transition', $post), [
+            'to' => PostStatus::InternalReview->value,
+            'comment' => "@[{$outsider->name}]({$outsider->id}) can't be tagged from another org",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertNotSentTo($outsider, PostNoteMentioned::class);
+    }
+
+    public function test_tagging_a_teammate_in_an_approval_override_reason_notifies_them(): void
+    {
+        Notification::fake();
+
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create([
+            'org_id' => $org->id,
+            'status' => PostStatus::InternalReview,
+            'approval_mode' => ApprovalMode::ClientRequired,
+        ]);
+
+        $this->actingAs($owner)->post(route('posts.override-approval', $post), [
+            'reason' => "@[{$strategist->name}]({$strategist->id}) approved on our call",
+        ])->assertRedirect(route('posts.edit', $post));
+
+        Notification::assertSentTo($strategist, PostNoteMentioned::class);
+    }
+
+    public function test_the_transition_tag_notification_links_to_the_post_editor(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
+        $client = Client::factory()->for($org, 'organization')->create(['name' => 'Acme']);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $data = (new PostNoteMentioned($post, PostStatus::InternalReview, $owner))
+            ->toArray($strategist);
+
+        $this->assertSame(route('posts.edit', $post), $data['url']);
+        $this->assertSame($post->id, $data['post_id']);
+        $this->assertStringContainsString('Acme', $data['body']);
     }
 
     public function test_a_client_approval_decision_notifies_org_users(): void

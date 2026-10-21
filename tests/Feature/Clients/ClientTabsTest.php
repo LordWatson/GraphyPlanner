@@ -136,6 +136,21 @@ class ClientTabsTest extends TestCase
                 ->has('filterOptions.statuses', count(PostStatus::cases())));
     }
 
+    public function test_the_posts_tab_hides_archived_posts_unless_explicitly_filtered(): void
+    {
+        $draft = Post::factory()->for($this->client)->create(['org_id' => $this->org->id, 'status' => PostStatus::Draft]);
+        $archived = Post::factory()->for($this->client)->create(['org_id' => $this->org->id, 'status' => PostStatus::Archived]);
+
+        $ids = fn (array $query) => $this->listedIds('clients.posts.index', 'posts', $query);
+
+        // Default list excludes archived posts.
+        $this->assertSame([$draft->id], $ids([]));
+        // Filtering by another status is unaffected and still never shows archived.
+        $this->assertSame([$draft->id], $ids(['status' => 'draft']));
+        // The archived posts are still reachable by explicitly selecting the Archived status.
+        $this->assertSame([$archived->id], $ids(['status' => 'archived']));
+    }
+
     public function test_the_posts_tab_never_lists_another_clients_posts(): void
     {
         $other = Client::factory()->for($this->org, 'organization')->create();

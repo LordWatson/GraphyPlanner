@@ -119,6 +119,7 @@ export default function PostEdit({
                     clientName={client.name}
                     allowedTransitions={allowedTransitions}
                     isDirty={editor.isDirty}
+                    mentionableUsers={mentionableUsers}
                     canResendReviewEmail={can.resend_review_email}
                     canRetryFailedTargets={can.retry_failed_targets}
                     canDelete={can.delete}

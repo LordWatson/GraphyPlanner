@@ -55,6 +55,8 @@ export function MentionTextarea({
     rows = 2,
     id,
     defaultValue,
+    required,
+    minLength,
 }: {
     name: string;
     users: MentionableUser[];
@@ -62,6 +64,8 @@ export function MentionTextarea({
     rows?: number;
     id?: string;
     defaultValue?: string;
+    required?: boolean;
+    minLength?: number;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [highlighted, setHighlighted] = useState(0);
@@ -159,6 +163,8 @@ export function MentionTextarea({
                 id={id}
                 name={name}
                 rows={rows}
+                required={required}
+                minLength={minLength}
                 defaultValue={defaultValue}
                 placeholder={placeholder}
                 onChange={syncMentionState}

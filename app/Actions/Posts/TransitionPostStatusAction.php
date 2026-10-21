@@ -13,11 +13,14 @@ use App\Jobs\SendScheduledPostToVendorJob;
 use App\Models\Post;
 use App\Models\User;
 use App\Notifications\PostApprovalDecided;
+use App\Notifications\PostNoteMentioned;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
 use App\Services\PostNotificationService;
 use App\Services\Publishing\VendorScheduleService;
+use App\Support\CommentMentionParser;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -204,7 +207,7 @@ class TransitionPostStatusAction
 
             $locked->refresh();
 
-            DB::afterCommit(function () use ($locked, $to, $user, $notifications) {
+            DB::afterCommit(function () use ($locked, $to, $user, $comment, $notifications) {
                 // Step 1.4: nothing calls the vendor until this point — the §6 checklist is
                 // already re-validated server-side before `scheduled` is even a legal
                 // destination (see `TransitionPostRequest`).
@@ -212,7 +215,13 @@ class TransitionPostStatusAction
                     $this->dispatchPublishJob($locked);
                 }
 
-                $this->notify($locked, $to, $user, $notifications);
+                // `@`-mentions ("tags") in the transition note (or an Owner's approval-override
+                // reason, which lands on the same note) notify each tagged teammate directly;
+                // they're then excluded from the broad status audience below so a tagged user
+                // doesn't also get the generic "post needs review" alert.
+                $mentioned = $this->notifyMentioned($locked, $to, $comment, $user, $notifications);
+
+                $this->notify($locked, $to, $user, $notifications, $mentioned->pluck('id'));
 
                 // Campaigns enhancement C-6.3: the campaign's first post out marks it live.
                 if (in_array($to, [PostStatus::Published, PostStatus::PartiallyPublished], true) && $locked->campaign_id !== null) {
@@ -233,11 +242,16 @@ class TransitionPostStatusAction
      * Notify the interested audience for a transition: org users (minus the actor) when a post
      * lands in `internal_review`, org users when a client decides (approved/changes requested),
      * client-portal users when a post lands in `waiting_client`.
+     *
+     * `$excludeIds` are users already notified directly because they were `@`-mentioned in the
+     * transition note — they're dropped from the broad audience to avoid a duplicate alert.
+     *
+     * @param  Collection<int, int>  $excludeIds
      */
-    private function notify(Post $post, PostStatus $to, ?User $user, PostNotificationService $notifications): void
+    private function notify(Post $post, PostStatus $to, ?User $user, PostNotificationService $notifications, Collection $excludeIds = new Collection): void
     {
         if ($to === PostStatus::InternalReview) {
-            $recipients = $notifications->orgRecipients($post, $user);
+            $recipients = $notifications->orgRecipients($post, $user)->whereNotIn('id', $excludeIds);
 
             $notifications->send($recipients, new PostWaitingForInternalReview($post));
 
@@ -253,7 +267,7 @@ class TransitionPostStatusAction
 
         if ($to === PostStatus::WaitingClient) {
             $notifications->send(
-                $notifications->clientPortalRecipients($post),
+                $notifications->clientPortalRecipients($post)->whereNotIn('id', $excludeIds),
                 new PostWaitingForClientReview($post),
             );
 
@@ -276,9 +290,54 @@ class TransitionPostStatusAction
             : ApprovalDecision::ChangesRequested;
 
         $notifications->send(
-            $notifications->orgRecipients($post),
+            $notifications->orgRecipients($post)->whereNotIn('id', $excludeIds),
             new PostApprovalDecided($post, $decision),
         );
+    }
+
+    /**
+     * Resolve the `@[Name](id)` "tag" tokens in the transition note and notify each one directly
+     * with a `PostNoteMentioned` so a tagged teammate is pulled in to look at the post. The `@`
+     * mechanism is shared with post comments, but status dialogs are internal, so tokens are
+     * validated against this org's recipients only (never the actor, never outsiders, never a
+     * client-portal user) and never trusted at face value.
+     *
+     * Returns the users that were notified so the caller can keep them out of the broad status
+     * audience. No-ops for the unauthenticated review portal (a `null` actor can't tag anyone).
+     *
+     * @return Collection<int, User>
+     */
+    private function notifyMentioned(Post $post, PostStatus $to, ?string $comment, ?User $user, PostNotificationService $notifications): Collection
+    {
+        if ($user === null || $comment === null) {
+            return new Collection;
+        }
+
+        $mentionedIds = CommentMentionParser::extractUserIds($comment);
+
+        if ($mentionedIds === []) {
+            return new Collection;
+        }
+
+        $mentioned = $notifications->orgRecipients($post, exclude: $user)
+            ->whereIn('id', $mentionedIds)
+            ->values();
+
+        foreach ($mentioned as $recipient) {
+            $recipient->notify(new PostNoteMentioned($post, $to, $user));
+        }
+
+        if ($mentioned->isNotEmpty()) {
+            Log::info('Post transition mentions notified', [
+                'post_id' => $post->id,
+                'org_id' => $post->org_id,
+                'user_id' => $user->id,
+                'to_status' => $to->value,
+                'mentioned_user_ids' => $mentioned->pluck('id')->all(),
+            ]);
+        }
+
+        return $mentioned;
     }
 
     /**

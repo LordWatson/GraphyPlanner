@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Post;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +14,8 @@ class ListClientPostsAction
 
     /**
      * Page through a client's posts, newest first, filtered by caption search, status, campaign
-     * and/or target channel. Backs the client page's Posts tab.
+     * and/or target channel. Backs the client page's Posts tab. Archived posts are excluded by
+     * default and surface only when the status filter is explicitly set to "Archived".
      *
      * @param  array{search?: string|null, status?: string|null, campaign?: int|null, platform?: string|null}  $filters
      * @return LengthAwarePaginator<int, Post>
@@ -31,6 +33,9 @@ class ListClientPostsAction
                 $query->whereRaw("lower(master_caption) like ? escape '\'", ['%'.mb_strtolower($escaped).'%']);
             })
             ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
+            // Archived posts are dropped work — hidden from the default list unless the user
+            // deliberately filters to the "Archived" status above.
+            ->when(blank($filters['status'] ?? null), fn (Builder $query) => $query->where('status', '!=', PostStatus::Archived->value))
             ->when(filled($filters['campaign'] ?? null), fn (Builder $query) => $query->where('campaign_id', $filters['campaign']))
             ->when(filled($platform), fn (Builder $query) => $query->whereHas(
                 'targets.socialAccount',

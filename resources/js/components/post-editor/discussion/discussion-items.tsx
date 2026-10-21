@@ -197,7 +197,7 @@ export function ActivityItem({
                 </div>
                 {log.note && (
                     <blockquote className="border-border text-foreground/80 border-l-2 pl-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
-                        {log.note}
+                        {renderCommentBody(log.note)}
                     </blockquote>
                 )}
                 {log.review_link_sent && (

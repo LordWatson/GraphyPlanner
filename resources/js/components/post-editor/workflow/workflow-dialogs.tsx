@@ -1,6 +1,10 @@
 import { Form } from '@inertiajs/react';
 import { ArrowRight, ShieldCheck, TriangleAlert, XCircle } from 'lucide-react';
 import InputError from '@/components/input-error';
+import {
+    MentionTextarea,
+    type MentionableUser,
+} from '@/components/mention-textarea';
 import type { Checklist } from '@/components/post-editor/types';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -16,9 +20,6 @@ import { Label } from '@/components/ui/label';
 import type { TransitionAction } from '@/lib/post-workflow';
 import { overrideApproval, transition as transitionPost } from '@/routes/posts';
 
-const textareaClass =
-    'border-input bg-card focus-visible:border-ring focus-visible:ring-ring/40 dark:bg-input/30 placeholder:text-muted-foreground flex w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]';
-
 /** Confirms one status move, blocking scheduling until the checklist passes; can attach a note. */
 export function TransitionDialog({
     postId,
@@ -26,6 +27,7 @@ export function TransitionDialog({
     action,
     checklist,
     isDirty,
+    mentionableUsers,
     onOpenChange,
 }: {
     postId: number;
@@ -33,6 +35,8 @@ export function TransitionDialog({
     action: TransitionAction | null;
     checklist: Checklist;
     isDirty: boolean;
+    /** Teammates who can be `@`-tagged in the note (same list as the comment composer). */
+    mentionableUsers: MentionableUser[];
     onOpenChange: (open: boolean) => void;
 }) {
     const blockedBy =
@@ -107,16 +111,16 @@ export function TransitionDialog({
                                     <Label htmlFor="transition-comment">
                                         Note{' '}
                                         <span className="text-muted-foreground font-normal">
-                                            (optional, added to the activity
-                                            log)
+                                            (optional, added to the activity log
+                                            — type @ to tag a teammate)
                                         </span>
                                     </Label>
-                                    <textarea
+                                    <MentionTextarea
                                         id="transition-comment"
                                         name="comment"
                                         rows={3}
                                         placeholder={action.notePlaceholder}
-                                        className={textareaClass}
+                                        users={mentionableUsers}
                                     />
                                     <InputError message={errors.comment} />
                                 </div>
@@ -169,11 +173,14 @@ export function OverrideApprovalDialog({
     postId,
     clientName,
     open,
+    mentionableUsers,
     onOpenChange,
 }: {
     postId: number;
     clientName: string;
     open: boolean;
+    /** Teammates who can be `@`-tagged in the reason (same list as the comment composer). */
+    mentionableUsers: MentionableUser[];
     onOpenChange: (open: boolean) => void;
 }) {
     return (
@@ -200,15 +207,20 @@ export function OverrideApprovalDialog({
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-1.5">
-                                <Label htmlFor="override-reason">Reason</Label>
-                                <textarea
+                                <Label htmlFor="override-reason">
+                                    Reason{' '}
+                                    <span className="text-muted-foreground font-normal">
+                                        (type @ to tag a teammate)
+                                    </span>
+                                </Label>
+                                <MentionTextarea
                                     id="override-reason"
                                     name="reason"
                                     rows={3}
                                     required
                                     minLength={5}
                                     placeholder="e.g. Approved on our call this morning."
-                                    className={textareaClass}
+                                    users={mentionableUsers}
                                 />
                                 <InputError message={errors.reason} />
                             </div>
