@@ -16,8 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Step C-7.3 — "Share with client": freeze the KPI results as they stand now into
- * `kpi_snapshot` (so the numbers the client saw never change when later data arrives), bump the
- * version, publish the report to the portal and, after commit, email the client's portal contacts
+ * `kpi_snapshot` and (M-3.1) the engagement into `engagement_snapshot` (so the numbers the client
+ * saw never change when later data arrives), bump the version, publish the report to the portal and, after commit, email the client's portal contacts
  * the branded PDF. Never includes fees or invoices.
  */
 class ShareCampaignReportAction
@@ -36,6 +36,8 @@ class ShareCampaignReportAction
 
             $report->update([
                 'kpi_snapshot' => $this->snapshot($campaign),
+                // Step M-3.1: engagement freezes with the KPIs (null when nothing is measured yet).
+                'engagement_snapshot' => $this->kpis->engagementSnapshot($campaign),
                 'status' => CampaignReportStatus::Shared,
                 'version' => $report->version + 1,
                 'shared_at' => now(),

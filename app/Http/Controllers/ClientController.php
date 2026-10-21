@@ -45,7 +45,7 @@ class ClientController extends Controller
 
         return Inertia::render('clients/index', [
             'clients' => $listClients($user, $filters, $canViewBilling)
-                ->through(fn (Client $client) => ClientPresenter::row($client, $canViewBilling)),
+                ->through(fn (Client $client) => ClientPresenter::row($client, $canViewBilling, $user)),
             'filters' => $filters,
             'filterOptions' => [
                 'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
@@ -131,7 +131,7 @@ class ClientController extends Controller
         $this->authorize('update', $client);
 
         return Inertia::render('clients/edit', [
-            'client' => ClientPresenter::detail($client, $request->user()->can('viewBilling', $client)),
+            'client' => ClientPresenter::detail($client, $request->user()->can('viewBilling', $client), $request->user()),
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
             'languages' => LanguageOptions::options(),

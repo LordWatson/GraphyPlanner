@@ -8,6 +8,7 @@ use App\Enums\MediaRatio;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
+use App\Jobs\RecomputeClientHealthJob;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
 use App\Policies\PostPolicy;
@@ -130,6 +131,11 @@ class Post extends Model
             // at risk — re-check its grid once the change is committed.
             if ($post->wasChanged('status') && ! $post->wasRecentlyCreated) {
                 DB::afterCommit(fn () => app(GridOrderRiskService::class)->checkForPost($post));
+            }
+
+            // Step M-3.4: failures, overdue approvals, cadence and calendar gaps feed health.
+            if ($post->wasChanged('status')) {
+                RecomputeClientHealthJob::dispatch($post->client_id);
             }
         });
         static::deleted(fn (self $post) => SharedPropsCache::forgetPendingApprovals($post->client_id));

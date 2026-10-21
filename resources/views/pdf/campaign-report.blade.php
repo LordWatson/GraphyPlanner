@@ -158,6 +158,51 @@
             </table>
         @endif
 
+        @if (! empty($engagement))
+            @php
+                $num = fn ($value) => $value === null ? '—' : number_format((float) $value);
+                $totals = $engagement['totals'] ?? [];
+                $growth = $engagement['followers']['growth'] ?? null;
+            @endphp
+            <div class="section">
+                <span class="eyebrow">Engagement &mdash; across the campaign's posts</span>
+                <table class="strip" style="margin-top: 8px;">
+                    <tr>
+                        <td class="first" style="width: 25%;">
+                            <div class="eyebrow">Reach</div>
+                            <div class="serif figure">{{ $num($totals['reach'] ?? null) }}</div>
+                        </td>
+                        <td style="width: 25%;">
+                            <div class="eyebrow">Interactions</div>
+                            <div class="serif figure">{{ $num($totals['engagement'] ?? null) }}</div>
+                        </td>
+                        <td style="width: 25%;">
+                            <div class="eyebrow">Engagement rate</div>
+                            <div class="serif figure">{{ ($engagement['engagement_rate'] ?? null) === null ? '—' : rtrim(rtrim(number_format((float) $engagement['engagement_rate'], 1), '0'), '.').'%' }}</div>
+                        </td>
+                        <td style="width: 25%;">
+                            <div class="eyebrow">Follower growth</div>
+                            <div class="serif figure">{{ $growth === null ? '—' : ($growth >= 0 ? '+' : '').number_format((float) $growth) }}</div>
+                        </td>
+                    </tr>
+                </table>
+                @if (! empty($engagement['top_posts']))
+                    <table class="rows">
+                        <thead><tr><th class="eyebrow">Top posts</th><th class="eyebrow right">Interactions</th><th class="eyebrow right">Reach</th></tr></thead>
+                        <tbody>
+                            @foreach ($engagement['top_posts'] as $post)
+                                <tr>
+                                    <td>{{ $post['caption'] ?? 'Untitled post' }} <span class="muted mono" style="font-size: 8.5px;">{{ strtoupper(implode(' · ', $post['platforms'] ?? [])) }}</span></td>
+                                    <td class="num">{{ $num($post['engagement'] ?? null) }}</td>
+                                    <td class="num">{{ $num($post['reach'] ?? $post['impressions'] ?? null) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        @endif
+
         @if (! empty($report->highlights))
             <div class="section">
                 <span class="eyebrow">A &mdash; Highlights</span>

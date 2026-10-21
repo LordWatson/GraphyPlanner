@@ -3,20 +3,25 @@
 namespace App\Support\Clients;
 
 use App\Models\Client;
+use App\Models\ClientHealthHistory;
+use App\Models\User;
 
 /**
  * Step I-2.4/I-2.5 — the client array shape shared by the roster, the client page header and the
  * edit form (moved out of `ClientController::transform`). Billing fields are null unless the
  * viewer may see billing. Health is read from the materialized columns (`Client::health()`).
+ *
+ * Step M-3.4: health comes through `Client::healthFor($viewer)` — the weighted reasons the viewer
+ * may read (Owner-only ones dropped for everyone else) — and the detail adds the 90-day trend.
  */
 final class ClientPresenter
 {
     /**
      * @return array<string, mixed>
      */
-    public static function detail(Client $client, bool $canViewBilling): array
+    public static function detail(Client $client, bool $canViewBilling, ?User $viewer = null): array
     {
-        $health = $client->health();
+        $health = $client->healthFor($viewer);
 
         return [
             'id' => $client->id,
@@ -39,7 +44,32 @@ final class ClientPresenter
             'billing_address' => $canViewBilling ? $client->billing_address : null,
             'health' => $health['status']->value,
             'health_reason' => $health['reason'],
+            'health_reasons' => $health['reasons'],
+            'health_trend' => self::trend($client),
+            'target_posts_per_week' => $client->target_posts_per_week,
         ];
+    }
+
+    /**
+     * Step M-3.4 — health over the last 90 days: the status at the start of the window, then every
+     * change, oldest first (from `client_health_history`). Reasons are left out — an old reason may
+     * have been Owner-only.
+     *
+     * @return list<array{status: string, at: string}>
+     */
+    public static function trend(Client $client, int $days = 90): array
+    {
+        $since = now()->subDays($days);
+        $before = $client->healthHistory()->where('created_at', '<', $since)->latest('created_at')->latest('id')->first();
+        $changes = $client->healthHistory()->where('created_at', '>=', $since)->oldest('created_at')->oldest('id')->get();
+
+        return array_values(collect($before === null ? [] : [$before])
+            ->merge($changes)
+            ->map(fn (ClientHealthHistory $row) => [
+                'status' => $row->health_status->value,
+                'at' => ($row === $before ? $since : $row->created_at)?->toIso8601String() ?? $since->toIso8601String(),
+            ])
+            ->all());
     }
 
     /**
@@ -47,9 +77,9 @@ final class ClientPresenter
      *
      * @return array<string, mixed>
      */
-    public static function row(Client $client, bool $canViewBilling): array
+    public static function row(Client $client, bool $canViewBilling, ?User $viewer = null): array
     {
-        $health = $client->health();
+        $health = $client->healthFor($viewer);
 
         return [
             'id' => $client->id,
@@ -65,6 +95,7 @@ final class ClientPresenter
             'billing_cycle' => $canViewBilling ? $client->billing_cycle?->value : null,
             'health' => $health['status']->value,
             'health_reason' => $health['reason'],
+            'health_reasons' => $health['reasons'],
             'archived_at' => $client->deleted_at?->toIso8601String(),
             'has_invoices' => $client->getAttribute('has_invoices') === null ? null : (bool) $client->getAttribute('has_invoices'),
         ];

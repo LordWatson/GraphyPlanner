@@ -3,10 +3,10 @@
 namespace App\Enums;
 
 /**
- * Step C-7.1 — what a campaign KPI measures. The first five come from data the app already has;
- * the engagement metrics are listed so agencies can set targets now, but report
- * `available: false` until engagement tracking (Phase 12 / I-10.1, I-10.4) lands — never a zero
- * that looks like a real result.
+ * Step C-7.1 — what a campaign KPI measures. The first five come from the app's own workflow data;
+ * the engagement metrics (Step M-3.1) come from synced platform readings and report
+ * `available: false` until a reading exists (`CampaignKpiService`) — never a zero that looks like
+ * a real result.
  */
 enum CampaignMetric: string
 {
@@ -54,7 +54,11 @@ enum CampaignMetric: string
         return $this === self::ApprovalTurnaround;
     }
 
-    public function isAvailable(): bool
+    /**
+     * Measured from the app's own workflow data, so always available. The engagement metrics
+     * depend on synced readings and are decided per campaign by `CampaignKpiService`.
+     */
+    public function isWorkflowMetric(): bool
     {
         return in_array($this, [
             self::PostsPublished,

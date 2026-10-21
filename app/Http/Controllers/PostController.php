@@ -33,6 +33,7 @@ use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Services\Analytics\BestTimeService;
 use App\Services\ClientHashtagService;
 use App\Services\Grids\GridPlanService;
 use App\Services\PostNotificationService;
@@ -78,6 +79,7 @@ class PostController extends Controller
         ApplyCampaignDefaultsAction $defaults,
         PlatformRolloutGate $rollout,
         GridPlanService $grids,
+        BestTimeService $bestTime,
     ): Response {
         $this->authorize('view', $post);
 
@@ -104,36 +106,40 @@ class PostController extends Controller
         $hashtagSuggestions = $this->hashtagSuggestions($client, $hashtags);
         $mentionableUsers = $notifications->mentionableRecipients($post, exclude: $user);
 
+        // Step M-2.6: an account on a platform that isn't switched on for publishing yet is only
+        // listed when the post already targets it, so it can be removed.
+        $accounts = $client->socialAccounts()->get()
+            ->filter(fn (SocialAccount $account) => $rollout->platformEnabled($account->platform)
+                || $post->targets->contains('social_account_id', $account->id))
+            ->values();
+        $bestTimes = $bestTime->forAccounts(array_values(array_map('intval', $accounts->modelKeys())));
+
         return Inertia::render('posts/edit', [
             'post' => $this->transformPostForEditor($post, $evaluateChecklist),
             'client' => ['id' => $client->id, 'name' => $client->name],
             // Per-platform limits travel with every selectable account (not just the post's saved
             // targets) so the editor can show caption/hashtag usage and a live readiness check the
             // moment a new channel is toggled on, before anything is saved.
-            // Step M-2.6: an account on a platform that isn't switched on for publishing yet is
-            // only listed when the post already targets it, so it can be removed.
-            'targetAccounts' => $client->socialAccounts()->get()
-                ->filter(fn (SocialAccount $account) => $rollout->platformEnabled($account->platform)
-                    || $post->targets->contains('social_account_id', $account->id))
-                ->values()
-                ->map(fn (SocialAccount $account) => [
-                    'id' => $account->id,
-                    'platform' => $account->platform->value,
-                    'platform_label' => $account->platform->label(),
-                    'handle' => $account->handle,
-                    'display_name' => $account->display_name,
-                    'timezone' => $account->timezone,
-                    'caption_limit' => $account->platform->captionLimit(),
-                    'max_hashtags' => $account->platform->maxHashtags(),
-                    'is_text_only_capable' => $account->platform->isTextOnlyCapable(),
-                    'enabled' => $rollout->platformEnabled($account->platform),
-                    'connection_status' => $account->connection_status->value,
-                    // Step M-2.6: registry `required_settings` this account hasn't filled in.
-                    'missing_settings' => array_values(array_filter(
-                        $account->platform->spec()->requiredSettings,
-                        fn (string $setting) => blank($account->platform_settings[$setting] ?? null),
-                    )),
-                ]),
+            'targetAccounts' => $accounts->map(fn (SocialAccount $account) => [
+                'id' => $account->id,
+                'platform' => $account->platform->value,
+                'platform_label' => $account->platform->label(),
+                'handle' => $account->handle,
+                'display_name' => $account->display_name,
+                'timezone' => $account->timezone,
+                'caption_limit' => $account->platform->captionLimit(),
+                'max_hashtags' => $account->platform->maxHashtags(),
+                'is_text_only_capable' => $account->platform->isTextOnlyCapable(),
+                'enabled' => $rollout->platformEnabled($account->platform),
+                'connection_status' => $account->connection_status->value,
+                // Step M-2.6: registry `required_settings` this account hasn't filled in.
+                'missing_settings' => array_values(array_filter(
+                    $account->platform->spec()->requiredSettings,
+                    fn (string $setting) => blank($account->platform_settings[$setting] ?? null),
+                )),
+                // Step M-3.2: best slots from this account's own engagement (or "learning").
+                'best_time' => $bestTimes[$account->id] ?? null,
+            ]),
             'allowedTransitions' => array_map(
                 fn (PostStatus $to) => ['value' => $to->value, 'label' => $to->label()],
                 $allowedTransitions,

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\RecomputeClientHealthJob;
 use App\Models\Scopes\OrganizationScope;
 use App\Support\StoredFileUrl;
 use Database\Factories\BrandBrainFactory;
@@ -40,6 +41,12 @@ class BrandBrain extends Model
 {
     /** @use HasFactory<BrandBrainFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        // Step M-3.4: Brand Brain gaps are a client health (advisory) reason.
+        static::saved(fn (self $brain) => RecomputeClientHealthJob::dispatch($brain->client_id));
+    }
 
     /**
      * Step I-1.6: a private file's URL is signed and short-lived, so it's minted on every read

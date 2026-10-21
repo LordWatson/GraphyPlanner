@@ -31,7 +31,7 @@ import { tickInterval } from './format';
  * y-axes. Each takes the series as-is and a `daily` flag for tick density.
  */
 
-type Bucket = { label: string } & Record<string, number | string>;
+type Bucket = { label: string } & Record<string, number | string | null>;
 
 function Frame({
     children,
@@ -135,6 +135,55 @@ export function PublishingChart({
                     strokeDasharray="5 4"
                     dot={false}
                     activeDot={activeDot}
+                />
+            </LineChart>
+        </Frame>
+    );
+}
+
+/** Step M-3.1 — one running total per bucket as a line (followers); gaps stay gaps. */
+export function TotalLineChart({
+    series,
+    daily,
+    dataKey,
+    name,
+    className,
+}: {
+    series: Bucket[];
+    daily: boolean;
+    dataKey: string;
+    name: string;
+    className?: string;
+}) {
+    return (
+        <Frame className={className} label={`${name} over time`}>
+            <LineChart data={series} margin={chartMargin}>
+                {Axes({
+                    length: series.length,
+                    daily,
+                    yWidth: 44,
+                    yFormatter: (value) =>
+                        new Intl.NumberFormat('en-GB', {
+                            notation: 'compact',
+                        }).format(value),
+                })}
+                <Tooltip
+                    contentStyle={chartTooltipStyle}
+                    cursor={{
+                        stroke: 'var(--color-foreground)',
+                        strokeOpacity: 0.2,
+                        strokeWidth: 1,
+                    }}
+                />
+                <Line
+                    type="monotone"
+                    dataKey={dataKey}
+                    name={name}
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={activeDot}
+                    connectNulls={false}
                 />
             </LineChart>
         </Frame>

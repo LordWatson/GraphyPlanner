@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BarChart3, Gauge, Medal, Share2, Timer } from 'lucide-react';
+import { BarChart3, Gauge, Heart, Medal, Share2, Timer } from 'lucide-react';
 import { ShareBars } from '@/components/analytics/figures';
 import { CampaignLayout } from '@/components/campaigns/campaign-layout';
 import { KpiEditor } from '@/components/campaigns/results/kpi-editor';
@@ -31,8 +31,14 @@ type ResultsProps = CampaignWorkspaceProps & {
         status: string;
         status_label: string;
         platforms: string[];
-        hours_to_approve: number;
+        engagement: number | null;
+        reach: number | null;
+        impressions: number | null;
+        engagement_rate: number | null;
+        hours_to_approve: number | null;
+        ranked_by: 'engagement' | 'approval_speed';
     }[];
+    topPostsRankedBy: 'engagement' | 'approval_speed';
     approvals: {
         sent_to_client: number;
         approved: number;
@@ -51,12 +57,14 @@ const hours = (value: number | null) =>
         : value >= 48
           ? `${Math.round(value / 24)}d`
           : `${Math.round(value)}h`;
+const count = new Intl.NumberFormat('en-GB', { notation: 'compact' });
 const platformLabel = (value: string) =>
     value.charAt(0).toUpperCase() + value.slice(1);
 
 /**
  * Step C-7.2 — the Results tab: targets vs actuals, published over time by phase, the platform
- * split, the fastest sign-offs (until engagement data exists), approval turnaround, and the wrap
+ * split, top posts by engagement (M-3.1; the fastest sign-offs until readings exist), approval
+ * turnaround, and the wrap
  * report (C-7.3). No fees or invoices here — those stay on Overview for Owner/Strategist.
  */
 export default function CampaignResults(props: ResultsProps) {
@@ -68,6 +76,7 @@ export default function CampaignResults(props: ResultsProps) {
         series,
         platforms,
         topPosts,
+        topPostsRankedBy,
         approvals,
         report,
         canEditResults,
@@ -195,12 +204,21 @@ export default function CampaignResults(props: ResultsProps) {
                     <Panel
                         icon={Medal}
                         eyebrow="Top posts"
-                        title="Fastest sign-offs"
-                        description="Ranked by approval speed until engagement data is on."
+                        title={
+                            topPostsRankedBy === 'engagement'
+                                ? 'Most engaging'
+                                : 'Fastest sign-offs'
+                        }
+                        description={
+                            topPostsRankedBy === 'engagement'
+                                ? 'Ranked by likes, comments, shares and saves.'
+                                : 'Ranked by approval speed until platform readings arrive.'
+                        }
                     >
                         {topPosts.length === 0 ? (
                             <p className="text-muted-foreground text-sm">
-                                No client approvals yet.
+                                Nothing to rank yet. Posts show here once they
+                                go live and the first readings arrive.
                             </p>
                         ) : (
                             <ol className="flex flex-col gap-3">
@@ -226,12 +244,36 @@ export default function CampaignResults(props: ResultsProps) {
                                                     value={post.status}
                                                     label={post.status_label}
                                                 />
-                                                <span className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11px]">
-                                                    <Timer className="size-3" />
-                                                    {hours(
-                                                        post.hours_to_approve,
-                                                    )}
-                                                </span>
+                                                {post.ranked_by ===
+                                                'engagement' ? (
+                                                    <span className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11px] tabular-nums">
+                                                        <Heart
+                                                            className="size-3"
+                                                            aria-hidden
+                                                        />
+                                                        {post.engagement ===
+                                                        null
+                                                            ? '—'
+                                                            : count.format(
+                                                                  post.engagement,
+                                                              )}{' '}
+                                                        interactions
+                                                        {post.engagement_rate !==
+                                                            null &&
+                                                            ` · ${post.engagement_rate.toFixed(1)}%`}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11px]">
+                                                        <Timer
+                                                            className="size-3"
+                                                            aria-hidden
+                                                        />
+                                                        {hours(
+                                                            post.hours_to_approve,
+                                                        )}{' '}
+                                                        to approve
+                                                    </span>
+                                                )}
                                             </span>
                                         </Link>
                                     </li>

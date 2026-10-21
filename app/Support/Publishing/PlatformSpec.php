@@ -43,6 +43,8 @@ final readonly class PlatformSpec
         public array $captionFold,
         public string $defaultFormat,
         public array $formats,
+        public bool $accountMetrics = true,
+        public bool $postMetrics = true,
     ) {}
 
     /**
@@ -94,6 +96,8 @@ final readonly class PlatformSpec
             captionFold: ['chars' => (int) ($fold['chars'] ?? 240), 'lines' => (int) ($fold['lines'] ?? 5)],
             defaultFormat: isset($formats[$defaultFormat]) ? $defaultFormat : (string) array_key_first($formats),
             formats: $formats,
+            accountMetrics: (bool) ($config['account_metrics'] ?? true),
+            postMetrics: (bool) ($config['post_metrics'] ?? true),
         );
     }
 
@@ -142,6 +146,8 @@ final readonly class PlatformSpec
             'caption_fold' => $this->captionFold,
             'default_format' => $this->defaultFormat,
             'formats' => array_values(array_map(fn (FormatSpec $format) => $format->toArray(), $this->formats)),
+            'account_metrics' => $this->accountMetrics,
+            'post_metrics' => $this->postMetrics,
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\Role;
 use App\Models\Campaign;
+use App\Models\ClientReport;
 use App\Models\GridPlan;
 use App\Models\Invoice;
 use App\Models\Post;
@@ -35,10 +36,15 @@ class EnsureClientPortalAccess
             abort(403, 'This client account has been archived.');
         }
 
-        foreach (['post', 'invoice', 'campaign', 'grid'] as $parameter) {
+        foreach (['post', 'invoice', 'campaign', 'grid', 'report'] as $parameter) {
             $model = $request->route($parameter);
 
-            if (($model instanceof Post || $model instanceof Invoice || $model instanceof Campaign || $model instanceof GridPlan) && $model->client_id !== $user->client_id) {
+            if (($model instanceof Post || $model instanceof Invoice || $model instanceof Campaign || $model instanceof GridPlan || $model instanceof ClientReport) && $model->client_id !== $user->client_id) {
+                abort(404);
+            }
+
+            // Step M-3.3: a monthly report reaches the portal only once it's published.
+            if ($model instanceof ClientReport && ! $model->isPublished()) {
                 abort(404);
             }
 

@@ -6,6 +6,7 @@ use App\Actions\Clients\RecomputeClientHealthAction;
 use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
 use App\Enums\ClientHealth;
+use App\Enums\ClientReportSchedule;
 use App\Enums\ClientStatus;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Services\ClientHealthService;
@@ -41,8 +42,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $billing_address
  * @property ClientHealth|null $health_status
  * @property string|null $health_reason
+ * @property list<array{key: string, tone: string, weight: int, label: string, owner_only?: bool}>|null $health_reasons
  * @property Carbon|null $health_computed_at
  * @property int $approval_lead_days
+ * @property int|null $target_posts_per_week
+ * @property ClientReportSchedule $report_schedule
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -51,12 +55,20 @@ use Illuminate\Support\Carbon;
     'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
-    'approval_lead_days', 'default_approval_mode',
+    'approval_lead_days', 'default_approval_mode', 'report_schedule', 'target_posts_per_week',
 ])]
 class Client extends Model
 {
     /** @use HasFactory<ClientFactory> */
     use BelongsToOrganization, HasFactory, SoftDeletes;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        // Step M-3.3: mirrors the column default.
+        'report_schedule' => 'review',
+    ];
 
     /**
      * @return array<string, string>
@@ -73,6 +85,9 @@ class Client extends Model
             'retainer_amount' => 'decimal:2',
             'health_status' => ClientHealth::class,
             'health_computed_at' => 'datetime',
+            'health_reasons' => 'array',
+            'target_posts_per_week' => 'integer',
+            'report_schedule' => ClientReportSchedule::class,
         ];
     }
 
@@ -81,7 +96,7 @@ class Client extends Model
      *
      * @var list<string>
      */
-    public const HEALTH_INPUTS = ['status', 'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle'];
+    public const HEALTH_INPUTS = ['status', 'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'target_posts_per_week'];
 
     protected static function booted(): void
     {
@@ -213,7 +228,45 @@ class Client extends Model
             return ['status' => $this->health_status, 'reason' => $this->health_reason];
         }
 
-        return app(ClientHealthService::class)->compute($this);
+        $computed = app(ClientHealthService::class)->compute($this);
+
+        return ['status' => $computed['status'], 'reason' => $computed['reason']];
+    }
+
+    /**
+     * Step M-3.4 — health as `$viewer` may see it: the stored status (so lists sort and filter the
+     * same for everyone) with the reasons they're allowed to read, heaviest first. Owner-only
+     * reasons (overdue invoices) are dropped for everyone else; when one of those is the headline,
+     * a non-Owner gets the next visible reason, or a plain "an Owner has the details" line.
+     *
+     * @return array{status: ClientHealth, reason: string, reasons: list<array{key: string, tone: string, weight: int, label: string}>}
+     */
+    public function healthFor(?User $viewer): array
+    {
+        $health = $this->health();
+        $owner = $viewer !== null && ($viewer->isOwner() || $viewer->isSuperAdmin());
+        $reasons = array_values(array_filter(
+            $this->health_reasons ?? [],
+            fn (array $reason) => $owner || ! ($reason['owner_only'] ?? false),
+        ));
+        $visible = array_values(array_filter($reasons, fn (array $reason) => $reason['tone'] !== ClientHealth::Green->value));
+
+        $reason = $health['reason'];
+
+        if (! $owner && collect($this->health_reasons ?? [])->contains(fn (array $hidden) => ($hidden['owner_only'] ?? false) && $hidden['label'] === $reason)) {
+            $reason = $visible[0]['label'] ?? 'Needs attention — an Owner has the details.';
+        }
+
+        return [
+            'status' => $health['status'],
+            'reason' => $reason,
+            'reasons' => array_map(fn (array $item) => [
+                'key' => $item['key'],
+                'tone' => $item['tone'],
+                'weight' => $item['weight'],
+                'label' => $item['label'],
+            ], $reasons),
+        ];
     }
 
     /**
@@ -222,5 +275,15 @@ class Client extends Model
     public function healthHistory(): HasMany
     {
         return $this->hasMany(ClientHealthHistory::class);
+    }
+
+    /**
+     * Step M-3.3: monthly client reports, newest first.
+     *
+     * @return HasMany<ClientReport, $this>
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(ClientReport::class)->latest('period_start');
     }
 }

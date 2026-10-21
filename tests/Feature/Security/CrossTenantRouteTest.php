@@ -18,6 +18,7 @@ use App\Models\CampaignShareLink;
 use App\Models\CampaignTemplate;
 use App\Models\Client;
 use App\Models\ClientInvitation;
+use App\Models\ClientReport;
 use App\Models\ConnectInvite;
 use App\Models\GridPlan;
 use App\Models\GridTile;
@@ -203,6 +204,8 @@ class CrossTenantRouteTest extends TestCase
             ClientInvitation::class => ClientInvitation::factory()->create(['client_id' => $client->id]),
             StaffInvitation::class => StaffInvitation::factory()->create(['org_id' => $org->id]),
             OrganizationReport::class => OrganizationReport::factory()->create(['org_id' => $org->id, 'created_by' => $owner->id]),
+            // Step M-3.3: a published monthly report (so only tenancy, not draft status, refuses it).
+            ClientReport::class => ClientReport::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'client_id' => $client->id, 'period_start' => '2026-09-01', 'period_end' => '2026-09-30', 'status' => 'published', 'published_at' => now(), 'snapshot' => []]),
             AiTrend::class => $trend,
             AiPostIdea::class => $idea,
             AiImageGeneration::class => $generation,

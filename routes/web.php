@@ -3,6 +3,7 @@
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiImageController;
 use App\Http\Controllers\Analytics\AnalyticsController as OrganizationAnalyticsController;
+use App\Http\Controllers\Analytics\ClientReportController;
 use App\Http\Controllers\Analytics\ReportController as OrganizationReportController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\Portal\PortalDashboardController;
 use App\Http\Controllers\Portal\PortalGridController;
 use App\Http\Controllers\Portal\PortalInvoiceController;
 use App\Http\Controllers\Portal\PortalPostController;
+use App\Http\Controllers\Portal\PortalReportController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\ReviewController;
@@ -463,6 +465,15 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('analytics.export');
     Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.pdf');
     Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
+    // Step M-3.3: monthly client reports (studio side).
+    Route::get('clients/{client}/reports', [ClientReportController::class, 'index'])->name('clients.reports.index');
+    Route::post('clients/{client}/reports', [ClientReportController::class, 'store'])->name('clients.reports.store');
+    Route::put('clients/{client}/report-schedule', [ClientReportController::class, 'updateSchedule'])->name('clients.report-schedule.update');
+    Route::get('client-reports/{report}', [ClientReportController::class, 'show'])->name('client-reports.show');
+    Route::put('client-reports/{report}', [ClientReportController::class, 'update'])->name('client-reports.update');
+    Route::post('client-reports/{report}/refresh', [ClientReportController::class, 'refresh'])->name('client-reports.refresh');
+    Route::post('client-reports/{report}/publish', [ClientReportController::class, 'publish'])->name('client-reports.publish');
+    Route::get('client-reports/{report}/pdf', [ClientReportController::class, 'pdf'])->middleware('throttle:exports')->name('client-reports.pdf');
     Route::resource('analytics/reports', OrganizationReportController::class)
         ->names('analytics.reports')
         ->parameters(['reports' => 'report']);
@@ -504,6 +515,10 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
     Route::get('invoices/{invoice}/pdf', [PortalInvoiceController::class, 'pdf'])->name('invoices.pdf');
+    // Step M-3.3: the client's published monthly reports.
+    Route::get('reports', [PortalReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/{report}', [PortalReportController::class, 'show'])->name('reports.show');
+    Route::get('reports/{report}/pdf', [PortalReportController::class, 'pdf'])->middleware('throttle:exports')->name('reports.pdf');
     // Step M-2.8: "Connect your accounts" — the client's own accounts only.
     Route::post('accounts/{socialAccount}/connect', [PortalAccountConnectController::class, 'connect'])->name('accounts.connect');
 });
@@ -673,6 +688,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
     Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware('throttle:exports')->name('analytics.export');
     Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.pdf');
     Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
+    Route::get('clients/{client}/reports', [ClientReportController::class, 'index'])->name('clients.reports.index');
+    Route::get('client-reports/{report}', [ClientReportController::class, 'show'])->name('client-reports.show');
     Route::get('analytics/reports', [OrganizationReportController::class, 'index'])->name('analytics.reports.index');
     Route::get('analytics/reports/{report}', [OrganizationReportController::class, 'show'])->name('analytics.reports.show');
     Route::get('analytics/reports/{report}/export', [OrganizationReportController::class, 'export'])->middleware('throttle:exports')->name('analytics.reports.export');

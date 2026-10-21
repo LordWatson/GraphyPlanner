@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { campaignSwatch } from '@/components/campaigns/campaign-chip';
+import { HealthReasons } from '@/components/clients/health-reasons';
 import { EmptyState, Panel, StatStrip } from '@/components/page';
 import type { StatStripItem } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
@@ -28,6 +29,7 @@ import {
 } from '@/routes/clients';
 import { show as showCampaign } from '@/routes/campaigns';
 import { edit as editPost } from '@/routes/posts';
+import { EngagementPanels } from './engagement-section';
 import { FigureList, MoneyRow, ShareBars } from './figures';
 import {
     formatHours,
@@ -44,7 +46,8 @@ import {
 import type { CampaignRow, OrgSummary, TopClientRow } from './types';
 
 /**
- * Step 17.4 — renders a `GetOrganizationAnalyticsSummaryAction` result: the numeral spec row, then
+ * Step 17.4 — renders a `GetOrganizationAnalyticsSummaryAction` result (engagement panels from
+ * Step M-3.1): the numeral spec row, then
  * one panel per visible section. Shared by the studio's analytics page, the client drill-down, a
  * saved report's run view and the super admin's per-org drill-down, so all four read identically.
  *
@@ -63,7 +66,8 @@ export function OrganizationAnalyticsView({
     const currency = summary.primary_currency;
     const daily = summary.filters.granularity === 'day';
     const per = daily ? 'Per day' : 'Per month';
-    const { clients, posts, approvals, team, revenue, ai } = summary;
+    const { clients, posts, approvals, team, revenue, ai, engagement } =
+        summary;
     const series = summary.series;
     const nothingVisible = summary.metrics.length === 0;
 
@@ -77,6 +81,20 @@ export function OrganizationAnalyticsView({
                 posts.success_rate === null
                     ? 'No publish attempts yet'
                     : `${formatPercent(posts.success_rate)} success · ${posts.failed} failed`,
+        });
+    }
+
+    if (engagement) {
+        strip.push({
+            label: 'Interactions',
+            value:
+                engagement.totals.engagement === null
+                    ? '—'
+                    : pad(engagement.totals.engagement),
+            caption:
+                engagement.engagement_rate === null
+                    ? 'No readings yet'
+                    : `${formatPercent(engagement.engagement_rate)} engagement rate`,
         });
     }
 
@@ -264,6 +282,14 @@ export function OrganizationAnalyticsView({
                 </div>
             )}
 
+            {engagement && (
+                <EngagementPanels
+                    engagement={engagement}
+                    daily={daily}
+                    links={links}
+                />
+            )}
+
             {approvals && (
                 <Panel
                     eyebrow={`${per} · turnaround in hours`}
@@ -362,6 +388,10 @@ export function OrganizationAnalyticsView({
                                     <p className="text-[15px] text-pretty">
                                         {summary.client.reason}
                                     </p>
+                                    <HealthReasons
+                                        reasons={summary.client.reasons ?? []}
+                                        className="self-start"
+                                    />
                                 </div>
                             ) : (
                                 <ClientHealth clients={clients} links={links} />

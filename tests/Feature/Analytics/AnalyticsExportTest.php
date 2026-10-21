@@ -79,7 +79,7 @@ class AnalyticsExportTest extends TestCase
         $this->assertStringContainsString('"Client needing attention",Health,Reason'."\nCrest,red,", $csv);
         $this->assertStringContainsString('Period,Created,Published,Failed,"Sent for approval",Approved,"Invoiced (GBP)"', $csv);
         $this->assertStringContainsString('Client,Health,Published,Scheduled,"Waiting on client","Invoiced (GBP)"', $csv);
-        $this->assertStringContainsString("Acme,green,1,1,1,1500\n", $csv);
+        $this->assertStringContainsString("Acme,amber,1,1,1,1500\n", $csv);
         $this->assertStringNotContainsString('Foreign Client', $csv);
     }
 
@@ -92,7 +92,7 @@ class AnalyticsExportTest extends TestCase
         $this->assertStringNotContainsString('AED', $csv);
         $this->assertStringNotContainsString('cost_estimate', $csv);
         $this->assertStringContainsString("posts,published,2,\n", $csv);
-        $this->assertStringContainsString("Acme,green,1,1,1\n", $csv);
+        $this->assertStringContainsString("Acme,amber,1,1,1\n", $csv);
     }
 
     public function test_a_strategists_export_has_revenue_but_no_ai_cost(): void
@@ -113,7 +113,7 @@ class AnalyticsExportTest extends TestCase
 
         $csv = AnalyticsCsv::toString(OrganizationAnalyticsCsv::rows($summary));
 
-        $this->assertStringContainsString('Client,Acme,green,', $csv);
+        $this->assertStringContainsString('Client,Acme,amber,', $csv);
         $this->assertStringContainsString("posts,published,1,\n", $csv);
         $this->assertStringNotContainsString('approvals,', $csv);
         $this->assertStringContainsString("Campaign,Client,Published,Scheduled,\"Waiting on client\"\n\"Autumn launch\",Acme,1,0,0", $csv);

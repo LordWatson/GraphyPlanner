@@ -144,6 +144,23 @@ export type TargetAccountData = {
     connection_status?: string;
     /** Required registry settings this account hasn't filled in (e.g. a Pinterest board). */
     missing_settings?: string[];
+    /** Step M-3.2: best slots from the account's own engagement (`BestTimeService`). */
+    best_time?: BestTime | null;
+};
+
+export type BestTime = {
+    status: 'ready' | 'learning';
+    sample: number;
+    needed: number;
+    ranked_by: 'rate' | 'interactions' | null;
+    slots: {
+        weekday: number;
+        hour: number;
+        block_hours: number;
+        label: string;
+        posts: number;
+        score: number;
+    }[];
 };
 
 /**

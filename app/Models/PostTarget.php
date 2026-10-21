@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -33,6 +34,14 @@ use Illuminate\Support\Carbon;
  * @property string|null $first_comment
  * @property string|null $link_url
  * @property string|null $format
+ * @property string|null $vendor_request_id
+ * @property string|null $platform_post_id
+ * @property string|null $post_url
+ * @property Carbon|null $published_at
+ * @property Carbon|null $metrics_synced_at
+ * @property string|null $metrics_error
+ * @property int|null $latest_metrics_id
+ * @property-read PostTargetMetric|null $latestMetrics
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -40,6 +49,7 @@ use Illuminate\Support\Carbon;
     'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc',
     'reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at', 'publish_correlation_id',
     'caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format',
+    'vendor_request_id', 'platform_post_id', 'post_url', 'published_at', 'metrics_synced_at', 'metrics_error', 'latest_metrics_id',
 ])]
 class PostTarget extends Model
 {
@@ -56,6 +66,8 @@ class PostTarget extends Model
             'scheduled_at_utc' => 'datetime',
             'reminder_sent_at' => 'datetime',
             'publish_requested_at' => 'datetime',
+            'published_at' => 'datetime',
+            'metrics_synced_at' => 'datetime',
             'status' => PostTargetStatus::class,
             'hashtags_override' => 'array',
         ];
@@ -75,6 +87,24 @@ class PostTarget extends Model
     public function socialAccount(): BelongsTo
     {
         return $this->belongsTo(SocialAccount::class)->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * Step M-3.1: the newest engagement reading for this channel (null until the first sync).
+     *
+     * @return BelongsTo<PostTargetMetric, $this>
+     */
+    public function latestMetrics(): BelongsTo
+    {
+        return $this->belongsTo(PostTargetMetric::class, 'latest_metrics_id');
+    }
+
+    /**
+     * @return HasMany<PostTargetMetric, $this>
+     */
+    public function metrics(): HasMany
+    {
+        return $this->hasMany(PostTargetMetric::class);
     }
 
     /**

@@ -23,7 +23,7 @@ use Carbon\CarbonImmutable;
  */
 final readonly class OrganizationAnalyticsFilters
 {
-    public const METRICS = ['clients', 'posts', 'approvals', 'team', 'revenue', 'ai'];
+    public const METRICS = ['clients', 'posts', 'approvals', 'team', 'revenue', 'ai', 'engagement'];
 
     /**
      * @param  list<int>  $clientIds  empty = every client

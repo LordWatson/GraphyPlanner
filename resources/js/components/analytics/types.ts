@@ -1,3 +1,5 @@
+import type { HealthReason } from '@/components/clients/health-reasons';
+import type { BestTime } from '@/components/post-editor/types';
 import type { CurrencyTotal } from '@/lib/currency';
 import type { RangeKey } from './format';
 
@@ -8,7 +10,8 @@ export type SectionKey =
     | 'approvals'
     | 'team'
     | 'revenue'
-    | 'ai';
+    | 'ai'
+    | 'engagement';
 
 export const sectionKeys: SectionKey[] = [
     'clients',
@@ -17,6 +20,7 @@ export const sectionKeys: SectionKey[] = [
     'team',
     'revenue',
     'ai',
+    'engagement',
 ];
 
 export const sectionLabels: Record<SectionKey, string> = {
@@ -26,6 +30,7 @@ export const sectionLabels: Record<SectionKey, string> = {
     team: 'Team workload',
     revenue: 'Billing',
     ai: 'AI usage',
+    engagement: 'Engagement',
 };
 
 /** `OrganizationAnalyticsFilters::toArray()`. */
@@ -106,6 +111,8 @@ export type OrgSummary = {
         status: string;
         health: HealthTone;
         reason: string;
+        /** Step M-3.4: weighted reasons, filtered for the viewer. */
+        reasons?: HealthReason[];
     } | null;
     filters: OrgFilters;
     metrics: SectionKey[];
@@ -197,11 +204,95 @@ export type OrgSummary = {
         };
         cost_estimate: number | null;
     } | null;
-    engagement: null;
+    engagement: EngagementSection | null;
     primary_currency: string;
     series: OrgSeriesBucket[];
     top_clients: TopClientRow[] | null;
     top_campaigns: CampaignRow[] | null;
+};
+
+export type EngagementTotals = {
+    impressions: number | null;
+    reach: number | null;
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    saves: number | null;
+    clicks: number | null;
+    engagement: number | null;
+};
+
+export type EngagementTopPost = {
+    post_id: number;
+    client_id: number | null;
+    client_name: string | null;
+    caption: string | null;
+    thumbnail_url: string | null;
+    published_at: string;
+    platforms: string[];
+    post_url: string | null;
+    engagement: number | null;
+    impressions: number | null;
+    reach: number | null;
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    saves: number | null;
+    engagement_rate: number | null;
+};
+
+/** Step M-3.1 — `EngagementMetrics::summary()`. Nulls mean "not reported", never zero. */
+export type EngagementSection = {
+    published_channels: number;
+    measured_channels: number;
+    totals: EngagementTotals;
+    engagement_rate: number | null;
+    by_platform: {
+        platform: string;
+        label: string;
+        available: boolean;
+        note: string | null;
+        published: number;
+        measured: number;
+        engagement: number | null;
+        impressions: number | null;
+        reach: number | null;
+        engagement_rate: number | null;
+    }[];
+    followers: {
+        current: number | null;
+        growth: number | null;
+        accounts: {
+            social_account_id: number;
+            client_id: number;
+            platform: string;
+            platform_label: string;
+            handle: string;
+            followers: number;
+            growth: number | null;
+        }[];
+    };
+    series: {
+        key: string;
+        label: string;
+        engagement: number;
+        impressions: number;
+        followers: number | null;
+    }[];
+    top_posts: EngagementTopPost[];
+    last_synced_at: string | null;
+    /** Step M-3.2: per account on the client drill-down; null on org-wide views. */
+    best_times: AccountBestTime[] | null;
+};
+
+export type AccountBestTime = BestTime & {
+    social_account_id: number;
+    platform: string;
+    platform_label: string;
+    handle: string;
+    timezone: string;
 };
 
 export type OrgFilterOptions = {

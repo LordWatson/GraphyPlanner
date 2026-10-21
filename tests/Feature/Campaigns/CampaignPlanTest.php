@@ -272,7 +272,7 @@ class CampaignPlanTest extends TestCase
         // Unavailable metrics never show a zero that looks like a result.
         $this->assertNull($results[1]['actual']);
         $this->assertFalse($results[1]['available']);
-        $this->assertSame('Available once engagement tracking is on.', $results[1]['note']);
+        $this->assertSame(CampaignKpiService::UNAVAILABLE_NOTE, $results[1]['note']);
 
         $this->actingAs($this->designer())->put(route('campaigns.kpis.update', $this->campaign), ['kpis' => []])->assertForbidden();
         $this->actingAs($this->owner())->put(route('campaigns.kpis.update', $this->campaign), [

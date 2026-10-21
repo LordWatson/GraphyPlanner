@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Step I-2.5 — re-run `ClientHealthService` for one client and store the result on
- * `clients.health_status/health_reason/health_computed_at`, recording a `client_health_history`
+ * `clients.health_status/health_reason/health_reasons/health_computed_at`, recording a `client_health_history`
  * row whenever the status or reason actually changes.
  *
  * Fired from the events the rules depend on: the client's own attributes (`Client::saved`), a
@@ -38,12 +38,15 @@ class RecomputeClientHealthAction
 
         $result = $this->health->compute($client);
         $changed = $client->health_status !== $result['status'] || $client->health_reason !== $result['reason'];
+        // Step M-3.4: the full reason list is kept current too (history records headline changes).
+        $reasonsChanged = $changed || ($client->health_reasons ?? []) !== $result['reasons'];
 
         DB::transaction(function () use ($client, $result, $changed) {
             $client->timestamps = false;
             $client->forceFill([
                 'health_status' => $result['status'],
                 'health_reason' => $result['reason'],
+                'health_reasons' => $result['reasons'],
                 'health_computed_at' => Carbon::now(),
             ])->saveQuietly();
             $client->timestamps = true;
@@ -58,8 +61,11 @@ class RecomputeClientHealthAction
             }
         });
 
-        if ($changed) {
+        if ($reasonsChanged) {
             AnalyticsCache::bust($client->org_id);
+        }
+
+        if ($changed) {
 
             Log::info('Client health changed', [
                 'org_id' => $client->org_id,

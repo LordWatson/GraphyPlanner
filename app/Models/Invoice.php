@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\InvoiceStatus;
+use App\Jobs\RecomputeClientHealthJob;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
 use App\Support\StoredFileUrl;
@@ -62,6 +63,18 @@ class Invoice extends Model
 {
     /** @use HasFactory<InvoiceFactory> */
     use BelongsToOrganization, HasFactory, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        // Step M-3.4: overdue invoices feed client health (an Owner-only reason).
+        $recompute = fn (self $invoice) => RecomputeClientHealthJob::dispatch($invoice->client_id);
+        static::saved(function (self $invoice) use ($recompute) {
+            if ($invoice->wasRecentlyCreated || $invoice->wasChanged(['status', 'due_date'])) {
+                $recompute($invoice);
+            }
+        });
+        static::deleted($recompute);
+    }
 
     /**
      * Step I-1.6: a private file's URL is signed and short-lived, so it's minted on every read

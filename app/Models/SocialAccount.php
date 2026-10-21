@@ -42,6 +42,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $last_health_check_at
  * @property string|null $last_health_error
  * @property string|null $token_expiry_warning
+ * @property Carbon|null $metrics_synced_at
+ * @property string|null $metrics_error
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -52,6 +54,7 @@ use Illuminate\Support\Carbon;
     'connection_status', 'provider', 'external_profile_id', 'external_account_id', 'connected_at',
     'meta_access_token', 'meta_access_token_expires_at', 'meta_instagram_user_id',
     'platform_settings', 'last_health_check_at', 'last_health_error', 'token_expiry_warning',
+    'metrics_synced_at', 'metrics_error',
 ])]
 // Step I-1.6: never serialized — a `toArray()`/Inertia prop of an account can't leak the Meta
 // token or the vendor profile id.
@@ -87,6 +90,7 @@ class SocialAccount extends Model
             // Laravel's `encrypted` cast handles that transparently for both reads and writes.
             'meta_access_token' => 'encrypted',
             'meta_access_token_expires_at' => 'datetime',
+            'metrics_synced_at' => 'datetime',
         ];
     }
 
@@ -173,5 +177,15 @@ class SocialAccount extends Model
     public function postTargets(): HasMany
     {
         return $this->hasMany(PostTarget::class);
+    }
+
+    /**
+     * Step M-3.1: one row per day (followers, reach…), newest last.
+     *
+     * @return HasMany<SocialAccountMetric, $this>
+     */
+    public function dailyMetrics(): HasMany
+    {
+        return $this->hasMany(SocialAccountMetric::class);
     }
 }

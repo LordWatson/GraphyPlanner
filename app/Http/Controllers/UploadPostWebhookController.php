@@ -8,6 +8,7 @@ use App\Enums\Platform;
 use App\Enums\PostTargetStatus;
 use App\Models\PostTarget;
 use App\Support\Observability\TraceContext;
+use App\Support\Publishing\VendorPostRef;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
@@ -98,6 +99,12 @@ class UploadPostWebhookController extends Controller
             $target,
             $ok,
             $ok ? null : ((string) ($result['error'] ?? 'Upload-Post reported a failed publish.')),
+            // Step M-3.1: the upload request id and the live post, for engagement metrics.
+            ref: new VendorPostRef(
+                $request->input('request_id'),
+                $result['publish_id'] ?? $result['post_id'] ?? null,
+                $result['url'] ?? null,
+            ),
         );
 
         return response()->json(['received' => true]);

@@ -4,6 +4,7 @@ namespace App\Actions\Publishing;
 
 use App\Enums\PostTargetStatus;
 use App\Models\PostTarget;
+use App\Support\Publishing\VendorPostRef;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -14,6 +15,9 @@ use Illuminate\Support\Facades\Log;
  * decide (Step I-1.3) whether the post is finished — `published`, `partially_published` or
  * `failed` — via the same `TransitionPostStatusAction` used everywhere else, so the activity log
  * stays complete.
+ *
+ * Step M-3.1: a published target also records when it went live (`published_at`) and whatever the
+ * vendor told us about the live post (`VendorPostRef`), so its engagement can be fetched later.
  */
 class SyncPublishStatusAction
 {
@@ -22,10 +26,12 @@ class SyncPublishStatusAction
         bool $ok,
         ?string $error = null,
         ResolvePostPublishOutcomeAction $resolve = new ResolvePostPublishOutcomeAction,
+        ?VendorPostRef $ref = null,
     ): void {
         $target->update([
             'status' => $ok ? PostTargetStatus::Published : PostTargetStatus::Failed,
             'error' => $ok ? null : $error,
+            ...($ok ? ['published_at' => $target->published_at ?? now(), ...($ref?->toColumns() ?? [])] : []),
         ]);
 
         $post = $target->post()->first();

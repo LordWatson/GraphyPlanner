@@ -31,6 +31,7 @@ type ClientData = {
     default_approval_mode: string;
     default_language: string | null;
     approval_email: string | null;
+    target_posts_per_week: number | null;
     billing_email: string | null;
     billing_address: string | null;
     notes_internal: string | null;
@@ -307,6 +308,32 @@ export default function ClientEdit({
                                     defaultValue={client.approval_email ?? ''}
                                 />
                                 <InputError message={errors.approval_email} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="target_posts_per_week">
+                                    Target posts per week
+                                </Label>
+                                <Input
+                                    id="target_posts_per_week"
+                                    name="target_posts_per_week"
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    inputMode="numeric"
+                                    placeholder="e.g. 3"
+                                    defaultValue={
+                                        client.target_posts_per_week ?? ''
+                                    }
+                                />
+                                <p className="text-muted-foreground text-xs">
+                                    The cadence you’ve agreed. Client health
+                                    flags a month that falls well short of it.
+                                    Leave empty for no target.
+                                </p>
+                                <InputError
+                                    message={errors.target_posts_per_week}
+                                />
                             </div>
 
                             <div className="grid gap-2">

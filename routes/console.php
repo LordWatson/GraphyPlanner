@@ -50,9 +50,19 @@ $safely(Schedule::command('grids:prune')->weeklyOn(0, '03:45'), 'grids:prune');
 // SendScheduledOrganizationReportsAction.
 $safely(Schedule::command('analytics:send-scheduled-reports')->dailyAt('07:00'), 'analytics:send-scheduled-reports');
 
-// Step I-2.5: nightly sweep behind the event-driven health recompute, so stored client health
-// can never drift for long if a write path is missed.
-$safely(Schedule::command('clients:recompute-health')->dailyAt('02:30'), 'clients:recompute-health');
+// Step M-3.1: nightly engagement metrics (followers, reach, per-post engagement) per organization,
+// queued one job per org on the reports queue — see SyncOrganizationEngagementAction.
+$safely(Schedule::command('analytics:sync-engagement')->dailyAt('04:00'), 'analytics:sync-engagement');
+
+// Step M-3.3: monthly client reports — on the report day (org timezone) last month's report is
+// drafted for review or, for automatic clients, published and emailed. Hourly so every timezone
+// gets its run early in its own morning; idempotent per client and month.
+$safely(Schedule::command('analytics:send-client-reports')->hourlyAt(20), 'analytics:send-client-reports');
+
+// Step I-2.5: sweep behind the event-driven health recompute, so stored client health can never
+// drift for long if a write path is missed. Step M-3.4: hourly — v2 signals are time-based (an
+// approval going overdue, a calendar gap opening up).
+$safely(Schedule::command('clients:recompute-health')->hourlyAt(35), 'clients:recompute-health');
 
 // Campaigns enhancement C-4.4: assignees hear about deliverables due tomorrow or just overdue.
 $safely(Schedule::command('campaigns:send-due-reminders')->dailyAt('08:15'), 'campaigns:send-due-reminders');

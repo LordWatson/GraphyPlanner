@@ -40,6 +40,34 @@ final class OrganizationAnalyticsCsv
             unset($sections['ai']['cost_estimate']);
         }
 
+        // Step M-3.1: engagement's figures, per platform keyed by platform; its series and top
+        // posts get their own tables below, and per-account follower rows are left out.
+        if (is_array($sections['engagement'] ?? null)) {
+            $engagement = $sections['engagement'];
+            $sections['engagement'] = [
+                'published_channels' => $engagement['published_channels'],
+                'measured_channels' => $engagement['measured_channels'],
+                'totals' => $engagement['totals'],
+                'engagement_rate' => $engagement['engagement_rate'],
+                'followers' => ['current' => $engagement['followers']['current'], 'growth' => $engagement['followers']['growth']],
+                'by_platform' => array_column(array_map(fn (array $row) => [
+                    'platform' => $row['platform'],
+                    'figures' => [
+                        'available' => $row['available'],
+                        'published' => $row['published'],
+                        'measured' => $row['measured'],
+                        'engagement' => $row['engagement'],
+                        'engagement_rate' => $row['engagement_rate'],
+                    ],
+                ], $engagement['by_platform']), 'figures', 'platform'),
+                'last_synced_at' => $engagement['last_synced_at'],
+            ];
+
+            if ($sections['engagement']['by_platform'] === []) {
+                unset($sections['engagement']['by_platform']);
+            }
+        }
+
         array_push($rows, ...AnalyticsCsv::sectionRows($sections, $summary['metrics'], self::listRows(...)));
 
         if (is_array($summary['team'] ?? null)) {
@@ -99,6 +127,30 @@ final class OrganizationAnalyticsCsv
 
         if (is_array($summary['top_campaigns'] ?? null)) {
             array_push($rows, ...self::campaignTable($summary['top_campaigns']));
+        }
+
+        if (is_array($summary['engagement'] ?? null)) {
+            array_push($rows, ...AnalyticsCsv::table(
+                ['Period', 'Interactions', 'Impressions', 'Followers'],
+                array_map(fn (array $bucket) => [$bucket['key'], $bucket['engagement'], $bucket['impressions'], $bucket['followers']], $summary['engagement']['series']),
+            ));
+
+            if ($summary['engagement']['top_posts'] !== []) {
+                array_push($rows, ...AnalyticsCsv::table(
+                    ['Top post', 'Client', 'Platforms', 'Published', 'Interactions', 'Reach', 'Impressions', 'Engagement rate', 'URL'],
+                    array_map(fn (array $post) => [
+                        $post['caption'],
+                        $post['client_name'],
+                        implode(' ', $post['platforms']),
+                        $post['published_at'],
+                        $post['engagement'],
+                        $post['reach'],
+                        $post['impressions'],
+                        $post['engagement_rate'],
+                        $post['post_url'],
+                    ], $summary['engagement']['top_posts']),
+                ));
+            }
         }
 
         return $rows;

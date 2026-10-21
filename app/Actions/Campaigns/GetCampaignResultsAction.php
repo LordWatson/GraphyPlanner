@@ -10,6 +10,7 @@ use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\User;
 use App\Services\Analytics\ApprovalMetrics;
+use App\Services\Analytics\EngagementMetrics;
 use App\Services\Analytics\PostActivityMetrics;
 use App\Services\CampaignKpiService;
 use Carbon\CarbonImmutable;
@@ -18,7 +19,7 @@ use Illuminate\Support\Str;
 
 /**
  * Step C-7.2 — the Results tab: KPI targets vs actuals, published-over-time by phase, the platform
- * split, top posts (by approval speed until engagement tracking exists), approval turnaround, and
+ * split, top posts (by engagement — M-3.1 — else approval speed), approval turnaround, and
  * the wrap report (C-7.3). Never carries fees or invoices — billing lives on Overview, for
  * Owner/Strategist only.
  */
@@ -29,6 +30,7 @@ class GetCampaignResultsAction
     public function __construct(
         private readonly CampaignKpiService $kpis,
         private readonly ApprovalMetrics $approvals,
+        private readonly EngagementMetrics $engagement,
     ) {}
 
     /**
@@ -42,20 +44,23 @@ class GetCampaignResultsAction
         $actuals = $this->kpis->actuals($campaign);
 
         $published = $this->published($campaign);
+        $topPosts = $this->topPosts($campaign);
 
         return [
-            'kpis' => $this->kpis->results($campaign),
+            'kpis' => $this->kpis->results($campaign, $actuals),
             'metrics' => array_map(fn (CampaignMetric $metric) => [
                 'value' => $metric->value,
                 'label' => $metric->label(),
                 'unit' => $metric->unit(),
-                'available' => $metric->isAvailable(),
+                'available' => $actuals[$metric->value]['available'],
                 'actual' => $actuals[$metric->value]['actual'],
                 'detail' => $actuals[$metric->value]['detail'],
+                'note' => $actuals[$metric->value]['note'],
             ], CampaignMetric::cases()),
             'series' => $this->series($published, $campaign, $timezone),
             'platforms' => $this->platforms($campaign),
-            'topPosts' => $this->topPosts($campaign),
+            'topPosts' => $topPosts,
+            'topPostsRankedBy' => $topPosts[0]['ranked_by'] ?? 'engagement',
             'approvals' => $this->approvals->summary($scope, $range),
             'report' => $this->report($campaign),
             'canEditResults' => $user->can('update', $campaign),
@@ -165,11 +170,48 @@ class GetCampaignResultsAction
     }
 
     /**
-     * Until engagement tracking lands, "top" means the posts the client signed off fastest.
+     * Step M-3.1: the campaign's posts with the most interactions (each post's channels summed,
+     * latest reading each). Before any reading exists, "top" falls back to the posts the client
+     * signed off fastest — each row says which via `ranked_by`.
      *
      * @return list<array<string, mixed>>
      */
     public function topPosts(Campaign $campaign): array
+    {
+        $engaged = $this->engagement->topPosts(
+            $this->engagement->channels($this->kpis->scope($campaign), $this->kpis->range($campaign)),
+            self::TOP_POSTS,
+        );
+
+        if ($engaged !== []) {
+            $statuses = Post::query()->whereIn('id', array_column($engaged, 'post_id'))->get(['id', 'status'])->keyBy('id');
+
+            return array_map(fn (array $row) => [
+                'id' => $row['post_id'],
+                'caption' => $row['caption'],
+                'status' => $statuses->get($row['post_id'])?->status->value,
+                'status_label' => $statuses->get($row['post_id'])?->status->label(),
+                'platforms' => $row['platforms'],
+                'thumbnail_url' => $row['thumbnail_url'],
+                'post_url' => $row['post_url'],
+                'engagement' => $row['engagement'],
+                'reach' => $row['reach'],
+                'impressions' => $row['impressions'],
+                'engagement_rate' => $row['engagement_rate'],
+                'hours_to_approve' => null,
+                'ranked_by' => 'engagement',
+            ], $engaged);
+        }
+
+        return $this->fastestApproved($campaign);
+    }
+
+    /**
+     * Before engagement readings exist: the posts the client signed off fastest.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function fastestApproved(Campaign $campaign): array
     {
         $logs = PostActivityMetrics::realTransitions(PostActivityLog::query())
             ->whereIn('post_id', $campaign->posts()->select('id'))
@@ -214,7 +256,14 @@ class GetCampaignResultsAction
                 'status' => $post->status->value,
                 'status_label' => $post->status->label(),
                 'platforms' => $post->targets->map(fn ($target) => $target->socialAccount?->platform->value)->filter()->unique()->values()->all(),
+                'thumbnail_url' => null,
+                'post_url' => null,
+                'engagement' => null,
+                'reach' => null,
+                'impressions' => null,
+                'engagement_rate' => null,
                 'hours_to_approve' => $hours,
+                'ranked_by' => 'approval_speed',
             ];
         }
 
@@ -242,6 +291,7 @@ class GetCampaignResultsAction
             'shared_at' => $report->shared_at?->toIso8601String(),
             'shared_by' => $report->sharer?->name,
             'kpi_snapshot' => $report->kpi_snapshot,
+            'engagement_snapshot' => $report->engagement_snapshot,
         ];
     }
 }

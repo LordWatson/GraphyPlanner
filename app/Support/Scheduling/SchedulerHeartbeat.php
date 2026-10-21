@@ -27,9 +27,13 @@ final class SchedulerHeartbeat
         'social-accounts:check-health' => ['label' => 'Social account health check', 'interval_minutes' => 60],
         'ai:generate-daily-briefs' => ['label' => 'Daily AI briefs', 'interval_minutes' => 1440],
         'ai-images:prune' => ['label' => 'AI image prune', 'interval_minutes' => 1440],
-        'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 1440],
+        // Step M-3.4: hourly.
+        'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 60],
         'analytics:send-scheduled-reports' => ['label' => 'Scheduled reports', 'interval_minutes' => 1440],
         'campaigns:send-due-reminders' => ['label' => 'Campaign due reminders', 'interval_minutes' => 1440],
+        // Phase M-3: engagement sync (daily) and monthly client reports (hourly, per org timezone).
+        'analytics:sync-engagement' => ['label' => 'Engagement metrics sync', 'interval_minutes' => 1440],
+        'analytics:send-client-reports' => ['label' => 'Monthly client reports', 'interval_minutes' => 60],
         // Phase 18: weekly.
         'grids:prune' => ['label' => 'Grid plan prune', 'interval_minutes' => 10080],
     ];

@@ -85,7 +85,7 @@ class PollPendingPublishStatusesAction
                 'ok' => $result->ok,
             ]);
 
-            $sync($target, $result->ok, $result->error);
+            $sync($target, $result->ok, $result->error, ref: $result->ref);
         }
 
         return $checked;

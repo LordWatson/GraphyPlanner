@@ -167,7 +167,7 @@ class PlatformAnalyticsTest extends TestCase
                 ->where('organization.id', $this->northlight->id)
                 ->where('summary.scope', 'organization')
                 ->where('summary.organization.name', 'Northlight Studio')
-                ->where('summary.metrics', ['clients', 'posts', 'approvals', 'team', 'revenue', 'ai'])
+                ->where('summary.metrics', ['clients', 'posts', 'approvals', 'team', 'revenue', 'ai', 'engagement'])
                 ->where('summary.clients.total', 2)
                 ->where('summary.clients.active', 1)
                 ->where('summary.clients.paused', 1)

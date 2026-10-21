@@ -50,7 +50,9 @@
         'team' => ['Who carried the', 'load'],
         'revenue' => ['What was', 'billed'],
         'ai' => ['What AI', 'did'],
+        'engagement' => ['How people', 'responded'],
     ];
+    $count = fn ($value) => $value === null ? '—' : number_format((int) $value);
 
     // A lightweight SVG bar chart of published (teal) and failed (red, hatched by opacity) per bucket.
     $series = $summary['series'];
@@ -559,6 +561,55 @@
                     <td></td>
                 </tr>
             </table>
+        </div>
+    @endif
+
+    {{-- Engagement (Step M-3.1) --}}
+    @if ($has('engagement'))
+        @php $engagement = $summary['engagement']; @endphp
+        <div class="sheet page-break">
+            <span class="eyebrow">07 &mdash; Engagement</span>
+            <div class="serif headline">{{ $sectionTitles['engagement'][0] }} <em>{{ $sectionTitles['engagement'][1] }}</em>.</div>
+            <div class="note">Latest platform readings for posts published in range. A dash means the platform didn't report it.</div>
+
+            <table class="strip">
+                <tr>
+                    <td class="first"><div class="eyebrow">Reach</div><div class="serif figure">{{ $count($engagement['totals']['reach']) }}</div><div class="cap">{{ $int($engagement['measured_channels']) }} of {{ $int($engagement['published_channels']) }} channels measured</div></td>
+                    <td><div class="eyebrow">Interactions</div><div class="serif figure">{{ $count($engagement['totals']['engagement']) }}</div><div class="cap">likes, comments, shares, saves</div></td>
+                    <td><div class="eyebrow">Engagement rate</div><div class="serif figure">{{ $percent($engagement['engagement_rate']) }}</div><div class="cap">interactions ÷ reach</div></td>
+                    <td><div class="eyebrow">Followers</div><div class="serif figure">{{ $count($engagement['followers']['current']) }}</div><div class="cap">{{ $engagement['followers']['growth'] === null ? 'growth not tracked yet' : ($engagement['followers']['growth'] >= 0 ? '+' : '').$int($engagement['followers']['growth']).' in range' }}</div></td>
+                </tr>
+            </table>
+
+            <table class="rows">
+                <thead><tr><th class="eyebrow">Platform</th><th class="eyebrow right">Published</th><th class="eyebrow right">Interactions</th><th class="eyebrow right">Rate</th></tr></thead>
+                <tbody>
+                    @foreach ($engagement['by_platform'] as $row)
+                        <tr>
+                            <td>{{ $row['label'] }}@if (! $row['available'])<span class="muted"> &mdash; not available</span>@endif</td>
+                            <td class="num">{{ $int($row['published']) }}</td>
+                            <td class="num">{{ $count($row['engagement']) }}</td>
+                            <td class="num">{{ $percent($row['engagement_rate']) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+
+            @if ($engagement['top_posts'] !== [])
+                <table class="rows">
+                    <thead><tr><th class="eyebrow">No.</th><th class="eyebrow">Top posts</th><th class="eyebrow right">Interactions</th><th class="eyebrow right">Reach</th></tr></thead>
+                    <tbody>
+                        @foreach ($engagement['top_posts'] as $index => $post)
+                            <tr>
+                                <td class="idx">{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}</td>
+                                <td>{{ $post['caption'] ?? 'Untitled post' }} <span class="muted">{{ $post['client_name'] }}</span></td>
+                                <td class="num">{{ $count($post['engagement']) }}</td>
+                                <td class="num">{{ $count($post['reach'] ?? $post['impressions']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         </div>
     @endif
 </body>

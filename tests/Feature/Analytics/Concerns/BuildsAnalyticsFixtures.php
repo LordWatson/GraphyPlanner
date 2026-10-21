@@ -74,8 +74,8 @@ trait BuildsAnalyticsFixtures
         $this->designer = $this->staff('Dee Designer', Role::Designer);
         $this->viewer = $this->staff('Vic Viewer', Role::Viewer);
 
-        // Acme: green (owner, start date, monthly retainer). Bolt: paused → amber. Crest: active,
-        // no owner → red, quarterly retainer. An archived client is left out everywhere.
+        // Acme: owner, start date, monthly retainer — amber under health v2 (Step M-3.4) because its
+        // post failed this week. Bolt: paused → amber. Crest: active, no owner → red, quarterly retainer. An archived client is left out everywhere.
         $this->acme = Client::factory()->for($this->org, 'organization')->create([
             'name' => 'Acme', 'owner_user_id' => $this->owner->id, 'retainer_amount' => 1200, 'billing_cycle' => BillingCycle::Monthly,
             'created_at' => now()->subDays(100),

@@ -8,6 +8,7 @@ use App\Models\Campaign;
 use App\Models\CampaignKpi;
 use App\Models\PostActivityLog;
 use App\Services\Analytics\ApprovalMetrics;
+use App\Services\Analytics\EngagementMetrics;
 use App\Services\Analytics\PostActivityMetrics;
 use App\Support\Analytics\AnalyticsRange;
 use App\Support\Analytics\AnalyticsScope;
@@ -20,8 +21,10 @@ use Illuminate\Support\Facades\DB;
  * `AnalyticsScope` narrowed to the campaign (no new aggregation code for approvals), over the
  * campaign's whole life in the organization's timezone.
  *
- * Engagement metrics report `available: false` with "Available once engagement tracking is on."
- * and a null actual — never a zero that looks like a real result.
+ * Step M-3.1: engagement metrics (reach, impressions, engagement rate, follower growth, link
+ * clicks) come from `EngagementMetrics` over the same campaign scope and range. Until a reading
+ * exists they report `available: false` with a plain note and a null actual — never a zero that
+ * looks like a real result.
  */
 class CampaignKpiService
 {
@@ -30,9 +33,16 @@ class CampaignKpiService
      */
     public const ON_TIME_GRACE_MINUTES = 15;
 
-    public const UNAVAILABLE_NOTE = 'Available once engagement tracking is on.';
+    public const UNAVAILABLE_NOTE = 'No engagement readings yet. They arrive the day after posts go live.';
 
-    public function __construct(private readonly ApprovalMetrics $approvals) {}
+    public const NO_FOLLOWERS_NOTE = "No follower counts yet for this client's accounts.";
+
+    public const NO_CLICKS_NOTE = "These platforms haven't reported link clicks.";
+
+    public function __construct(
+        private readonly ApprovalMetrics $approvals,
+        private readonly EngagementMetrics $engagement,
+    ) {}
 
     public function scope(Campaign $campaign): AnalyticsScope
     {
@@ -66,6 +76,12 @@ class CampaignKpiService
         $published = $scope->posts()->whereIn('status', [PostStatus::Published, PostStatus::PartiallyPublished])->count();
         $onTime = $this->onTime($campaign);
         $deliverables = $this->deliverables($campaign);
+        $channels = $this->engagement->channels($scope, $range)->whereNotNull('metric_id');
+        $totals = $this->engagement->totals($channels);
+        $rate = $this->engagement->rate($channels);
+        $followers = $this->engagement->followers($scope, $range);
+        $measured = $channels->count();
+        $readings = $measured === 1 ? '1 post channel measured' : "{$measured} post channels measured";
 
         $actuals = [];
 
@@ -90,7 +106,15 @@ class CampaignKpiService
                     (float) $deliverables['done'],
                     "{$deliverables['done']} of {$deliverables['total']} planned",
                 ),
-                default => ['actual' => null, 'available' => false, 'note' => self::UNAVAILABLE_NOTE, 'detail' => null],
+                CampaignMetric::Reach => $this->engagementValue($totals['reach'], $readings),
+                CampaignMetric::Impressions => $this->engagementValue($totals['impressions'] ?? $totals['views'], $totals['impressions'] === null && $totals['views'] !== null ? "Views · {$readings}" : $readings),
+                CampaignMetric::EngagementRate => $this->engagementValue($rate, $rate === null ? null : "Interactions ÷ reach · {$readings}"),
+                CampaignMetric::FollowerGrowth => $followers['growth'] === null
+                    ? $this->unavailable(self::NO_FOLLOWERS_NOTE)
+                    : $this->value((float) $followers['growth'], sprintf('%s followers now', number_format((int) $followers['current']))),
+                CampaignMetric::LinkClicks => $totals['clicks'] === null
+                    ? $this->unavailable($measured > 0 ? self::NO_CLICKS_NOTE : self::UNAVAILABLE_NOTE)
+                    : $this->value((float) $totals['clicks'], $readings),
             };
         }
 
@@ -98,17 +122,58 @@ class CampaignKpiService
     }
 
     /**
-     * The campaign's KPI targets with actuals and progress, in display order.
+     * The campaign's KPI targets with actuals and progress, in display order. Pass `$actuals` when
+     * the caller already computed them.
      *
+     * @param  array<string, array{actual: float|null, available: bool, note: string|null, detail: string|null}>|null  $actuals
      * @return list<array<string, mixed>>
      */
-    public function results(Campaign $campaign): array
+    public function results(Campaign $campaign, ?array $actuals = null): array
     {
-        $actuals = $this->actuals($campaign);
+        $actuals ??= $this->actuals($campaign);
 
         return array_values($campaign->kpis()->get()->map(
             fn (CampaignKpi $kpi) => self::row($kpi->metric, (float) $kpi->target, $actuals[$kpi->metric->value]),
         )->all());
+    }
+
+    /**
+     * Step M-3.1 (C-7.3) — the engagement a wrap report freezes when it's shared: totals, rate,
+     * follower growth and the top three posts. Client-safe by construction (no ids beyond the
+     * post's own, no thumbnails — signed URLs expire). Null when nothing has been measured.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function engagementSnapshot(Campaign $campaign): ?array
+    {
+        $scope = $this->scope($campaign);
+        $range = $this->range($campaign);
+        $channels = $this->engagement->channels($scope, $range);
+        $measured = $channels->whereNotNull('metric_id');
+        $followers = $this->engagement->followers($scope, $range);
+
+        if ($measured->isEmpty() && $followers['growth'] === null) {
+            return null;
+        }
+
+        return [
+            'captured_at' => now()->toIso8601String(),
+            'measured_channels' => $measured->count(),
+            'totals' => $this->engagement->totals($measured),
+            'engagement_rate' => $this->engagement->rate($measured),
+            'followers' => ['current' => $followers['current'], 'growth' => $followers['growth']],
+            'top_posts' => array_map(fn (array $post) => [
+                'post_id' => $post['post_id'],
+                'caption' => $post['caption'],
+                'platforms' => $post['platforms'],
+                'published_at' => $post['published_at'],
+                'post_url' => $post['post_url'],
+                'engagement' => $post['engagement'],
+                'reach' => $post['reach'],
+                'impressions' => $post['impressions'],
+                'engagement_rate' => $post['engagement_rate'],
+            ], $this->engagement->topPosts($channels, 3)),
+        ];
     }
 
     /**
@@ -206,6 +271,22 @@ class CampaignKpiService
             ->first();
 
         return ['done' => (int) ($row->done ?? 0), 'total' => (int) ($row->total ?? 0)];
+    }
+
+    /**
+     * @return array{actual: float|null, available: bool, note: string|null, detail: string|null}
+     */
+    private function engagementValue(int|float|null $actual, ?string $detail): array
+    {
+        return $actual === null ? $this->unavailable(self::UNAVAILABLE_NOTE) : $this->value((float) $actual, $detail);
+    }
+
+    /**
+     * @return array{actual: float|null, available: bool, note: string|null, detail: string|null}
+     */
+    private function unavailable(string $note): array
+    {
+        return ['actual' => null, 'available' => false, 'note' => $note, 'detail' => null];
     }
 
     /**
