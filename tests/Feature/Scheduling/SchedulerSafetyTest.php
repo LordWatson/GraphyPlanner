@@ -4,6 +4,7 @@ namespace Tests\Feature\Scheduling;
 
 use App\Models\User;
 use App\Support\Scheduling\SchedulerHeartbeat;
+use Cron\CronExpression;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,6 +37,25 @@ class SchedulerSafetyTest extends TestCase
             array_keys(SchedulerHeartbeat::COMMANDS),
             array_keys($this->scheduledCommands()),
         );
+    }
+
+    public function test_each_heartbeat_interval_matches_the_real_schedule_cadence(): void
+    {
+        // The super admin dashboard marks a command stale after two of its registered intervals, so
+        // a heartbeat interval that disagrees with the actual cron cadence silently breaks staleness
+        // detection (e.g. a job that now runs every 30 min still registered as daily).
+        foreach ($this->scheduledCommands() as $name => $event) {
+            $cron = new CronExpression($event->getExpression());
+            $first = $cron->getNextRunDate(new \DateTime('2026-01-05 00:00:00'));
+            $second = $cron->getNextRunDate($first);
+            $actualMinutes = (int) round(($second->getTimestamp() - $first->getTimestamp()) / 60);
+
+            $this->assertSame(
+                SchedulerHeartbeat::COMMANDS[$name]['interval_minutes'],
+                $actualMinutes,
+                "{$name} is scheduled every {$actualMinutes} min but its heartbeat interval says otherwise.",
+            );
+        }
     }
 
     public function test_a_successful_run_records_a_heartbeat(): void

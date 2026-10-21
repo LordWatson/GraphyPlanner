@@ -50,9 +50,11 @@ $safely(Schedule::command('grids:prune')->weeklyOn(0, '03:45'), 'grids:prune');
 // SendScheduledOrganizationReportsAction.
 $safely(Schedule::command('analytics:send-scheduled-reports')->dailyAt('07:00'), 'analytics:send-scheduled-reports');
 
-// Step M-3.1: nightly engagement metrics (followers, reach, per-post engagement) per organization,
-// queued one job per org on the reports queue — see SyncOrganizationEngagementAction.
-$safely(Schedule::command('analytics:sync-engagement')->dailyAt('04:00'), 'analytics:sync-engagement');
+// Step M-3.1: engagement metrics (followers, reach, per-post engagement) per organization, queued
+// one job per org on the reports queue — see SyncOrganizationEngagementAction. Runs every 30 min so
+// a freshly published post shows its stats quickly; the per-channel `min_interval_hours` guard keeps
+// each sweep from re-reading the same post (and hammering the vendor) more than once an hour.
+$safely(Schedule::command('analytics:sync-engagement')->everyThirtyMinutes(), 'analytics:sync-engagement');
 
 // Step M-3.3: monthly client reports — on the report day (org timezone) last month's report is
 // drafted for review or, for automatic clients, published and emailed. Hourly so every timezone

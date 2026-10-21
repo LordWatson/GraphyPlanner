@@ -31,8 +31,8 @@ final class SchedulerHeartbeat
         'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 60],
         'analytics:send-scheduled-reports' => ['label' => 'Scheduled reports', 'interval_minutes' => 1440],
         'campaigns:send-due-reminders' => ['label' => 'Campaign due reminders', 'interval_minutes' => 1440],
-        // Phase M-3: engagement sync (daily) and monthly client reports (hourly, per org timezone).
-        'analytics:sync-engagement' => ['label' => 'Engagement metrics sync', 'interval_minutes' => 1440],
+        // Phase M-3: engagement sync (every 30 min) and monthly client reports (hourly, per org timezone).
+        'analytics:sync-engagement' => ['label' => 'Engagement metrics sync', 'interval_minutes' => 30],
         'analytics:send-client-reports' => ['label' => 'Monthly client reports', 'interval_minutes' => 60],
         // Phase 18: weekly.
         'grids:prune' => ['label' => 'Grid plan prune', 'interval_minutes' => 10080],
