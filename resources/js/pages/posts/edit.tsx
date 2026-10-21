@@ -1,5 +1,6 @@
 import type { FormComponentRef } from '@inertiajs/core';
 import { Form, Head } from '@inertiajs/react';
+import { ChevronDown, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ImageStudio } from '@/components/image-studio/image-studio';
 import type { ImageStudioData } from '@/components/image-studio/types';
@@ -13,11 +14,22 @@ import { EditorFormFields } from '@/components/post-editor/editor/editor-form-fi
 import type { EditorGridLink } from '@/components/post-editor/editor/editor-header';
 import { EditorHeader } from '@/components/post-editor/editor/editor-header';
 import { EditorSidebar } from '@/components/post-editor/editor/editor-sidebar';
+import {
+    EditorTabs,
+    ErrorTabSwitcher,
+    TabFooter,
+    TabPanel,
+} from '@/components/post-editor/editor/editor-tabs';
 import { MediaSection } from '@/components/post-editor/editor/media-section';
 import { ReadOnlyContent } from '@/components/post-editor/editor/read-only-content';
 import { SaveBar } from '@/components/post-editor/editor/save-bar';
 import { SettingsSection } from '@/components/post-editor/editor/settings-section';
 import { ShortcutsDialog } from '@/components/post-editor/editor/shortcuts-dialog';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useEditorNavigation } from '@/components/post-editor/editor/use-editor-navigation';
 import { usePostEditor } from '@/components/post-editor/editor/use-post-editor';
 import { PostDiscussion } from '@/components/post-editor/post-discussion';
@@ -98,6 +110,19 @@ export default function PostEdit({
     });
     useKeyboardShortcut({ key: '?' }, () => setShowShortcuts(true));
 
+    // Open the discussion straight to the activity log when there's feedback to read.
+    const needsFeedback = [
+        'changes_requested',
+        'failed',
+        'partially_published',
+    ].includes(post.status);
+
+    // How many images the studio already holds for this post, shown on its collapsed card.
+    const imageCount = (imageStudio?.generations ?? []).reduce(
+        (sum, generation) => sum + generation.variants.length,
+        0,
+    );
+
     const page = {
         post,
         client,
@@ -140,21 +165,32 @@ export default function PostEdit({
                             >
                                 {({ processing, errors }) => (
                                     <>
-                                        <ComposeSection
-                                            errors={errors}
-                                            showAi={Boolean(
-                                                ai?.enabled && ai?.canUse,
-                                            )}
-                                        />
-                                        <ChannelsSection
-                                            error={
-                                                errors[
-                                                    'targets.0.social_account_id'
-                                                ]
-                                            }
-                                        />
-                                        <MediaSection />
-                                        <SettingsSection errors={errors} />
+                                        <ErrorTabSwitcher errors={errors} />
+                                        <EditorTabs errors={errors} />
+                                        <TabPanel tab="compose">
+                                            <ComposeSection
+                                                errors={errors}
+                                                showAi={Boolean(
+                                                    ai?.enabled && ai?.canUse,
+                                                )}
+                                            />
+                                        </TabPanel>
+                                        <TabPanel tab="channels">
+                                            <ChannelsSection
+                                                error={
+                                                    errors[
+                                                        'targets.0.social_account_id'
+                                                    ]
+                                                }
+                                            />
+                                        </TabPanel>
+                                        <TabPanel tab="media">
+                                            <MediaSection />
+                                        </TabPanel>
+                                        <TabPanel tab="settings">
+                                            <SettingsSection errors={errors} />
+                                        </TabPanel>
+                                        <TabFooter />
                                         <EditorFormFields />
                                         <SaveBar
                                             isDirty={editor.isDirty}
@@ -178,6 +214,9 @@ export default function PostEdit({
                             canComment={can.comment}
                             canResendReviewEmail={can.resend_review_email}
                             mentionableUsers={mentionableUsers}
+                            collapsible
+                            defaultOpen={needsFeedback}
+                            defaultTab={needsFeedback ? 'activity' : 'comments'}
                         />
                     </div>
 
@@ -185,12 +224,46 @@ export default function PostEdit({
                 </div>
 
                 {imageStudio && (
-                    <div
+                    <Collapsible
                         id="image-studio"
-                        className="border-foreground scroll-mt-20 border-t pt-8"
+                        className="border-border bg-card scroll-mt-20 rounded-2xl border shadow-sm"
                     >
-                        <ImageStudio data={imageStudio} />
-                    </div>
+                        <CollapsibleTrigger className="group hover:bg-muted/40 focus-visible:ring-ring/50 flex w-full items-center gap-4 rounded-2xl p-5 text-start transition-colors outline-none focus-visible:ring-[3px]">
+                            <span className="bg-accent text-primary flex size-11 shrink-0 items-center justify-center rounded-full">
+                                <Sparkles className="size-5" />
+                            </span>
+                            <span className="grid min-w-0 flex-1 gap-0.5">
+                                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                    <span className="font-display text-lg leading-tight">
+                                        Make it{' '}
+                                        <em className="text-primary not-italic">
+                                            visual
+                                        </em>
+                                        .
+                                    </span>
+                                    {imageCount > 0 && (
+                                        <span className="eyebrow text-muted-foreground">
+                                            {imageCount} image
+                                            {imageCount === 1 ? '' : 's'}
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="text-muted-foreground text-[13px] text-pretty">
+                                    Generate on-brand images for this post with
+                                    AI — art-directed from the client's brand.
+                                </span>
+                            </span>
+                            <span className="border-border text-muted-foreground group-hover:border-primary/40 group-hover:text-primary flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors">
+                                <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+                                <span className="sr-only">
+                                    Open the image studio
+                                </span>
+                            </span>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border-border/70 border-t p-5 pt-6">
+                            <ImageStudio data={imageStudio} hideHeader />
+                        </CollapsibleContent>
+                    </Collapsible>
                 )}
             </Page>
             <ShortcutsDialog

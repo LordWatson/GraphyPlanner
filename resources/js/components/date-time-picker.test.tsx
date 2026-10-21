@@ -63,10 +63,12 @@ describe('DateTimePicker', () => {
         render(<Harness initial={{ date: '2026-10-20', time: '' }} />);
 
         fireEvent.change(
-            screen.getByLabelText('Time for @harbour on LinkedIn'),
-            {
-                target: { value: '14:30' },
-            },
+            screen.getByLabelText('Time for @harbour on LinkedIn hour'),
+            { target: { value: '14' } },
+        );
+        fireEvent.change(
+            screen.getByLabelText('Time for @harbour on LinkedIn minutes'),
+            { target: { value: '30' } },
         );
         expect(screen.getByRole('status')).toHaveTextContent(
             '2026-10-20 14:30',

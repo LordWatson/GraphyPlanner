@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { ArrowRight, Ellipsis, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { confirmDialog } from '@/components/confirm-dialog';
 import type { MentionableUser } from '@/components/mention-textarea';
@@ -10,6 +10,7 @@ import type {
     TransitionOption,
 } from '@/components/post-editor/types';
 import { StageTrack } from '@/components/post-editor/workflow/stage-track';
+import { MoveMenu } from '@/components/post-editor/workflow/transition-controls';
 import {
     OverrideApprovalDialog,
     TransitionDialog,
@@ -19,14 +20,6 @@ import {
     ReviewLinkRow,
 } from '@/components/post-editor/workflow/workflow-rows';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useKeyboardShortcut } from '@/hooks/use-keyboard-shortcut';
 import type { TransitionAction } from '@/lib/post-workflow';
 import {
@@ -84,10 +77,15 @@ export function PostWorkflow({
         post.approval_mode,
     );
     const primary = actions.find((action) => action.to === primaryTo) ?? null;
-    const secondary = actions.filter(
+    // Forward moves advance the post; back moves return it a step. Both are shown as buttons so
+    // moving back and forth is obvious; system/archive moves sit in the "more" menu.
+    const forwardSecondary = actions.filter(
         (action) => action.intent === 'forward' && action.to !== primaryTo,
     );
-    const overflow = actions.filter((action) => action.intent !== 'forward');
+    const backMoves = actions.filter((action) => action.intent === 'back');
+    const overflow = actions.filter(
+        (action) => action.intent === 'system' || action.intent === 'archive',
+    );
 
     // Step I-4.6 / M-1.6: ⌘/Ctrl + Enter opens "send for review" (internal first, else the
     // client). It still confirms in the dialog — the shortcut never moves a post on its own.
@@ -133,125 +131,90 @@ export function PostWorkflow({
         ? (post.targets ?? []).filter((target) => target.status === 'failed')
         : [];
 
+    const hasMoves =
+        backMoves.length > 0 ||
+        forwardSecondary.length > 0 ||
+        primary !== null ||
+        canOverrideApproval;
+
     return (
         <section className="animate-rise border-border bg-card flex flex-col rounded-2xl border [animation-delay:80ms]">
             <div className="px-5 pt-5 pb-4">
                 <StageTrack status={post.status} />
             </div>
 
-            <div className="border-border/70 flex flex-col gap-4 border-t px-5 py-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex min-w-0 flex-col gap-1">
-                    <p className="font-display text-xl leading-tight">
-                        {guidance.headline}
-                    </p>
-                    <p className="text-muted-foreground text-[13px] text-pretty">
-                        {guidance.hint}
-                        {scheduleBlocked &&
-                            ' Finish the readiness checklist to unlock scheduling.'}
-                    </p>
+            <div className="border-border/70 flex flex-col gap-4 border-t px-5 py-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <p className="font-display text-xl leading-tight">
+                            {guidance.headline}
+                        </p>
+                        <p className="text-muted-foreground text-[13px] text-pretty">
+                            {guidance.hint}
+                            {scheduleBlocked &&
+                                ' Finish the readiness checklist to unlock scheduling.'}
+                        </p>
+                    </div>
+                    <MoveMenu
+                        overflow={overflow}
+                        canDelete={canDelete}
+                        onSelect={setPending}
+                        onDelete={() => void deletePost()}
+                    />
                 </div>
 
-                {(actions.length > 0 || canOverrideApproval) && (
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        {(overflow.length > 0 || canDelete) && (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        aria-label="More status options"
-                                    >
-                                        <Ellipsis />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="end"
-                                    className="w-56"
-                                >
-                                    <DropdownMenuLabel className="eyebrow text-muted-foreground">
-                                        Move post
-                                    </DropdownMenuLabel>
-                                    {overflow.map((action, index) => {
-                                        const Icon = action.icon;
-                                        const startsArchive =
-                                            action.intent === 'archive' &&
-                                            index > 0;
-
-                                        return (
-                                            <div key={action.to}>
-                                                {startsArchive && (
-                                                    <DropdownMenuSeparator />
-                                                )}
-                                                <DropdownMenuItem
-                                                    variant={
-                                                        action.intent ===
-                                                        'archive'
-                                                            ? 'destructive'
-                                                            : 'default'
-                                                    }
-                                                    onSelect={() =>
-                                                        setPending(action)
-                                                    }
-                                                >
-                                                    <Icon />
-                                                    {action.label}
-                                                </DropdownMenuItem>
-                                            </div>
-                                        );
-                                    })}
-                                    {canDelete && (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                variant="destructive"
-                                                onSelect={() =>
-                                                    void deletePost()
-                                                }
-                                            >
-                                                <Trash2 />
-                                                Delete post
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
-                        {canOverrideApproval && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setOverriding(true)}
-                            >
-                                <ShieldCheck />
-                                Approve without client
-                            </Button>
-                        )}
-                        {secondary.map((action) => {
-                            const Icon = action.icon;
-
-                            return (
+                {hasMoves && (
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            {backMoves.map((action) => (
                                 <Button
                                     key={action.to}
                                     type="button"
                                     variant="outline"
                                     onClick={() => setPending(action)}
                                 >
-                                    <Icon />
+                                    <ArrowLeft />
                                     {action.label}
                                 </Button>
-                            );
-                        })}
-                        {primary && (
-                            <Button
-                                type="button"
-                                onClick={() => setPending(primary)}
-                            >
-                                <primary.icon />
-                                {primary.label}
-                                <ArrowRight />
-                            </Button>
-                        )}
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {canOverrideApproval && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setOverriding(true)}
+                                >
+                                    <ShieldCheck />
+                                    Approve without client
+                                </Button>
+                            )}
+                            {forwardSecondary.map((action) => {
+                                const Icon = action.icon;
+
+                                return (
+                                    <Button
+                                        key={action.to}
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setPending(action)}
+                                    >
+                                        <Icon />
+                                        {action.label}
+                                    </Button>
+                                );
+                            })}
+                            {primary && (
+                                <Button
+                                    type="button"
+                                    onClick={() => setPending(primary)}
+                                >
+                                    <primary.icon />
+                                    {primary.label}
+                                    <ArrowRight />
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
