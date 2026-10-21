@@ -163,6 +163,12 @@ class UploadPostAdapter implements PublishAdapter
             'external_profile_id' => $query['profile'] ?? $query['username'] ?? $account->external_profile_id,
             'connection_status' => ConnectionStatus::Connected,
             'connected_at' => now(),
+            // A reconnect is a fresh, healthy state — clear any stale health failure left behind by
+            // an earlier sweep (Step 1.6), otherwise the Accounts tab keeps showing the red "no
+            // longer accepts this connection" line next to a green "connected" pill until the next
+            // hourly health check happens to overwrite it.
+            'last_health_error' => null,
+            'token_expiry_warning' => null,
         ]);
 
         Log::info('Upload-Post account connected', [
@@ -979,7 +985,13 @@ class UploadPostAdapter implements PublishAdapter
 
     private function baseRequest(SocialAccount $account): PendingRequest
     {
-        $apiKey = $account->organization?->upload_post_key ?? '';
+        // The Upload-Post API key lives on the account's organization. Load that relation
+        // explicitly instead of relying on every caller to eager-load it: publish, health and
+        // status paths all build a request from a SocialAccount pulled fresh from the DB (e.g.
+        // PublishPostTargetJob), and with lazy loading disabled a bare `$account->organization`
+        // would throw a LazyLoadingViolationException. `loadMissing` is a no-op when it's already
+        // loaded, so eager-loading callers pay no extra query.
+        $apiKey = $account->loadMissing('organization')->organization?->upload_post_key ?? '';
 
         // Upload-Post's API authenticates via an `Apikey` scheme, not the standard OAuth
         // `Bearer` scheme, so `withToken()` (which always sends `Bearer <token>`) can't be used

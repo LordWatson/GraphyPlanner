@@ -111,6 +111,49 @@ class UploadPostAdapterTest extends TestCase
         $this->assertContains('scheduled_date', $result->sentFields);
     }
 
+    /**
+     * Regression: the real publish path (PublishPostTargetJob) hands the adapter a SocialAccount
+     * pulled fresh from the DB without its `organization` relation loaded. With lazy loading
+     * disabled, `baseRequest()` reading `$account->organization` for the API key threw a
+     * LazyLoadingViolationException, which surfaced to the user as a per-channel publish error
+     * ("… Attempted to lazy load [organization] on model [App\Models\SocialAccount] …"). The
+     * adapter must load the relation itself and publish normally.
+     */
+    public function test_publish_loads_the_organization_when_the_account_relation_is_not_eager_loaded(): void
+    {
+        Http::fake([
+            '*/upload_photos' => Http::response(['request_id' => 'up-reg'], 200),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::LinkedIn,
+            'external_account_id' => 'ext-acct-1',
+        ]);
+        $post = Post::factory()->create([
+            'client_id' => $account->client_id,
+            'master_caption' => 'Hello world',
+        ]);
+        $asset = Asset::factory()->create(['client_id' => $post->client_id, 'url' => 'https://cdn.test/media.jpg']);
+        $post->assets()->attach($asset);
+        PostTarget::factory()->create([
+            'post_id' => $post->id,
+            'social_account_id' => $account->id,
+            'scheduled_at_utc' => '2030-10-01 12:00:00',
+        ]);
+        $post->load('targets', 'assets');
+
+        // Fetch the account fresh so `organization` is NOT loaded, exactly as the publish job does.
+        $freshAccount = SocialAccount::findOrFail($account->id);
+        $this->assertFalse($freshAccount->relationLoaded('organization'));
+
+        $result = (new UploadPostAdapter)->publish($post, new Collection([$freshAccount]))->first();
+
+        $this->assertTrue($result->ok);
+        $this->assertSame('up-reg', $result->externalPostId);
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Apikey org-secret-key'));
+    }
+
     public function test_instagram_publish_maps_location_media_type_and_audio(): void
     {
         Http::fake([
@@ -418,6 +461,28 @@ class UploadPostAdapterTest extends TestCase
         $this->assertSame('vendor-profile-123', $account->external_profile_id);
         $this->assertSame(ConnectionStatus::Connected, $account->connection_status);
         $this->assertNotNull($account->connected_at);
+    }
+
+    public function test_handle_callback_clears_a_stale_health_error_left_by_an_earlier_sweep(): void
+    {
+        // An earlier health sweep (Step 1.6) flagged the account; reconnecting must wipe that red
+        // line so the Accounts tab doesn't show "no longer accepts this connection" next to a
+        // green "connected" pill.
+        $account = SocialAccount::factory()->create([
+            'connection_status' => ConnectionStatus::TokenExpired,
+            'last_health_error' => 'The publishing service no longer accepts this connection. Reconnect the account.',
+            'token_expiry_warning' => SocialAccount::TOKEN_EXPIRED,
+        ]);
+
+        (new UploadPostAdapter)->handleCallback([
+            'social_account_id' => $account->id,
+            'profile' => 'vendor-profile-123',
+        ]);
+
+        $account->refresh();
+        $this->assertSame(ConnectionStatus::Connected, $account->connection_status);
+        $this->assertNull($account->last_health_error);
+        $this->assertNull($account->token_expiry_warning);
     }
 
     public function test_handle_callback_is_a_no_op_when_the_social_account_id_is_missing(): void
