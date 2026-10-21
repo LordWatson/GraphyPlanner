@@ -153,6 +153,11 @@ export function convertSlot(
     return instant === null ? null : instantToZoned(instant, toZone);
 }
 
+/** Today's local date (`YYYY-MM-DD`) in `timeZone` — the earliest day worth scheduling. */
+export function todayIn(timeZone: string, now: number = Date.now()): string {
+    return instantToZoned(now, timeZone).date;
+}
+
 /** The viewer's own timezone (the browser's). */
 export function viewerTimeZone(): string {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';

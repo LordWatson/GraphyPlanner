@@ -60,7 +60,14 @@ function initialFields(data: ImageStudioData): ArtFields {
  * everything else is secondary. Designers get the grid read-only (download only). Data screen:
  * no Signal Orange, patterns or peeks.
  */
-export function ImageStudio({ data }: { data: ImageStudioData }) {
+export function ImageStudio({
+    data,
+    hideHeader = false,
+}: {
+    data: ImageStudioData;
+    /** The post editor shows its own collapsible section header, so the built-in one is hidden. */
+    hideHeader?: boolean;
+}) {
     const generations = useGenerationPolling(data.generations);
     const latest = generations[0] as StudioGeneration | undefined;
     const earlier = generations.slice(1);
@@ -339,46 +346,50 @@ export function ImageStudio({ data }: { data: ImageStudioData }) {
     return (
         <section
             className="@container flex flex-col gap-6"
-            aria-labelledby="image-studio-title"
+            aria-labelledby={hideHeader ? undefined : 'image-studio-title'}
+            aria-label={hideHeader ? 'Image studio' : undefined}
         >
-            <header className="flex flex-col gap-2">
-                <Eyebrow>Image studio</Eyebrow>
-                <h2
-                    id="image-studio-title"
-                    className="font-display text-[2rem] leading-[1.05] tracking-[-0.02em] sm:text-[2.25rem]"
-                >
-                    Make it <em className="text-primary not-italic">visual</em>.
-                </h2>
-                {data.target.caption && (
-                    <button
-                        type="button"
-                        aria-expanded={captionOpen}
-                        onClick={() => setCaptionOpen((open) => !open)}
-                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex w-full items-start gap-2 rounded-sm text-left text-sm outline-none focus-visible:ring-[3px]"
+            {!hideHeader && (
+                <header className="flex flex-col gap-2">
+                    <Eyebrow>Image studio</Eyebrow>
+                    <h2
+                        id="image-studio-title"
+                        className="font-display text-[2rem] leading-[1.05] tracking-[-0.02em] sm:text-[2.25rem]"
                     >
-                        <span
-                            className={cn(
-                                'border-primary border-l-2 pl-3 whitespace-pre-line',
-                                !captionOpen && 'line-clamp-1',
-                            )}
+                        Make it{' '}
+                        <em className="text-primary not-italic">visual</em>.
+                    </h2>
+                    {data.target.caption && (
+                        <button
+                            type="button"
+                            aria-expanded={captionOpen}
+                            onClick={() => setCaptionOpen((open) => !open)}
+                            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex w-full items-start gap-2 rounded-sm text-left text-sm outline-none focus-visible:ring-[3px]"
                         >
-                            “{data.target.caption}”
-                        </span>
-                        <ChevronDown
-                            className={cn(
-                                'mt-0.5 size-4 shrink-0 transition-transform',
-                                captionOpen && 'rotate-180',
-                            )}
-                            aria-hidden
-                        />
-                        <span className="sr-only">
-                            {captionOpen
-                                ? 'Collapse caption'
-                                : 'Show full caption'}
-                        </span>
-                    </button>
-                )}
-            </header>
+                            <span
+                                className={cn(
+                                    'border-primary border-l-2 pl-3 whitespace-pre-line',
+                                    !captionOpen && 'line-clamp-1',
+                                )}
+                            >
+                                “{data.target.caption}”
+                            </span>
+                            <ChevronDown
+                                className={cn(
+                                    'mt-0.5 size-4 shrink-0 transition-transform',
+                                    captionOpen && 'rotate-180',
+                                )}
+                                aria-hidden
+                            />
+                            <span className="sr-only">
+                                {captionOpen
+                                    ? 'Collapse caption'
+                                    : 'Show full caption'}
+                            </span>
+                        </button>
+                    )}
+                </header>
+            )}
 
             {error && (
                 <div

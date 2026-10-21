@@ -6,6 +6,7 @@ import {
     isValidTimeZone,
     nextWeeklySlot,
     offsetMinutes,
+    todayIn,
     zonedToInstant,
 } from '@/lib/timezones';
 
@@ -79,6 +80,14 @@ describe('timezones', () => {
         ).toBeNull();
         expect(isValidTimeZone('Mars/Olympus')).toBe(false);
         expect(isValidTimeZone('Asia/Dubai')).toBe(true);
+    });
+
+    it('gives today in a zone, which can differ from the viewer’s day', () => {
+        // 21:30 UTC on 20 Oct is still the 20th in London (BST, +1) but already the 21st in Dubai (+4).
+        const now = Date.UTC(2026, 9, 20, 21, 30);
+
+        expect(todayIn('Europe/London', now)).toBe('2026-10-20');
+        expect(todayIn('Asia/Dubai', now)).toBe('2026-10-21');
     });
 
     it('names a zone by its city', () => {

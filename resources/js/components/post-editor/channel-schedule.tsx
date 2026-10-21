@@ -7,7 +7,7 @@ import type {
 } from '@/components/post-editor/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { nextWeeklySlot } from '@/lib/timezones';
+import { nextWeeklySlot, todayIn } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
 function Usage({
@@ -208,6 +208,7 @@ export function ChannelSchedule({
                                         size="sm"
                                         label={account.handle}
                                         timeZone={account.timezone}
+                                        min={todayIn(account.timezone)}
                                         value={row}
                                         onChange={(next) => {
                                             if (next.date !== row.date) {

@@ -59,7 +59,8 @@ export function DateTimePicker({
                     aria-label={`Time for ${label}`}
                     value={value.time}
                     onChange={(time) => onChange({ ...value, time })}
-                    className={size === 'sm' ? 'h-8 w-[6.5rem]' : 'w-28'}
+                    size={size}
+                    className={size === 'sm' ? 'w-[8.5rem]' : 'w-40'}
                 />
             </div>
             {timeZone && (

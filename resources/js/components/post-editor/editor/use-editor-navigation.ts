@@ -3,17 +3,23 @@ import type { ComposerScope } from '@/components/post-editor/composer';
 import type { EditorSection } from '@/components/post-editor/editor/editor-state';
 import { cn } from '@/lib/utils';
 
+/** The four tabbed areas of the editor (the preview lives in the right rail, not a tab). */
+export type EditorTab = 'compose' | 'channels' | 'media' | 'settings';
+
 /**
- * Step I-4.6 / M-1.6 — moving around the editor: the checklist's "jump to the field that fixes
- * this" (scroll + a brief ring), the folded settings panel, and the one channel context the
- * composer edits and the preview shows.
+ * Step I-4.6 / M-1.6 — moving around the editor. The Write / Where & when / Media / Settings
+ * panels are tabs: one shows at a time while the others stay mounted (so every field still
+ * submits). The checklist's "jump to the field that fixes this" switches to that panel's tab,
+ * brings it into view and flashes it; media framing jumps to the preview in the right rail.
+ * `scope`/`previewId` keep the composer and preview on the one channel being customized.
  */
 export function useEditorNavigation(selectedIds: number[]) {
-    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<EditorTab>('compose');
     const [flashed, setFlashed] = useState<EditorSection | null>(null);
     const [scope, setScope] = useState<ComposerScope>('all');
     const [previewId, setPreviewId] = useState<number | null>(null);
     const captionRef = useRef<HTMLTextAreaElement>(null);
+    const tabsRef = useRef<HTMLDivElement>(null);
     const sectionRefs = useRef<Partial<Record<EditorSection, HTMLElement>>>({});
 
     const activeScope: ComposerScope =
@@ -42,17 +48,33 @@ export function useEditorNavigation(selectedIds: number[]) {
         }
     };
 
+    const flashFor = (section: EditorSection) => {
+        setFlashed(section);
+        window.setTimeout(() => setFlashed(null), 1400);
+    };
+
+    const smooth = () =>
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const jumpTo = (section: EditorSection) => {
-        if (section === 'settings') {
-            setSettingsOpen(true);
+        // Media framing is a right-rail tool, not a tab — scroll to it where it sits.
+        if (section === 'preview') {
+            requestAnimationFrame(() => {
+                sectionRefs.current.preview?.scrollIntoView({
+                    behavior: smooth() ? 'smooth' : 'auto',
+                    block: 'start',
+                });
+                flashFor(section);
+            });
+
+            return;
         }
 
+        setActiveTab(section);
+
         requestAnimationFrame(() => {
-            const reduce = window.matchMedia(
-                '(prefers-reduced-motion: reduce)',
-            ).matches;
-            sectionRefs.current[section]?.scrollIntoView({
-                behavior: reduce ? 'auto' : 'smooth',
+            tabsRef.current?.scrollIntoView({
+                behavior: smooth() ? 'smooth' : 'auto',
                 block: 'start',
             });
 
@@ -60,8 +82,7 @@ export function useEditorNavigation(selectedIds: number[]) {
                 captionRef.current?.focus({ preventScroll: true });
             }
 
-            setFlashed(section);
-            window.setTimeout(() => setFlashed(null), 1400);
+            flashFor(section);
         });
     };
 
@@ -72,8 +93,9 @@ export function useEditorNavigation(selectedIds: number[]) {
         );
 
     return {
-        settingsOpen,
-        setSettingsOpen,
+        activeTab,
+        setTab: setActiveTab,
+        tabsRef,
         activeScope,
         changeScope,
         previewId,
