@@ -1,14 +1,38 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Download, FileText, Landmark } from 'lucide-react';
+import { Form, Head, Link } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    CircleCheck,
+    Download,
+    FileText,
+    Landmark,
+} from 'lucide-react';
+import { useState } from 'react';
 
+import InputError from '@/components/input-error';
+import type { InvoiceTaxLine } from '@/components/invoices/types';
 import { formatInvoiceDate } from '@/components/invoices/types';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
-import { index as portalInvoicesIndex } from '@/routes/portal/invoices';
+import {
+    index as portalInvoicesIndex,
+    reportPayment as reportInvoicePayment,
+} from '@/routes/portal/invoices';
 
 type InvoiceItem = {
     id: number;
@@ -27,6 +51,9 @@ type InvoiceData = {
     display_status: string;
     display_status_label: string;
     amount: string;
+    subtotal: string;
+    tax_total: string;
+    tax_breakdown: InvoiceTaxLine[];
     currency: string;
     issue_date: string;
     due_date: string | null;
@@ -35,6 +62,12 @@ type InvoiceData = {
     is_unpaid: boolean;
     is_overdue: boolean;
     days_overdue: number;
+    can_report_payment: boolean;
+    is_pending_confirmation: boolean;
+    payment_reported_at: string | null;
+    payment_reported_method: string | null;
+    payment_reported_reference: string | null;
+    payment_reported_note: string | null;
     pdf_url: string | null;
     pdf_original_filename: string | null;
     items: InvoiceItem[];
@@ -44,6 +77,7 @@ type InvoiceData = {
 
 const headlines: Record<string, [string, string]> = {
     sent: ['Ready for', 'payment'],
+    pending_confirmation: ['Payment', 'reported'],
     overdue: ['Payment', 'overdue'],
     paid: ['Paid —', 'thank you'],
     void: ['No longer', 'due'],
@@ -68,6 +102,8 @@ export default function PortalInvoiceShow({
         'invoice',
     ];
     const retainer = Number(invoice.retainer_amount_snapshot ?? 0);
+    const hasTax =
+        invoice.tax_breakdown.length > 0 || Number(invoice.tax_total) > 0;
 
     return (
         <>
@@ -114,24 +150,46 @@ export default function PortalInvoiceShow({
                         )
                     }
                     actions={
-                        invoice.pdf_url && (
-                            <Button variant="outline" asChild>
-                                <a
-                                    href={invoice.pdf_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    download={
-                                        invoice.pdf_original_filename ??
-                                        undefined
-                                    }
-                                >
-                                    <Download />
-                                    Download PDF
-                                </a>
-                            </Button>
-                        )
+                        <>
+                            {invoice.can_report_payment && (
+                                <ReportPaymentDialog invoice={invoice} />
+                            )}
+                            {invoice.pdf_url && (
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href={invoice.pdf_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        download={
+                                            invoice.pdf_original_filename ??
+                                            undefined
+                                        }
+                                    >
+                                        <Download />
+                                        Download PDF
+                                    </a>
+                                </Button>
+                            )}
+                        </>
                     }
                 />
+
+                {invoice.is_pending_confirmation && (
+                    <div
+                        role="status"
+                        className="border-warning/30 bg-warning/5 animate-rise flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm"
+                    >
+                        <CircleCheck className="text-warning mt-0.5 size-4 shrink-0" />
+                        <p>
+                            Thanks — you’ve told {studio.name} you’ve paid this
+                            invoice
+                            {invoice.payment_reported_at
+                                ? ` on ${formatInvoiceDate(invoice.payment_reported_at)}`
+                                : ''}
+                            . They’ll confirm it shortly.
+                        </p>
+                    </div>
+                )}
 
                 <section className="animate-rise border-border bg-card grid grid-cols-1 overflow-hidden rounded-2xl border sm:grid-cols-[1.2fr_1fr_1fr]">
                     <div
@@ -253,6 +311,37 @@ export default function PortalInvoiceShow({
                                     </span>
                                 </li>
                             )}
+                            {hasTax && (
+                                <>
+                                    <li className="flex items-baseline justify-between gap-4 px-5 py-3">
+                                        <span className="text-muted-foreground text-sm">
+                                            Subtotal
+                                        </span>
+                                        <span className="font-mono text-sm tabular-nums">
+                                            {formatCurrency(
+                                                invoice.subtotal,
+                                                currency,
+                                            )}
+                                        </span>
+                                    </li>
+                                    {invoice.tax_breakdown.map((line) => (
+                                        <li
+                                            key={`${line.name}-${line.rate}`}
+                                            className="flex items-baseline justify-between gap-4 px-5 py-3"
+                                        >
+                                            <span className="text-muted-foreground text-sm">
+                                                {line.name}
+                                            </span>
+                                            <span className="font-mono text-sm tabular-nums">
+                                                {formatCurrency(
+                                                    line.tax,
+                                                    currency,
+                                                )}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </>
+                            )}
                             <li className="bg-muted/40 flex items-baseline justify-between gap-4 px-5 py-3.5">
                                 <span className="eyebrow text-muted-foreground">
                                     Total
@@ -313,5 +402,108 @@ export default function PortalInvoiceShow({
                 )}
             </Page>
         </>
+    );
+}
+
+/**
+ * Step M-4.2 — the client tells the studio they've paid. This reports the payment (optionally with
+ * a method / reference / note); the studio confirms it. It never marks the invoice paid itself.
+ */
+function ReportPaymentDialog({ invoice }: { invoice: InvoiceData }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                    <CircleCheck />
+                    Mark as paid
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <Form
+                    {...reportInvoicePayment.form(invoice.id)}
+                    onSuccess={() => setOpen(false)}
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    Let us know you’ve paid
+                                </DialogTitle>
+                                <DialogDescription>
+                                    This tells the studio you’ve paid{' '}
+                                    {formatCurrency(
+                                        invoice.amount,
+                                        invoice.currency,
+                                    )}{' '}
+                                    for {invoice.invoice_number}. They’ll
+                                    confirm it on their side. Adding a reference
+                                    helps them match it up.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-2">
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="method">
+                                        How did you pay?{' '}
+                                        <span className="text-muted-foreground font-normal">
+                                            (optional)
+                                        </span>
+                                    </Label>
+                                    <Input
+                                        id="method"
+                                        name="method"
+                                        placeholder="e.g. Bank transfer"
+                                    />
+                                    <InputError message={errors.method} />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="reference">
+                                        Payment reference{' '}
+                                        <span className="text-muted-foreground font-normal">
+                                            (optional)
+                                        </span>
+                                    </Label>
+                                    <Input
+                                        id="reference"
+                                        name="reference"
+                                        placeholder="e.g. the transfer reference"
+                                    />
+                                    <InputError message={errors.reference} />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="note">
+                                        Anything to add?{' '}
+                                        <span className="text-muted-foreground font-normal">
+                                            (optional)
+                                        </span>
+                                    </Label>
+                                    <Textarea
+                                        id="note"
+                                        name="note"
+                                        rows={3}
+                                        placeholder="e.g. Paid in two instalments."
+                                    />
+                                    <InputError message={errors.note} />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    <CircleCheck />
+                                    I’ve paid this
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </Form>
+            </DialogContent>
+        </Dialog>
     );
 }

@@ -23,6 +23,8 @@ use Illuminate\Support\Carbon;
  * @property string $default_currency
  * @property string|null $billing_details
  * @property string|null $payment_instructions
+ * @property string|null $tax_registration_number
+ * @property string|null $tax_registration_label
  * @property int $invoice_payment_terms_days
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
@@ -36,7 +38,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -93,6 +95,25 @@ class Organization extends Model
     public function clients(): HasMany
     {
         return $this->hasMany(Client::class, 'org_id');
+    }
+
+    /**
+     * Step M-4.1 — the organization's tax rates (VAT/TRN rates offered on invoices).
+     *
+     * @return HasMany<TaxRate, $this>
+     */
+    public function taxRates(): HasMany
+    {
+        return $this->hasMany(TaxRate::class, 'org_id');
+    }
+
+    /**
+     * Whether the agency has a tax registration number. When it does, its invoices read
+     * "Tax invoice" rather than "Invoice" (Step M-4.1).
+     */
+    public function hasTaxRegistration(): bool
+    {
+        return filled($this->tax_registration_number);
     }
 
     /**

@@ -1,6 +1,8 @@
 import { Form, Head } from '@inertiajs/react';
+import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,6 +36,10 @@ type ClientData = {
     target_posts_per_week: number | null;
     billing_email: string | null;
     billing_address: string | null;
+    tax_registration_number: string | null;
+    billing_currency: string | null;
+    default_tax_rate_id: number | null;
+    auto_invoice_retainer: boolean | null;
     notes_internal: string | null;
 };
 
@@ -44,6 +50,8 @@ export default function ClientEdit({
     billingCycles,
     languages,
     owners,
+    currencies,
+    taxRates,
 }: {
     client: ClientData;
     statuses: Option[];
@@ -51,7 +59,13 @@ export default function ClientEdit({
     billingCycles: Option[];
     languages: Option[];
     owners: Option[];
+    currencies: Option[];
+    taxRates: Option[];
 }) {
+    const [autoRetainer, setAutoRetainer] = useState(
+        client.auto_invoice_retainer ?? false,
+    );
+
     return (
         <>
             <Head title={`Edit ${client.name}`} />
@@ -69,6 +83,15 @@ export default function ClientEdit({
                             data.owner_user_id === 'none'
                                 ? ''
                                 : data.owner_user_id,
+                        // "Studio default" / "No default" map to an empty value (null).
+                        billing_currency:
+                            data.billing_currency === 'none'
+                                ? ''
+                                : data.billing_currency,
+                        default_tax_rate_id:
+                            data.default_tax_rate_id === 'none'
+                                ? ''
+                                : data.default_tax_rate_id,
                     })}
                     options={{ preserveScroll: true }}
                     className="border-border bg-card grid gap-6 rounded-2xl border p-4 shadow-sm sm:p-6"
@@ -366,6 +389,131 @@ export default function ClientEdit({
                                     defaultValue={client.billing_address ?? ''}
                                 />
                                 <InputError message={errors.billing_address} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="tax_registration_number">
+                                    VAT / TRN number
+                                </Label>
+                                <Input
+                                    id="tax_registration_number"
+                                    name="tax_registration_number"
+                                    placeholder="The client's tax registration number"
+                                    defaultValue={
+                                        client.tax_registration_number ?? ''
+                                    }
+                                />
+                                <p className="text-muted-foreground text-xs">
+                                    Printed in the invoice's “Billed to” block.
+                                </p>
+                                <InputError
+                                    message={errors.tax_registration_number}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="billing_currency">
+                                    Billing currency
+                                </Label>
+                                <Select
+                                    name="billing_currency"
+                                    defaultValue={
+                                        client.billing_currency ?? 'none'
+                                    }
+                                >
+                                    <SelectTrigger
+                                        id="billing_currency"
+                                        className="w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Studio default
+                                        </SelectItem>
+                                        {currencies.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.value} — {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">
+                                    New invoices for this client default to this
+                                    currency, and its retainer is billed in it.
+                                </p>
+                                <InputError message={errors.billing_currency} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="default_tax_rate_id">
+                                    Default tax rate
+                                </Label>
+                                <Select
+                                    name="default_tax_rate_id"
+                                    defaultValue={
+                                        client.default_tax_rate_id
+                                            ? String(client.default_tax_rate_id)
+                                            : 'none'
+                                    }
+                                >
+                                    <SelectTrigger
+                                        id="default_tax_rate_id"
+                                        className="w-full"
+                                    >
+                                        <SelectValue placeholder="No default" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            No default
+                                        </SelectItem>
+                                        {taxRates.map((rate) => (
+                                            <SelectItem
+                                                key={rate.value}
+                                                value={rate.value}
+                                            >
+                                                {rate.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">
+                                    Applied to this client's retainer and new
+                                    fixed-amount and campaign-fee invoices. Set
+                                    your rates in Settings → Organization.
+                                </p>
+                                <InputError
+                                    message={errors.default_tax_rate_id}
+                                />
+                            </div>
+
+                            <div className="flex items-start gap-2">
+                                <input
+                                    type="hidden"
+                                    name="auto_invoice_retainer"
+                                    value={autoRetainer ? '1' : '0'}
+                                />
+                                <Checkbox
+                                    id="auto_invoice_retainer"
+                                    checked={autoRetainer}
+                                    onCheckedChange={(checked) =>
+                                        setAutoRetainer(checked === true)
+                                    }
+                                />
+                                <Label
+                                    htmlFor="auto_invoice_retainer"
+                                    className="font-normal"
+                                >
+                                    Auto-draft the retainer each billing cycle{' '}
+                                    <span className="text-muted-foreground">
+                                        — creates a draft invoice for review
+                                        each period. Nothing is sent
+                                        automatically.
+                                    </span>
+                                </Label>
                             </div>
 
                             <div className="grid gap-2">

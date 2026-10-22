@@ -9,6 +9,7 @@ use App\Enums\ClientHealth;
 use App\Enums\ClientReportSchedule;
 use App\Enums\ClientStatus;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Scopes\OrganizationScope;
 use App\Services\ClientHealthService;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -40,6 +41,10 @@ use Illuminate\Support\Carbon;
  * @property string|null $approval_email
  * @property string|null $billing_email
  * @property string|null $billing_address
+ * @property string|null $tax_registration_number
+ * @property string|null $billing_currency
+ * @property int|null $default_tax_rate_id
+ * @property bool $auto_invoice_retainer
  * @property ClientHealth|null $health_status
  * @property string|null $health_reason
  * @property list<array{key: string, tone: string, weight: int, label: string, owner_only?: bool}>|null $health_reasons
@@ -55,6 +60,7 @@ use Illuminate\Support\Carbon;
     'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
+    'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
     'approval_lead_days', 'default_approval_mode', 'report_schedule', 'target_posts_per_week',
 ])]
 class Client extends Model
@@ -83,6 +89,7 @@ class Client extends Model
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
             'retainer_amount' => 'decimal:2',
+            'auto_invoice_retainer' => 'boolean',
             'health_status' => ClientHealth::class,
             'health_computed_at' => 'datetime',
             'health_reasons' => 'array',
@@ -147,6 +154,27 @@ class Client extends Model
     public function invoiceRecipientEmail(): ?string
     {
         return $this->billing_email ?: $this->approval_email;
+    }
+
+    /**
+     * Step M-4.1 — the client's default tax rate, applied to its retainer and to new fixed-amount
+     * and campaign-fee lines.
+     *
+     * @return BelongsTo<TaxRate, $this>
+     */
+    public function defaultTaxRate(): BelongsTo
+    {
+        return $this->belongsTo(TaxRate::class, 'default_tax_rate_id')->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * Step M-4.1 — the currency this client is billed in: its own `billing_currency` when set,
+     * otherwise the organization's default. Invoices for the client default to it, and finalizing
+     * a retainer invoice in any other currency is rejected (no conversion is performed).
+     */
+    public function billingCurrency(): string
+    {
+        return $this->billing_currency ?: $this->organization->default_currency;
     }
 
     /**

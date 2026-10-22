@@ -197,6 +197,11 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('invoices.send');
     Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
         ->name('invoices.mark-paid');
+    // Step M-4.2: confirm (→ paid) or revert (→ sent) a payment the client reported.
+    Route::post('invoices/{invoice}/confirm-payment', [InvoiceController::class, 'confirmPayment'])
+        ->name('invoices.confirm-payment');
+    Route::post('invoices/{invoice}/revert-payment', [InvoiceController::class, 'revertPayment'])
+        ->name('invoices.revert-payment');
     Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
         ->name('invoices.finalize');
     Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind'])
@@ -515,6 +520,8 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::get('invoices', [PortalInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [PortalInvoiceController::class, 'show'])->name('invoices.show');
     Route::get('invoices/{invoice}/pdf', [PortalInvoiceController::class, 'pdf'])->name('invoices.pdf');
+    // Step M-4.2: the client reports they've paid (→ pending confirmation); the org confirms.
+    Route::post('invoices/{invoice}/report-payment', [PortalInvoiceController::class, 'reportPayment'])->name('invoices.report-payment');
     // Step M-3.3: the client's published monthly reports.
     Route::get('reports', [PortalReportController::class, 'index'])->name('reports.index');
     Route::get('reports/{report}', [PortalReportController::class, 'show'])->name('reports.show');
@@ -597,6 +604,11 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('invoices.send');
     Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
         ->name('invoices.mark-paid');
+    // Step M-4.2: confirm (→ paid) or revert (→ sent) a payment the client reported.
+    Route::post('invoices/{invoice}/confirm-payment', [InvoiceController::class, 'confirmPayment'])
+        ->name('invoices.confirm-payment');
+    Route::post('invoices/{invoice}/revert-payment', [InvoiceController::class, 'revertPayment'])
+        ->name('invoices.revert-payment');
     Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
         ->name('invoices.finalize');
     Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind'])

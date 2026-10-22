@@ -4,6 +4,7 @@ use App\Http\Controllers\Settings\AiUsageController;
 use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Controllers\Settings\TaxRateController;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +49,12 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step 16.11: Owner-only AI usage (images this month vs quota, estimated cost).
     Route::get('settings/ai-usage', [AiUsageController::class, 'edit'])->name('ai-usage.edit');
     Route::put('settings/ai-usage', [AiUsageController::class, 'update'])->name('ai-usage.update');
+
+    // Step M-4.1: the organization's tax-rate list (Owner-only, via TaxRatePolicy). The settings
+    // page has already confirmed the password, so these mutations aren't re-gated.
+    Route::post('settings/tax-rates', [TaxRateController::class, 'store'])->name('tax-rates.store');
+    Route::put('settings/tax-rates/{taxRate}', [TaxRateController::class, 'update'])->name('tax-rates.update');
+    Route::post('settings/tax-rates/{taxRate}/archive', [TaxRateController::class, 'archive'])->name('tax-rates.archive');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

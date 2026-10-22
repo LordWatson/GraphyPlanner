@@ -31,6 +31,8 @@ class UpdateInvoiceRequest extends FormRequest
             'currency' => ['nullable', 'string', Rule::in([...CurrencyOptions::codes(), $invoice->currency])],
             // Ignored by UpdateInvoiceAction once the invoice is finalized/built from items.
             'amount' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
+            // Step M-4.1: invoice-level tax rate for a fixed-amount invoice (must be this org's).
+            'tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('org_id', $invoice->org_id)],
             'issue_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
             'description' => ['nullable', 'string', 'max:5000'],

@@ -89,6 +89,15 @@ class InvoicePolicy
     }
 
     /**
+     * Determine whether the user can confirm (or revert) a payment the client reported from the
+     * portal (Step M-4.2).
+     */
+    public function confirmPayment(User $user, Invoice $invoice): bool
+    {
+        return $this->manages($user, $invoice);
+    }
+
+    /**
      * Determine whether the user can void a sent invoice.
      */
     public function void(User $user, Invoice $invoice): bool

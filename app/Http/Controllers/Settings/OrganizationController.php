@@ -6,6 +6,7 @@ use App\Actions\Organizations\TestUploadPostConnectionAction;
 use App\Actions\Organizations\UpdateOrganizationSettingsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\OrganizationSettingsUpdateRequest;
+use App\Models\TaxRate;
 use App\Support\Options\CurrencyOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,8 @@ class OrganizationController extends Controller
                 'default_currency' => $organization->default_currency,
                 'billing_details' => $organization->billing_details,
                 'payment_instructions' => $organization->payment_instructions,
+                'tax_registration_number' => $organization->tax_registration_number,
+                'tax_registration_label' => $organization->tax_registration_label,
                 'invoice_payment_terms_days' => $organization->invoice_payment_terms_days,
                 'has_upload_post_key' => filled($organization->upload_post_key),
                 'has_upload_post_webhook_secret' => filled($organization->upload_post_webhook_secret),
@@ -40,6 +43,19 @@ class OrganizationController extends Controller
                 'xai_key_last4' => self::lastFour($organization->xai_key),
             ],
             'currencies' => CurrencyOptions::options(),
+            // Step M-4.1: the org's tax rates, active first then archived, for the rates manager.
+            'tax_rates' => $organization->taxRates()
+                ->orderBy('archived_at')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->map(fn ($rate) => [
+                    'id' => $rate->id,
+                    'name' => $rate->name,
+                    'rate' => (string) $rate->rate,
+                    'is_archived' => $rate->isArchived(),
+                ]),
+            'can_manage_tax_rates' => $request->user()->can('manage', TaxRate::class),
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Actions\InvoiceItems;
 
 use App\Enums\InvoiceStatus;
 use App\Models\InvoiceItem;
+use App\Support\Invoices\TaxRateSnapshot;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,9 @@ class UpdateInvoiceItemAction
         }
 
         return DB::transaction(function () use ($invoiceItem, $data) {
+            // Step M-4.1: re-snapshot the tax rate whenever the line's rate choice changes.
+            $data = TaxRateSnapshot::apply($data, $invoiceItem->org_id);
+
             $invoiceItem->update($data);
 
             if ($invoiceItem->invoice->is_finalized) {

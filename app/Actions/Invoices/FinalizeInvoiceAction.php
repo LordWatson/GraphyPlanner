@@ -29,6 +29,7 @@ class FinalizeInvoiceAction
             ]);
         }
 
+        $invoice->loadMissing('client.defaultTaxRate');
         $retainerAmount = (float) ($invoice->client->retainer_amount ?? 0);
 
         // A pure retainer invoice (no extra items) is fine as long as there's a retainer to bill.
@@ -38,13 +39,29 @@ class FinalizeInvoiceAction
             ]);
         }
 
-        return DB::transaction(function () use ($invoice, $retainerAmount) {
+        // Step M-4.1: the retainer has no currency of its own — it's read in the client's billing
+        // currency. We never convert, so a retainer invoice raised in any other currency is
+        // rejected rather than silently mis-added.
+        if ($retainerAmount > 0 && $invoice->currency !== $invoice->client->billingCurrency()) {
+            throw ValidationException::withMessages([
+                'currency' => "This client's retainer is billed in {$invoice->client->billingCurrency()}, so a retainer invoice can't be raised in {$invoice->currency}.",
+            ]);
+        }
+
+        $retainerRate = $invoice->client->defaultTaxRate;
+
+        return DB::transaction(function () use ($invoice, $retainerAmount, $retainerRate) {
+            // Snapshot the retainer and its tax rate, then compute every money column from the
+            // items' and retainer's snapshotted rates (InvoiceTotals, via refreshFinalizedAmount).
             $invoice->update([
-                'amount' => $invoice->itemsSubtotal() + $retainerAmount,
                 'retainer_amount_snapshot' => $retainerAmount,
+                'retainer_tax_rate' => $retainerAmount > 0 ? $retainerRate?->rate : null,
+                'retainer_tax_name' => $retainerAmount > 0 ? $retainerRate?->name : null,
                 'is_finalized' => true,
                 'finalized_at' => now(),
             ]);
+
+            $invoice->refreshFinalizedAmount();
 
             Log::info('Invoice finalized', [
                 'invoice_id' => $invoice->id,

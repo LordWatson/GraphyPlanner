@@ -6,6 +6,7 @@ use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Models\Client;
+use App\Support\Options\CurrencyOptions;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -48,6 +49,11 @@ class StoreClientRequest extends FormRequest
             'target_posts_per_week' => ['nullable', 'integer', 'min:1', 'max:50'],
             'billing_email' => ['nullable', 'email', 'max:255'],
             'billing_address' => ['nullable', 'string', 'max:1000'],
+            // Step M-4.1 / M-4.3.
+            'tax_registration_number' => ['nullable', 'string', 'max:60'],
+            'billing_currency' => ['nullable', 'string', Rule::in(CurrencyOptions::codes())],
+            'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('org_id', $this->user()->org_id)],
+            'auto_invoice_retainer' => ['nullable', 'boolean'],
         ];
     }
 }

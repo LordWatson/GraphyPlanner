@@ -30,6 +30,7 @@ use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
+use App\Models\TaxRate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -201,6 +202,8 @@ class CrossTenantRouteTest extends TestCase
             ConnectInvite::class => ConnectInvite::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'client_id' => $client->id, 'token_hash' => hash('sha256', 'foreign-connect'), 'expires_at' => now()->addDay()]),
             Invoice::class => $invoice,
             InvoiceItem::class => InvoiceItem::factory()->create(['invoice_id' => $invoice->id, 'org_id' => $org->id]),
+            // Step M-4.1: a tax rate belonging to the other org (settings/tax-rates/{taxRate}).
+            TaxRate::class => TaxRate::factory()->for($org, 'organization')->create(),
             ClientInvitation::class => ClientInvitation::factory()->create(['client_id' => $client->id]),
             StaffInvitation::class => StaffInvitation::factory()->create(['org_id' => $org->id]),
             OrganizationReport::class => OrganizationReport::factory()->create(['org_id' => $org->id, 'created_by' => $owner->id]),

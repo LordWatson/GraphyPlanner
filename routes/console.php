@@ -68,3 +68,8 @@ $safely(Schedule::command('clients:recompute-health')->hourlyAt(35), 'clients:re
 
 // Campaigns enhancement C-4.4: assignees hear about deliverables due tomorrow or just overdue.
 $safely(Schedule::command('campaigns:send-due-reminders')->dailyAt('08:15'), 'campaigns:send-due-reminders');
+
+// Step M-4.3: draft this period's retainer invoices for opted-in clients. Idempotent per client
+// and period (computed in the org timezone), so a daily run only ever creates a period's draft
+// once; the team reviews, finalizes and sends — nothing auto-sends. See GenerateRetainerDraftsAction.
+$safely(Schedule::command('invoices:generate-retainer-drafts')->dailyAt('06:30'), 'invoices:generate-retainer-drafts');

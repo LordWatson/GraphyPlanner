@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Jobs\RecomputeClientHealthJob;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
+use App\Support\Invoices\InvoiceTotals;
 use App\Support\StoredFileUrl;
 use Database\Factories\InvoiceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -28,19 +29,30 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * @property string $invoice_number
  * @property InvoiceStatus $status
  * @property string $amount
+ * @property string|null $subtotal
+ * @property string $tax_total
+ * @property list<array{name: string, rate: float, net: float, tax: float}>|null $tax_breakdown
+ * @property int|null $tax_rate_id
  * @property bool $is_finalized
  * @property string|null $retainer_amount_snapshot
+ * @property string|null $retainer_tax_rate
+ * @property string|null $retainer_tax_name
  * @property Carbon|null $finalized_at
  * @property string $currency
  * @property Carbon $issue_date
  * @property Carbon|null $due_date
  * @property string|null $description
+ * @property string|null $retainer_period
  * @property Carbon|null $sent_at
  * @property string|null $sent_to_email
  * @property Carbon|null $last_reminded_at
  * @property int $reminder_count
  * @property Carbon|null $paid_at
  * @property string|null $payment_reference
+ * @property Carbon|null $payment_reported_at
+ * @property string|null $payment_reported_method
+ * @property string|null $payment_reported_reference
+ * @property string|null $payment_reported_note
  * @property Carbon|null $voided_at
  * @property string|null $void_reason
  * @property string|null $pdf_disk
@@ -54,9 +66,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * @property Carbon|null $deleted_at
  */
 #[Fillable([
-    'org_id', 'client_id', 'invoice_number', 'status', 'amount', 'is_finalized', 'retainer_amount_snapshot',
-    'finalized_at', 'currency', 'issue_date', 'due_date', 'description', 'sent_at', 'sent_to_email',
-    'last_reminded_at', 'reminder_count', 'paid_at', 'payment_reference', 'voided_at', 'void_reason',
+    'org_id', 'client_id', 'invoice_number', 'status', 'amount', 'subtotal', 'tax_total', 'tax_breakdown',
+    'tax_rate_id', 'is_finalized', 'retainer_amount_snapshot', 'retainer_tax_rate', 'retainer_tax_name',
+    'finalized_at', 'currency', 'issue_date', 'due_date', 'description', 'retainer_period', 'sent_at', 'sent_to_email',
+    'last_reminded_at', 'reminder_count', 'paid_at', 'payment_reference',
+    'payment_reported_at', 'payment_reported_method', 'payment_reported_reference', 'payment_reported_note',
+    'voided_at', 'void_reason',
     'pdf_disk', 'pdf_path', 'pdf_url', 'pdf_original_filename', 'pdf_mime_type', 'pdf_size',
 ])]
 class Invoice extends Model
@@ -95,8 +110,12 @@ class Invoice extends Model
         return [
             'status' => InvoiceStatus::class,
             'amount' => 'decimal:2',
+            'subtotal' => 'decimal:2',
+            'tax_total' => 'decimal:2',
+            'tax_breakdown' => 'array',
             'is_finalized' => 'boolean',
             'retainer_amount_snapshot' => 'decimal:2',
+            'retainer_tax_rate' => 'decimal:2',
             'issue_date' => 'date',
             'due_date' => 'date',
             'finalized_at' => 'datetime',
@@ -104,6 +123,7 @@ class Invoice extends Model
             'last_reminded_at' => 'datetime',
             'reminder_count' => 'integer',
             'paid_at' => 'datetime',
+            'payment_reported_at' => 'datetime',
             'voided_at' => 'datetime',
         ];
     }
@@ -131,6 +151,17 @@ class Invoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Step M-4.1 — the invoice-level tax rate used by a fixed-amount invoice (one with no line
+     * items); itemised invoices tax each line instead.
+     *
+     * @return BelongsTo<TaxRate, $this>
+     */
+    public function taxRate(): BelongsTo
+    {
+        return $this->belongsTo(TaxRate::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -282,16 +313,73 @@ class Invoice extends Model
     }
 
     /**
-     * Recompute and persist Invoice::amount from the current line items plus the already
-     * snapshotted retainer, for an already-finalized invoice whose items were edited after the
-     * fact (so the locked-in total — and a subsequently regenerated PDF — stay accurate without
-     * requiring a separate "un-finalize/re-finalize" step).
+     * Whether the client has reported paying this invoice and the org hasn't confirmed yet
+     * (Step M-4.2).
+     */
+    public function isPendingConfirmation(): bool
+    {
+        return $this->status === InvoiceStatus::PendingConfirmation;
+    }
+
+    /**
+     * Step M-4.1 — the net subtotal, falling back to `amount` for legacy invoices written before
+     * the tax columns existed (those had no tax, so net == total).
+     */
+    public function netSubtotal(): float
+    {
+        return (float) ($this->subtotal ?? $this->amount);
+    }
+
+    /**
+     * The per-rate tax summary printed on the PDF / shown in the UI (empty for a zero-tax invoice).
+     *
+     * @return list<array{name: string, rate: float, net: float, tax: float}>
+     */
+    public function taxBreakdownRows(): array
+    {
+        return $this->tax_breakdown ?? [];
+    }
+
+    /**
+     * Step M-4.1 — the net + tax lines of a finalized/itemised invoice, built from the rates
+     * snapshotted onto its items and the retainer, so the total is computed the same way every
+     * time without re-reading live rates.
+     *
+     * @return array<int, array{net: float, rate: float|null, name: string|null}>
+     */
+    public function finalizedTaxLines(): array
+    {
+        $this->loadMissing('items');
+
+        $lines = $this->items->map(fn (InvoiceItem $item) => [
+            'net' => $item->lineTotal(),
+            'rate' => $item->tax_rate !== null ? (float) $item->tax_rate : null,
+            'name' => $item->tax_name,
+        ])->values()->all();
+
+        $retainer = (float) ($this->retainer_amount_snapshot ?? 0);
+
+        if ($retainer > 0) {
+            $lines[] = [
+                'net' => $retainer,
+                'rate' => $this->retainer_tax_rate !== null ? (float) $this->retainer_tax_rate : null,
+                'name' => $this->retainer_tax_name,
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Recompute and persist the money columns (subtotal, tax, breakdown and the grand-total
+     * `amount`) from the current line items plus the already snapshotted retainer, for a finalized
+     * invoice whose items were edited after the fact — so the locked-in total (and a subsequently
+     * regenerated PDF) stay accurate without a separate "un-finalize / re-finalize" step.
      */
     public function refreshFinalizedAmount(): void
     {
         $this->unsetRelation('items');
-        $retainerAmount = (float) ($this->retainer_amount_snapshot ?? 0);
 
-        $this->update(['amount' => $this->itemsSubtotal() + $retainerAmount]);
+        $this->update(InvoiceTotals::fromLines($this->finalizedTaxLines())->toInvoiceColumns());
     }
 }

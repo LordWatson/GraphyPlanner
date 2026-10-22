@@ -30,6 +30,7 @@ import type {
     InvoiceDetail,
     InvoiceItemData,
     InvoiceTimelineEvent,
+    TaxRateOption,
 } from '@/components/invoices/types';
 import { formatInvoiceDate } from '@/components/invoices/types';
 import { Page, PageHeader, Panel } from '@/components/page';
@@ -52,11 +53,14 @@ import invoicesRoutes, {
     finalize as finalizeInvoice,
     generatePdf as generateInvoicePdf,
     duplicate as duplicateInvoice,
+    confirmPayment as confirmInvoicePayment,
+    revertPayment as revertInvoicePayment,
 } from '@/routes/invoices';
 
 const headline: Record<InvoiceDetail['display_status'], [string, string]> = {
     draft: ['Draft', 'invoice'],
     sent: ['Awaiting', 'payment'],
+    pending_confirmation: ['Payment', 'reported'],
     overdue: ['Payment', 'overdue'],
     paid: ['Paid in', 'full'],
     void: ['Invoice', 'void'],
@@ -66,10 +70,12 @@ export default function InvoiceShow({
     invoice,
     client,
     can,
+    tax_rates: taxRates,
 }: {
     invoice: InvoiceDetail;
     client: InvoiceClientSummary;
     can: InvoiceAbilities;
+    tax_rates: TaxRateOption[];
 }) {
     // Every figure on this page (items, retainer, total) is in the invoice's own currency.
     const currency = invoice.currency;
@@ -155,9 +161,13 @@ export default function InvoiceShow({
                                 invoice={invoice}
                                 canManage={can.manage_items}
                                 currency={currency}
+                                taxRates={taxRates}
                             />
                             {can.manage_items && (
-                                <AddItemForm invoiceId={invoice.id} />
+                                <AddItemForm
+                                    invoiceId={invoice.id}
+                                    taxRates={taxRates}
+                                />
                             )}
                             <Totals
                                 invoice={invoice}
@@ -368,6 +378,30 @@ function PrimaryActions({
                     variant="default"
                 />
             )}
+            {can.confirm_payment && (
+                <Form {...confirmInvoicePayment.form(invoice.id)}>
+                    {({ processing }) => (
+                        <Button type="submit" disabled={processing}>
+                            <Check />
+                            Confirm payment
+                        </Button>
+                    )}
+                </Form>
+            )}
+            {can.revert_payment && (
+                <Form {...revertInvoicePayment.form(invoice.id)}>
+                    {({ processing }) => (
+                        <Button
+                            type="submit"
+                            variant="outline"
+                            disabled={processing}
+                        >
+                            <X />
+                            Not received yet
+                        </Button>
+                    )}
+                </Form>
+            )}
         </>
     );
 }
@@ -463,6 +497,33 @@ function StateCallout({
             <Callout icon={Info} tone="info">
                 Finalize to lock in the total (billable items plus the client's
                 retainer) before sending. You can still adjust items afterwards.
+            </Callout>
+        );
+    }
+
+    if (invoice.status === 'pending_confirmation') {
+        const detail = [
+            invoice.payment_reported_method &&
+                `via ${invoice.payment_reported_method}`,
+            invoice.payment_reported_reference &&
+                `ref. ${invoice.payment_reported_reference}`,
+        ]
+            .filter(Boolean)
+            .join(', ');
+
+        return (
+            <Callout icon={Info} tone="info">
+                The client reported paying this invoice
+                {invoice.payment_reported_at
+                    ? ` on ${formatInvoiceDate(invoice.payment_reported_at)}`
+                    : ''}
+                {detail ? ` (${detail})` : ''}. Confirm it to lock the invoice
+                as paid, or send it back if the payment hasn't arrived.
+                {invoice.payment_reported_note && (
+                    <span className="mt-1 block italic">
+                        “{invoice.payment_reported_note}”
+                    </span>
+                )}
             </Callout>
         );
     }
@@ -670,10 +731,12 @@ function ItemsTable({
     invoice,
     canManage,
     currency,
+    taxRates,
 }: {
     invoice: InvoiceDetail;
     canManage: boolean;
     currency: string;
+    taxRates: TaxRateOption[];
 }) {
     const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -703,6 +766,7 @@ function ItemsTable({
                         <li key={item.id} className="bg-muted/40 px-5 py-4">
                             <ItemForm
                                 item={item}
+                                taxRates={taxRates}
                                 onDone={() => setEditingId(null)}
                             />
                         </li>
@@ -750,6 +814,11 @@ function ItemRow({
                 {!item.is_billable && (
                     <span className="bg-muted text-muted-foreground ml-2 inline-flex rounded-full px-2 py-0.5 align-middle text-[11px] font-medium">
                         Included
+                    </span>
+                )}
+                {item.is_billable && item.tax_name && (
+                    <span className="bg-muted text-muted-foreground ml-2 inline-flex rounded-full px-2 py-0.5 align-middle text-[11px] font-medium">
+                        {item.tax_name}
                     </span>
                 )}
                 <span className="text-muted-foreground block font-mono text-xs sm:hidden">
@@ -814,10 +883,12 @@ function ItemFields({
     idPrefix,
     item,
     errors,
+    taxRates,
 }: {
     idPrefix: string;
     item?: InvoiceItemData;
     errors: Record<string, string | undefined>;
+    taxRates: TaxRateOption[];
 }) {
     const [billable, setBillable] = useState(item?.is_billable ?? true);
 
@@ -859,6 +930,26 @@ function ItemFields({
                 />
                 <InputError message={errors.quantity} />
             </div>
+            {taxRates.length > 0 && (
+                <div className="col-span-2 grid gap-1.5 sm:col-span-3">
+                    <Label htmlFor={`${idPrefix}-tax`}>Tax rate</Label>
+                    <select
+                        id={`${idPrefix}-tax`}
+                        name="tax_rate_id"
+                        defaultValue={item?.tax_rate_id ?? ''}
+                        disabled={!billable}
+                        className="border-input bg-background ring-offset-background focus-visible:ring-ring h-9 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+                    >
+                        <option value="">No tax</option>
+                        {taxRates.map((rate) => (
+                            <option key={rate.value} value={rate.value}>
+                                {rate.label}
+                            </option>
+                        ))}
+                    </select>
+                    <InputError message={errors.tax_rate_id} />
+                </div>
+            )}
             <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
                 <input
                     type="hidden"
@@ -884,9 +975,11 @@ function ItemFields({
 
 function ItemForm({
     item,
+    taxRates,
     onDone,
 }: {
     item: InvoiceItemData;
+    taxRates: TaxRateOption[];
     onDone: () => void;
 }) {
     return (
@@ -902,6 +995,7 @@ function ItemForm({
                         idPrefix={`item-${item.id}`}
                         item={item}
                         errors={errors}
+                        taxRates={taxRates}
                     />
                     <InputError message={errors.invoice} />
                     <div className="flex gap-2">
@@ -925,7 +1019,13 @@ function ItemForm({
     );
 }
 
-function AddItemForm({ invoiceId }: { invoiceId: number }) {
+function AddItemForm({
+    invoiceId,
+    taxRates,
+}: {
+    invoiceId: number;
+    taxRates: TaxRateOption[];
+}) {
     const [open, setOpen] = useState(false);
 
     if (!open) {
@@ -956,7 +1056,11 @@ function AddItemForm({ invoiceId }: { invoiceId: number }) {
                     <span className="eyebrow text-muted-foreground">
                         New line item
                     </span>
-                    <ItemFields idPrefix="new-item" errors={errors} />
+                    <ItemFields
+                        idPrefix="new-item"
+                        errors={errors}
+                        taxRates={taxRates}
+                    />
                     <InputError message={errors.invoice} />
                     <div className="flex gap-2">
                         <Button type="submit" size="sm" disabled={processing}>
@@ -991,11 +1095,16 @@ function Totals({
 }) {
     const retainerAmount = Number(retainer ?? 0);
     const hasItems = invoice.items.length > 0;
+    // Tax is computed and locked at finalize (or on a fixed-amount invoice straight away); a
+    // not-yet-finalized itemised draft shows a projected net total with a "tax on finalize" note.
+    const hasTax =
+        invoice.tax_breakdown.length > 0 || Number(invoice.tax_total) > 0;
     const projected = invoice.is_finalized
         ? Number(invoice.amount)
         : hasItems
           ? invoice.items_subtotal + retainerAmount
           : Number(invoice.amount);
+    const itemsHaveTax = invoice.items.some((item) => item.tax_rate !== null);
 
     return (
         <div className="border-border/70 flex justify-end border-t px-5 py-4">
@@ -1022,6 +1131,34 @@ function Totals({
                             {formatCurrency(retainerAmount, currency)}
                         </dd>
                     </div>
+                )}
+                {hasTax && (
+                    <>
+                        <div className="border-border/70 mt-1 flex justify-between gap-4 border-t pt-2">
+                            <dt className="text-muted-foreground">Subtotal</dt>
+                            <dd className="font-mono tabular-nums">
+                                {formatCurrency(invoice.subtotal, currency)}
+                            </dd>
+                        </div>
+                        {invoice.tax_breakdown.map((line) => (
+                            <div
+                                key={`${line.name}-${line.rate}`}
+                                className="flex justify-between gap-4"
+                            >
+                                <dt className="text-muted-foreground">
+                                    {line.name}
+                                </dt>
+                                <dd className="font-mono tabular-nums">
+                                    {formatCurrency(line.tax, currency)}
+                                </dd>
+                            </div>
+                        ))}
+                    </>
+                )}
+                {!invoice.is_finalized && itemsHaveTax && !hasTax && (
+                    <p className="text-muted-foreground text-xs">
+                        Tax is added when you finalize.
+                    </p>
                 )}
                 <div
                     className={cn(

@@ -130,7 +130,7 @@ class InvoiceLedgerService
      */
     public function csvRows(int $orgId, array $filters = []): iterable
     {
-        yield ['Invoice number', 'Client', 'Status', 'Issue date', 'Due date', 'Amount', 'Currency', 'Sent at', 'Paid at', 'Payment reference', 'Notes'];
+        yield ['Invoice number', 'Client', 'Status', 'Issue date', 'Due date', 'Subtotal', 'Tax', 'Amount', 'Currency', 'Sent at', 'Paid at', 'Payment reference', 'Notes'];
 
         foreach ($this->query($orgId, $filters)->lazy() as $invoice) {
             yield [
@@ -139,6 +139,8 @@ class InvoiceLedgerService
                 $invoice->displayStatusLabel(),
                 $invoice->issue_date->toDateString(),
                 $invoice->due_date?->toDateString() ?? '',
+                number_format($invoice->netSubtotal(), 2, '.', ''),
+                number_format((float) $invoice->tax_total, 2, '.', ''),
                 number_format((float) $invoice->amount, 2, '.', ''),
                 $invoice->currency,
                 $invoice->sent_at?->toDateString() ?? '',

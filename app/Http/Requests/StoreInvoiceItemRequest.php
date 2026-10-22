@@ -26,6 +26,7 @@ class StoreInvoiceItemRequest extends FormRequest
         // accept another organization's ids.
         $invoice = $this->route('invoice');
         $clientId = $invoice instanceof Invoice ? $invoice->client_id : null;
+        $orgId = $invoice instanceof Invoice ? $invoice->org_id : null;
 
         return [
             'description' => ['required', 'string'],
@@ -33,6 +34,8 @@ class StoreInvoiceItemRequest extends FormRequest
             'price' => ['nullable', 'numeric', 'min:0'],
             'quantity' => ['required', 'integer', 'min:1'],
             'post_id' => ['nullable', 'integer', Rule::exists('posts', 'id')->where('client_id', $clientId)],
+            // Step M-4.1: a tax rate must belong to the invoice's organization (Step I-1.9).
+            'tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('org_id', $orgId)],
         ];
     }
 }

@@ -116,6 +116,8 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
     invoice: {
         draft: { tone: 'neutral', label: 'Draft' },
         sent: { tone: 'info', label: 'Sent' },
+        // Step M-4.2: the client reported payment; the agency hasn't confirmed it yet.
+        pending_confirmation: { tone: 'warning', label: 'Payment reported' },
         paid: { tone: 'success', label: 'Paid' },
         // Derived by the backend (`Invoice::displayStatus()`): sent and past its due date.
         overdue: { tone: 'danger', label: 'Overdue' },

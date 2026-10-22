@@ -3,6 +3,8 @@
 namespace App\Actions\Invoices;
 
 use App\Models\Invoice;
+use App\Models\TaxRate;
+use App\Support\Invoices\InvoiceTotals;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -10,10 +12,13 @@ use Illuminate\Validation\ValidationException;
 class UpdateInvoiceAction
 {
     /**
-     * Update an invoice's editable details (amount, currency, dates, description). Status,
-     * invoice_number, org_id and client_id are never touched here. Once finalized, `amount` is
-     * locked; `currency` can only change while the invoice is an unfinalized draft (after that
-     * the total — and what the client has been sent — is fixed in that currency).
+     * Update an invoice's editable details (amount, currency, tax rate, dates, description).
+     * Status, invoice_number, org_id and client_id are never touched here. Once finalized,
+     * `amount` is locked; `currency` can only change while the invoice is an unfinalized draft
+     * (after that the total — and what the client has been sent — is fixed in that currency).
+     *
+     * For a fixed-amount invoice (no line items) the submitted `amount` is the net; the grand
+     * total, tax and breakdown are recomputed here (Step M-4.1).
      *
      * @param  array<string, mixed>  $data
      */
@@ -39,6 +44,8 @@ class UpdateInvoiceAction
             ]);
         }
 
+        $data = $this->recomputeFixedAmountTotals($invoice, $data);
+
         return DB::transaction(function () use ($invoice, $data) {
             $previousCurrency = $invoice->currency;
 
@@ -54,5 +61,32 @@ class UpdateInvoiceAction
 
             return $invoice;
         });
+    }
+
+    /**
+     * For a fixed-amount invoice (no line items), turn a submitted net `amount` and/or
+     * `tax_rate_id` into the stored subtotal / tax / breakdown / grand-total columns. Itemised and
+     * finalized invoices are left untouched (their totals come from items + the retainer).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function recomputeFixedAmountTotals(Invoice $invoice, array $data): array
+    {
+        $touchesTotals = array_key_exists('amount', $data) || array_key_exists('tax_rate_id', $data);
+
+        if (! $touchesTotals || $invoice->is_finalized || $invoice->items()->exists()) {
+            return $data;
+        }
+
+        $net = array_key_exists('amount', $data) ? (float) $data['amount'] : $invoice->netSubtotal();
+        $taxRateId = array_key_exists('tax_rate_id', $data) ? $data['tax_rate_id'] : $invoice->tax_rate_id;
+        $taxRate = $taxRateId !== null
+            ? TaxRate::query()->withoutOrgScope()->where('org_id', $invoice->org_id)->find((int) $taxRateId)
+            : null;
+
+        $totals = InvoiceTotals::fromLines([['net' => $net, 'rate' => $taxRate?->rate, 'name' => $taxRate?->name]]);
+
+        return [...$data, ...$totals->toInvoiceColumns(), 'tax_rate_id' => $taxRate?->id];
     }
 }

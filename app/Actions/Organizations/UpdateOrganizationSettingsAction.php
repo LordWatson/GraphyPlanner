@@ -17,7 +17,7 @@ class UpdateOrganizationSettingsAction
      * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
      * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
-     * @param  array{default_timezone: string, default_currency: string, billing_details?: string|null, payment_instructions?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -33,6 +33,15 @@ class UpdateOrganizationSettingsAction
 
             if (array_key_exists('payment_instructions', $data)) {
                 $organization->payment_instructions = $data['payment_instructions'];
+            }
+
+            // Step M-4.1: the agency's tax registration (drives the "Tax invoice" heading).
+            if (array_key_exists('tax_registration_number', $data)) {
+                $organization->tax_registration_number = $data['tax_registration_number'];
+            }
+
+            if (array_key_exists('tax_registration_label', $data)) {
+                $organization->tax_registration_label = $data['tax_registration_label'];
             }
 
             if (isset($data['invoice_payment_terms_days'])) {

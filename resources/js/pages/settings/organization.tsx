@@ -14,6 +14,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { edit, testUploadPost } from '@/routes/organization';
+import {
+    store as storeTaxRate,
+    update as updateTaxRate,
+    archive as archiveTaxRate,
+} from '@/routes/tax-rates';
+import { useState } from 'react';
+import { Pencil, Plus, Trash2, Undo2, X } from 'lucide-react';
 
 /** "Key is set (…a1b2)" — Step I-1.6 shows the last four characters, never the key. */
 function storedHint(
@@ -30,6 +37,13 @@ function storedHint(
 
 type Option = { value: string; label: string };
 
+type TaxRate = {
+    id: number;
+    name: string;
+    rate: string;
+    is_archived: boolean;
+};
+
 type OrganizationProps = {
     organization: {
         name: string;
@@ -37,6 +51,8 @@ type OrganizationProps = {
         default_currency: string;
         billing_details: string | null;
         payment_instructions: string | null;
+        tax_registration_number: string | null;
+        tax_registration_label: string | null;
         invoice_payment_terms_days: number;
         has_upload_post_key: boolean;
         has_upload_post_webhook_secret: boolean;
@@ -46,11 +62,15 @@ type OrganizationProps = {
         xai_key_last4: string | null;
     };
     currencies: Option[];
+    tax_rates: TaxRate[];
+    can_manage_tax_rates: boolean;
 };
 
 export default function Organization({
     organization,
     currencies,
+    tax_rates: taxRates,
+    can_manage_tax_rates: canManageTaxRates,
 }: OrganizationProps) {
     return (
         <>
@@ -161,6 +181,53 @@ export default function Organization({
                                             errors.invoice_payment_terms_days
                                         }
                                     />
+                                </div>
+
+                                <div className="grid gap-2 sm:grid-cols-[1fr_12rem]">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="tax_registration_number">
+                                            VAT / TRN number
+                                        </Label>
+                                        <Input
+                                            id="tax_registration_number"
+                                            name="tax_registration_number"
+                                            defaultValue={
+                                                organization.tax_registration_number ??
+                                                ''
+                                            }
+                                            placeholder="Your VAT reg / TRN"
+                                        />
+                                        <p className="text-muted-foreground text-xs">
+                                            Set it and invoices read “Tax
+                                            invoice” and print your number.
+                                        </p>
+                                        <InputError
+                                            className="mt-2"
+                                            message={
+                                                errors.tax_registration_number
+                                            }
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="tax_registration_label">
+                                            Label
+                                        </Label>
+                                        <Input
+                                            id="tax_registration_label"
+                                            name="tax_registration_label"
+                                            defaultValue={
+                                                organization.tax_registration_label ??
+                                                ''
+                                            }
+                                            placeholder="VAT or TRN"
+                                        />
+                                        <InputError
+                                            className="mt-2"
+                                            message={
+                                                errors.tax_registration_label
+                                            }
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="grid gap-2">
@@ -303,6 +370,8 @@ export default function Organization({
                     )}
                 </Form>
 
+                {canManageTaxRates && <TaxRatesManager taxRates={taxRates} />}
+
                 {organization.has_upload_post_key && (
                     <Form
                         {...testUploadPost.form()}
@@ -330,6 +399,197 @@ export default function Organization({
                 )}
             </div>
         </>
+    );
+}
+
+/**
+ * Step M-4.1 — the organization's tax-rate list, applied to invoice line items and the retainer.
+ * Each row is edited inline or archived (never deleted, so historical invoices keep their rate).
+ */
+function TaxRatesManager({ taxRates }: { taxRates: TaxRate[] }) {
+    const [editingId, setEditingId] = useState<number | null>(null);
+
+    return (
+        <section className="border-border space-y-4 rounded-xl border p-4">
+            <Heading
+                variant="small"
+                title="Tax rates"
+                description="Choose from these on invoice line items. Archive a rate to retire it — invoices already using it keep it."
+            />
+
+            <ul className="divide-border divide-y">
+                {taxRates.map((rate) =>
+                    editingId === rate.id ? (
+                        <li key={rate.id} className="py-3">
+                            <Form
+                                {...updateTaxRate.form(rate.id)}
+                                options={{ preserveScroll: true }}
+                                onSuccess={() => setEditingId(null)}
+                                className="flex flex-wrap items-end gap-3"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid flex-1 gap-1.5">
+                                            <Label
+                                                htmlFor={`rate-name-${rate.id}`}
+                                            >
+                                                Name
+                                            </Label>
+                                            <Input
+                                                id={`rate-name-${rate.id}`}
+                                                name="name"
+                                                defaultValue={rate.name}
+                                            />
+                                            <InputError message={errors.name} />
+                                        </div>
+                                        <div className="grid w-28 gap-1.5">
+                                            <Label
+                                                htmlFor={`rate-pct-${rate.id}`}
+                                            >
+                                                Rate %
+                                            </Label>
+                                            <Input
+                                                id={`rate-pct-${rate.id}`}
+                                                name="rate"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                                defaultValue={rate.rate}
+                                            />
+                                            <InputError message={errors.rate} />
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={processing}
+                                        >
+                                            Save
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setEditingId(null)}
+                                        >
+                                            <X />
+                                            Cancel
+                                        </Button>
+                                    </>
+                                )}
+                            </Form>
+                        </li>
+                    ) : (
+                        <li
+                            key={rate.id}
+                            className="flex items-center justify-between gap-3 py-3"
+                        >
+                            <div className="min-w-0">
+                                <span
+                                    className={
+                                        rate.is_archived
+                                            ? 'text-muted-foreground line-through'
+                                            : ''
+                                    }
+                                >
+                                    {rate.name}
+                                </span>
+                                <span className="text-muted-foreground ml-2 font-mono text-sm tabular-nums">
+                                    {rate.rate}%
+                                </span>
+                                {rate.is_archived && (
+                                    <span className="text-muted-foreground ml-2 text-xs">
+                                        Archived
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                {!rate.is_archived && (
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-8"
+                                        aria-label={`Edit ${rate.name}`}
+                                        onClick={() => setEditingId(rate.id)}
+                                    >
+                                        <Pencil className="size-3.5" />
+                                    </Button>
+                                )}
+                                <Form
+                                    {...archiveTaxRate.form(rate.id)}
+                                    options={{ preserveScroll: true }}
+                                >
+                                    {({ processing }) => (
+                                        <Button
+                                            type="submit"
+                                            size="icon"
+                                            variant="ghost"
+                                            className="size-8"
+                                            disabled={processing}
+                                            aria-label={
+                                                rate.is_archived
+                                                    ? `Restore ${rate.name}`
+                                                    : `Archive ${rate.name}`
+                                            }
+                                        >
+                                            {rate.is_archived ? (
+                                                <Undo2 className="size-3.5" />
+                                            ) : (
+                                                <Trash2 className="size-3.5" />
+                                            )}
+                                        </Button>
+                                    )}
+                                </Form>
+                            </div>
+                        </li>
+                    ),
+                )}
+                {taxRates.length === 0 && (
+                    <li className="text-muted-foreground py-3 text-sm">
+                        No tax rates yet. Add one below.
+                    </li>
+                )}
+            </ul>
+
+            <Form
+                {...storeTaxRate.form()}
+                options={{ preserveScroll: true }}
+                resetOnSuccess
+                className="border-border flex flex-wrap items-end gap-3 border-t pt-4"
+            >
+                {({ processing, errors }) => (
+                    <>
+                        <div className="grid flex-1 gap-1.5">
+                            <Label htmlFor="new-rate-name">New rate name</Label>
+                            <Input
+                                id="new-rate-name"
+                                name="name"
+                                placeholder="e.g. UK VAT (20%)"
+                            />
+                            <InputError message={errors.name} />
+                        </div>
+                        <div className="grid w-28 gap-1.5">
+                            <Label htmlFor="new-rate-pct">Rate %</Label>
+                            <Input
+                                id="new-rate-pct"
+                                name="rate"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                placeholder="20"
+                            />
+                            <InputError message={errors.rate} />
+                        </div>
+                        <Button type="submit" size="sm" disabled={processing}>
+                            <Plus />
+                            Add rate
+                        </Button>
+                    </>
+                )}
+            </Form>
+        </section>
     );
 }
 

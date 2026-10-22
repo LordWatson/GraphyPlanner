@@ -53,6 +53,13 @@
     $hasItems = $items->isNotEmpty();
     $index = 0;
 
+    // Step M-4.1: a VAT/TRN-registered agency issues a "Tax invoice"; the totals show net subtotal,
+    // tax per rate, then the grand total.
+    $docType = $organization->hasTaxRegistration() ? 'Tax invoice' : 'Invoice';
+    $subtotal = $invoice->netSubtotal();
+    $taxRows = $invoice->taxBreakdownRows();
+    $hasTax = (float) $invoice->tax_total > 0 || $taxRows !== [];
+
     // Master Alima artwork (public/brand) — never redrawn. Shared with the analytics report PDF.
     $logo = \App\Support\Pdf\PdfBrand::markTile();
     $wordmark = \App\Support\Pdf\PdfBrand::wordmark();
@@ -61,7 +68,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $invoice->invoice_number }}</title>
+    <title>{{ $docType }} {{ $invoice->invoice_number }}</title>
     <style>
         @include('pdf.partials.brand-fonts')
 
@@ -292,7 +299,7 @@
                             <td style="vertical-align: middle;"><img class="logo" src="{{ $logo }}" alt=""></td>
                             <td style="vertical-align: middle;">
                                 <div class="serif studio">{{ $organization->name }}</div>
-                                <div class="mono studio-caption">INVOICE</div>
+                                <div class="mono studio-caption">{{ strtoupper($docType) }}</div>
                             </td>
                         </tr>
                     </table>
@@ -361,12 +368,18 @@
                     @if ($client->invoiceRecipientEmail())
                         <div class="party-line">{{ $client->invoiceRecipientEmail() }}</div>
                     @endif
+                    @if ($client->tax_registration_number)
+                        <div class="party-line">{{ $organization->tax_registration_label ?: 'Tax reg.' }} {{ $client->tax_registration_number }}</div>
+                    @endif
                 </td>
                 <td>
                     <div class="eyebrow">From</div>
                     <div class="party-name">{{ $organization->name }}</div>
                     @if ($organization->billing_details)
                         <div class="party-line">{!! nl2br(e($organization->billing_details)) !!}</div>
+                    @endif
+                    @if ($organization->tax_registration_number)
+                        <div class="party-line">{{ $organization->tax_registration_label ?: 'Tax reg.' }} {{ $organization->tax_registration_number }}</div>
                     @endif
                 </td>
             </tr>
@@ -413,14 +426,26 @@
                         <td class="mono idx first">01</td>
                         <td class="desc">{{ $invoice->description ?: 'Professional services' }}</td>
                         <td class="nums num">1</td>
-                        <td class="nums num">{{ $money($invoice->amount) }}</td>
-                        <td class="nums num last">{{ $money($invoice->amount) }}</td>
+                        <td class="nums num">{{ $money($subtotal) }}</td>
+                        <td class="nums num last">{{ $money($subtotal) }}</td>
                     </tr>
                 @endif
             </tbody>
         </table>
 
         <table class="totals">
+            @if ($hasTax)
+                <tr>
+                    <td>Subtotal</td>
+                    <td class="num nums">{{ $money($subtotal) }}</td>
+                </tr>
+                @foreach ($taxRows as $taxRow)
+                    <tr>
+                        <td>{{ $taxRow['name'] }}</td>
+                        <td class="num nums">{{ $money($taxRow['tax']) }}</td>
+                    </tr>
+                @endforeach
+            @endif
             <tr class="grand">
                 <td colspan="2">
                     <div class="grand-block {{ $isSettled ? 'settled' : '' }}">

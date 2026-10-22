@@ -5,6 +5,7 @@ namespace App\Actions\InvoiceItems;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Support\Invoices\TaxRateSnapshot;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -26,6 +27,9 @@ class AddInvoiceItemAction
 
         return DB::transaction(function () use ($invoice, $data) {
             $nextSortOrder = ((int) $invoice->items()->max('sort_order')) + 1;
+
+            // Step M-4.1: snapshot the chosen tax rate so it can't drift later.
+            $data = TaxRateSnapshot::apply($data, $invoice->org_id);
 
             $item = $invoice->items()->create([
                 ...$data,

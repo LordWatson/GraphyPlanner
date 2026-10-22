@@ -6,6 +6,7 @@ import type {
     InvoiceAbilities,
     InvoiceClientSummary,
     InvoiceDetail,
+    TaxRateOption,
 } from '@/components/invoices/types';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
@@ -34,11 +35,13 @@ export default function InvoiceEdit({
     client,
     can,
     currencies,
+    tax_rates: taxRates,
 }: {
     invoice: InvoiceDetail;
     client: InvoiceClientSummary;
     can: InvoiceAbilities;
     currencies: CurrencyOption[];
+    tax_rates: TaxRateOption[];
 }) {
     return (
         <>
@@ -192,6 +195,38 @@ export default function InvoiceEdit({
                                         </p>
                                         <InputError message={errors.currency} />
                                     </div>
+                                    {can.edit_amount && taxRates.length > 0 && (
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="tax_rate_id">
+                                                Tax rate
+                                            </Label>
+                                            <select
+                                                id="tax_rate_id"
+                                                name="tax_rate_id"
+                                                defaultValue={
+                                                    invoice.tax_rate_id ?? ''
+                                                }
+                                                className="border-input bg-background ring-offset-background focus-visible:ring-ring h-9 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                                            >
+                                                <option value="">No tax</option>
+                                                {taxRates.map((rate) => (
+                                                    <option
+                                                        key={rate.value}
+                                                        value={rate.value}
+                                                    >
+                                                        {rate.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="text-muted-foreground text-xs">
+                                                Added on top of the amount
+                                                above.
+                                            </p>
+                                            <InputError
+                                                message={errors.tax_rate_id}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="description">

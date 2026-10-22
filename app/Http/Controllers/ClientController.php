@@ -20,9 +20,11 @@ use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
 use App\Models\ConnectInvite;
 use App\Models\SocialAccount;
+use App\Models\TaxRate;
 use App\Models\User;
 use App\Support\Clients\ClientPresenter;
 use App\Support\Clients\ClientTabPresenter;
+use App\Support\Options\CurrencyOptions;
 use App\Support\Options\LanguageOptions;
 use App\Support\Options\TimezoneOptions;
 use Illuminate\Http\RedirectResponse;
@@ -136,6 +138,15 @@ class ClientController extends Controller
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
             'languages' => LanguageOptions::options(),
             'owners' => $this->ownerOptions($request),
+            'currencies' => CurrencyOptions::options(),
+            // Step M-4.1: the org's active tax rates for the client's default-rate picker.
+            'taxRates' => TaxRate::query()
+                ->where('org_id', $client->org_id)
+                ->active()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get(['id', 'name', 'rate'])
+                ->map(fn (TaxRate $rate) => ['value' => (string) $rate->id, 'label' => $rate->name]),
         ]);
     }
 

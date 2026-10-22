@@ -67,6 +67,8 @@ class CreateInvoiceFromCampaignAction
                 'price' => $amount,
                 'quantity' => 1,
                 'is_billable' => true,
+                // Step M-4.1: the fee inherits the client's default tax rate.
+                'tax_rate_id' => $campaign->client->default_tax_rate_id,
             ]);
 
             $campaign->recordActivity('invoice.added', $user, meta: ['invoice_id' => $invoice->id, 'amount' => $amount]);

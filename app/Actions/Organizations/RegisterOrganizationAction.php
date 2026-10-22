@@ -3,6 +3,7 @@
 namespace App\Actions\Organizations;
 
 use App\Actions\Campaigns\SeedStarterCampaignTemplatesAction;
+use App\Actions\TaxRates\SeedDefaultTaxRatesAction;
 use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Organization;
@@ -60,6 +61,9 @@ class RegisterOrganizationAction
 
             // Campaigns enhancement C-3.4: three starter templates to begin with.
             (new SeedStarterCampaignTemplatesAction)($organization);
+
+            // Step M-4.1: UK + UAE starter tax rates, editable in Settings.
+            (new SeedDefaultTaxRatesAction)($organization);
 
             return $owner;
         });

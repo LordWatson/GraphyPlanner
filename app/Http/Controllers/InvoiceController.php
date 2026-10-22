@@ -8,6 +8,7 @@ use App\Actions\Invoices\DuplicateInvoiceAction;
 use App\Actions\Invoices\FinalizeInvoiceAction;
 use App\Actions\Invoices\GenerateInvoicePdfAction;
 use App\Actions\Invoices\MarkInvoicePaidAction;
+use App\Actions\Invoices\RevertPaymentReportAction;
 use App\Actions\Invoices\SendInvoiceAction;
 use App\Actions\Invoices\SendInvoiceReminderAction;
 use App\Actions\Invoices\UpdateInvoiceAction;
@@ -23,6 +24,7 @@ use App\Http\Requests\UploadInvoicePdfRequest;
 use App\Http\Requests\VoidInvoiceRequest;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\TaxRate;
 use App\Services\InvoiceLedgerService;
 use App\Support\Invoices\InvoicePresenter;
 use App\Support\Options\CurrencyOptions;
@@ -125,6 +127,7 @@ class InvoiceController extends Controller
             'invoice' => InvoicePresenter::detail($invoice),
             'client' => $this->clientSummary($invoice),
             'can' => InvoicePresenter::abilities($invoice, $request->user()),
+            'tax_rates' => $this->taxRateOptions($invoice->org_id),
         ]);
     }
 
@@ -140,6 +143,7 @@ class InvoiceController extends Controller
             'client' => $this->clientSummary($invoice),
             'can' => InvoicePresenter::abilities($invoice, $request->user()),
             'currencies' => CurrencyOptions::options(),
+            'tax_rates' => $this->taxRateOptions($invoice->org_id),
         ]);
     }
 
@@ -238,6 +242,34 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Step M-4.2 — confirm a payment the client reported, locking the invoice as paid.
+     */
+    public function confirmPayment(Invoice $invoice, MarkInvoicePaidAction $action): RedirectResponse
+    {
+        $this->authorize('confirmPayment', $invoice);
+
+        $action($invoice);
+
+        $this->toast("{$invoice->invoice_number} confirmed as paid.");
+
+        return back();
+    }
+
+    /**
+     * Step M-4.2 — reject a reported payment ("Not received yet"), returning the invoice to sent.
+     */
+    public function revertPayment(Invoice $invoice, RevertPaymentReportAction $action): RedirectResponse
+    {
+        $this->authorize('confirmPayment', $invoice);
+
+        $action($invoice);
+
+        $this->toast("{$invoice->invoice_number} returned to the client to try again.");
+
+        return back();
+    }
+
+    /**
      * Void a sent invoice.
      */
     public function void(VoidInvoiceRequest $request, Invoice $invoice, VoidInvoiceAction $action): RedirectResponse
@@ -293,6 +325,29 @@ class InvoiceController extends Controller
             'recipient_email' => $client->invoiceRecipientEmail(),
             'retainer_amount' => $client->retainer_amount !== null ? (string) $client->retainer_amount : null,
         ];
+    }
+
+    /**
+     * Step M-4.1 — the org's active tax rates, for the line-item / invoice-level rate pickers.
+     *
+     * @return array<int, array{value: string, label: string, rate: string}>
+     */
+    private function taxRateOptions(int $orgId): array
+    {
+        return TaxRate::query()
+            ->withoutOrgScope()
+            ->where('org_id', $orgId)
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (TaxRate $rate) => [
+                'value' => (string) $rate->id,
+                'label' => $rate->name,
+                'rate' => number_format((float) $rate->rate, 2, '.', ''),
+            ])
+            ->values()
+            ->all();
     }
 
     private function toast(string $message, string $type = 'success'): void

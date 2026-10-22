@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Actions\Invoices\ReportInvoicePaymentAction;
 use App\Enums\InvoiceStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Portal\ReportInvoicePaymentRequest;
 use App\Models\Invoice;
 use App\Support\Invoices\InvoicePresenter;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,6 +49,24 @@ class PortalInvoiceController extends Controller
         abort_if($invoice->status === InvoiceStatus::Draft, 404);
 
         return $invoice->pdfResponse();
+    }
+
+    /**
+     * Step M-4.2 — the client reports they've paid this invoice. Scoped to the logged-in contact's
+     * own client (never a value from the request); the Action enforces that only a `sent` invoice
+     * can be reported.
+     */
+    public function reportPayment(ReportInvoicePaymentRequest $request, Invoice $invoice, ReportInvoicePaymentAction $action): RedirectResponse
+    {
+        abort_unless($invoice->client_id === $request->user()->client_id, 404);
+        // Drafts are never shown to the client, so there's nothing here to report against.
+        abort_if($invoice->status === InvoiceStatus::Draft, 404);
+
+        $action($invoice, $request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Thanks — we’ll confirm your payment shortly.']);
+
+        return back();
     }
 
     public function show(Request $request, Invoice $invoice): Response

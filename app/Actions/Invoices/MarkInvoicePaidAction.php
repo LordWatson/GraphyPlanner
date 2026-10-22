@@ -14,16 +14,21 @@ class MarkInvoicePaidAction
     public function __construct(private GenerateInvoicePdfAction $generatePdf) {}
 
     /**
-     * Mark a sent invoice as paid, recording when the payment arrived (defaults to now) and an
+     * Mark an invoice as paid, recording when the payment arrived (defaults to now) and an
      * optional payment reference, then refresh the generated PDF so it doubles as a receipt.
+     *
+     * Two routes reach `paid` (Step M-4.2): the org marking a `sent` invoice paid directly (it
+     * took the payment itself), and the org confirming a payment the client reported from the
+     * portal (`pending_confirmation`). When confirming and no reference is supplied, the client's
+     * reported reference is carried over.
      *
      * @param  array{paid_at?: string|null, payment_reference?: string|null}  $data
      */
     public function __invoke(Invoice $invoice, array $data = []): Invoice
     {
-        if ($invoice->status !== InvoiceStatus::Sent) {
+        if (! in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::PendingConfirmation], true)) {
             throw ValidationException::withMessages([
-                'status' => 'Only sent invoices can be marked as paid.',
+                'status' => 'Only sent or payment-reported invoices can be marked as paid.',
             ]);
         }
 
@@ -35,7 +40,7 @@ class MarkInvoicePaidAction
             $invoice->update([
                 'status' => InvoiceStatus::Paid,
                 'paid_at' => $paidAt,
-                'payment_reference' => $data['payment_reference'] ?? null,
+                'payment_reference' => $data['payment_reference'] ?? $invoice->payment_reported_reference,
             ]);
 
             if ($invoice->shouldRefreshGeneratedPdf()) {

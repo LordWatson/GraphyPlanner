@@ -42,6 +42,12 @@ final class ClientPresenter
             'approval_email' => $client->approval_email,
             'billing_email' => $canViewBilling ? $client->billing_email : null,
             'billing_address' => $canViewBilling ? $client->billing_address : null,
+            // Step M-4.1 / M-4.3: tax registration, per-client billing currency, default tax rate
+            // and the recurring-retainer opt-in (all billing-gated).
+            'tax_registration_number' => $canViewBilling ? $client->tax_registration_number : null,
+            'billing_currency' => $canViewBilling ? $client->billing_currency : null,
+            'default_tax_rate_id' => $canViewBilling ? $client->default_tax_rate_id : null,
+            'auto_invoice_retainer' => $canViewBilling ? $client->auto_invoice_retainer : null,
             'health' => $health['status']->value,
             'health_reason' => $health['reason'],
             'health_reasons' => $health['reasons'],

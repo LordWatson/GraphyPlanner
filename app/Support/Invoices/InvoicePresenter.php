@@ -32,6 +32,9 @@ final class InvoicePresenter
             'is_overdue' => $invoice->isOverdue(),
             'days_overdue' => $invoice->daysOverdue(),
             'amount' => (string) $invoice->amount,
+            'subtotal' => number_format($invoice->netSubtotal(), 2, '.', ''),
+            'tax_total' => (string) $invoice->tax_total,
+            'tax_breakdown' => $invoice->taxBreakdownRows(),
             'currency' => $invoice->currency,
             'issue_date' => $invoice->issue_date->toDateString(),
             'due_date' => $invoice->due_date?->toDateString(),
@@ -59,11 +62,19 @@ final class InvoicePresenter
             'is_finalized' => $invoice->is_finalized,
             'needs_finalizing' => $invoice->needsFinalizing(),
             'retainer_amount_snapshot' => $invoice->retainer_amount_snapshot !== null ? (string) $invoice->retainer_amount_snapshot : null,
+            'retainer_tax_rate' => $invoice->retainer_tax_rate !== null ? (string) $invoice->retainer_tax_rate : null,
+            'retainer_tax_name' => $invoice->retainer_tax_name,
+            'tax_rate_id' => $invoice->tax_rate_id,
             'finalized_at' => $invoice->finalized_at?->toIso8601String(),
             'sent_to_email' => $invoice->sent_to_email,
             'last_reminded_at' => $invoice->last_reminded_at?->toIso8601String(),
             'reminder_count' => $invoice->reminder_count,
             'payment_reference' => $invoice->payment_reference,
+            // Step M-4.2: what the client reported when they said they'd paid.
+            'payment_reported_at' => $invoice->payment_reported_at?->toIso8601String(),
+            'payment_reported_method' => $invoice->payment_reported_method,
+            'payment_reported_reference' => $invoice->payment_reported_reference,
+            'payment_reported_note' => $invoice->payment_reported_note,
             'voided_at' => $invoice->voided_at?->toIso8601String(),
             'void_reason' => $invoice->void_reason,
             // Step I-1.6: an authorized route, never a direct storage URL.
@@ -76,6 +87,10 @@ final class InvoicePresenter
                 'is_billable' => $item->is_billable,
                 'price' => $item->price !== null ? (string) $item->price : null,
                 'quantity' => $item->quantity,
+                'tax_rate_id' => $item->tax_rate_id,
+                'tax_rate' => $item->tax_rate !== null ? (string) $item->tax_rate : null,
+                'tax_name' => $item->tax_name,
+                'tax_amount' => $item->taxAmount(),
                 'sort_order' => $item->sort_order,
                 'line_total' => $item->lineTotal(),
             ])->values(),
@@ -97,18 +112,24 @@ final class InvoicePresenter
 
         $isDraft = $invoice->status === InvoiceStatus::Draft;
         $isSent = $invoice->status === InvoiceStatus::Sent;
+        $isPending = $invoice->status === InvoiceStatus::PendingConfirmation;
         $canUpdate = $user->can('update', $invoice);
 
         return [
             'update' => $canUpdate,
             'delete' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Void], true) && $user->can('delete', $invoice),
             'send' => $isDraft && $user->can('send', $invoice),
+            // Step M-4.2: the org can mark a sent invoice paid directly (it took the payment itself).
             'mark_paid' => $isSent && $user->can('markPaid', $invoice),
+            // Confirm / revert a payment the client reported from the portal.
+            'confirm_payment' => $isPending && $user->can('confirmPayment', $invoice),
+            'revert_payment' => $isPending && $user->can('confirmPayment', $invoice),
             'finalize' => $isDraft && ! $invoice->is_finalized && $user->can('finalize', $invoice),
             'manage_items' => $isDraft && $canUpdate,
             'edit_currency' => $invoice->canChangeCurrency() && $canUpdate,
             'edit_amount' => $isDraft && ! $invoice->is_finalized && $invoice->items->isEmpty() && $canUpdate,
             'generate_pdf' => $invoice->canGeneratePdf() && $canUpdate,
+            // A reported-but-unconfirmed invoice is reverted to `sent` before it can be voided.
             'void' => $isSent && $user->can('void', $invoice),
             'remind' => $isSent
                 && ! $invoice->last_reminded_at?->gt(now()->subHours(SendInvoiceReminderAction::COOLDOWN_HOURS))
@@ -135,6 +156,9 @@ final class InvoicePresenter
             'display_status' => $invoice->displayStatus(),
             'display_status_label' => $invoice->displayStatusLabel(),
             'amount' => (string) $invoice->amount,
+            'subtotal' => number_format($invoice->netSubtotal(), 2, '.', ''),
+            'tax_total' => (string) $invoice->tax_total,
+            'tax_breakdown' => $invoice->taxBreakdownRows(),
             'currency' => $invoice->currency,
             'issue_date' => $invoice->issue_date->toDateString(),
             'due_date' => $invoice->due_date?->toDateString(),
@@ -143,6 +167,14 @@ final class InvoicePresenter
             'is_unpaid' => $invoice->status === InvoiceStatus::Sent,
             'is_overdue' => $invoice->isOverdue(),
             'days_overdue' => $invoice->daysOverdue(),
+            // Step M-4.2: the client can report payment on a sent invoice; once reported it shows
+            // "awaiting confirmation" and what they told us.
+            'can_report_payment' => $invoice->status === InvoiceStatus::Sent,
+            'is_pending_confirmation' => $invoice->isPendingConfirmation(),
+            'payment_reported_at' => $invoice->payment_reported_at?->toIso8601String(),
+            'payment_reported_method' => $invoice->payment_reported_method,
+            'payment_reported_reference' => $invoice->payment_reported_reference,
+            'payment_reported_note' => $invoice->payment_reported_note,
             // Step I-1.6: served through the portal's own authorized route.
             'pdf_url' => $invoice->hasPdf() ? route('portal.invoices.pdf', $invoice) : null,
             'pdf_original_filename' => $invoice->pdf_original_filename,

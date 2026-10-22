@@ -21,12 +21,16 @@ use Illuminate\Support\Carbon;
  * @property bool $is_billable
  * @property string|null $price
  * @property int $quantity
+ * @property int|null $tax_rate_id
+ * @property string|null $tax_rate
+ * @property string|null $tax_name
  * @property int $sort_order
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'invoice_id', 'org_id', 'post_id', 'campaign_id', 'description', 'is_billable', 'price', 'quantity', 'sort_order',
+    'invoice_id', 'org_id', 'post_id', 'campaign_id', 'description', 'is_billable', 'price', 'quantity',
+    'tax_rate_id', 'tax_rate', 'tax_name', 'sort_order',
 ])]
 class InvoiceItem extends Model
 {
@@ -42,8 +46,17 @@ class InvoiceItem extends Model
             'is_billable' => 'boolean',
             'price' => 'decimal:2',
             'quantity' => 'integer',
+            'tax_rate' => 'decimal:2',
             'sort_order' => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<TaxRate, $this>
+     */
+    public function taxRate(): BelongsTo
+    {
+        return $this->belongsTo(TaxRate::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -71,7 +84,7 @@ class InvoiceItem extends Model
     }
 
     /**
-     * The total for this line item: zero for non-billable items, regardless of price.
+     * The net total for this line item: zero for non-billable items, regardless of price.
      */
     public function lineTotal(): float
     {
@@ -80,5 +93,18 @@ class InvoiceItem extends Model
         }
 
         return (float) $this->price * $this->quantity;
+    }
+
+    /**
+     * Step M-4.1 — the tax charged on this line (net × rate), or zero when no rate is set or the
+     * line isn't billable.
+     */
+    public function taxAmount(): float
+    {
+        if ($this->tax_rate === null) {
+            return 0.0;
+        }
+
+        return round($this->lineTotal() * (float) $this->tax_rate / 100, 2);
     }
 }
