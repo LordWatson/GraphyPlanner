@@ -64,6 +64,7 @@ use App\Services\Publishing\UploadPostMusicProvider;
 use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
+use App\Services\Workspace\CurrentWorkspace;
 use App\Support\Queues;
 use App\Support\RateLimits;
 use Carbon\CarbonImmutable;
@@ -84,6 +85,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Step B-1.3: one workspace resolver per request, so the primary brand is resolved and
+        // cached once (bound `scoped` so it never leaks across requests under Octane/queue reuse).
+        $this->app->scoped(CurrentWorkspace::class);
+
         // Local disk today (config('assets.disk'), "public" by default); swap this
         // binding for an S3-backed implementation once Phase 1/2 needs signed-URL
         // uploads (spec §10) — no caller of App\Contracts\AssetStorage needs to change.

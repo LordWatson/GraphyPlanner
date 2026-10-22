@@ -19,14 +19,16 @@ class StoreStaffInvitationRequest extends FormRequest
     }
 
     /**
-     * Staff roles a user can be invited into — `Role::ClientReviewer` is reserved for the
-     * client-portal invitation flow (Step 6.1/6.2) and is never assignable here.
+     * Staff roles a user can be invited into. `Role::ClientReviewer` is reserved for the
+     * client-portal invitation flow (Step 6.1/6.2) and is never assignable here. Step B-1.5: a
+     * business workspace additionally never assigns `SuperAdmin` — its team is Owner/Manager/
+     * Creator/Viewer (see `Role::assignableFor()`).
      *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
-        $staffRoles = array_filter(Role::cases(), fn (Role $role) => $role !== Role::ClientReviewer);
+        $staffRoles = Role::assignableFor($this->user()->organization->type);
 
         return [
             'email' => ['required', 'email', 'max:255'],

@@ -37,7 +37,8 @@ class UpdatePostRequest extends FormRequest
         $platforms = array_map(fn (Platform $platform) => $platform->value, Platform::cases());
 
         return [
-            'approval_mode' => ['nullable', new Enum(ApprovalMode::class)],
+            // Step B-1.4: client approval isn't a concept in a business workspace.
+            'approval_mode' => ['nullable', new Enum(ApprovalMode::class), $this->rejectClientApprovalForBusiness()],
             'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
             'master_caption' => ['nullable', 'string', 'max:65000'],
             'review_message' => ['nullable', 'string'],
@@ -94,6 +95,19 @@ class UpdatePostRequest extends FormRequest
             // Step I-3.2 / M-2.3: checked against the account's platform in `after()`.
             'targets.*.format' => ['nullable', 'string', 'max:32'],
         ];
+    }
+
+    /**
+     * Step B-1.4 — a business workspace has no client to approve posts, so `ApprovalMode::
+     * ClientRequired` is rejected for it (agencies are unaffected).
+     */
+    private function rejectClientApprovalForBusiness(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === ApprovalMode::ClientRequired->value && $this->user()?->organization?->isBusiness() === true) {
+                $fail(__('Client approval isn’t available in this workspace.'));
+            }
+        };
     }
 
     /**

@@ -38,4 +38,17 @@ class ClientFactory extends Factory
             'approval_email' => fake()->companyEmail(),
         ];
     }
+
+    /**
+     * Step B-1.2 — a business workspace's single primary brand. The database's unique index allows
+     * only one of these per organization, so give each `primary()` client its own org (the default)
+     * or an explicitly business org.
+     */
+    public function primary(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_primary' => true,
+            'status' => ClientStatus::Active,
+        ]);
+    }
 }

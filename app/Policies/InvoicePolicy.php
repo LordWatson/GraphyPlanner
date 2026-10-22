@@ -10,6 +10,17 @@ use App\Models\User;
 class InvoicePolicy
 {
     /**
+     * Step B-1.4 — client invoicing is agency-only. A business workspace bills on its own
+     * subscription (Phase B-9) and never touches client invoices, so every ability here is denied
+     * for it (defence in depth behind the `workspace:agency` route guard). Returning null leaves
+     * super admins (allowed by the global `Gate::before`) and agencies to the per-ability checks.
+     */
+    public function before(User $user, string $ability): ?bool
+    {
+        return $user->organization?->isBusiness() === true ? false : null;
+    }
+
+    /**
      * Determine whether the user can view the invoice history for a client.
      */
     public function viewAny(User $user, Client $client): bool

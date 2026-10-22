@@ -60,6 +60,10 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'preview' => $request->is('preview', 'preview/*'),
+            // Step B-1.3 / B-1.5: the workspace shell. `type` switches navigation and copy; `brand`
+            // is the business workspace's primary brand (null for an agency); `roleLabels` maps each
+            // stored role to the label this workspace shows ("Manager"/"Creator" for business).
+            'workspace' => fn (): ?array => self::sharedWorkspace($user()),
             'client' => function () use ($user): ?array {
                 $current = $user();
 
@@ -117,6 +121,32 @@ class HandleInertiaRequests extends Middleware
             'client_id' => $user->client_id,
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
+        ];
+    }
+
+    /**
+     * Step B-1.3 — the shared workspace shell. Resolved defensively: the shared props run on every
+     * response, so a business org missing its primary brand reports `brand: null` here (and is
+     * logged where it matters, in `CurrentWorkspace::brand()`) rather than 500-ing every page.
+     *
+     * @return array{type: string, brand: array{id: int, name: string}|null, roleLabels: array<string, string>}|null
+     */
+    private static function sharedWorkspace(?User $user): ?array
+    {
+        $organization = $user?->organization;
+
+        if ($organization === null) {
+            return null;
+        }
+
+        $brand = $organization->isBusiness() ? $organization->primaryBrand()->first() : null;
+
+        return [
+            'type' => $organization->type->value,
+            'brand' => $brand !== null ? ['id' => $brand->id, 'name' => $brand->name] : null,
+            'roleLabels' => collect(Role::cases())
+                ->mapWithKeys(fn (Role $role) => [$role->value => $role->labelFor($organization->type)])
+                ->all(),
         ];
     }
 

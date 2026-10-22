@@ -6,6 +6,7 @@ use App\Enums\ApprovalMode;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Post;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -32,7 +33,8 @@ class StorePostRequest extends FormRequest
 
         return [
             'status' => ['nullable', new Enum(PostStatus::class)],
-            'approval_mode' => ['nullable', new Enum(ApprovalMode::class)],
+            // Step B-1.4: client approval isn't a concept in a business workspace.
+            'approval_mode' => ['nullable', new Enum(ApprovalMode::class), $this->rejectClientApprovalForBusiness()],
             'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
             'master_caption' => ['nullable', 'string'],
             'hashtags' => ['nullable', 'array'],
@@ -45,5 +47,18 @@ class StorePostRequest extends FormRequest
             'targets.*.scheduled_local_date' => ['nullable', 'date'],
             'targets.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
         ];
+    }
+
+    /**
+     * Step B-1.4 — a business workspace has no client to approve posts, so `ApprovalMode::
+     * ClientRequired` is rejected for it (agencies are unaffected).
+     */
+    private function rejectClientApprovalForBusiness(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === ApprovalMode::ClientRequired->value && $this->user()?->organization?->isBusiness() === true) {
+                $fail(__('Client approval isn’t available in this workspace.'));
+            }
+        };
     }
 }

@@ -143,21 +143,25 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
     });
 
-    Route::resource('clients', ClientController::class);
+    // Step B-1.4: the clients CRM is agency-only. A business workspace has a single primary brand
+    // (no list/create/delete UI), so these routes 404 for it until a business equivalent exists.
+    Route::resource('clients', ClientController::class)->middleware('workspace:agency');
     // Step I-2.4: one route per client page tab (`clients.show` is the Social accounts tab).
     Route::get('clients/{client}/posts', [ClientTabController::class, 'posts'])->name('clients.posts.index');
     Route::get('clients/{client}/media', [ClientTabController::class, 'media'])->name('clients.media');
     Route::get('clients/{client}/campaigns', [ClientTabController::class, 'campaigns'])->name('clients.campaigns.index');
-    Route::get('clients/{client}/billing', [ClientTabController::class, 'billing'])->name('clients.billing');
-    Route::get('clients/{client}/portal-access', [ClientTabController::class, 'portalAccess'])->name('clients.portal-access');
+    Route::get('clients/{client}/billing', [ClientTabController::class, 'billing'])->middleware('workspace:agency')->name('clients.billing');
+    Route::get('clients/{client}/portal-access', [ClientTabController::class, 'portalAccess'])->middleware('workspace:agency')->name('clients.portal-access');
     Route::get('clients/{client}/ai', [ClientTabController::class, 'ai'])->name('clients.ai.index');
-    Route::get('clients/{client}/briefs', [ClientTabController::class, 'briefs'])->name('clients.briefs');
+    Route::get('clients/{client}/briefs', [ClientTabController::class, 'briefs'])->middleware('workspace:agency')->name('clients.briefs');
     // Step I-1.5: "delete" (above) archives; these act on archived (soft-deleted) clients.
     Route::post('clients/{client}/restore', [ClientController::class, 'restore'])
         ->withTrashed()
+        ->middleware('workspace:agency')
         ->name('clients.restore');
     Route::delete('clients/{client}/purge', [ClientController::class, 'purge'])
         ->withTrashed()
+        ->middleware('workspace:agency')
         ->name('clients.purge');
 
     Route::get('clients/{client}/brand-brain', [BrandBrainController::class, 'edit'])
@@ -170,59 +174,64 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::put('clients/{client}/brand-brain/references', [BrandBrainController::class, 'updateReferences'])
         ->name('clients.brand-brain.references.update');
 
-    Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
-        ->name('clients.invoices.store');
-    Route::get('invoices', [InvoiceController::class, 'index'])
-        ->name('invoices.index');
-    Route::get('invoices/export', [InvoiceController::class, 'export'])
-        ->middleware(['throttle:exports', 'password.confirm'])
-        ->name('invoices.export');
-    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
-        ->name('invoices.show');
-    Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
-        ->name('invoices.edit');
-    Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])
-        ->name('invoices.update');
-    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
-        ->name('invoices.destroy');
-    // Step I-1.6: invoice PDFs are private — streamed only through this authorized route.
-    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'showPdf'])
-        ->name('invoices.pdf.show');
-    Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
-        ->name('invoices.pdf.store');
-    Route::post('invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
-        ->middleware('throttle:exports')
-        ->name('invoices.generate-pdf');
-    Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
-        ->name('invoices.send');
-    Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
-        ->name('invoices.mark-paid');
-    // Step M-4.2: confirm (→ paid) or revert (→ sent) a payment the client reported.
-    Route::post('invoices/{invoice}/confirm-payment', [InvoiceController::class, 'confirmPayment'])
-        ->name('invoices.confirm-payment');
-    Route::post('invoices/{invoice}/revert-payment', [InvoiceController::class, 'revertPayment'])
-        ->name('invoices.revert-payment');
-    Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
-        ->name('invoices.finalize');
-    Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind'])
-        ->name('invoices.remind');
-    Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])
-        ->name('invoices.void');
-    Route::post('invoices/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])
-        ->name('invoices.duplicate');
+    // Step B-1.4: client invoicing is agency-only — a business workspace bills on its own
+    // subscription (Phase B-9), never issues client invoices. The whole block 404s for it.
+    Route::middleware('workspace:agency')->group(function () {
+        Route::post('clients/{client}/invoices', [InvoiceController::class, 'store'])
+            ->name('clients.invoices.store');
+        Route::get('invoices', [InvoiceController::class, 'index'])
+            ->name('invoices.index');
+        Route::get('invoices/export', [InvoiceController::class, 'export'])
+            ->middleware(['throttle:exports', 'password.confirm'])
+            ->name('invoices.export');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
+            ->name('invoices.show');
+        Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
+            ->name('invoices.edit');
+        Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])
+            ->name('invoices.update');
+        Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
+            ->name('invoices.destroy');
+        // Step I-1.6: invoice PDFs are private — streamed only through this authorized route.
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'showPdf'])
+            ->name('invoices.pdf.show');
+        Route::post('invoices/{invoice}/pdf', [InvoiceController::class, 'uploadPdf'])
+            ->name('invoices.pdf.store');
+        Route::post('invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+            ->middleware('throttle:exports')
+            ->name('invoices.generate-pdf');
+        Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])
+            ->name('invoices.send');
+        Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
+            ->name('invoices.mark-paid');
+        // Step M-4.2: confirm (→ paid) or revert (→ sent) a payment the client reported.
+        Route::post('invoices/{invoice}/confirm-payment', [InvoiceController::class, 'confirmPayment'])
+            ->name('invoices.confirm-payment');
+        Route::post('invoices/{invoice}/revert-payment', [InvoiceController::class, 'revertPayment'])
+            ->name('invoices.revert-payment');
+        Route::post('invoices/{invoice}/finalize', [InvoiceController::class, 'finalize'])
+            ->name('invoices.finalize');
+        Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind'])
+            ->name('invoices.remind');
+        Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])
+            ->name('invoices.void');
+        Route::post('invoices/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])
+            ->name('invoices.duplicate');
 
-    Route::post('invoices/{invoice}/items', [InvoiceItemController::class, 'store'])
-        ->name('invoices.items.store');
-    Route::put('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'update'])
-        ->name('invoice-items.update');
-    Route::delete('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'destroy'])
-        ->name('invoice-items.destroy');
+        Route::post('invoices/{invoice}/items', [InvoiceItemController::class, 'store'])
+            ->name('invoices.items.store');
+        Route::put('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'update'])
+            ->name('invoice-items.update');
+        Route::delete('invoice-items/{invoiceItem}', [InvoiceItemController::class, 'destroy'])
+            ->name('invoice-items.destroy');
+    });
 
     Route::post('clients/{client}/social-accounts', [SocialAccountController::class, 'store'])
         ->name('clients.social-accounts.store');
-    // Step M-2.8: client self-connect links.
-    Route::post('clients/{client}/connect-invites', [ConnectInviteController::class, 'store'])->name('clients.connect-invites.store');
-    Route::delete('connect-invites/{connectInvite}', [ConnectInviteController::class, 'destroy'])->name('connect-invites.destroy');
+    // Step M-2.8: client self-connect links. Step B-1.4: agency-only (a business workspace connects
+    // its own accounts directly, with no client to invite).
+    Route::post('clients/{client}/connect-invites', [ConnectInviteController::class, 'store'])->middleware('workspace:agency')->name('clients.connect-invites.store');
+    Route::delete('connect-invites/{connectInvite}', [ConnectInviteController::class, 'destroy'])->middleware('workspace:agency')->name('connect-invites.destroy');
     Route::put('social-accounts/{socialAccount}', [SocialAccountController::class, 'update'])
         ->name('social-accounts.update');
     Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
@@ -453,14 +462,18 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('ai-image-variants.download');
 
     // Step 2.5: internal-only "Daily Briefs" tab listing the nightly DailyBrief rows for a
-    // client, same gating as the AI endpoints above.
+    // client, same gating as the AI endpoints above. Step B-1.4: agency-only.
     Route::get('clients/{client}/daily-briefs', [DailyBriefController::class, 'index'])
+        ->middleware('workspace:agency')
         ->name('clients.daily-briefs.index');
 
     // Step 6.1: client portal invitations (Owner/Strategist only, see ClientInvitationPolicy).
+    // Step B-1.4: agency-only — a business workspace has no client portal.
     Route::post('clients/{client}/invitations', [ClientInvitationController::class, 'store'])
+        ->middleware('workspace:agency')
         ->name('clients.invitations.store');
     Route::delete('invitations/{invitation}', [ClientInvitationController::class, 'destroy'])
+        ->middleware('workspace:agency')
         ->name('invitations.destroy');
 
     // Phase 17: chapter 06 Analytics — every staff role (sections gated per role inside, see
@@ -469,16 +482,20 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step I-16.2 / M-1.2: raw data exports re-check the password (`password.confirm`, 3 h window).
     Route::get('analytics/export', [OrganizationAnalyticsController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('analytics.export');
     Route::get('analytics/pdf', [OrganizationAnalyticsController::class, 'pdf'])->middleware('throttle:exports')->name('analytics.pdf');
-    Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
-    // Step M-3.3: monthly client reports (studio side).
-    Route::get('clients/{client}/reports', [ClientReportController::class, 'index'])->name('clients.reports.index');
-    Route::post('clients/{client}/reports', [ClientReportController::class, 'store'])->name('clients.reports.store');
-    Route::put('clients/{client}/report-schedule', [ClientReportController::class, 'updateSchedule'])->name('clients.report-schedule.update');
-    Route::get('client-reports/{report}', [ClientReportController::class, 'show'])->name('client-reports.show');
-    Route::put('client-reports/{report}', [ClientReportController::class, 'update'])->name('client-reports.update');
-    Route::post('client-reports/{report}/refresh', [ClientReportController::class, 'refresh'])->name('client-reports.refresh');
-    Route::post('client-reports/{report}/publish', [ClientReportController::class, 'publish'])->name('client-reports.publish');
-    Route::get('client-reports/{report}/pdf', [ClientReportController::class, 'pdf'])->middleware('throttle:exports')->name('client-reports.pdf');
+    // Step B-1.4: per-client analytics and the monthly client-report workflow are agency-only. A
+    // business workspace gets its own single-brand insights (Phase B-8) instead.
+    Route::middleware('workspace:agency')->group(function () {
+        Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
+        // Step M-3.3: monthly client reports (studio side).
+        Route::get('clients/{client}/reports', [ClientReportController::class, 'index'])->name('clients.reports.index');
+        Route::post('clients/{client}/reports', [ClientReportController::class, 'store'])->name('clients.reports.store');
+        Route::put('clients/{client}/report-schedule', [ClientReportController::class, 'updateSchedule'])->name('clients.report-schedule.update');
+        Route::get('client-reports/{report}', [ClientReportController::class, 'show'])->name('client-reports.show');
+        Route::put('client-reports/{report}', [ClientReportController::class, 'update'])->name('client-reports.update');
+        Route::post('client-reports/{report}/refresh', [ClientReportController::class, 'refresh'])->name('client-reports.refresh');
+        Route::post('client-reports/{report}/publish', [ClientReportController::class, 'publish'])->name('client-reports.publish');
+        Route::get('client-reports/{report}/pdf', [ClientReportController::class, 'pdf'])->middleware('throttle:exports')->name('client-reports.pdf');
+    });
     Route::resource('analytics/reports', OrganizationReportController::class)
         ->names('analytics.reports')
         ->parameters(['reports' => 'report']);
@@ -496,7 +513,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
 // `/review/:token` and `/client-invite/:token` links above) — every route here is guarded by the
 // `portal` middleware, which requires a `Role::ClientReviewer` session and scopes any bound
 // `{post}`/`{invoice}` to that user's own `client_id`.
-Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.member', 'portal'])->group(function () {
+// Step B-1.4: `workspace:agency` is belt-and-braces here — the client portal belongs to agencies,
+// and a business workspace never has a `ClientReviewer` (Step B-1.5) to reach it.
+Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.member', 'portal', 'workspace:agency'])->group(function () {
     Route::get('/', [PortalDashboardController::class, 'index'])->name('dashboard');
     Route::get('calendar', [PortalCalendarController::class, 'index'])->name('calendar');
     Route::get('company', [PortalClientController::class, 'show'])->name('company');

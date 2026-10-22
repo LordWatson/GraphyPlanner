@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureOrganizationNotSuspended;
 use App\Http\Middleware\EnsurePreviewMode;
 use App\Http\Middleware\EnsureUserHasOrganization;
 use App\Http\Middleware\EnsureUserIsSuperAdmin;
+use App\Http\Middleware\EnsureWorkspaceType;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectClientReviewersToPortal;
@@ -62,6 +63,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // sends org-less super admins there instead.
             'super_admin' => EnsureUserIsSuperAdmin::class,
             'org.member' => EnsureUserHasOrganization::class,
+            // Step B-1.4: keep each organization type inside its own shell.
+            'workspace' => EnsureWorkspaceType::class,
             // Campaigns enhancement C-9.4: gated campaign features.
             'campaign.feature' => EnsureCampaignFeature::class,
         ]);

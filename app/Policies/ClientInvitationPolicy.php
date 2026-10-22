@@ -10,6 +10,16 @@ use App\Models\User;
 class ClientInvitationPolicy
 {
     /**
+     * Step B-1.4 — the client portal is agency-only, so a business workspace can never invite a
+     * client contact. Denies every ability here (defence in depth behind `workspace:agency`);
+     * null leaves super admins and agencies to the per-ability checks.
+     */
+    public function before(User $user, string $ability): ?bool
+    {
+        return $user->organization?->isBusiness() === true ? false : null;
+    }
+
+    /**
      * Determine whether the user can view the invitations for a client.
      */
     public function viewAny(User $user, Client $client): bool

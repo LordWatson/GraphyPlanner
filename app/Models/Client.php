@@ -30,6 +30,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $industry
  * @property array<int, string>|null $countries
  * @property ClientStatus $status
+ * @property bool $is_primary
+ * @property int|null $primary_org_id
  * @property ApprovalMode $default_approval_mode
  * @property int|null $owner_user_id
  * @property Carbon|null $start_date
@@ -57,7 +59,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $deleted_at
  */
 #[Fillable([
-    'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
+    'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status', 'is_primary',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
@@ -74,6 +76,8 @@ class Client extends Model
     protected $attributes = [
         // Step M-3.3: mirrors the column default.
         'report_schedule' => 'review',
+        // Step B-1.2: an ordinary client is not a business workspace's primary brand.
+        'is_primary' => false,
     ];
 
     /**
@@ -85,6 +89,7 @@ class Client extends Model
             'countries' => 'array',
             'tags' => 'array',
             'status' => ClientStatus::class,
+            'is_primary' => 'boolean',
             'default_approval_mode' => ApprovalMode::class,
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
