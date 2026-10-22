@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\ApprovalMode;
 use App\Enums\PostStatus;
-use App\Models\Client;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Models\Post;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,12 +13,14 @@ use Illuminate\Validation\Rules\Enum;
 
 class StorePostRequest extends FormRequest
 {
+    use ResolvesWorkspaceBrand;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return $this->user()->can('create', [Post::class, $this->route('client')]);
+        return $this->user()->can('create', [Post::class, $this->brand()]);
     }
 
     /**
@@ -28,8 +30,7 @@ class StorePostRequest extends FormRequest
     {
         // Step I-1.9: referenced records must belong to this client — a bare `exists:` rule would
         // accept another organization's ids.
-        $client = $this->route('client');
-        $clientId = $client instanceof Client ? $client->id : null;
+        $clientId = $this->brandId();
 
         return [
             'status' => ['nullable', new Enum(PostStatus::class)],

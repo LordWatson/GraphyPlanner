@@ -4,8 +4,8 @@ namespace App\Http\Requests;
 
 use App\Enums\AssetSource;
 use App\Enums\AssetType;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Models\Asset;
-use App\Models\Client;
 use App\Rules\SafeUpload;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -14,12 +14,14 @@ use Illuminate\Validation\Rules\Enum;
 
 class StoreAssetRequest extends FormRequest
 {
+    use ResolvesWorkspaceBrand;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return $this->user()->can('create', [Asset::class, $this->route('client')]);
+        return $this->user()->can('create', [Asset::class, $this->brand()]);
     }
 
     /**
@@ -29,8 +31,7 @@ class StoreAssetRequest extends FormRequest
     {
         // Step I-1.9: referenced records must belong to this client — a bare `exists:` rule would
         // accept another organization's ids.
-        $client = $this->route('client');
-        $clientId = $client instanceof Client ? $client->id : null;
+        $clientId = $this->brandId();
 
         return [
             // AssetSource::Ai is system-only (the Image Studio creates those rows), never user-submitted.

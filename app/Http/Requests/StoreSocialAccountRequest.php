@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Http\Requests\Concerns\ValidatesPlatformSettings;
 use App\Models\SocialAccount;
 use App\Services\Publishing\PlatformCapabilities;
@@ -14,14 +15,14 @@ use Illuminate\Validation\Validator;
 
 class StoreSocialAccountRequest extends FormRequest
 {
-    use ValidatesPlatformSettings;
+    use ResolvesWorkspaceBrand, ValidatesPlatformSettings;
 
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return $this->user()->can('create', [SocialAccount::class, $this->route('client')]);
+        return $this->user()->can('create', [SocialAccount::class, $this->brand()]);
     }
 
     /**

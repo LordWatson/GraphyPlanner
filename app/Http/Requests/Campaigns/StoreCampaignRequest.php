@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Campaigns;
 
 use App\Enums\CampaignStatus;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Models\Campaign;
 use App\Models\Client;
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class StoreCampaignRequest extends FormRequest
 {
+    use ResolvesWorkspaceBrand;
+
     public function authorize(): bool
     {
         return $this->user()->can('create', [Campaign::class, $this->client()]);
@@ -44,7 +47,7 @@ class StoreCampaignRequest extends FormRequest
     private function client(): Client
     {
         /** @var Client $client */
-        $client = $this->route('client');
+        $client = $this->brand();
 
         return $client;
     }

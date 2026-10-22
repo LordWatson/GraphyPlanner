@@ -22,8 +22,11 @@ class WorkspaceController extends Controller
 
         $this->authorize('update', $organization);
 
+        // Named `settings`, not `workspace`: the latter is the shared shell prop
+        // (`HandleInertiaRequests::sharedWorkspace`) the sidebar and copy read, so a page prop of the
+        // same name would shadow it and flip the business shell back to the agency one.
         return Inertia::render('settings/workspace', [
-            'workspace' => [
+            'settings' => [
                 'name' => $organization->name,
                 'require_post_review' => $organization->require_post_review,
             ],

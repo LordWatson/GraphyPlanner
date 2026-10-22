@@ -12,6 +12,7 @@ use App\Enums\ClientStatus;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\ClientHealthService;
+use App\Support\Workspace\PostingGoal;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -56,6 +57,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $health_computed_at
  * @property int $approval_lead_days
  * @property int|null $target_posts_per_week
+ * @property array<string, mixed>|null $posting_goal
  * @property ClientReportSchedule $report_schedule
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -67,6 +69,7 @@ use Illuminate\Support\Carbon;
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
     'approval_lead_days', 'default_approval_mode', 'report_schedule', 'target_posts_per_week',
+    'posting_goal',
 ])]
 class Client extends Model
 {
@@ -103,8 +106,19 @@ class Client extends Model
             'health_computed_at' => 'datetime',
             'health_reasons' => 'array',
             'target_posts_per_week' => 'integer',
+            // Step B-4.5: the richer weekly posting goal for a business workspace's primary brand.
+            'posting_goal' => 'array',
             'report_schedule' => ClientReportSchedule::class,
         ];
+    }
+
+    /**
+     * Step B-4.5 — the brand's posting goal as a value object (how many posts a week, which days),
+     * parsed defensively from the `posting_goal` JSON. Empty for a brand that never set one.
+     */
+    public function postingGoal(): PostingGoal
+    {
+        return PostingGoal::fromArray($this->posting_goal);
     }
 
     /**

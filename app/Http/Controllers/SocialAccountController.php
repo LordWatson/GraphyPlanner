@@ -121,6 +121,9 @@ class SocialAccountController extends Controller
                 $socialAccount === null => route('dashboard'),
                 $via === 'invite' => null,
                 $via === 'portal' => route('portal.dashboard'),
+                // Step B-4.1: a business workspace has no client page — send it back to its own
+                // Accounts page instead of the agency `clients.show`.
+                $socialAccount->client?->organization?->isBusiness() === true => route('business.accounts.index'),
                 default => route('clients.show', $socialAccount->client_id),
             },
         ]);

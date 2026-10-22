@@ -8,7 +8,15 @@ use App\Http\Controllers\Analytics\ReportController as OrganizationReportControl
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
+use App\Http\Controllers\Business\AccountController as BusinessAccountController;
+use App\Http\Controllers\Business\BrandController as BusinessBrandController;
+use App\Http\Controllers\Business\CollectionController as BusinessCollectionController;
+use App\Http\Controllers\Business\DashboardController as BusinessDashboardController;
+use App\Http\Controllers\Business\IdeaController as BusinessIdeaController;
+use App\Http\Controllers\Business\InsightController as BusinessInsightController;
+use App\Http\Controllers\Business\MediaController as BusinessMediaController;
 use App\Http\Controllers\Business\OnboardingController as BusinessOnboardingController;
+use App\Http\Controllers\Business\PostController as BusinessPostController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\Campaigns\CampaignAiController;
@@ -159,29 +167,83 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::post('complete', [BusinessOnboardingController::class, 'complete'])->name('onboarding.complete');
     });
 
+// Step B-4.1: the business workspace shell. Brand-implicit URLs — no `{client}` anywhere — with each
+// thin controller resolving the primary brand from `CurrentWorkspace` and calling the same engine
+// Actions/Form Requests the agency controllers use. `workspace:business` keeps an agency org out
+// (it 404s / redirects via `EnsureWorkspaceType`). The calendar, the post editor and a handful of
+// other brand-agnostic routes are shared as-is (see the main workspace group below).
+Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
+    ->name('business.')
+    ->group(function () {
+        // "Today" dashboard (B-4.3).
+        Route::get('today', BusinessDashboardController::class)->name('today');
+
+        // Posts: list, the empty-editor shortcut, and full create. The editor itself is the shared
+        // `posts.edit` (brand-agnostic).
+        Route::get('posts', [BusinessPostController::class, 'index'])->name('posts.index');
+        Route::post('posts/new', [BusinessPostController::class, 'create'])->name('posts.create');
+        Route::post('posts', [BusinessPostController::class, 'store'])->name('posts.store');
+
+        // Ideas (AI trends/ideas for the brand; B-6 adds the local/seasonal engine).
+        Route::get('ideas', [BusinessIdeaController::class, 'index'])->name('ideas.index');
+        Route::post('ideas/generate', [BusinessIdeaController::class, 'generate'])
+            ->middleware('throttle:ai')
+            ->name('ideas.generate');
+
+        // Media library.
+        Route::get('media', [BusinessMediaController::class, 'index'])->name('media.index');
+        Route::get('media/library', [BusinessMediaController::class, 'library'])->name('media.library');
+        Route::post('media', [BusinessMediaController::class, 'store'])->name('media.store');
+
+        // Collections (campaigns, renamed in copy).
+        Route::get('collections', [BusinessCollectionController::class, 'index'])->name('collections.index');
+        Route::post('collections', [BusinessCollectionController::class, 'store'])->name('collections.store');
+
+        // Brand: the profile (Brand Brain), basics + posting goal, and visual references.
+        Route::get('brand', [BusinessBrandController::class, 'edit'])->name('brand.edit');
+        Route::put('brand', [BusinessBrandController::class, 'update'])->name('brand.update');
+        Route::put('brand/profile', [BusinessBrandController::class, 'updateProfile'])->name('brand.profile.update');
+        Route::put('brand/references', [BusinessBrandController::class, 'updateReferences'])->name('brand.references.update');
+
+        // Accounts.
+        Route::get('accounts', [BusinessAccountController::class, 'index'])->name('accounts.index');
+        Route::post('accounts', [BusinessAccountController::class, 'store'])->name('accounts.store');
+        Route::put('accounts/{socialAccount}', [BusinessAccountController::class, 'update'])->name('accounts.update');
+        Route::delete('accounts/{socialAccount}', [BusinessAccountController::class, 'destroy'])->name('accounts.destroy');
+        Route::post('accounts/{socialAccount}/connect', [BusinessAccountController::class, 'connect'])->name('accounts.connect');
+
+        // Insights (single-brand; publishing consistency today, reach/engagement with Phase B-8).
+        Route::get('insights', [BusinessInsightController::class, 'index'])->name('insights.index');
+    });
+
 // The organization workspace. `org.member` (Step 15.1) sends org-less super admins to
 // `/super-admin` — everything in here is scoped by the user's `org_id`.
 Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Client portal contacts are sent to their `/portal/*` equivalents (see
     // `RedirectClientReviewersToPortal`) — the internal dashboard/calendar/home are staff-only UI.
     Route::middleware('portal.redirect')->group(function () {
-        Route::get('dashboard', DashboardController::class)->name('dashboard');
+        // Step B-4.2: the agency overview and needs-attention are agency-only — a business org is
+        // redirected to its own "Today" (`EnsureWorkspaceType`). The calendar is shared as-is (the
+        // business shell hides the client filter), so it is not guarded.
+        Route::get('dashboard', DashboardController::class)->middleware('workspace:agency')->name('dashboard');
 
         Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
 
-        Route::get('home', [HomeController::class, 'index'])->name('needs-attention');
+        Route::get('home', [HomeController::class, 'index'])->middleware('workspace:agency')->name('needs-attention');
     });
 
     // Step B-1.4: the clients CRM is agency-only. A business workspace has a single primary brand
     // (no list/create/delete UI), so these routes 404 for it until a business equivalent exists.
     Route::resource('clients', ClientController::class)->middleware('workspace:agency');
     // Step I-2.4: one route per client page tab (`clients.show` is the Social accounts tab).
-    Route::get('clients/{client}/posts', [ClientTabController::class, 'posts'])->name('clients.posts.index');
-    Route::get('clients/{client}/media', [ClientTabController::class, 'media'])->name('clients.media');
-    Route::get('clients/{client}/campaigns', [ClientTabController::class, 'campaigns'])->name('clients.campaigns.index');
+    // Step B-4.1: the client-page tabs that have a brand-implicit business equivalent are
+    // agency-only too — a business org is redirected to its own shell page (see `EnsureWorkspaceType`).
+    Route::get('clients/{client}/posts', [ClientTabController::class, 'posts'])->middleware('workspace:agency')->name('clients.posts.index');
+    Route::get('clients/{client}/media', [ClientTabController::class, 'media'])->middleware('workspace:agency')->name('clients.media');
+    Route::get('clients/{client}/campaigns', [ClientTabController::class, 'campaigns'])->middleware('workspace:agency')->name('clients.campaigns.index');
     Route::get('clients/{client}/billing', [ClientTabController::class, 'billing'])->middleware('workspace:agency')->name('clients.billing');
     Route::get('clients/{client}/portal-access', [ClientTabController::class, 'portalAccess'])->middleware('workspace:agency')->name('clients.portal-access');
-    Route::get('clients/{client}/ai', [ClientTabController::class, 'ai'])->name('clients.ai.index');
+    Route::get('clients/{client}/ai', [ClientTabController::class, 'ai'])->middleware('workspace:agency')->name('clients.ai.index');
     Route::get('clients/{client}/briefs', [ClientTabController::class, 'briefs'])->middleware('workspace:agency')->name('clients.briefs');
     // Step I-1.5: "delete" (above) archives; these act on archived (soft-deleted) clients.
     Route::post('clients/{client}/restore', [ClientController::class, 'restore'])
@@ -193,15 +255,19 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->middleware('workspace:agency')
         ->name('clients.purge');
 
-    Route::get('clients/{client}/brand-brain', [BrandBrainController::class, 'edit'])
-        ->name('clients.brand-brain.edit');
-    Route::put('clients/{client}/brand-brain', [BrandBrainController::class, 'update'])
-        ->name('clients.brand-brain.update');
-    Route::post('clients/{client}/brand-brain/persona', [BrandBrainController::class, 'uploadPersona'])
-        ->name('clients.brand-brain.persona.store');
-    // Step 16.4: Brand Brain visual references for the AI Image Studio.
-    Route::put('clients/{client}/brand-brain/references', [BrandBrainController::class, 'updateReferences'])
-        ->name('clients.brand-brain.references.update');
+    // Step B-4.1: the Brand Brain engine is agency-only on the `{client}` URL — a business org edits
+    // its brand through the brand-implicit `/brand` shell page instead.
+    Route::middleware('workspace:agency')->group(function () {
+        Route::get('clients/{client}/brand-brain', [BrandBrainController::class, 'edit'])
+            ->name('clients.brand-brain.edit');
+        Route::put('clients/{client}/brand-brain', [BrandBrainController::class, 'update'])
+            ->name('clients.brand-brain.update');
+        Route::post('clients/{client}/brand-brain/persona', [BrandBrainController::class, 'uploadPersona'])
+            ->name('clients.brand-brain.persona.store');
+        // Step 16.4: Brand Brain visual references for the AI Image Studio.
+        Route::put('clients/{client}/brand-brain/references', [BrandBrainController::class, 'updateReferences'])
+            ->name('clients.brand-brain.references.update');
+    });
 
     // Step B-1.4: client invoicing is agency-only — a business workspace bills on its own
     // subscription (Phase B-9), never issues client invoices. The whole block 404s for it.
@@ -255,7 +321,10 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
             ->name('invoice-items.destroy');
     });
 
+    // Step B-4.1: creating an account on a `{client}` is agency-only — a business org adds accounts
+    // through `business.accounts.store` (brand implicit).
     Route::post('clients/{client}/social-accounts', [SocialAccountController::class, 'store'])
+        ->middleware('workspace:agency')
         ->name('clients.social-accounts.store');
     // Step M-2.8: client self-connect links. Step B-1.4: agency-only (a business workspace connects
     // its own accounts directly, with no client to invite).
@@ -273,8 +342,10 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // connect flow above. Kept in the authenticated browser tab (unlike the Upload-Post popup
     // flow) since Facebook's own OAuth redirect returns here directly.
     Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/connect', [FacebookInstagramConnectController::class, 'redirect'])
+        ->middleware('workspace:agency')
         ->name('social-accounts.facebook.connect');
     Route::get('clients/{client}/social-accounts/{socialAccount}/facebook/callback', [FacebookInstagramConnectController::class, 'callback'])
+        ->middleware('workspace:agency')
         ->name('social-accounts.facebook.callback');
 
     // Static alternative to the dynamic callback above: Facebook Apps only allow a fixed,
@@ -284,13 +355,17 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('auth/meta/callback', [FacebookInstagramConnectController::class, 'metaCallback'])
         ->name('auth.meta.callback');
 
+    // Step B-4.1: creating a campaign on a `{client}` is agency-only — a business org creates
+    // "collections" through `business.collections.store`.
     Route::post('clients/{client}/campaigns', [CampaignController::class, 'store'])
+        ->middleware('workspace:agency')
         ->name('clients.campaigns.store');
 
     // `.junie/plans/campaigns-enhancement.md` — the campaigns hub (C-1.1) and the workspace, one
     // route per tab (C-1.2). Client contacts are sent to their portal pages.
+    // Step B-4.1: the agency campaigns hub is agency-only — a business org gets "Collections".
     Route::get('campaigns', CampaignIndexController::class)
-        ->middleware('portal.redirect')
+        ->middleware(['portal.redirect', 'workspace:agency'])
         ->name('campaigns.index');
     // C-7.4: before `campaigns/{campaign}` so "compare" never binds as a campaign.
     Route::get('campaigns/compare', CampaignCompareController::class)
@@ -375,8 +450,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // workflow (Step 18.7), turning tiles into posts and scheduling the sequence (18.9-18.11).
     // The org-wide grids hub (a section of 04 Clients, like the campaigns hub).
     Route::get('grids', GridPlanIndexController::class)->middleware('portal.redirect')->name('grids.index');
-    Route::get('clients/{client}/grids', [GridPlanController::class, 'index'])->name('clients.grids.index');
-    Route::post('clients/{client}/grids', [GridPlanController::class, 'store'])->name('clients.grids.store');
+    // Step B-4.1: the Instagram grid planner is an agency tool — agency-only on the `{client}` URL.
+    Route::get('clients/{client}/grids', [GridPlanController::class, 'index'])->middleware('workspace:agency')->name('clients.grids.index');
+    Route::post('clients/{client}/grids', [GridPlanController::class, 'store'])->middleware('workspace:agency')->name('clients.grids.store');
     Route::get('grids/{grid}/edit', [GridPlanController::class, 'edit'])->middleware('portal.redirect')->name('grids.edit');
     Route::put('grids/{grid}', [GridPlanController::class, 'update'])->name('grids.update');
     Route::delete('grids/{grid}', [GridPlanController::class, 'destroy'])->name('grids.destroy');
@@ -409,14 +485,22 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::post('grids/{grid}/tiles/{tile}/ai/fill', [GridAiController::class, 'fillSlot'])->scopeBindings()->middleware('throttle:ai-images')->name('grids.tiles.ai.fill');
     Route::post('grids/{grid}/tiles/{tile}/ai/use', [GridAiController::class, 'useVariant'])->scopeBindings()->name('grids.tiles.ai.use');
 
+    // Step B-4.1: the client-scoped asset engine is agency-only — a business org uploads through
+    // `business.media.*`. The brand-agnostic `assets.destroy` stays shared (the business media page
+    // reuses it).
     Route::get('clients/{client}/assets', [AssetController::class, 'index'])
+        ->middleware('workspace:agency')
         ->name('clients.assets.index');
     Route::post('clients/{client}/assets', [AssetController::class, 'store'])
+        ->middleware('workspace:agency')
         ->name('clients.assets.store');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])
         ->name('assets.destroy');
 
+    // Step B-4.1: creating a post on a `{client}` is agency-only — a business org posts through
+    // `business.posts.store`. The editor (`posts.edit`) and all `posts/{post}/*` routes stay shared.
     Route::post('clients/{client}/posts', [PostController::class, 'store'])
+        ->middleware('workspace:agency')
         ->name('clients.posts.store');
     Route::get('posts/{post}/edit', [PostController::class, 'edit'])
         ->middleware('portal.redirect')
@@ -455,9 +539,13 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step I-1.7: POST (they call a paid vendor and write rows — a GET can be prefetched, crawled
     // or replayed) and throttled per user + per org.
     Route::middleware('throttle:ai')->group(function () {
+        // Step B-4.1: the client-scoped trend/idea generators are agency-only — a business org asks
+        // for ideas through `business.ideas.generate`. The post-editor caption helper is shared.
         Route::post('clients/{client}/ai/trends', [AiController::class, 'trends'])
+            ->middleware('workspace:agency')
             ->name('clients.ai.trends');
         Route::post('clients/{client}/ai/ideas', [AiController::class, 'ideas'])
+            ->middleware('workspace:agency')
             ->name('clients.ai.ideas');
         Route::post('posts/{post}/ai/captions', [AiController::class, 'captions'])
             ->name('posts.ai.captions');
@@ -477,8 +565,10 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::post('ai-post-ideas/{aiPostIdea}/images', [AiImageController::class, 'generateForIdea'])
         ->middleware('throttle:ai-images')
         ->name('ai-post-ideas.images.store');
+    // Step B-4.1: the client-scoped Image Studio generate is agency-only for now (the business
+    // Image Studio presets land in Step B-6.5). The brand-agnostic `ai-image-*` routes stay shared.
     Route::post('clients/{client}/ai/images', [AiImageController::class, 'generate'])
-        ->middleware('throttle:ai-images')
+        ->middleware(['throttle:ai-images', 'workspace:agency'])
         ->name('clients.ai.images.store');
     Route::get('ai-image-generations/{generation}', [AiImageController::class, 'show'])
         ->name('ai-image-generations.show');

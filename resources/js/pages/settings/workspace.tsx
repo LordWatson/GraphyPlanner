@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { edit } from '@/routes/workspace-settings';
 
 type WorkspaceProps = {
-    workspace: {
+    settings: {
         name: string;
         require_post_review: boolean;
     };
@@ -19,9 +19,9 @@ type WorkspaceProps = {
  * through an internal review step before they can go out; off (the default), the owner schedules
  * in one tap. On brand: a single, clearly-explained choice, not a wall of toggles.
  */
-export default function WorkspaceSettings({ workspace }: WorkspaceProps) {
+export default function WorkspaceSettings({ settings }: WorkspaceProps) {
     const [requireReview, setRequireReview] = useState(
-        workspace.require_post_review,
+        settings.require_post_review,
     );
 
     return (

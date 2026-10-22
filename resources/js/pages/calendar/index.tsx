@@ -8,6 +8,7 @@ import type {
 } from '@/components/content-calendar';
 import { ContentCalendar } from '@/components/content-calendar';
 import { Page, PageHeader } from '@/components/page';
+import { useWorkspace } from '@/hooks/use-workspace';
 import type { Paginated } from '@/components/pagination';
 import type { UnscheduledPost } from '@/components/unscheduled-posts-sheet';
 import { UnscheduledPostsSheet } from '@/components/unscheduled-posts-sheet';
@@ -29,6 +30,9 @@ export default function Calendar({
     unscheduled,
     ...props
 }: CalendarPageProps) {
+    // Step B-4.1: a business workspace has one brand, so the calendar hides the client filter and
+    // leads each chip with its caption instead of a client name.
+    const { isBusiness } = useWorkspace();
     const count = props.occurrences.length;
     const reschedulable = useMemo(
         () => new Set(props.reschedulablePostIds ?? []),
@@ -93,6 +97,7 @@ export default function Calendar({
                 />
                 <ContentCalendar
                     {...props}
+                    multiClient={!isBusiness}
                     baseUrl={calendar().url}
                     postHref={(postId) => editPost(postId)}
                     canReschedule={(occurrence) =>

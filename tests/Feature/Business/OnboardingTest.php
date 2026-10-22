@@ -252,11 +252,11 @@ class OnboardingTest extends TestCase
         $this->post('/login', ['email' => $owner->email, 'password' => 'password'])
             ->assertRedirect('/welcome-setup');
 
-        // Once onboarding is stamped, login falls through to the dashboard.
+        // Once onboarding is stamped, login falls through to the business "Today" home (B-4.2).
         auth()->logout();
         $organization->forceFill(['onboarding_completed_at' => now()])->save();
 
         $this->post('/login', ['email' => $owner->email, 'password' => 'password'])
-            ->assertRedirect('/dashboard');
+            ->assertRedirect('/today');
     }
 }

@@ -41,14 +41,29 @@ class EnsureWorkspaceType
     }
 
     /**
-     * Route-name equivalents between the two shells. Empty until the business shell exists
-     * (Phase B-4); every guarded agency route therefore 404s for a business org for now, at which
-     * point entries like `clients.brand-brain.edit` → `brand.edit` turn the 404s into redirects.
+     * Route-name equivalents between the two shells (Step B-4.1). When a business org lands on one
+     * of the agency GET pages below, it's redirected to its own brand-implicit equivalent rather
+     * than 404'd. Only the landing pages are mapped; agency write/engine routes a business org
+     * should never call simply 404 (the feature isn't advertised).
      *
      * @return array<string, string>
      */
     private function equivalents(): array
     {
-        return [];
+        return [
+            // The agency overview / needs-attention → the business "Today".
+            'dashboard' => 'business.today',
+            'needs-attention' => 'business.today',
+            // The client page's tabs → the matching business shell page.
+            'clients.show' => 'business.accounts.index',
+            'clients.posts.index' => 'business.posts.index',
+            'clients.media' => 'business.media.index',
+            'clients.campaigns.index' => 'business.collections.index',
+            'clients.ai.index' => 'business.ideas.index',
+            'clients.brand-brain.edit' => 'business.brand.edit',
+            // The agency hubs / per-client analytics → their business equivalents.
+            'campaigns.index' => 'business.collections.index',
+            'clients.analytics' => 'business.insights.index',
+        ];
     }
 }

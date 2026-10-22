@@ -25,9 +25,11 @@ class PostApprovalModeWorkspaceTest extends TestCase
         $brand = (new CreatePrimaryBrandAction)($organization);
         $owner = User::factory()->for($organization, 'organization')->role(Role::Owner)->create();
 
+        // Step B-4.1: a business org posts through its brand-implicit shell route (the agency
+        // `clients.posts.store` is now closed to it); the `client_required` rejection still applies.
         $this->actingAs($owner)
-            ->from(route('clients.posts.index', $brand))
-            ->post(route('clients.posts.store', $brand), ['approval_mode' => ApprovalMode::ClientRequired->value])
+            ->from(route('business.posts.index'))
+            ->post(route('business.posts.store'), ['approval_mode' => ApprovalMode::ClientRequired->value])
             ->assertSessionHasErrors('approval_mode');
     }
 

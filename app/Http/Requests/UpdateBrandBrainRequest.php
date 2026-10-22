@@ -2,21 +2,22 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Client;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Policies\BrandBrainPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateBrandBrainRequest extends FormRequest
 {
+    use ResolvesWorkspaceBrand;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        /** @var Client $client */
-        $client = $this->route('client');
+        $client = $this->brand();
 
-        return app(BrandBrainPolicy::class)->update($this->user(), $client);
+        return $client !== null && app(BrandBrainPolicy::class)->update($this->user(), $client);
     }
 
     /**
@@ -92,7 +93,7 @@ class UpdateBrandBrainRequest extends FormRequest
             $value = data_get($input, $path);
 
             if (is_string($value)) {
-                $items = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $value)), fn ($item) => $item !== ''));
+                $items = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $value) ?: []), fn ($item) => $item !== ''));
                 data_set($input, $path, $items);
             }
         }

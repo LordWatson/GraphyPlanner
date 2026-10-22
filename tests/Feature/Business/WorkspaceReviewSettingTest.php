@@ -36,7 +36,12 @@ class WorkspaceReviewSettingTest extends TestCase
 
         $this->actingAs($owner)
             ->get(route('workspace-settings.edit'))
-            ->assertOk();
+            ->assertOk()
+            // Step B-4.2 regression: the page's own prop must not shadow the shared `workspace`
+            // shell prop, or the sidebar/copy flip back to the agency shell here.
+            ->assertInertia(fn ($page) => $page
+                ->where('workspace.type', 'business')
+                ->has('settings.require_post_review'));
     }
 
     public function test_owner_can_turn_review_on(): void
