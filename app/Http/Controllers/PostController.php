@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
+use App\Actions\Posts\CreateSharePreviewAction;
 use App\Actions\Posts\DeletePostAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
-use App\Actions\Posts\PostStatusTransitionMap;
+use App\Actions\Posts\QuickSchedulePostAction;
 use App\Actions\Posts\ReschedulePostAction;
 use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
@@ -19,7 +20,9 @@ use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
+use App\Http\Requests\CreateSharePreviewRequest;
 use App\Http\Requests\OverridePostApprovalRequest;
+use App\Http\Requests\QuickSchedulePostRequest;
 use App\Http\Requests\ReschedulePostRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
@@ -37,6 +40,7 @@ use App\Services\Analytics\BestTimeService;
 use App\Services\ClientHashtagService;
 use App\Services\Grids\GridPlanService;
 use App\Services\PostNotificationService;
+use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
@@ -80,11 +84,14 @@ class PostController extends Controller
         PlatformRolloutGate $rollout,
         GridPlanService $grids,
         BestTimeService $bestTime,
+        PostWorkflowResolver $workflows,
     ): Response {
         $this->authorize('view', $post);
 
         $user = $request->user();
         $post->load([
+            // Step B-3.1: the workspace workflow needs the org type (business vs agency).
+            'organization',
             // Step I-2.6: the editor reads the client and its brand brain (hashtag policy).
             'client.brandBrain',
             'targets.socialAccount',
@@ -98,8 +105,11 @@ class PostController extends Controller
         ]);
 
         $client = $post->client;
+        // Step B-3.1: the legal next steps come from this workspace's workflow (agency keeps the
+        // full client-approval lifecycle; a business workspace self-approves or opts into review),
+        // then narrowed to the ones this user is authorized to make.
         $allowedTransitions = array_values(array_filter(
-            PostStatusTransitionMap::allowedFor($post),
+            $workflows->forPost($post)->allowedTransitions($post, $user),
             fn (PostStatus $to) => $user->can('transition', [$post, $to]),
         ));
 
@@ -153,6 +163,19 @@ class PostController extends Controller
                 'override_approval' => $user->can('overrideApproval', $post),
                 'delete' => $user->can('delete', $post),
                 'create_asset' => $user->can('create', [Asset::class, $client]),
+                // Step B-3.2 / B-3.4: the one-tap schedule and the share-preview link.
+                'quick_schedule' => $user->can('transition', [$post, PostStatus::Scheduled]),
+                'share_preview' => $user->can('sharePreview', $post),
+            ],
+            // Step B-3.2: the business editor's one-tap primary action reads this to pick its label
+            // ("Schedule"/"Post now" when review is off, "Send for review" when it's on).
+            'workflow' => [
+                'is_business' => $post->organization->isBusiness(),
+                'requires_review' => $workflows->forPost($post)->requiresReview($post->organization),
+                // "Schedule" needs a time on every target; "Post now" doesn't. Lets the bar disable
+                // "Schedule" with a hint rather than bounce the user off a checklist failure.
+                'has_times' => $post->targets->isNotEmpty()
+                    && $post->targets->every(fn (PostTarget $target) => $target->scheduled_at_utc !== null),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
             // The image formats each channel offers (the preview's "Format" picker).
@@ -208,6 +231,43 @@ class PostController extends Controller
         ]);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step B-3.2 — the solo owner's one-tap schedule. Thin: it hands the post, actor and "when"
+     * ("schedule" uses the post's own times, "now" retimes every target to publish immediately) to
+     * `QuickSchedulePostAction`, which self-approves + schedules (review off) or sends for review
+     * (review on). A not-ready post surfaces as a normal validation error on the editor.
+     */
+    public function quickSchedule(QuickSchedulePostRequest $request, Post $post, QuickSchedulePostAction $action): RedirectResponse
+    {
+        $post = $action($post, $request->user(), $request->validated('when') ?? QuickSchedulePostAction::WHEN_SCHEDULED);
+
+        $message = $post->status === PostStatus::InternalReview
+            ? __('Sent for review.')
+            : __('Scheduled. We’ll post it for you.');
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
+
+        return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step B-3.4 — mint a read-only "Share preview" link (a partner/sponsor link) for this post and
+     * return the plain URL once as JSON (it's hashed at rest, so it's never recoverable afterwards).
+     */
+    public function sharePreview(CreateSharePreviewRequest $request, Post $post, CreateSharePreviewAction $action): JsonResponse
+    {
+        $days = $request->integer('expires_in_days') ?: 14;
+
+        $result = $action(
+            $post,
+            $request->boolean('allow_comments'),
+            $request->boolean('allow_approval'),
+            now()->addDays($days),
+        );
+
+        return response()->json(['url' => route('review.show', $result['token'])]);
     }
 
     /**

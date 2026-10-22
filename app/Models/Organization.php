@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $slug
  * @property OrganizationType $type
  * @property Carbon|null $onboarding_completed_at
+ * @property bool $require_post_review
  * @property string $default_timezone
  * @property string $default_currency
  * @property string|null $billing_details
@@ -41,7 +42,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'require_post_review', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -62,6 +63,7 @@ class Organization extends Model
      */
     protected $attributes = [
         'type' => 'agency',
+        'require_post_review' => false,
     ];
 
     /**
@@ -74,6 +76,7 @@ class Organization extends Model
         return [
             'type' => OrganizationType::class,
             'onboarding_completed_at' => 'datetime',
+            'require_post_review' => 'boolean',
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
             'xai_key' => 'encrypted',

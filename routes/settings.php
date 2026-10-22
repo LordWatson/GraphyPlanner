@@ -5,6 +5,7 @@ use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\TaxRateController;
+use App\Http\Controllers\Settings\WorkspaceController;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,13 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::post('settings/tax-rates', [TaxRateController::class, 'store'])->name('tax-rates.store');
     Route::put('settings/tax-rates/{taxRate}', [TaxRateController::class, 'update'])->name('tax-rates.update');
     Route::post('settings/tax-rates/{taxRate}/archive', [TaxRateController::class, 'archive'])->name('tax-rates.archive');
+});
+
+// Step B-3.3: the business workspace's own settings (e.g. "require post review"). Business-only, so
+// an agency 404s here; the Owner check is in the request/policy.
+Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])->group(function () {
+    Route::get('settings/workspace', [WorkspaceController::class, 'edit'])->name('workspace-settings.edit');
+    Route::put('settings/workspace', [WorkspaceController::class, 'update'])->name('workspace-settings.update');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

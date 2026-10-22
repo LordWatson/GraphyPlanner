@@ -20,12 +20,14 @@ use Illuminate\Support\Carbon;
  * @property int|null $client_id
  * @property int|null $post_id
  * @property int|null $grid_plan_id
+ * @property bool $allow_comments
+ * @property bool $allow_approval
  * @property Carbon $expires_at
  * @property Carbon|null $revoked_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['token_hash', 'client_id', 'post_id', 'grid_plan_id', 'expires_at', 'revoked_at'])]
+#[Fillable(['token_hash', 'client_id', 'post_id', 'grid_plan_id', 'allow_comments', 'allow_approval', 'expires_at', 'revoked_at'])]
 class ReviewToken extends Model
 {
     /** @use HasFactory<ReviewTokenFactory> */
@@ -37,9 +39,21 @@ class ReviewToken extends Model
     protected function casts(): array
     {
         return [
+            'allow_comments' => 'boolean',
+            'allow_approval' => 'boolean',
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Step B-3.4 — a token minted by "Share preview" (a partner/sponsor link) rather than the
+     * agency client-review flow. Carries at least one widened capability; the review portal reads
+     * it to decide whether comments/decisions are offered and to use brand-not-client copy.
+     */
+    public function isSharePreview(): bool
+    {
+        return $this->allow_comments || $this->allow_approval;
     }
 
     /**

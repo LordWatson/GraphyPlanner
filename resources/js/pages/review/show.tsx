@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
 import type { MediaFormat } from '@/lib/media-format';
 import { cn } from '@/lib/utils';
-import { decide } from '@/routes/review';
+import { decide, previewFeedback } from '@/routes/review';
 
 type AssetData = AssetPreviewData;
 
@@ -47,6 +47,8 @@ type PostData = {
     assets: AssetData[];
     targets: TargetData[];
     can_decide: boolean;
+    /** Step B-3.4: a share-preview viewer may leave a comment. */
+    can_comment?: boolean;
     /** Step 18.9: the grid whose look the client already approved. */
     grid_name?: string | null;
     comments: CommentData[];
@@ -61,11 +63,20 @@ export default function ReviewShow({
     token,
     client,
     post,
+    mode = 'client',
 }: {
     token: string;
     client: { name: string };
     post: PostData;
+    /** Step B-3.4: 'preview' = a brand/creator "Share preview" link (brand copy, no studio voice). */
+    mode?: 'client' | 'preview';
 }) {
+    const isPreview = mode === 'preview';
+    // A preview link's decision/comment goes to the no-status-change endpoint; the agency
+    // client-review link keeps running the status machine via `decide`.
+    const feedbackForm = isPreview
+        ? previewFeedback.form(token)
+        : decide.form(token);
     const previewTargets = post.targets
         .filter((target) => target.platform)
         .map((target, index) => ({
@@ -89,11 +100,21 @@ export default function ReviewShow({
             <Head title={`Review a post — ${client.name}`} />
             <PublicShell width="xl" context={client.name}>
                 <PublicTitle
-                    kicker={`For ${client.name}`}
+                    kicker={isPreview ? client.name : `For ${client.name}`}
                     title={
-                        post.can_decide ? (
+                        post.can_decide || post.can_comment ? (
+                            isPreview ? (
+                                <>
+                                    A <em>preview</em> for you.
+                                </>
+                            ) : (
+                                <>
+                                    Ready for your <em>review</em>.
+                                </>
+                            )
+                        ) : isPreview ? (
                             <>
-                                Ready for your <em>review</em>.
+                                A <em>preview</em>.
                             </>
                         ) : (
                             <>
@@ -239,7 +260,7 @@ export default function ReviewShow({
 
                         {post.can_decide ? (
                             <Form
-                                {...decide.form(token)}
+                                {...feedbackForm}
                                 className="border-border bg-card flex flex-col gap-4 rounded-2xl border p-5 shadow-sm sm:p-6"
                             >
                                 {({ processing, errors }) => (
@@ -251,7 +272,7 @@ export default function ReviewShow({
                                             <textarea
                                                 name="comment"
                                                 rows={3}
-                                                aria-label="Note for the studio (optional)"
+                                                aria-label="Note (optional)"
                                                 placeholder="Add a note (optional) — e.g. what you'd like changed"
                                                 className="border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/40 flex w-full rounded-lg border-2 px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
                                             />
@@ -270,7 +291,9 @@ export default function ReviewShow({
                                                 disabled={processing}
                                             >
                                                 <CheckCircle2 className="size-5" />
-                                                Approve
+                                                {isPreview
+                                                    ? 'Looks good'
+                                                    : 'Approve'}
                                             </Button>
                                             <Button
                                                 type="submit"
@@ -288,11 +311,44 @@ export default function ReviewShow({
                                     </>
                                 )}
                             </Form>
+                        ) : post.can_comment ? (
+                            <Form
+                                {...feedbackForm}
+                                className="border-border bg-card flex flex-col gap-4 rounded-2xl border p-5 shadow-sm sm:p-6"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <p className="font-display text-xl leading-tight">
+                                            Any thoughts?
+                                        </p>
+                                        <div className="grid gap-1.5">
+                                            <textarea
+                                                name="comment"
+                                                rows={3}
+                                                aria-label="Your comment"
+                                                placeholder="Leave a comment"
+                                                className="border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/40 flex w-full rounded-lg border-2 px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
+                                            />
+                                            <InputError
+                                                message={errors.comment}
+                                            />
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            size="lg"
+                                            disabled={processing}
+                                        >
+                                            Send comment
+                                        </Button>
+                                    </>
+                                )}
+                            </Form>
                         ) : (
                             <div className="border-border text-muted-foreground flex items-center gap-3 rounded-2xl border border-dashed p-5 text-sm">
                                 <CheckCircle2 className="text-success size-5 shrink-0" />
-                                This post has already been reviewed — no further
-                                action is needed.
+                                {isPreview
+                                    ? 'This is a read-only preview — thanks for taking a look.'
+                                    : 'This post has already been reviewed — no further action is needed.'}
                             </div>
                         )}
 

@@ -141,7 +141,7 @@ class PostStatusTransitionMap
     }
 
     /**
-     * @return array<int, PostStatus>
+     * @return list<PostStatus>
      */
     public static function allowedFor(Post $post): array
     {

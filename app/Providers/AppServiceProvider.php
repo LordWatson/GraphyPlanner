@@ -59,6 +59,7 @@ use App\Services\Analytics\Engagement\UploadPostEngagementSource;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
+use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
@@ -90,6 +91,11 @@ class AppServiceProvider extends ServiceProvider
         // Step B-1.3: one workspace resolver per request, so the primary brand is resolved and
         // cached once (bound `scoped` so it never leaks across requests under Octane/queue reuse).
         $this->app->scoped(CurrentWorkspace::class);
+
+        // Step B-3.1: the per-org-type post workflow resolver. Stateless, so a singleton is safe;
+        // its two workflow implementations are stateless too. No caller reads
+        // `PostStatusTransitionMap` directly for "allowed next steps" any more — they ask this.
+        $this->app->singleton(PostWorkflowResolver::class);
 
         // Local disk today (config('assets.disk'), "public" by default); swap this
         // binding for an S3-backed implementation once Phase 1/2 needs signed-URL

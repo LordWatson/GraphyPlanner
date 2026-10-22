@@ -77,6 +77,9 @@ Route::inertia('about', 'about')->name('about');
 Route::middleware('throttle:public-token')->group(function () {
     Route::get('review/{token}', [ReviewController::class, 'show'])->name('review.show');
     Route::post('review/{token}', [ReviewController::class, 'decide'])->name('review.decide');
+    // Step B-3.4: a "Share preview" viewer's feedback (partner comment / sponsor sign-off) — never
+    // moves the post, unlike the agency client-review decision above.
+    Route::post('review/{token}/preview-feedback', [ReviewController::class, 'previewFeedback'])->name('review.preview-feedback');
     // Step 18.8: a grid review link's decision (approve / request changes, with flagged tiles).
     Route::post('review/{token}/grid', [ReviewController::class, 'decideGrid'])->name('review.grid.decide');
 
@@ -425,6 +428,13 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('posts.destroy');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
+    // Step B-3.2: one-tap "Schedule" / "Post now" / "Send for review" for a solo owner or team.
+    Route::post('posts/{post}/quick-schedule', [PostController::class, 'quickSchedule'])
+        ->name('posts.quick-schedule');
+    // Step B-3.4: a read-only "Share preview" link for a partner/sponsor (reuses the review token).
+    Route::post('posts/{post}/share-preview', [PostController::class, 'sharePreview'])
+        ->middleware('throttle:6,1')
+        ->name('posts.share-preview');
     // Step I-3.8 / M-2.9: Owner-only approval override (with a reason).
     Route::post('posts/{post}/override-approval', [PostController::class, 'overrideApproval'])->name('posts.override-approval');
     Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Workspace;
 
+use App\Enums\ApprovalMode;
 use App\Enums\BrandKind;
 use App\Enums\ClientStatus;
 use App\Models\BrandBrain;
@@ -31,6 +32,11 @@ class CreatePrimaryBrandAction
                 'is_primary' => true,
                 'brand_kind' => $brandKind,
                 'default_language' => $defaultLanguage,
+                // Step B-3.1: a business workspace has no client to approve posts, so its brand's
+                // posts default to internal-only (the `clients` column default is `client_required`,
+                // which `BusinessPostWorkflow` would never honour). Keeps `CreatePostAction`'s
+                // fallback aligned with the business workflow.
+                'default_approval_mode' => ApprovalMode::InternalOnly,
             ]);
 
             // Every brand gets a Brand Brain; the business "Brand profile" editor (Step B-2.4 / B-4.1)

@@ -34,6 +34,7 @@ import { useEditorNavigation } from '@/components/post-editor/editor/use-editor-
 import { usePostEditor } from '@/components/post-editor/editor/use-post-editor';
 import { PostDiscussion } from '@/components/post-editor/post-discussion';
 import { PostWorkflow } from '@/components/post-editor/post-workflow';
+import { BusinessScheduleBar } from '@/components/post-editor/business-schedule-bar';
 import type {
     PostData,
     TargetAccountData,
@@ -65,6 +66,7 @@ export default function PostEdit({
     ai,
     imageStudio,
     mediaFormatOptions,
+    workflow,
     grid = null,
 }: {
     post: PostData;
@@ -79,6 +81,13 @@ export default function PostEdit({
         delete: boolean;
         override_approval: boolean;
         create_asset: boolean;
+        quick_schedule: boolean;
+        share_preview: boolean;
+    };
+    workflow: {
+        is_business: boolean;
+        requires_review: boolean;
+        has_times: boolean;
     };
     hashtagSuggestions: string[];
     campaignOptions: CampaignOption[];
@@ -138,6 +147,17 @@ export default function PostEdit({
             <Head title={`Edit post — ${client.name}`} />
             <Page>
                 <EditorHeader post={post} client={client} grid={grid} />
+
+                {workflow.is_business && (
+                    <BusinessScheduleBar
+                        postId={post.id}
+                        status={post.status}
+                        requiresReview={workflow.requires_review}
+                        hasTimes={workflow.has_times}
+                        canQuickSchedule={can.quick_schedule}
+                        canSharePreview={can.share_preview}
+                    />
+                )}
 
                 <PostWorkflow
                     post={post}

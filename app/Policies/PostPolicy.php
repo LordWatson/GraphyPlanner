@@ -192,6 +192,17 @@ class PostPolicy
     }
 
     /**
+     * Step B-3.4 — mint a read-only "Share preview" link (a partner/sponsor link). Sharing a post
+     * outside the workspace is a trust action, so it's limited to Owners and Managers
+     * (`Role::Strategist`) in the post's own org, never a Creator/Viewer or another org.
+     */
+    public function sharePreview(User $user, Post $post): bool
+    {
+        return $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+    }
+
+    /**
      * Determine whether the user can re-send a stored review-portal link email (from a
      * `waiting_client` activity log entry) to the client. Uses the same roles as `update`, since
      * this is an org-side action to help the client re-discover the review link.
