@@ -40,6 +40,14 @@ export type TargetData = {
     status_label: string;
     external_post_id: string | null;
     error: string | null;
+    /** Step B-5.3: a plain-language reading of a failed channel's vendor error. */
+    failure?: {
+        reason: string;
+        message: string;
+        fix: string;
+        retryable: boolean;
+        needs_reconnect: boolean;
+    } | null;
     /** Step M-2.2: this channel's overrides (null = uses the master). */
     caption_override: string | null;
     hashtags_override: string[] | null;

@@ -3,6 +3,7 @@
 namespace App\Services\Publishing;
 
 use App\Contracts\MusicProvider;
+use App\Contracts\PublishCredentials;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
@@ -178,7 +179,8 @@ class UploadPostMusicProvider implements MusicProvider
 
     private function client(SocialAccount $account): PendingRequest
     {
-        $apiKey = $account->organization?->upload_post_key ?? '';
+        // Step B-5.1: byo (the org's own key) or managed (Alima's platform key), via the contract.
+        $apiKey = app(PublishCredentials::class)->apiKeyFor($account);
 
         return VendorHttp::forReads(Http::baseUrl($this->baseUrl())
             ->withHeaders(['Authorization' => 'Apikey '.$apiKey])

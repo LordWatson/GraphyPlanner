@@ -4,6 +4,7 @@ namespace App\Services\Publishing;
 
 use App\Contracts\AssetStorage;
 use App\Contracts\PublishAdapter;
+use App\Contracts\PublishCredentials;
 use App\Enums\AssetType;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
@@ -29,9 +30,12 @@ use RuntimeException;
 use Throwable;
 
 /**
- * PublishAdapter implementation for Upload-Post (spec §7/§7.1). Each organization's
- * `upload_post_key` (Step 0.15) is used as the vendor API key, so every request is authenticated
- * per-org rather than via a shared app-wide credential.
+ * PublishAdapter implementation for Upload-Post (spec §7/§7.1). Every request's API key and
+ * publish profile ("user") are resolved through `App\Contracts\PublishCredentials` (Step B-5.1):
+ * byo orgs authenticate with their own `upload_post_key` and publish under a per-account profile
+ * (today's agency behaviour); managed orgs (business workspaces) authenticate with Alima's shared
+ * platform key and publish under their own single isolated profile. The adapter never reads the
+ * key or profile from the model directly, so neither mode leaks into the vendor code.
  *
  * `connectAccount()`/`handleCallback()` implement the Step 1.3 account connect flow against
  * Upload-Post's JWT-based hosted linking page. `cancel()`/`health()` remain interim/partial —
@@ -44,6 +48,7 @@ class UploadPostAdapter implements PublishAdapter
         private readonly ?string $baseUrl = null,
         private readonly PlatformRolloutGate $rolloutGate = new PlatformRolloutGate,
         private readonly PublishImageCropper $cropper = new PublishImageCropper,
+        private readonly PublishCredentials $credentials = new OrganizationOrPlatformCredentials,
     ) {}
 
     /**
@@ -53,7 +58,9 @@ class UploadPostAdapter implements PublishAdapter
      */
     public function connectAccount(SocialAccount $account, ?string $state = null): string
     {
-        $username = $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id;
+        // Step B-5.1: the profile is the per-account identifier (byo) or the org's single managed
+        // profile — resolved through the credentials contract so managed orgs stay isolated.
+        $username = $this->credentials->profileFor($account);
 
         $this->ensureProfileExists($account, $username);
 
@@ -246,7 +253,7 @@ class UploadPostAdapter implements PublishAdapter
     {
         $request = VendorHttp::forReads(
             Http::baseUrl((string) config('services.upload_post.app_base_url', 'https://app.upload-post.com/api'))
-                ->withHeaders(['Authorization' => 'Apikey '.($organization->upload_post_key ?? '')])
+                ->withHeaders(['Authorization' => 'Apikey '.$this->credentials->apiKeyForOrganization($organization)])
                 ->acceptJson(),
         );
 
@@ -308,7 +315,7 @@ class UploadPostAdapter implements PublishAdapter
         try {
             return VendorHttp::forReads(
                 Http::baseUrl($this->baseUrl())
-                    ->withHeaders(['Authorization' => 'Apikey '.($organization->upload_post_key ?? '')])
+                    ->withHeaders(['Authorization' => 'Apikey '.$this->credentials->apiKeyForOrganization($organization)])
                     ->acceptJson(),
             )->get('/uploadposts/users')->successful();
         } catch (Throwable $e) {
@@ -704,7 +711,7 @@ class UploadPostAdapter implements PublishAdapter
         $published = CaptionComposer::compose($spec, $caption, $hashtags, $link);
 
         $fields = [
-            'user' => $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id,
+            'user' => $this->credentials->profileFor($account),
             'title' => $published,
             'platform' => [$spec->vendor],
         ];
@@ -985,13 +992,12 @@ class UploadPostAdapter implements PublishAdapter
 
     private function baseRequest(SocialAccount $account): PendingRequest
     {
-        // The Upload-Post API key lives on the account's organization. Load that relation
-        // explicitly instead of relying on every caller to eager-load it: publish, health and
-        // status paths all build a request from a SocialAccount pulled fresh from the DB (e.g.
-        // PublishPostTargetJob), and with lazy loading disabled a bare `$account->organization`
-        // would throw a LazyLoadingViolationException. `loadMissing` is a no-op when it's already
-        // loaded, so eager-loading callers pay no extra query.
-        $apiKey = $account->loadMissing('organization')->organization?->upload_post_key ?? '';
+        // Step B-5.1: the key comes from the credentials contract (the org's own key in byo mode,
+        // Alima's platform key in managed mode), which loads the `organization` relation as needed
+        // — publish, health and status paths all build a request from a SocialAccount pulled fresh
+        // from the DB (e.g. PublishPostTargetJob), where a bare `$account->organization` would
+        // throw a LazyLoadingViolationException.
+        $apiKey = $this->credentials->apiKeyFor($account);
 
         // Upload-Post's API authenticates via an `Apikey` scheme, not the standard OAuth
         // `Bearer` scheme, so `withToken()` (which always sends `Bearer <token>`) can't be used

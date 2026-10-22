@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Publishing\SyncPublishStatusAction;
 use App\Contracts\OpsAlerter;
+use App\Contracts\PublishCredentials;
 use App\Enums\Platform;
 use App\Enums\PostTargetStatus;
 use App\Models\PostTarget;
@@ -112,11 +113,12 @@ class UploadPostWebhookController extends Controller
 
     /**
      * Verifies `X-Upload-Post-Signature: sha256=<hex>` against
-     * `HMAC_SHA256(webhook_secret, "{timestamp}.{raw body}")`, where `webhook_secret` is the
-     * resolved target's organization's `upload_post_webhook_secret` (Upload-Post issues one
-     * secret per account, not a single global one — see
-     * https://docs.upload-post.com/api/webhooks#security). Also rejects requests with a missing
-     * or stale `X-Upload-Post-Timestamp` (replay protection, per the vendor's docs).
+     * `HMAC_SHA256(webhook_secret, "{timestamp}.{raw body}")`, where `webhook_secret` is resolved
+     * through `PublishCredentials` for the target's organization (Step B-5.1): the org's own
+     * per-account secret in byo mode, or Alima's single platform secret in managed mode (business
+     * workspaces), so a managed org's delivery is routed to the right org by its unique `job_id`
+     * and verified with the platform secret — see https://docs.upload-post.com/api/webhooks#security.
+     * Also rejects requests with a missing or stale `X-Upload-Post-Timestamp` (replay protection).
      *
      * When the resolved organization has no webhook secret configured yet (e.g. it hasn't been
      * copied from the Upload-Post dashboard), verification is skipped with a warning rather than
@@ -124,7 +126,10 @@ class UploadPostWebhookController extends Controller
      */
     private function hasValidSignature(Request $request, PostTarget $target): bool
     {
-        $secret = (string) ($target->socialAccount?->organization->upload_post_webhook_secret ?? '');
+        $organization = $target->socialAccount?->organization;
+        $secret = $organization !== null
+            ? app(PublishCredentials::class)->webhookSecretFor($organization)
+            : '';
 
         if ($secret === '') {
             Log::warning('Upload-Post webhook: no webhook secret configured for this organization, skipping signature verification', [

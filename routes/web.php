@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Platform;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiImageController;
 use App\Http\Controllers\Analytics\AnalyticsController as OrganizationAnalyticsController;
@@ -208,6 +209,11 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         // Accounts.
         Route::get('accounts', [BusinessAccountController::class, 'index'])->name('accounts.index');
         Route::post('accounts', [BusinessAccountController::class, 'store'])->name('accounts.store');
+        // Step B-5.2: one-tap "log in with…" — lazily creates/reuses the brand's account for a
+        // platform and returns the hosted connect URL (no API keys, managed credentials).
+        Route::post('accounts/connect/{platform}', [BusinessAccountController::class, 'connectPlatform'])
+            ->whereIn('platform', array_map(fn ($p) => $p->value, Platform::cases()))
+            ->name('accounts.connect-platform');
         Route::put('accounts/{socialAccount}', [BusinessAccountController::class, 'update'])->name('accounts.update');
         Route::delete('accounts/{socialAccount}', [BusinessAccountController::class, 'destroy'])->name('accounts.destroy');
         Route::post('accounts/{socialAccount}/connect', [BusinessAccountController::class, 'connect'])->name('accounts.connect');

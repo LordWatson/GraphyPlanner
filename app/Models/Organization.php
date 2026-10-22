@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrganizationType;
+use App\Enums\PublishMode;
 use App\Enums\Role;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -32,6 +33,8 @@ use Illuminate\Support\Carbon;
  * @property int $invoice_payment_terms_days
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
+ * @property PublishMode|null $publish_mode
+ * @property string|null $upload_post_profile
  * @property string|null $xai_key
  * @property int|null $ai_monthly_image_quota
  * @property array<string, bool>|null $campaign_features
@@ -42,7 +45,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'require_post_review', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'require_post_review', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -79,6 +82,7 @@ class Organization extends Model
             'require_post_review' => 'boolean',
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
+            'publish_mode' => PublishMode::class,
             'xai_key' => 'encrypted',
             'invoice_payment_terms_days' => 'integer',
             'ai_monthly_image_quota' => 'integer',

@@ -1,9 +1,9 @@
 import { Head, router } from '@inertiajs/react';
-import { Link2, Loader2, Plus, Unplug } from 'lucide-react';
+import { Link2, Loader2, Settings2, Unplug } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { confirmDialog } from '@/components/confirm-dialog';
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import { Page, PageHeader, Panel } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -27,10 +27,10 @@ import {
 } from '@/components/ui/select';
 import { http } from '@/lib/http';
 import {
-    connect as connectAccount,
+    connectPlatform,
     destroy as destroyAccount,
     index as accountsIndex,
-    store as storeAccount,
+    update as updateAccount,
 } from '@/routes/business/accounts';
 
 type Option = { value: string; label: string };
@@ -40,14 +40,24 @@ type Account = {
     platform: string;
     handle: string;
     display_name: string | null;
+    timezone: string;
+    language: string | null;
+    country: string | null;
     connection_status: string;
     token_expiry: string | null;
+    last_health_error: string | null;
     can: { update: boolean; delete: boolean; connect: boolean };
 };
 
+type PlatformCard = {
+    value: string;
+    label: string;
+    hosted_connect: boolean;
+    account: Account | null;
+};
+
 type Props = {
-    accounts: Account[];
-    platforms: Option[];
+    platforms: PlatformCard[];
     timezones: Option[];
     defaults: {
         timezone: string;
@@ -58,29 +68,28 @@ type Props = {
 };
 
 export default function BusinessAccounts({
-    accounts,
     platforms,
     timezones,
     defaults,
     can,
 }: Props) {
-    const [adding, setAdding] = useState(false);
-    const [connectingId, setConnectingId] = useState<number | null>(null);
+    const [connecting, setConnecting] = useState<string | null>(null);
+    const [editing, setEditing] = useState<Account | null>(null);
 
-    const connect = async (account: Account) => {
-        setConnectingId(account.id);
+    const connect = async (platform: string) => {
+        setConnecting(platform);
 
         const response = await http.post<{ url: string }>(
-            connectAccount(account.id).url,
+            connectPlatform(platform).url,
             {},
             { toastOnError: true },
         );
 
-        setConnectingId(null);
+        setConnecting(null);
 
         if (response.ok && response.data.url) {
             window.open(response.data.url, '_blank', 'noopener,noreferrer');
-            toast.message('Finish connecting in the new tab, then come back.');
+            toast.message('Finish logging in on the new tab, then come back.');
         }
     };
 
@@ -111,120 +120,118 @@ export default function BusinessAccounts({
                         Your <em>accounts</em>.
                     </>
                 }
-                description="Connect the places you want to post. No API keys — just log in."
-                actions={
-                    can.create &&
-                    platforms.length > 0 && (
-                        <Button variant="brand" onClick={() => setAdding(true)}>
-                            <Plus />
-                            Add an account
-                        </Button>
-                    )
-                }
+                description="Connect the places you want to post. No API keys — just log in, and we handle the rest."
             />
 
-            {accounts.length === 0 ? (
-                <EmptyState
-                    icon={Link2}
-                    title="No accounts connected."
-                    description="Add your first account to start scheduling posts to it."
-                    action={
-                        can.create &&
-                        platforms.length > 0 && (
-                            <Button
-                                variant="brand"
-                                onClick={() => setAdding(true)}
-                            >
-                                <Plus />
-                                Add an account
-                            </Button>
-                        )
-                    }
-                />
-            ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {accounts.map((account) => {
-                        const Icon = platformIcon(account.platform);
+            <div className="grid gap-4 sm:grid-cols-2">
+                {platforms.map((card) => {
+                    const Icon = platformIcon(card.value);
+                    const account = card.account;
+                    const isConnected =
+                        account?.connection_status === 'connected';
+                    const busy = connecting === card.value;
 
-                        return (
-                            <Panel key={account.id} bodyClassName="p-5">
-                                <div className="flex items-start gap-4">
-                                    <span className="bg-accent text-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
-                                        <Icon className="size-5" />
-                                    </span>
-                                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                        <div className="flex min-w-0 flex-col gap-1">
-                                            <span className="truncate font-medium">
-                                                @{account.handle}
+                    return (
+                        <Panel key={card.value} bodyClassName="p-5">
+                            <div className="flex items-start gap-4">
+                                <span className="bg-accent text-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
+                                    <Icon className="size-5" />
+                                </span>
+                                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                                    <div className="flex min-w-0 flex-col gap-1">
+                                        <span className="font-semibold">
+                                            {card.label}
+                                        </span>
+                                        {account ? (
+                                            <>
+                                                <span className="text-muted-foreground truncate text-sm">
+                                                    @{account.handle}
+                                                </span>
+                                                <StatusPill
+                                                    kind="connection"
+                                                    value={
+                                                        account.connection_status
+                                                    }
+                                                    className="self-start"
+                                                />
+                                            </>
+                                        ) : (
+                                            <span className="text-muted-foreground text-sm">
+                                                Not connected yet.
                                             </span>
-                                            <StatusPill
-                                                kind="connection"
-                                                value={
-                                                    account.connection_status
-                                                }
-                                                className="self-start"
-                                            />
-                                        </div>
-                                        {account.token_expiry && (
-                                            <p className="text-muted-foreground text-xs">
-                                                {account.token_expiry}
-                                            </p>
                                         )}
-                                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                                            {account.can.connect && (
-                                                <Button
-                                                    size="sm"
-                                                    variant={
-                                                        account.connection_status ===
-                                                        'connected'
-                                                            ? 'outline'
-                                                            : 'brand'
-                                                    }
-                                                    disabled={
-                                                        connectingId ===
-                                                        account.id
-                                                    }
-                                                    onClick={() =>
-                                                        void connect(account)
-                                                    }
-                                                >
-                                                    {connectingId ===
-                                                    account.id ? (
-                                                        <Loader2 className="animate-spin" />
-                                                    ) : (
-                                                        <Link2 />
-                                                    )}
-                                                    {account.connection_status ===
-                                                    'connected'
-                                                        ? 'Reconnect'
-                                                        : 'Connect'}
-                                                </Button>
-                                            )}
-                                            {account.can.delete && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() =>
-                                                        void remove(account)
-                                                    }
-                                                >
-                                                    <Unplug />
-                                                    Remove
-                                                </Button>
-                                            )}
-                                        </div>
+                                    </div>
+
+                                    {account?.last_health_error && (
+                                        <p className="text-destructive text-xs">
+                                            {account.last_health_error}
+                                        </p>
+                                    )}
+                                    {account?.token_expiry && (
+                                        <p className="text-muted-foreground text-xs">
+                                            {account.token_expiry}
+                                        </p>
+                                    )}
+
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        {can.create && (
+                                            <Button
+                                                size="sm"
+                                                variant={
+                                                    isConnected
+                                                        ? 'outline'
+                                                        : 'brand'
+                                                }
+                                                disabled={busy}
+                                                onClick={() =>
+                                                    void connect(card.value)
+                                                }
+                                            >
+                                                {busy ? (
+                                                    <Loader2 className="animate-spin" />
+                                                ) : (
+                                                    <Link2 />
+                                                )}
+                                                {isConnected
+                                                    ? 'Reconnect'
+                                                    : 'Connect'}
+                                            </Button>
+                                        )}
+                                        {account?.can.update && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setEditing(account)
+                                                }
+                                            >
+                                                <Settings2 />
+                                                Advanced
+                                            </Button>
+                                        )}
+                                        {account?.can.delete && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    void remove(account)
+                                                }
+                                            >
+                                                <Unplug />
+                                                Remove
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
-                            </Panel>
-                        );
-                    })}
-                </div>
-            )}
+                            </div>
+                        </Panel>
+                    );
+                })}
+            </div>
 
-            <AddAccountDialog
-                open={adding}
-                onOpenChange={setAdding}
-                platforms={platforms}
+            <EditAccountDialog
+                account={editing}
+                onOpenChange={(open) => !open && setEditing(null)}
                 timezones={timezones}
                 defaults={defaults}
             />
@@ -232,39 +239,44 @@ export default function BusinessAccounts({
     );
 }
 
-function AddAccountDialog({
-    open,
+function EditAccountDialog({
+    account,
     onOpenChange,
-    platforms,
     timezones,
     defaults,
 }: {
-    open: boolean;
+    account: Account | null;
     onOpenChange: (open: boolean) => void;
-    platforms: Option[];
     timezones: Option[];
     defaults: Props['defaults'];
 }) {
-    const [platform, setPlatform] = useState('');
     const [handle, setHandle] = useState('');
     const [timezone, setTimezone] = useState(defaults.timezone);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
 
+    // Seed the form each time a different account opens the dialog.
+    const [seededFor, setSeededFor] = useState<number | null>(null);
+    if (account && account.id !== seededFor) {
+        setSeededFor(account.id);
+        setHandle(account.handle);
+        setTimezone(account.timezone ?? defaults.timezone);
+        setErrors({});
+    }
+
     const submit = () => {
+        if (!account) {
+            return;
+        }
+
         setSaving(true);
 
-        router.post(
-            storeAccount().url,
-            { platform, handle, timezone },
+        router.put(
+            updateAccount(account.id).url,
+            { platform: account.platform, handle, timezone },
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    onOpenChange(false);
-                    setPlatform('');
-                    setHandle('');
-                    setErrors({});
-                },
+                onSuccess: () => onOpenChange(false),
                 onError: (formErrors) => setErrors(formErrors),
                 onFinish: () => setSaving(false),
             },
@@ -272,37 +284,17 @@ function AddAccountDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={account !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add an account</DialogTitle>
+                    <DialogTitle>Advanced settings</DialogTitle>
                     <DialogDescription>
-                        Pick a platform and your handle. You'll connect it right
-                        after.
+                        Fine-tune how this account posts. We've filled these in
+                        from your brand.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4 py-2">
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="platform">Platform</Label>
-                        <Select value={platform} onValueChange={setPlatform}>
-                            <SelectTrigger id="platform">
-                                <SelectValue placeholder="Choose a platform" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {platforms.map((option) => (
-                                    <SelectItem
-                                        key={option.value}
-                                        value={option.value}
-                                    >
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <InputError message={errors.platform} />
-                    </div>
-
                     <div className="flex flex-col gap-1.5">
                         <Label htmlFor="handle">Handle</Label>
                         <Input
@@ -314,33 +306,25 @@ function AddAccountDialog({
                         <InputError message={errors.handle} />
                     </div>
 
-                    <details className="group">
-                        <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-sm">
-                            Advanced
-                        </summary>
-                        <div className="mt-3 flex flex-col gap-1.5">
-                            <Label htmlFor="timezone">Timezone</Label>
-                            <Select
-                                value={timezone}
-                                onValueChange={setTimezone}
-                            >
-                                <SelectTrigger id="timezone">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {timezones.map((option) => (
-                                        <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <InputError message={errors.timezone} />
-                        </div>
-                    </details>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="timezone">Timezone</Label>
+                        <Select value={timezone} onValueChange={setTimezone}>
+                            <SelectTrigger id="timezone">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {timezones.map((option) => (
+                                    <SelectItem
+                                        key={option.value}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.timezone} />
+                    </div>
                 </div>
 
                 <DialogFooter>
@@ -352,10 +336,10 @@ function AddAccountDialog({
                     </Button>
                     <Button
                         variant="brand"
-                        disabled={saving || !platform || !handle}
+                        disabled={saving || !handle}
                         onClick={submit}
                     >
-                        Add account
+                        Save
                     </Button>
                 </DialogFooter>
             </DialogContent>

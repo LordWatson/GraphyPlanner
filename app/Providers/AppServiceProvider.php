@@ -11,6 +11,7 @@ use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
+use App\Contracts\PublishCredentials;
 use App\Contracts\VirusScanner;
 use App\Contracts\WebsiteSummarizer;
 use App\Models\AiImageGeneration;
@@ -61,6 +62,7 @@ use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
 use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
+use App\Services\Publishing\OrganizationOrPlatformCredentials;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
 use App\Services\Security\ClamAvVirusScanner;
@@ -119,6 +121,12 @@ class AppServiceProvider extends ServiceProvider
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule
         // endpoint, webhook sync, and health integration still land in Steps 1.3-1.6.
         $this->app->bind(PublishAdapter::class, UploadPostAdapter::class);
+
+        // Step B-5.1: the single seam for vendor credentials — byo (the org's own key) for
+        // agencies, managed (Alima's platform key + a per-org profile) for business workspaces.
+        // The adapter, the webhook verifier and the music/engagement readers all resolve keys and
+        // the publish profile through this contract, never from the model directly.
+        $this->app->bind(PublishCredentials::class, OrganizationOrPlatformCredentials::class);
 
         // Step M-3.1: engagement metrics (M-0.2 audit — Upload-Post reports all nine networks).
         $this->app->bind(EngagementSource::class, UploadPostEngagementSource::class);

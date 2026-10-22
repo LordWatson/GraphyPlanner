@@ -18,6 +18,8 @@ use App\Actions\Publishing\SearchMusicAction;
 use App\Enums\CampaignStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
+use App\Enums\PublishFailureReason;
 use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
 use App\Http\Requests\CreateSharePreviewRequest;
@@ -319,9 +321,21 @@ class PostController extends Controller
     {
         $this->authorize('retryFailedTargets', $post);
 
-        $action($post, $request->user());
+        // Step B-5.3: an optional `target` retries just that one failed channel, leaving the
+        // others. The id must belong to this post (a channel from another post can't be retried).
+        $validated = $request->validate([
+            'target' => ['nullable', 'integer'],
+        ]);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Retrying the failed channels.')]);
+        $only = isset($validated['target'])
+            ? ($post->targets()->whereKey($validated['target'])->first() ?? abort(404))
+            : null;
+
+        $action($post, $request->user(), $only);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $only !== null
+            ? __('Retrying this channel.')
+            : __('Retrying the failed channels.')]);
 
         return to_route('posts.edit', $post);
     }
@@ -503,6 +517,12 @@ class PostController extends Controller
                 'status_label' => $target->status->label(),
                 'external_post_id' => $target->external_post_id,
                 'error' => $target->error,
+                // Step B-5.3: a plain-language reading of a failed channel's vendor error, with a
+                // fix action and whether a bare retry will help.
+                'failure' => $target->status === PostTargetStatus::Failed && filled($target->error)
+                    ? PublishFailureReason::classify($target->error, $target->socialAccount?->platform)
+                        ->describe($target->socialAccount?->platform)
+                    : null,
             ])->values(),
             'activity_logs' => $post->activityLogs->sortByDesc('created_at')->map(fn ($log) => [
                 'id' => $log->id,
