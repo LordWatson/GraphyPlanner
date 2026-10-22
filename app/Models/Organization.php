@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $slug
  * @property OrganizationType $type
+ * @property Carbon|null $onboarding_completed_at
  * @property string $default_timezone
  * @property string $default_currency
  * @property string|null $billing_details
@@ -72,6 +73,7 @@ class Organization extends Model
     {
         return [
             'type' => OrganizationType::class,
+            'onboarding_completed_at' => 'datetime',
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
             'xai_key' => 'encrypted',
@@ -194,6 +196,15 @@ class Organization extends Model
     public function isAgency(): bool
     {
         return $this->type === OrganizationType::Agency;
+    }
+
+    /**
+     * Step B-2.2 — whether this business workspace still needs the guided setup. True only for a
+     * business org that hasn't finished or skipped onboarding; agencies never onboard this way.
+     */
+    public function needsOnboarding(): bool
+    {
+        return $this->isBusiness() && $this->onboarding_completed_at === null;
     }
 
     /**

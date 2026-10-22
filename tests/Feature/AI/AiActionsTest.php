@@ -9,12 +9,14 @@ use App\Contracts\AiProvider;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Post;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\ClientContextBuilder;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\ImageBriefInput;
@@ -55,6 +57,11 @@ class AiActionsTest extends TestCase
             public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
             {
                 return new AiImageBrief(subject: $input->title);
+            }
+
+            public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+            {
+                return AiBrandProfileDraft::empty();
             }
         });
 
@@ -97,6 +104,11 @@ class AiActionsTest extends TestCase
             {
                 return new AiImageBrief(subject: $input->title);
             }
+
+            public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+            {
+                return AiBrandProfileDraft::empty();
+            }
         });
 
         // Simulate a stale/incompatible cache entry (e.g. one unserialized as
@@ -137,6 +149,11 @@ class AiActionsTest extends TestCase
             public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
             {
                 return new AiImageBrief(subject: $input->title);
+            }
+
+            public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+            {
+                return AiBrandProfileDraft::empty();
             }
         });
 
@@ -191,6 +208,11 @@ class AiActionsTest extends TestCase
             public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
             {
                 return new AiImageBrief(subject: $input->title);
+            }
+
+            public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+            {
+                return AiBrandProfileDraft::empty();
             }
         });
 

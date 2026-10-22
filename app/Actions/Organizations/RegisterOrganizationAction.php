@@ -4,6 +4,9 @@ namespace App\Actions\Organizations;
 
 use App\Actions\Campaigns\SeedStarterCampaignTemplatesAction;
 use App\Actions\TaxRates\SeedDefaultTaxRatesAction;
+use App\Actions\Workspace\CreatePrimaryBrandAction;
+use App\Enums\BrandKind;
+use App\Enums\OrganizationType;
 use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Organization;
@@ -28,21 +31,33 @@ use Illuminate\Support\Str;
  *   welcome email — that link is the only way in, so it also counts as email verification.
  *
  * Either way the `OrganizationWelcomeMail` is queued once the transaction has committed.
+ *
+ * Step B-2.1 — the action is workspace-type-aware: callers may pass `type` (default `agency`, so
+ * existing callers are unchanged). For a `business` signup it creates the single primary brand via
+ * `CreatePrimaryBrandAction` **inside the same transaction**, so a business org can never exist
+ * without its brand.
  */
 class RegisterOrganizationAction
 {
+    public function __construct(
+        private readonly CreatePrimaryBrandAction $createPrimaryBrand = new CreatePrimaryBrandAction,
+    ) {}
+
     /**
-     * @param  array{organization_name: string, default_timezone: string, default_currency: string, name: string, email: string, password?: string|null}  $data
+     * @param  array{organization_name: string, default_timezone: string, default_currency: string, name: string, email: string, password?: string|null, type?: string|OrganizationType|null, brand_kind?: string|BrandKind|null}  $data
      */
     public function __invoke(array $data, ?User $onboardedBy = null): User
     {
         $password = $data['password'] ?? null;
         $selfServe = filled($password);
+        $type = $this->resolveType($data['type'] ?? null);
+        $brandKind = $this->resolveBrandKind($data['brand_kind'] ?? null);
 
-        $owner = DB::transaction(function () use ($data, $password, $selfServe) {
+        $owner = DB::transaction(function () use ($data, $password, $selfServe, $type, $brandKind) {
             $organization = Organization::create([
                 'name' => trim($data['organization_name']),
                 'slug' => $this->uniqueSlug($data['organization_name']),
+                'type' => $type,
                 'default_timezone' => $data['default_timezone'],
                 'default_currency' => strtoupper($data['default_currency']),
             ]);
@@ -65,6 +80,12 @@ class RegisterOrganizationAction
             // Step M-4.1: UK + UAE starter tax rates, editable in Settings.
             (new SeedDefaultTaxRatesAction)($organization);
 
+            // Step B-2.1: a business workspace owns exactly one primary brand, created here so the
+            // org + owner + brand (+ its empty Brand Brain) either all exist or none do.
+            if ($type === OrganizationType::Business) {
+                ($this->createPrimaryBrand)($organization, $organization->name, null, $brandKind);
+            }
+
             return $owner;
         });
 
@@ -83,11 +104,30 @@ class RegisterOrganizationAction
             'org_id' => $owner->org_id,
             'user_id' => $owner->id,
             'owner_email' => $owner->email,
+            'type' => $type->value,
             'source' => $selfServe ? 'self_serve' : 'super_admin',
             'onboarded_by' => $onboardedBy?->id,
         ]);
 
         return $owner;
+    }
+
+    private function resolveType(string|OrganizationType|null $type): OrganizationType
+    {
+        if ($type instanceof OrganizationType) {
+            return $type;
+        }
+
+        return $type !== null ? OrganizationType::from($type) : OrganizationType::Agency;
+    }
+
+    private function resolveBrandKind(string|BrandKind|null $brandKind): ?BrandKind
+    {
+        if ($brandKind instanceof BrandKind) {
+            return $brandKind;
+        }
+
+        return $brandKind !== null ? BrandKind::from($brandKind) : null;
     }
 
     private function uniqueSlug(string $name): string

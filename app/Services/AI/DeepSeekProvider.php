@@ -10,12 +10,14 @@ use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\Post;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Campaigns\AiCampaignBriefDraft;
 use App\Support\AI\Campaigns\AiCampaignWrapDraft;
 use App\Support\AI\Campaigns\AiDeliverableSuggestion;
@@ -181,6 +183,32 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         ]);
 
         return $this->briefs->finalize($client, $brief->with(['subject' => $this->briefs->stripHashtags($brief->subject)]), $input);
+    }
+
+    /**
+     * Step B-2.4: draft a business/creator's Brand Brain from the plain facts they gave onboarding.
+     * No `Client` exists yet, so the system prompt carries no company context; everything the model
+     * grounds on is in the user prompt. Falls back to an empty draft if DeepSeek fails, so the
+     * wizard never dead-ends.
+     */
+    public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+    {
+        $model = (string) config('ai.deepseek.model', 'deepseek-chat');
+
+        $payload = $this->requestStructured(
+            method: 'draftBrandProfile',
+            systemPrompt: $this->buildBrandProfileSystemPrompt(),
+            userPrompt: $this->buildBrandProfileUserPrompt($input),
+            validator: fn (array $data): ?string => is_array($data['voice'] ?? null) ? null : 'voice must be an object',
+            context: ['brand_name' => $input->name],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null) {
+            return AiBrandProfileDraft::empty();
+        }
+
+        return AiBrandProfileDraft::fromArray($payload, succeeded: true, provider: 'deepseek', model: $model);
     }
 
     /**
@@ -425,6 +453,46 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
 
         $lines[] = '';
         $lines[] = 'Respond with JSON: {"summary": string (2-3 sentences), "highlights": string[] (3-5), "learnings": string, "next_steps": string}';
+
+        return implode("\n", $lines);
+    }
+
+    private function buildBrandProfileSystemPrompt(): string
+    {
+        return implode("\n", [
+            'You are a brand strategist helping a small business or creator set up their social media brand profile in Alima Planner.',
+            'They have just signed up and given you a few plain facts. Draft a concise, practical brand profile they can accept or tweak.',
+            'Write in plain, warm, second-person British English. Be specific to the facts given; never invent products, prices, awards or locations that were not provided.',
+            'Always respond with a single, strictly valid JSON object matching the schema in the user message — no prose, no markdown fences.',
+        ]);
+    }
+
+    private function buildBrandProfileUserPrompt(BrandProfileInput $input): string
+    {
+        $lines = [
+            'Draft a brand profile from these facts:',
+            '- Brand name: '.$this->guardrail->scrub($input->name),
+        ];
+
+        if (filled($input->oneLiner)) {
+            $lines[] = '- What they do: '.$this->guardrail->scrub((string) $input->oneLiner);
+        }
+
+        if (filled($input->location)) {
+            $lines[] = '- Location: '.$this->guardrail->scrub((string) $input->location);
+        }
+
+        if (filled($input->websiteText)) {
+            $lines[] = '- Text from their website: '.$this->guardrail->scrub((string) $input->websiteText);
+        }
+
+        if (filled($input->bioText)) {
+            $lines[] = '- Their social bio: '.$this->guardrail->scrub((string) $input->bioText);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Keep every list to 3-5 short items. Content pillars are the 3-5 recurring themes they should post about.';
+        $lines[] = 'Respond with JSON: {"voice": {"tone": string, "personality": string, "do_nots": string[]}, "audience": {"description": string, "demographics": string, "pain_points": string[]}, "offer": {"value_proposition": string, "key_products": string[], "pricing_notes": string|null}, "content_pillars": string[]}';
 
         return implode("\n", $lines);
     }

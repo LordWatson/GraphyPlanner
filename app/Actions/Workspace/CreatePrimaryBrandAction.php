@@ -2,6 +2,7 @@
 
 namespace App\Actions\Workspace;
 
+use App\Enums\BrandKind;
 use App\Enums\ClientStatus;
 use App\Models\BrandBrain;
 use App\Models\Client;
@@ -20,14 +21,15 @@ use Illuminate\Support\Facades\Log;
  */
 class CreatePrimaryBrandAction
 {
-    public function __invoke(Organization $organization, ?string $name = null, ?string $defaultLanguage = null): Client
+    public function __invoke(Organization $organization, ?string $name = null, ?string $defaultLanguage = null, ?BrandKind $brandKind = null): Client
     {
-        return DB::transaction(function () use ($organization, $name, $defaultLanguage) {
+        return DB::transaction(function () use ($organization, $name, $defaultLanguage, $brandKind) {
             $client = Client::create([
                 'org_id' => $organization->id,
                 'name' => trim($name ?? '') !== '' ? trim((string) $name) : $organization->name,
                 'status' => ClientStatus::Active,
                 'is_primary' => true,
+                'brand_kind' => $brandKind,
                 'default_language' => $defaultLanguage,
             ]);
 
@@ -38,6 +40,7 @@ class CreatePrimaryBrandAction
             Log::info('Primary brand created', [
                 'org_id' => $organization->id,
                 'client_id' => $client->id,
+                'brand_kind' => $brandKind?->value,
             ]);
 
             return $client;

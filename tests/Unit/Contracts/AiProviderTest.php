@@ -7,9 +7,11 @@ use App\Models\Client;
 use App\Models\Post;
 use App\Services\AI\DeepSeekProvider;
 use App\Services\AI\NullAiProvider;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Support\Facades\Log;
@@ -39,6 +41,11 @@ class AiProviderTest extends TestCase
             public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
             {
                 return new AiImageBrief(subject: $input->title);
+            }
+
+            public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+            {
+                return AiBrandProfileDraft::empty();
             }
         };
 

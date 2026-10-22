@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SuperAdmin;
 
+use App\Enums\OrganizationType;
 use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Client;
@@ -265,6 +266,42 @@ class OrganizationManagementTest extends TestCase
 
         Mail::assertQueued(OrganizationWelcomeMail::class, fn (OrganizationWelcomeMail $mail) => $mail->hasTo('sam@harbour.test')
             && str_contains((string) $mail->setPasswordUrl, '/reset-password/'));
+    }
+
+    public function test_a_super_admin_can_onboard_a_business_workspace_with_its_primary_brand(): void
+    {
+        Mail::fake();
+
+        $this->actingAs($this->superAdmin)->post(route('super-admin.organizations.store'), [
+            'organization_name' => 'Jess Bakes',
+            'type' => OrganizationType::Business->value,
+            'default_timezone' => 'Europe/London',
+            'default_currency' => 'GBP',
+            'name' => 'Jess Baker',
+            'email' => 'jess@jessbakes.test',
+        ]);
+
+        $organization = User::query()->where('email', 'jess@jessbakes.test')->sole()->organization;
+
+        $this->assertTrue($organization->isBusiness());
+        $brand = Client::query()->where('org_id', $organization->id)->sole();
+        $this->assertTrue($brand->is_primary);
+        $this->assertDatabaseHas('brand_brains', ['client_id' => $brand->id]);
+    }
+
+    public function test_onboarding_defaults_to_an_agency_when_no_type_is_given(): void
+    {
+        Mail::fake();
+
+        $this->actingAs($this->superAdmin)->post(route('super-admin.organizations.store'), [
+            'organization_name' => 'Northlight',
+            'default_timezone' => 'UTC',
+            'default_currency' => 'USD',
+            'name' => 'Rae',
+            'email' => 'rae@northlight.test',
+        ]);
+
+        $this->assertTrue(User::query()->where('email', 'rae@northlight.test')->sole()->organization->isAgency());
     }
 
     public function test_onboarding_rejects_an_email_that_already_has_an_account(): void

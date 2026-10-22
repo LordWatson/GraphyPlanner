@@ -3,11 +3,13 @@
 namespace App\Http\Requests\SuperAdmin;
 
 use App\Concerns\ProfileValidationRules;
+use App\Enums\OrganizationType;
 use App\Models\Organization;
 use App\Support\Options\CurrencyOptions;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 
 /**
  * Step 15.3 — a super admin onboards an organization on a customer's behalf. No password: the
@@ -36,6 +38,8 @@ class StoreOrganizationRequest extends FormRequest
     {
         return [
             'organization_name' => ['required', 'string', 'min:2', 'max:120'],
+            // Step B-2.1: a super admin can onboard an agency or a business/creator workspace.
+            'type' => ['nullable', new Enum(OrganizationType::class)],
             'default_timezone' => ['required', 'timezone:all'],
             'default_currency' => ['required', 'string', Rule::in(CurrencyOptions::codes())],
             'name' => $this->nameRules(),
@@ -44,14 +48,16 @@ class StoreOrganizationRequest extends FormRequest
     }
 
     /**
-     * The validated onboarding, shaped for `RegisterOrganizationAction` (no password).
+     * The validated onboarding, shaped for `RegisterOrganizationAction` (no password). A `business`
+     * type makes the Action create the primary brand in the same transaction (Step B-2.1).
      *
-     * @return array{organization_name: string, default_timezone: string, default_currency: string, name: string, email: string}
+     * @return array{organization_name: string, type: string, default_timezone: string, default_currency: string, name: string, email: string}
      */
     public function registration(): array
     {
         return [
             'organization_name' => $this->string('organization_name')->toString(),
+            'type' => $this->filled('type') ? $this->string('type')->toString() : OrganizationType::Agency->value,
             'default_timezone' => $this->string('default_timezone')->toString(),
             'default_currency' => $this->string('default_currency')->toString(),
             'name' => $this->string('name')->toString(),

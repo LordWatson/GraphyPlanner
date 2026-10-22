@@ -9,9 +9,11 @@ use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\Post;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Campaigns\AiCampaignBriefDraft;
 use App\Support\AI\Campaigns\AiCampaignWrapDraft;
 use App\Support\AI\Images\AiImageBrief;
@@ -57,6 +59,13 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         $this->logDisabled('draftImageBrief', ['client_id' => $client->id, 'org_id' => $client->org_id]);
 
         return (new BrandImageBriefFactory)->defaults($client, $input);
+    }
+
+    public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+    {
+        $this->logDisabled('draftBrandProfile', ['brand_name' => $input->name]);
+
+        return AiBrandProfileDraft::empty();
     }
 
     public function draftCampaignBrief(Campaign $campaign): AiCampaignBriefDraft

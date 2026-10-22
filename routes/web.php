@@ -8,6 +8,7 @@ use App\Http\Controllers\Analytics\ReportController as OrganizationReportControl
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
+use App\Http\Controllers\Business\OnboardingController as BusinessOnboardingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\Campaigns\CampaignAiController;
@@ -42,6 +43,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Organizations\BusinessRegistrationController;
 use App\Http\Controllers\Organizations\RegistrationController;
 use App\Http\Controllers\Portal\PortalAccountConnectController;
 use App\Http\Controllers\Portal\PortalCalendarController;
@@ -119,6 +121,13 @@ Route::middleware('guest')->group(function () {
     Route::post('register-organization', [RegistrationController::class, 'store'])
         ->middleware('throttle:6,1')
         ->name('organizations.register.store');
+
+    // Step B-2.1: the business/creator entry point into the same product — "manage your own brand".
+    // Creates a `business` org with its single primary brand. Throttled like the agency signup.
+    Route::get('start', [BusinessRegistrationController::class, 'create'])->name('organizations.start');
+    Route::post('start', [BusinessRegistrationController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('organizations.start.store');
 });
 Route::redirect('register', '/register-organization')->name('register');
 
@@ -129,6 +138,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
 });
+
+// Step B-2.2 / B-2.3: the business/creator guided setup. `workspace:business` keeps it off limits
+// to agency orgs (they 404). The brand is implicit — resolved from `CurrentWorkspace` — so no route
+// takes a `{client}` parameter.
+Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
+    ->prefix('welcome-setup')
+    ->name('business.')
+    ->group(function () {
+        Route::get('/', [BusinessOnboardingController::class, 'show'])->name('onboarding');
+        Route::put('brand', [BusinessOnboardingController::class, 'updateBrand'])->name('onboarding.brand');
+        Route::post('brand-profile', [BusinessOnboardingController::class, 'draftProfile'])
+            ->middleware('throttle:ai')
+            ->name('onboarding.draft');
+        Route::put('voice', [BusinessOnboardingController::class, 'saveVoice'])->name('onboarding.voice');
+        Route::post('skip', [BusinessOnboardingController::class, 'skip'])->name('onboarding.skip');
+        Route::post('complete', [BusinessOnboardingController::class, 'complete'])->name('onboarding.complete');
+    });
 
 // The organization workspace. `org.member` (Step 15.1) sends org-less super admins to
 // `/super-admin` — everything in here is scoped by the user's `org_id`.

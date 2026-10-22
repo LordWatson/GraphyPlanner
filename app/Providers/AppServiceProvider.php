@@ -12,6 +12,7 @@ use App\Contracts\MusicProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Contracts\VirusScanner;
+use App\Contracts\WebsiteSummarizer;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
 use App\Models\BrandBrain;
@@ -64,6 +65,7 @@ use App\Services\Publishing\UploadPostMusicProvider;
 use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
+use App\Services\Web\HttpWebsiteSummarizer;
 use App\Services\Workspace\CurrentWorkspace;
 use App\Support\Queues;
 use App\Support\RateLimits;
@@ -96,6 +98,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);
+
+        // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
+        // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private
+        // address) and returns null on any failure. Faked in tests.
+        $this->app->bind(WebsiteSummarizer::class, HttpWebsiteSummarizer::class);
 
         // Step I-16.2 / M-1.2: upload virus scanning — ClamAV when configured, otherwise none.
         $this->app->bind(VirusScanner::class, fn () => config('security.uploads.virus_scanner') === 'clamav'

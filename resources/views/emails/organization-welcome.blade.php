@@ -20,10 +20,17 @@
                             <h1 style="margin:0 0 12px; font-family:'Poppins', Arial, sans-serif; font-size:22px; line-height:1.3; color:#181723; font-weight:600;">
                                 Welcome aboard, {{ \Illuminate\Support\Str::before($owner->name, ' ') ?: $owner->name }}.
                             </h1>
-                            <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
-                                {{ $organizationName }} is set up on Alima and you're its owner. Add your first client,
-                                invite the team and start planning — we're glad you're here.
-                            </p>
+                            @if ($isBusiness)
+                                <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
+                                    {{ $organizationName }} is set up on Alima. Let's get your brand ready: tell us your
+                                    voice, connect your accounts and line up your first post — we'll guide you.
+                                </p>
+                            @else
+                                <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
+                                    {{ $organizationName }} is set up on Alima and you're its owner. Add your first client,
+                                    invite the team and start planning — we're glad you're here.
+                                </p>
+                            @endif
 
                             @if ($setPasswordUrl)
                                 <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
@@ -35,7 +42,7 @@
                                 <tr>
                                     <td style="border-radius:999px; background-color:#181723;">
                                         <a href="{{ $setPasswordUrl ?? $dashboardUrl }}" style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:600; color:#F5F2E8; text-decoration:none; border-radius:999px;">
-                                            {{ $setPasswordUrl ? 'Choose your password' : "Let's get started" }}
+                                            {{ $setPasswordUrl ? 'Choose your password' : ($isBusiness ? 'Set up my brand' : "Let's get started") }}
                                         </a>
                                     </td>
                                 </tr>
@@ -51,8 +58,13 @@
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; background-color:#EFE6F3; border-radius:12px;">
                                 <tr>
                                     <td style="padding:16px 20px; font-size:13px; line-height:1.6; color:#181723;">
-                                        <strong style="font-weight:600;">Three quick wins:</strong> add a client and fill in their Brand Brain,
-                                        connect a social account, then draft your first post. Got a question? Let's talk.
+                                        @if ($isBusiness)
+                                            <strong style="font-weight:600;">Three quick wins:</strong> set your brand voice,
+                                            connect a social account, then schedule your first post. Got a question? Let's talk.
+                                        @else
+                                            <strong style="font-weight:600;">Three quick wins:</strong> add a client and fill in their Brand Brain,
+                                            connect a social account, then draft your first post. Got a question? Let's talk.
+                                        @endif
                                     </td>
                                 </tr>
                             </table>

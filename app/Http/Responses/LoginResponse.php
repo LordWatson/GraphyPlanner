@@ -33,7 +33,9 @@ class LoginResponse implements LoginResponseContract
             Role::ClientReviewer => '/portal',
             // Step 15.1: platform staff have no org workspace — they land on their own console.
             Role::SuperAdmin => '/super-admin',
-            default => '/dashboard',
+            // Step B-2.2: a business workspace that hasn't finished (or skipped) its guided setup
+            // lands there first; once onboarding is stamped it falls through to the dashboard.
+            default => $user?->organization?->needsOnboarding() ? '/welcome-setup' : '/dashboard',
         };
 
         return redirect()->intended($home);

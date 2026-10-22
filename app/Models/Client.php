@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Clients\RecomputeClientHealthAction;
 use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
+use App\Enums\BrandKind;
 use App\Enums\ClientHealth;
 use App\Enums\ClientReportSchedule;
 use App\Enums\ClientStatus;
@@ -28,10 +29,12 @@ use Illuminate\Support\Carbon;
  * @property string|null $legal_name
  * @property string|null $website
  * @property string|null $industry
+ * @property string|null $location
  * @property array<int, string>|null $countries
  * @property ClientStatus $status
  * @property bool $is_primary
  * @property int|null $primary_org_id
+ * @property BrandKind|null $brand_kind
  * @property ApprovalMode $default_approval_mode
  * @property int|null $owner_user_id
  * @property Carbon|null $start_date
@@ -59,7 +62,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $deleted_at
  */
 #[Fillable([
-    'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status', 'is_primary',
+    'org_id', 'name', 'legal_name', 'website', 'industry', 'location', 'countries', 'status', 'is_primary', 'brand_kind',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
@@ -90,6 +93,7 @@ class Client extends Model
             'tags' => 'array',
             'status' => ClientStatus::class,
             'is_primary' => 'boolean',
+            'brand_kind' => BrandKind::class,
             'default_approval_mode' => ApprovalMode::class,
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
