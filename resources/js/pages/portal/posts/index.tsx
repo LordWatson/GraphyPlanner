@@ -1,12 +1,16 @@
-import { Head, Link } from '@inertiajs/react';
-import { Inbox } from 'lucide-react';
+import { Form, Head, Link } from '@inertiajs/react';
+import { CheckCheck, Inbox } from 'lucide-react';
 
 import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
 import type { PortalPostRowData } from '@/components/portal-post-row';
 import { PortalPostRow } from '@/components/portal-post-row';
+import { Button } from '@/components/ui/button';
 import { resolveStatus, toneBgClass } from '@/lib/status';
 import { cn } from '@/lib/utils';
-import { index as portalPostsIndex } from '@/routes/portal/posts';
+import {
+    decideAll as approveAllPortalPosts,
+    index as portalPostsIndex,
+} from '@/routes/portal/posts';
 
 type StatusOption = { value: string; label: string };
 
@@ -119,6 +123,25 @@ export default function PortalPostsIndex({
                                 {waiting.map((post) => (
                                     <PortalPostRow key={post.id} post={post} />
                                 ))}
+                                {waiting.length > 1 && (
+                                    <Form
+                                        {...approveAllPortalPosts.form()}
+                                        options={{ preserveScroll: true }}
+                                        className="px-2 pt-2"
+                                    >
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                variant="outline"
+                                                className="w-full"
+                                                disabled={processing}
+                                            >
+                                                <CheckCheck className="size-4" />
+                                                Approve all {waiting.length}
+                                            </Button>
+                                        )}
+                                    </Form>
+                                )}
                             </Panel>
                         )}
                         {rest.length > 0 && (

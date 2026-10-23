@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\Clients\RecomputeClientHealthAction;
 use App\Enums\ApprovalMode;
+use App\Enums\ApprovalPolicy;
 use App\Enums\BillingCycle;
 use App\Enums\BrandKind;
 use App\Enums\ClientHealth;
@@ -15,6 +16,7 @@ use App\Services\ClientHealthService;
 use App\Support\Workspace\PostingGoal;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,6 +39,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $primary_org_id
  * @property BrandKind|null $brand_kind
  * @property ApprovalMode $default_approval_mode
+ * @property ApprovalPolicy $approval_policy
  * @property int|null $owner_user_id
  * @property Carbon|null $start_date
  * @property string|null $retainer_amount
@@ -68,7 +71,7 @@ use Illuminate\Support\Carbon;
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
-    'approval_lead_days', 'default_approval_mode', 'report_schedule', 'target_posts_per_week',
+    'approval_lead_days', 'default_approval_mode', 'approval_policy', 'report_schedule', 'target_posts_per_week',
     'posting_goal',
 ])]
 class Client extends Model
@@ -84,6 +87,8 @@ class Client extends Model
         'report_schedule' => 'review',
         // Step B-1.2: an ordinary client is not a business workspace's primary brand.
         'is_primary' => false,
+        // Step M-6.3: single-approver behaviour by default.
+        'approval_policy' => 'any',
     ];
 
     /**
@@ -98,6 +103,7 @@ class Client extends Model
             'is_primary' => 'boolean',
             'brand_kind' => BrandKind::class,
             'default_approval_mode' => ApprovalMode::class,
+            'approval_policy' => ApprovalPolicy::class,
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
             'retainer_amount' => 'decimal:2',
@@ -198,6 +204,79 @@ class Client extends Model
     public function billingCurrency(): string
     {
         return $this->billing_currency ?: $this->organization->default_currency;
+    }
+
+    /**
+     * Step M-6.1 — named contacts at this client (approvers, billing, marketing leads, other).
+     *
+     * @return HasMany<ClientContact, $this>
+     */
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(ClientContact::class);
+    }
+
+    /**
+     * Step M-6.3 — the contacts that must approve this client's posts, in a stable order (the order
+     * they were added). An approver is a review-email contact; approval steps are built from this
+     * list per the client's `approval_policy`.
+     *
+     * @return Collection<int, ClientContact>
+     */
+    public function approverContacts(): Collection
+    {
+        return $this->contacts()->receivingReviewEmails()->orderBy('id')->get();
+    }
+
+    /**
+     * Step M-6.1 — email recipients for a post review request: every approver-style contact that
+     * opted into review emails, falling back to the legacy `approval_email` when no contact has.
+     * Case-insensitive de-duplication. Never staff.
+     *
+     * @return list<array{name: string|null, email: string}>
+     */
+    public function reviewEmailRecipients(): array
+    {
+        $recipients = [];
+
+        foreach ($this->contacts()->receivingReviewEmails()->orderBy('id')->get(['id', 'name', 'email']) as $contact) {
+            $recipients[strtolower($contact->email)] ??= ['name' => $contact->name, 'email' => $contact->email];
+        }
+
+        if ($recipients === []) {
+            $approval = trim((string) $this->approval_email);
+
+            if ($approval !== '' && filter_var($approval, FILTER_VALIDATE_EMAIL) !== false) {
+                $recipients[strtolower($approval)] = ['name' => null, 'email' => $approval];
+            }
+        }
+
+        return array_values($recipients);
+    }
+
+    /**
+     * Step M-6.1 — email recipients for an invoice: every billing contact that opted into invoices,
+     * falling back to the legacy billing/approval address when none has.
+     *
+     * @return list<array{name: string|null, email: string}>
+     */
+    public function invoiceRecipients(): array
+    {
+        $recipients = [];
+
+        foreach ($this->contacts()->receivingInvoices()->orderBy('id')->get(['id', 'name', 'email']) as $contact) {
+            $recipients[strtolower($contact->email)] ??= ['name' => $contact->name, 'email' => $contact->email];
+        }
+
+        if ($recipients === []) {
+            $fallback = trim((string) $this->invoiceRecipientEmail());
+
+            if ($fallback !== '' && filter_var($fallback, FILTER_VALIDATE_EMAIL) !== false) {
+                $recipients[strtolower($fallback)] = ['name' => null, 'email' => $fallback];
+            }
+        }
+
+        return array_values($recipients);
     }
 
     /**

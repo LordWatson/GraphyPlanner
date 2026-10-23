@@ -44,6 +44,10 @@ final class SchedulerHeartbeat
         'invoices:generate-retainer-drafts' => ['label' => 'Retainer drafts', 'interval_minutes' => 1440],
         // Step M-5.8: daily recurring-post draft generation.
         'posts:generate-recurring-drafts' => ['label' => 'Recurring post drafts', 'interval_minutes' => 1440],
+        // Step M-6.5 (Phase 9): daily overdue-approval reminders.
+        'approvals:send-overdue-reminders' => ['label' => 'Overdue approval reminders', 'interval_minutes' => 1440],
+        // Step M-6.7 (I-12.1): daily notification digest.
+        'notifications:send-digest' => ['label' => 'Notification digest', 'interval_minutes' => 1440],
         // Step B-8.2: weekly business Insights digest, swept hourly (acts Monday morning per tz).
         'business:send-insights-digest' => ['label' => 'Weekly insights digest', 'interval_minutes' => 60],
     ];

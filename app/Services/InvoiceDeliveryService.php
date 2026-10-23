@@ -19,12 +19,18 @@ use Throwable;
 class InvoiceDeliveryService
 {
     /**
-     * Resolve who an invoice email should go to: an explicit override, else the client's billing
-     * contact (falling back to its approval contact). Null when there's nobody to email.
+     * Resolve who an invoice email should go to: an explicit override, else the client's first
+     * billing contact (Step M-6.1), falling back to the legacy billing/approval address. Null when
+     * there's nobody to email. The invoice records a single `sent_to_email`, so this returns one
+     * address; every portal reviewer is also notified in-app below.
      */
     public function resolveRecipient(Invoice $invoice, ?string $override = null): ?string
     {
-        return filled($override) ? $override : $invoice->client->invoiceRecipientEmail();
+        if (filled($override)) {
+            return $override;
+        }
+
+        return $invoice->client->invoiceRecipients()[0]['email'] ?? null;
     }
 
     /**

@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Grids\DecideGridPlanAction;
+use App\Actions\Posts\Approvals\SubmitClientDecisionAction;
 use App\Actions\Posts\RecordPreviewFeedbackAction;
-use App\Actions\Posts\TransitionPostStatusAction;
+use App\Enums\ApprovalDecision;
 use App\Enums\GridPlanStatus;
 use App\Enums\PostStatus;
 use App\Http\Requests\Grids\GridDecisionRequest;
@@ -15,6 +16,7 @@ use App\Models\Post;
 use App\Models\ReviewToken;
 use App\Services\Posts\PostRevisionService;
 use App\Support\Grids\GridPlanPresenter;
+use App\Support\Posts\PostFeedbackPresenter;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -101,6 +103,9 @@ class ReviewController extends Controller
                         'created_at' => $comment->created_at?->toIso8601String(),
                     ])
                     ->values(),
+                // Step M-6.4: the client sees any visual-feedback pins/suggestions rendered here too
+                // (read-only on the token link — the portal is where they add them).
+                'feedback' => PostFeedbackPresenter::threads($post, null, forClient: true),
             ],
         ]);
     }
@@ -111,7 +116,7 @@ class ReviewController extends Controller
     public function decide(
         ReviewDecisionRequest $request,
         string $token,
-        TransitionPostStatusAction $action,
+        SubmitClientDecisionAction $action,
     ): RedirectResponse {
         $reviewToken = $this->resolveToken($token);
 
@@ -123,10 +128,14 @@ class ReviewController extends Controller
         // machine — its feedback goes through `previewFeedback()` so this stays the agency path.
         abort_if($this->isPreview($reviewToken, $post), 404);
 
+        // Step M-6.3: the anonymous token decision speaks for the client as a whole (it can't be
+        // attributed to one approver), so it releases or stops the post at once.
         $action(
             $post,
-            PostStatus::from($request->validated('decision')),
             null,
+            PostStatus::from($request->validated('decision')) === PostStatus::Approved
+                ? ApprovalDecision::Approved
+                : ApprovalDecision::ChangesRequested,
             $request->validated('comment'),
         );
 

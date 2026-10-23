@@ -30,7 +30,9 @@ class RedirectClientReviewersToPortal
 
         return match ($request->route()?->getName()) {
             'calendar' => to_route('portal.calendar', $request->only(['campaign_id', 'status', 'platform'])),
-            'posts.edit' => $this->redirectForPost($request->route('post'), $user->client_id),
+            // Any post-scoped internal route lands the reviewer on that post in their portal (or the
+            // portal posts list when it isn't theirs / not yet client-visible). Step M-6.2.
+            'posts.edit', 'posts.transition', 'posts.comments.store' => $this->redirectForPost($request->route('post'), $user->client_id),
             // Step C-1.1/C-1.2: the campaigns hub and workspace have portal counterparts.
             'campaigns.index', 'campaigns.compare' => to_route('portal.campaigns.index'),
             'campaigns.show' => $this->redirectForCampaign($request->route('campaign'), $user->client_id),

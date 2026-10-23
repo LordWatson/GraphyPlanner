@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
+use App\Actions\Posts\Approvals\GenerateApprovalCertificatePdfAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
 use App\Actions\Posts\CreateSharePreviewAction;
@@ -52,6 +53,7 @@ use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
 use App\Support\Grids\GridLibrary;
+use App\Support\Posts\PostFeedbackPresenter;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -163,7 +165,7 @@ class PostController extends Controller
         $bestTimes = $bestTime->forAccounts(array_values(array_map('intval', $accounts->modelKeys())));
 
         return Inertia::render('posts/edit', [
-            'post' => $this->transformPostForEditor($post, $evaluateChecklist),
+            'post' => $this->transformPostForEditor($post, $evaluateChecklist, $user),
             'client' => ['id' => $client->id, 'name' => $client->name],
             // Per-platform limits travel with every selectable account (not just the post's saved
             // targets) so the editor can show caption/hashtag usage and a live readiness check the
@@ -332,6 +334,21 @@ class PostController extends Controller
     }
 
     /**
+     * Step M-6.3 — download the approval certificate for an approved post (staff view). Only once
+     * the post is approved; the policy/approvers/content-hash come from its approval steps.
+     */
+    public function approvalCertificate(Post $post, GenerateApprovalCertificatePdfAction $action): \Illuminate\Http\Response
+    {
+        $this->authorize('view', $post);
+        abort_unless($post->status === PostStatus::Approved, 404);
+
+        return response($action($post), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="approval-certificate-post-'.$post->id.'.pdf"',
+        ]);
+    }
+
+    /**
      * Shift a post's targets by a number of days — the calendar's (confirmed) drag-and-drop move.
      * Redirects back so the calendar keeps its filters.
      */
@@ -418,6 +435,10 @@ class PostController extends Controller
             $request->user(),
             $request->validated('body'),
             (bool) $request->validated('internal_only'),
+            anchorType: $request->anchorType(),
+            anchor: $request->anchorPayload(),
+            parentId: $request->validated('parent_id') !== null ? (int) $request->validated('parent_id') : null,
+            suggestedEdit: $request->validated('suggested_edit'),
         );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Comment posted.')]);
@@ -543,7 +564,7 @@ class PostController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function transformPostForEditor(Post $post, EvaluatePostChecklistAction $evaluateChecklist): array
+    private function transformPostForEditor(Post $post, EvaluatePostChecklistAction $evaluateChecklist, User $viewer): array
     {
         return [
             'id' => $post->id,
@@ -624,6 +645,10 @@ class PostController extends Controller
                 'mentioned_user_ids' => $comment->mentionedUsers->pluck('id')->values(),
                 'created_at' => $comment->created_at?->toIso8601String(),
             ])->values(),
+            // Step M-6.4: visual-feedback threads (pins, caption notes, suggested edits) for the
+            // staff feedback board — unresolved ones block approval.
+            'feedback' => PostFeedbackPresenter::threads($post, $viewer, forClient: false),
+            'unresolved_feedback' => $post->unresolvedFeedback()->count(),
         ];
     }
 }

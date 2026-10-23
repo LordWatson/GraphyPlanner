@@ -39,6 +39,7 @@ use App\Http\Controllers\Campaigns\CampaignRunController;
 use App\Http\Controllers\Campaigns\CampaignShareLinkController;
 use App\Http\Controllers\Campaigns\CampaignTemplateController;
 use App\Http\Controllers\Campaigns\CampaignWorkspaceController;
+use App\Http\Controllers\ClientContactController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
@@ -62,6 +63,7 @@ use App\Http\Controllers\MyWorkController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Organizations\BusinessRegistrationController;
 use App\Http\Controllers\Organizations\RegistrationController;
+use App\Http\Controllers\Portal\MagicLinkController;
 use App\Http\Controllers\Portal\PortalAccountConnectController;
 use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalCampaignController;
@@ -72,6 +74,7 @@ use App\Http\Controllers\Portal\PortalInvoiceController;
 use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\Portal\PortalReportController;
 use App\Http\Controllers\PostController;
+use App\Http\Controllers\PostFeedbackController;
 use App\Http\Controllers\PostRevisionController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
@@ -127,6 +130,10 @@ Route::middleware('throttle:public-token')->group(function () {
     // is possession of a live `ConnectInvite` token, scoped to its one client's account slots.
     Route::get('connect/{token}', [PublicConnectController::class, 'show'])->name('connect.show');
     Route::post('connect/{token}/accounts/{socialAccount}', [PublicConnectController::class, 'connect'])->name('connect.account');
+
+    // Step M-6.2: the passwordless "magic link" — a single-use, expiring token that signs a client
+    // reviewer into their portal, landing on the emailed post. Unauthenticated by design.
+    Route::get('portal-login/{token}', [MagicLinkController::class, 'login'])->name('portal.magic-login');
 });
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
@@ -279,9 +286,13 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
 
 // The organization workspace. `org.member` (Step 15.1) sends org-less super admins to
 // `/super-admin` — everything in here is scoped by the user's `org_id`.
-Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
-    // Client portal contacts are sent to their `/portal/*` equivalents (see
-    // `RedirectClientReviewersToPortal`) — the internal dashboard/calendar/home are staff-only UI.
+// Step M-6.2 (I-8.1): `portal.redirect` is applied to the whole internal workspace so a client
+// reviewer (`Role::ClientReviewer`) can never reach any internal page — every route here sends them
+// to their `/portal/*` equivalent (or the portal dashboard). Their experience lives entirely in
+// `/portal/*`; the notification bell, profile and logout they do use sit in the shared group above.
+Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(function () {
+    // Deep-link redirects for the pages with a direct portal counterpart (dashboard/calendar/home);
+    // the group-level `portal.redirect` above already blocks everything else.
     Route::middleware('portal.redirect')->group(function () {
         // Step B-4.2: the agency overview and needs-attention are agency-only — a business org is
         // redirected to its own "Today" (`EnsureWorkspaceType`). The calendar is shared as-is (the
@@ -605,6 +616,14 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('posts.destroy');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
+    // Step M-6.3: the approval certificate for an approved post (staff view).
+    Route::get('posts/{post}/approval-certificate', [PostController::class, 'approvalCertificate'])
+        ->middleware('throttle:exports')
+        ->name('posts.approval-certificate');
+    // Step M-6.4: staff act on visual feedback — resolve a thread, accept/dismiss a suggested edit.
+    Route::post('comments/{comment}/resolve', [PostFeedbackController::class, 'resolve'])->name('comments.resolve');
+    Route::post('comments/{comment}/accept-suggestion', [PostFeedbackController::class, 'acceptSuggestion'])->name('comments.accept-suggestion');
+    Route::post('comments/{comment}/dismiss-suggestion', [PostFeedbackController::class, 'dismissSuggestion'])->name('comments.dismiss-suggestion');
     // Step M-5.2: duplicate a post into a fresh draft (content + media + targets, no schedule).
     Route::post('posts/{post}/duplicate', [PostController::class, 'duplicate'])
         ->name('posts.duplicate');
@@ -713,6 +732,17 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->middleware('workspace:agency')
         ->name('invitations.destroy');
 
+    // Step M-6.1: client contacts (Owner/Strategist, agency-only — see ClientContactPolicy).
+    Route::post('clients/{client}/contacts', [ClientContactController::class, 'store'])
+        ->middleware('workspace:agency')
+        ->name('clients.contacts.store');
+    Route::put('contacts/{contact}', [ClientContactController::class, 'update'])
+        ->middleware('workspace:agency')
+        ->name('contacts.update');
+    Route::delete('contacts/{contact}', [ClientContactController::class, 'destroy'])
+        ->middleware('workspace:agency')
+        ->name('contacts.destroy');
+
     // Phase 17: chapter 06 Analytics — every staff role (sections gated per role inside, see
     // `AnalyticsAccess`); client reviewers get a 403 from `OrganizationAnalyticsFilterRequest`.
     Route::get('analytics', [OrganizationAnalyticsController::class, 'index'])->name('analytics.index');
@@ -766,8 +796,13 @@ Route::prefix('portal')->name('portal.')->middleware(['auth', 'verified', 'org.m
     Route::post('campaigns/{campaign}/comments', [CampaignCommentController::class, 'store'])->name('campaigns.comments.store');
     Route::get('posts', [PortalPostController::class, 'index'])->name('posts.index');
     Route::get('posts/{post}', [PortalPostController::class, 'show'])->name('posts.show');
+    // Step M-6.3: approve every post waiting on this reviewer at once, and the approval certificate.
+    Route::post('posts/approve-all', [PortalPostController::class, 'decideAll'])->name('posts.decide-all');
     Route::post('posts/{post}/decide', [PortalPostController::class, 'decide'])->name('posts.decide');
+    Route::get('posts/{post}/certificate', [PortalPostController::class, 'certificate'])->middleware('throttle:exports')->name('posts.certificate');
     Route::post('posts/{post}/comments', [PortalPostController::class, 'comment'])->name('posts.comments.store');
+    // Step M-6.4: a reviewer resolves / re-opens one of the post's feedback threads.
+    Route::post('comments/{comment}/resolve', [PortalPostController::class, 'resolveComment'])->name('comments.resolve');
     // Phase 18: the client's grids (only once sent to them; see `EnsureClientPortalAccess`).
     Route::get('grids', [PortalGridController::class, 'index'])->name('grids.index');
     Route::get('grids/{grid}', [PortalGridController::class, 'show'])->name('grids.show');

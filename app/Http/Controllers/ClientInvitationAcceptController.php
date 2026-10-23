@@ -6,6 +6,7 @@ use App\Actions\ClientInvitations\AcceptClientInvitationAction;
 use App\Http\Requests\AcceptClientInvitationRequest;
 use App\Models\ClientInvitation;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -43,9 +44,15 @@ class ClientInvitationAcceptController extends Controller
     ): RedirectResponse {
         $invitation = $this->resolveInvitation($token);
 
-        $action($invitation, $request->validated('name'), $request->validated('password'));
+        $user = $action($invitation, $request->validated('name'), $request->validated('password'));
 
-        return to_route('login')->with('status', 'Your account has been created — you can now log in.');
+        // Step M-6.2 (I-8.1): one client experience — accepting the invite signs the contact straight
+        // into their portal rather than bouncing them to a second login screen. The session is
+        // regenerated against fixation, as the login flow does.
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return to_route('portal.dashboard');
     }
 
     /**

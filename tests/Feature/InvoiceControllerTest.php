@@ -228,8 +228,10 @@ class InvoiceControllerTest extends TestCase
         $this->assertSame(InvoiceStatus::Draft, $invoice->fresh()->status);
     }
 
-    public function test_client_reviewer_does_not_see_invoices_on_the_client_page(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_client_pages_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): the reviewer never reaches the internal client/billing pages at all —
+        // they are redirected to their portal, which has its own (billing-free) view.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         Invoice::factory()->for($client)->create(['org_id' => $org->id]);
@@ -237,12 +239,8 @@ class InvoiceControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $this->actingAs($reviewer)->get(route('clients.billing', $client))->assertForbidden();
-
-        $response = $this->actingAs($reviewer)->get(route('clients.show', $client));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->where('stats.billing', null)->missing('invoices'));
+        $this->actingAs($reviewer)->get(route('clients.billing', $client))->assertRedirect(route('portal.dashboard'));
+        $this->actingAs($reviewer)->get(route('clients.show', $client))->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_paid_invoice_does_not_expose_send_or_mark_paid_actions(): void

@@ -3,6 +3,7 @@
 namespace App\Support\Clients;
 
 use App\Models\Campaign;
+use App\Models\ClientContact;
 use App\Models\ClientInvitation;
 use App\Models\Invoice;
 use App\Models\Post;
@@ -150,6 +151,29 @@ final class ClientTabPresenter
             'is_pending' => $invitation->isPending(),
             'can' => [
                 'delete' => $invitation->isPending() && $user->can('delete', $invitation),
+            ],
+        ];
+    }
+
+    /**
+     * Step M-6.1 — a client contact row for the Portal access tab.
+     *
+     * @return array<string, mixed>
+     */
+    public static function contact(ClientContact $contact, User $user): array
+    {
+        return [
+            'id' => $contact->id,
+            'name' => $contact->name,
+            'email' => $contact->email,
+            'phone' => $contact->phone,
+            'role' => $contact->role->value,
+            'role_label' => $contact->role->label(),
+            'receives_review_emails' => $contact->receives_review_emails,
+            'receives_invoices' => $contact->receives_invoices,
+            'can' => [
+                'update' => $user->can('update', $contact),
+                'delete' => $user->can('delete', $contact),
             ],
         ];
     }

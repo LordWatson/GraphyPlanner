@@ -99,14 +99,17 @@ class MoveGridPostsAction
     private function emailClientOnce(GridPlan $plan, int $count): void
     {
         $plan->loadMissing('client');
-        $email = $plan->client->approval_email;
+        // Step M-6.1: reach every approver contact that opted into review emails (legacy fallback).
+        $recipients = $plan->client->reviewEmailRecipients();
 
-        if (blank($email)) {
-            Log::warning('Skipped grid captions email — no approval_email on file', ['grid_plan_id' => $plan->id]);
+        if ($recipients === []) {
+            Log::warning('Skipped grid captions email — no review-email contacts on file', ['grid_plan_id' => $plan->id]);
 
             return;
         }
 
-        Mail::to((string) $email)->queue(new GridPostsReadyMail($plan, $count));
+        foreach ($recipients as $recipient) {
+            Mail::to($recipient['email'])->queue(new GridPostsReadyMail($plan, $count));
+        }
     }
 }

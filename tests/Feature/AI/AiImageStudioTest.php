@@ -408,19 +408,23 @@ class AiImageStudioTest extends TestCase
         $viewer = User::factory()->for($this->org, 'organization')->role(Role::Viewer)->create();
 
         foreach ([$reviewer, $viewer] as $user) {
-            $this->actingAs($user)->post(route('ai-post-ideas.images.store', $this->idea), $this->payload())->assertForbidden();
-            $this->actingAs($user)->post(route('clients.ai.images.store', $this->client), $this->payload())->assertForbidden();
-            $this->actingAs($user)->getJson(route('ai-image-generations.show', $generation))->assertForbidden();
-            $this->actingAs($user)->post(route('ai-image-generations.use', $generation), ['variant_ids' => [$variant->id]])->assertForbidden();
-            $this->actingAs($user)->get(route('ai-image-variants.download', $variant))->assertForbidden();
+            // Step M-6.2 (I-8.1): a client reviewer is redirected to their portal (302) before the
+            // internal AI endpoints run; a viewer is refused by policy (403). Both are denied.
+            $denied = $user->role === Role::ClientReviewer ? 302 : 403;
+
+            $this->actingAs($user)->post(route('ai-post-ideas.images.store', $this->idea), $this->payload())->assertStatus($denied);
+            $this->actingAs($user)->post(route('clients.ai.images.store', $this->client), $this->payload())->assertStatus($denied);
+            $this->actingAs($user)->getJson(route('ai-image-generations.show', $generation))->assertStatus($denied);
+            $this->actingAs($user)->post(route('ai-image-generations.use', $generation), ['variant_ids' => [$variant->id]])->assertStatus($denied);
+            $this->actingAs($user)->get(route('ai-image-variants.download', $variant))->assertStatus($denied);
 
             foreach (['refine', 'regenerate', 'finalize'] as $action) {
                 $this->actingAs($user)
                     ->post(route("ai-image-variants.{$action}", $variant), ['instruction' => 'x y', 'request_id' => (string) Str::uuid()])
-                    ->assertForbidden();
+                    ->assertStatus($denied);
             }
 
-            $this->actingAs($user)->post(route('ai-image-variants.discard', $variant), ['discarded' => true])->assertForbidden();
+            $this->actingAs($user)->post(route('ai-image-variants.discard', $variant), ['discarded' => true])->assertStatus($denied);
         }
     }
 

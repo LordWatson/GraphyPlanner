@@ -18,6 +18,7 @@ use App\Models\CampaignPhase;
 use App\Models\CampaignShareLink;
 use App\Models\CampaignTemplate;
 use App\Models\Client;
+use App\Models\ClientContact;
 use App\Models\ClientInvitation;
 use App\Models\ClientReport;
 use App\Models\ConnectInvite;
@@ -30,6 +31,7 @@ use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Models\PostComment;
 use App\Models\PostRevision;
 use App\Models\PostTarget;
 use App\Models\SavedPostView;
@@ -39,6 +41,7 @@ use App\Models\TaxRate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
@@ -60,6 +63,11 @@ class CrossTenantRouteTest extends TestCase
 
         // Exports / org settings sit behind `password.confirm` (Step M-1.2); not under test here.
         $this->confirmPassword();
+
+        // This generated test sweeps every bound route for every role, so it hits the shared
+        // `exports` rate limiter (PDF/CSV routes) far harder than any real session would. Throttling
+        // is orthogonal to tenancy, so disable it here — a 429 would prove nothing about isolation.
+        $this->withoutMiddleware(ThrottleRequests::class);
     }
 
     /**
@@ -200,6 +208,8 @@ class CrossTenantRouteTest extends TestCase
             Client::class => $client,
             Post::class => $post,
             PostActivityLog::class => PostActivityLog::factory()->create(['post_id' => $post->id, 'to_status' => PostStatus::WaitingClient]),
+            // Step M-6.4: a feedback comment on the other org's post (comments/{comment}/*).
+            PostComment::class => PostComment::factory()->create(['post_id' => $post->id]),
             Campaign::class => $campaign,
             CampaignPhase::class => CampaignPhase::factory()->create(['campaign_id' => $campaign->id]),
             CampaignDeliverable::class => CampaignDeliverable::factory()->create(['campaign_id' => $campaign->id]),
@@ -221,6 +231,8 @@ class CrossTenantRouteTest extends TestCase
             // Step M-4.1: a tax rate belonging to the other org (settings/tax-rates/{taxRate}).
             TaxRate::class => TaxRate::factory()->for($org, 'organization')->create(),
             ClientInvitation::class => ClientInvitation::factory()->create(['client_id' => $client->id]),
+            // Step M-6.1: a contact belonging to the other org's client (contacts/{contact}).
+            ClientContact::class => ClientContact::factory()->forClient($client)->create(),
             StaffInvitation::class => StaffInvitation::factory()->create(['org_id' => $org->id]),
             OrganizationReport::class => OrganizationReport::factory()->create(['org_id' => $org->id, 'created_by' => $owner->id]),
             // Step M-3.3: a published monthly report (so only tenancy, not draft status, refuses it).

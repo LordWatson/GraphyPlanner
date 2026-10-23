@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Portal\CreatePortalLoginTokenAction;
 use App\Actions\ReviewTokens\CreateReviewTokenAction;
 use App\Enums\PostStatus;
 use App\Exceptions\Posts\InvalidPostTransitionException;
@@ -77,7 +78,7 @@ class BulkTransitionPostsAction
                     ? new class extends SendClientReviewRequestedEmailAction
                     {
                         // The caller sends one email for the batch instead.
-                        public function __invoke(Post $post, CreateReviewTokenAction $createReviewToken = new CreateReviewTokenAction): ?ReviewToken
+                        public function __invoke(Post $post, CreateReviewTokenAction $createReviewToken = new CreateReviewTokenAction, CreatePortalLoginTokenAction $createPortalLoginToken = new CreatePortalLoginTokenAction): ?ReviewToken
                         {
                             return null;
                         }

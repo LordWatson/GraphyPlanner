@@ -23,6 +23,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property int|null $org_id
  * @property Role|null $role
  * @property int|null $client_id
+ * @property array<string, array<string, bool>>|null $notification_preferences
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
@@ -34,7 +35,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'org_id', 'role', 'client_id'])]
+#[Fillable(['name', 'email', 'password', 'org_id', 'role', 'client_id', 'notification_preferences'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 /**
  * Step 15.2.3: `MustVerifyEmail` makes the `verified` route middleware enforce Fortify's email
@@ -64,6 +65,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'role' => Role::class,
+            'notification_preferences' => 'array',
         ];
     }
 

@@ -151,8 +151,11 @@ class ClientControllerTest extends TestCase
         $response->assertInvalid('owner_user_id');
     }
 
-    public function test_client_reviewer_cannot_see_billing_fields_when_viewing_their_client(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_client_page_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): a client reviewer lives entirely in `/portal/*` — the internal client
+        // page (which carries internal-only data) now redirects them to the portal instead of
+        // rendering a stripped-down view.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create([
             'retainer_amount' => 5000,
@@ -161,10 +164,7 @@ class ClientControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.show', $client));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->where('client.retainer_amount', null));
+        $this->actingAs($reviewer)->get(route('clients.show', $client))->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_designer_cannot_see_billing_or_portal_access_on_the_client_show_page(): void
@@ -192,8 +192,9 @@ class ClientControllerTest extends TestCase
         $this->actingAs($designer)->get(route('clients.portal-access', $client))->assertForbidden();
     }
 
-    public function test_client_reviewer_cannot_view_another_clients_page(): void
+    public function test_client_reviewer_is_redirected_from_another_clients_page_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): blocked before authorization even runs — redirected to the portal.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         $otherClient = Client::factory()->for($org, 'organization')->create();
@@ -201,9 +202,7 @@ class ClientControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.show', $otherClient));
-
-        $response->assertForbidden();
+        $this->actingAs($reviewer)->get(route('clients.show', $otherClient))->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_owner_can_save_a_billing_contact_that_designers_cannot_see(): void

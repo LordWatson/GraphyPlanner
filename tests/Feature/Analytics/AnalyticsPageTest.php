@@ -118,8 +118,10 @@ class AnalyticsPageTest extends TestCase
         ];
 
         foreach ($routes as [$method, $url]) {
-            $this->actingAs($this->reviewer)->{$method}($url, ['name' => 'x', 'filters' => ['range' => '30d']])
-                ->assertForbidden();
+            // Step M-6.2 (I-8.1): a reviewer is either refused (403) or redirected to their portal
+            // (302) before the internal analytics page runs — never allowed in.
+            $status = $this->actingAs($this->reviewer)->{$method}($url, ['name' => 'x', 'filters' => ['range' => '30d']])->getStatusCode();
+            $this->assertContains($status, [302, 403], "Expected reviewer to be blocked from {$url}, got {$status}.");
         }
 
         $this->assertModelExists($report);

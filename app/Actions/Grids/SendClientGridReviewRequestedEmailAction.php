@@ -25,8 +25,11 @@ class SendClientGridReviewRequestedEmailAction
         $plan->loadMissing('client');
         $client = $plan->client;
 
-        if (blank($client->approval_email)) {
-            Log::warning('Skipped client grid review email — no approval_email on file', [
+        // Step M-6.1: reach every approver contact that opted into review emails (legacy fallback).
+        $recipients = $client->reviewEmailRecipients();
+
+        if ($recipients === []) {
+            Log::warning('Skipped client grid review email — no review-email contacts on file', [
                 'client_id' => $plan->client_id,
                 'grid_plan_id' => $plan->id,
             ]);
@@ -34,7 +37,7 @@ class SendClientGridReviewRequestedEmailAction
             return null;
         }
 
-        return DB::transaction(function () use ($plan, $client, $createReviewToken) {
+        return DB::transaction(function () use ($plan, $client, $createReviewToken, $recipients) {
             $revoked = ReviewToken::query()
                 ->where('grid_plan_id', $plan->id)
                 ->whereNull('revoked_at')
@@ -44,15 +47,18 @@ class SendClientGridReviewRequestedEmailAction
             ['token' => $plainToken, 'model' => $token] = $createReviewToken($client, gridPlan: $plan);
 
             $reviewUrl = URL::to("/review/{$plainToken}");
-            $email = (string) $client->approval_email;
+            $emails = array_map(fn (array $recipient) => $recipient['email'], $recipients);
 
-            DB::afterCommit(function () use ($email, $plan, $reviewUrl, $token) {
-                Mail::to($email)->send(new ClientGridReviewRequestedMail($plan, $reviewUrl));
+            DB::afterCommit(function () use ($emails, $plan, $reviewUrl, $token) {
+                foreach ($emails as $email) {
+                    Mail::to($email)->send(new ClientGridReviewRequestedMail($plan, $reviewUrl));
+                }
 
                 Log::info('Client grid review email queued', [
                     'client_id' => $plan->client_id,
                     'grid_plan_id' => $plan->id,
                     'review_token_id' => $token->id,
+                    'recipient_count' => count($emails),
                 ]);
             });
 

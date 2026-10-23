@@ -16,6 +16,7 @@ import { BrandMark } from '@/components/brand-mark';
 import { NotificationBell } from '@/components/notification-bell';
 import { ShellPaddedContext } from '@/components/page';
 import { PreviewBanner } from '@/components/preview-banner';
+import { PwaProvider } from '@/components/pwa/pwa-provider';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -203,6 +204,14 @@ export default function ClientPortalLayout({
                 <span>© {new Date().getFullYear()} Alima</span>
                 <span>Your studio&apos;s client portal</span>
             </footer>
+
+            {/* Step M-6.6 (I-8.6): the portal is an installable PWA — add it to the home screen to
+                review and approve on the go. Scoped to /portal via its own manifest. */}
+            <PwaProvider
+                manifestHref="/portal.webmanifest"
+                title="Add the portal to your phone"
+                description="Install it to review and approve your content in a tap."
+            />
         </div>
     );
 }

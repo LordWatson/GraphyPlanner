@@ -222,8 +222,9 @@ class AssetControllerTest extends TestCase
         Storage::disk('public')->assertExists($path);
     }
 
-    public function test_client_reviewer_sees_assets_scoped_to_their_client(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_media_tab_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): the internal media tab is staff-only — a reviewer is sent to the portal.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         Asset::factory()->for($client)->create(['org_id' => $org->id]);
@@ -231,16 +232,7 @@ class AssetControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.media', $client));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('clients/tabs/media')->where('stats.assets', 1));
-
-        $this->actingAs($reviewer)
-            ->getJson(route('clients.assets.index', $client))
-            ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.can.delete', false);
+        $this->actingAs($reviewer)->get(route('clients.media', $client))->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_json_delete_returns_no_content_instead_of_redirecting(): void

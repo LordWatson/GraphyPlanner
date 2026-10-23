@@ -39,27 +39,61 @@ export function NotificationBell() {
 
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [unreadOnly, setUnreadOnly] = useState(false);
+    const [nextBefore, setNextBefore] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
     const [notifications, setNotifications] = useState<
         NotificationItem[] | null
     >(null);
 
-    useEffect(() => {
-        if (!open || notifications !== null) {
-            return;
-        }
+    type Page = {
+        notifications: NotificationItem[];
+        next_before: string | null;
+        has_more: boolean;
+    };
 
-        setLoading(true);
+    const load = (before: string | null, replace: boolean) => {
+        if (before) {
+            setLoadingMore(true);
+        } else {
+            setLoading(true);
+        }
+        const query: Record<string, string> = {};
+        if (before) query.before = before;
+        if (unreadOnly) query.filter = 'unread';
 
         void http
-            .get<{ notifications: NotificationItem[] }>(
-                indexNotifications.url(),
-                { toastOnError: true },
-            )
-            .then((result) =>
-                setNotifications(result.ok ? result.data.notifications : []),
-            )
-            .finally(() => setLoading(false));
-    }, [open, notifications]);
+            .get<Page>(indexNotifications.url({ query }), {
+                toastOnError: true,
+            })
+            .then((result) => {
+                if (!result.ok) {
+                    if (replace) setNotifications([]);
+                    return;
+                }
+                setNotifications((prev) =>
+                    replace || prev === null
+                        ? result.data.notifications
+                        : [...prev, ...result.data.notifications],
+                );
+                setNextBefore(result.data.next_before);
+                setHasMore(result.data.has_more);
+            })
+            .finally(() => {
+                setLoading(false);
+                setLoadingMore(false);
+            });
+    };
+
+    // Load the first page when opened, and reload when the unread filter changes while open.
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+        load(null, true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, unreadOnly]);
 
     const handleSelect = (notification: NotificationItem) => {
         setOpen(false);
@@ -71,7 +105,7 @@ export function NotificationBell() {
             readAllNotifications.url(),
             {},
             {
-                onSuccess: () => setNotifications(null),
+                onSuccess: () => load(null, true),
             },
         );
     };
@@ -112,6 +146,31 @@ export function NotificationBell() {
                         </button>
                     )}
                 </div>
+                <div className="flex gap-1.5 px-4 pb-2">
+                    <button
+                        type="button"
+                        onClick={() => setUnreadOnly(false)}
+                        className={
+                            unreadOnly
+                                ? 'text-muted-foreground text-xs'
+                                : 'text-foreground text-xs font-medium'
+                        }
+                    >
+                        All
+                    </button>
+                    <span className="text-muted-foreground text-xs">·</span>
+                    <button
+                        type="button"
+                        onClick={() => setUnreadOnly(true)}
+                        className={
+                            unreadOnly
+                                ? 'text-foreground text-xs font-medium'
+                                : 'text-muted-foreground text-xs'
+                        }
+                    >
+                        Unread
+                    </button>
+                </div>
                 <DropdownMenuSeparator className="m-0" />
                 <div className="max-h-96 overflow-y-auto p-1.5">
                     {loading && (
@@ -146,6 +205,16 @@ export function NotificationBell() {
                                 )}
                             </DropdownMenuItem>
                         ))}
+                    {!loading && hasMore && (
+                        <button
+                            type="button"
+                            onClick={() => load(nextBefore, false)}
+                            disabled={loadingMore}
+                            className="text-muted-foreground hover:text-foreground w-full px-2 py-2 text-center text-xs"
+                        >
+                            {loadingMore ? 'Loading…' : 'Load more'}
+                        </button>
+                    )}
                 </div>
             </DropdownMenuContent>
         </DropdownMenu>

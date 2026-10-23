@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AiUsageController;
+use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -28,6 +29,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+
+    // Step M-6.7 (I-12.1): per-user notification preferences (in-app + daily digest, per category).
+    Route::get('settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('notifications.edit');
+    Route::put('settings/notifications', [NotificationPreferenceController::class, 'update'])->name('notifications.update');
 
 });
 

@@ -54,6 +54,7 @@ type OrganizationProps = {
         tax_registration_number: string | null;
         tax_registration_label: string | null;
         invoice_payment_terms_days: number;
+        approval_sla_hours: number | null;
         has_upload_post_key: boolean;
         has_upload_post_webhook_secret: boolean;
         has_xai_key: boolean;
@@ -180,6 +181,33 @@ export default function Organization({
                                         message={
                                             errors.invoice_payment_terms_days
                                         }
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="approval_sla_hours">
+                                        Approval SLA (hours)
+                                    </Label>
+                                    <Input
+                                        id="approval_sla_hours"
+                                        name="approval_sla_hours"
+                                        type="number"
+                                        min={1}
+                                        max={720}
+                                        className="mt-1 block w-32"
+                                        defaultValue={
+                                            organization.approval_sla_hours ??
+                                            ''
+                                        }
+                                    />
+                                    <p className="text-muted-foreground text-xs">
+                                        Flag a post as overdue once it has
+                                        waited on review this long. Leave blank
+                                        for no SLA.
+                                    </p>
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.approval_sla_hours}
                                     />
                                 </div>
 

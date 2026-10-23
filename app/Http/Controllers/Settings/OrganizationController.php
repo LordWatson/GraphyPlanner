@@ -34,6 +34,8 @@ class OrganizationController extends Controller
                 'tax_registration_number' => $organization->tax_registration_number,
                 'tax_registration_label' => $organization->tax_registration_label,
                 'invoice_payment_terms_days' => $organization->invoice_payment_terms_days,
+                // Step M-6.5 (Phase 9): the approval SLA window in hours (null = no SLA).
+                'approval_sla_hours' => $organization->approval_sla_hours,
                 'has_upload_post_key' => filled($organization->upload_post_key),
                 'has_upload_post_webhook_secret' => filled($organization->upload_post_webhook_secret),
                 'has_xai_key' => filled($organization->xai_key),

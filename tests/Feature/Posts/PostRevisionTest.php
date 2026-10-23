@@ -149,9 +149,10 @@ class PostRevisionTest extends TestCase
         app(UpdatePostAction::class)($post, ['master_caption' => 'One'], $this->owner);
         $revision = $post->revisions()->latest('id')->firstOrFail();
 
+        // Step M-6.2 (I-8.1): a reviewer is redirected to their portal before the internal route.
         $this->actingAs($reviewer)
             ->post(route('posts.revisions.restore', [$post, $revision]))
-            ->assertForbidden();
+            ->assertRedirect();
 
         $this->assertSame('One', $post->refresh()->master_caption);
     }

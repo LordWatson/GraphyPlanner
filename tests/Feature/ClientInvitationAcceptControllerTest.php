@@ -38,12 +38,14 @@ class ClientInvitationAcceptControllerTest extends TestCase
             'password_confirmation' => 'password123',
         ]);
 
-        $response->assertRedirect(route('login'));
+        // Step M-6.2 (I-8.1): accepting signs the contact straight into their portal.
+        $response->assertRedirect(route('portal.dashboard'));
 
         $this->assertNotNull($invitation->fresh()->accepted_at);
 
         $user = User::where('email', 'contact@acme.test')->first();
         $this->assertNotNull($user);
+        $this->assertAuthenticatedAs($user);
         $this->assertTrue($user->hasRole(Role::ClientReviewer));
         $this->assertSame($client->id, $user->client_id);
         $this->assertSame($org->id, $user->org_id);
@@ -70,7 +72,7 @@ class ClientInvitationAcceptControllerTest extends TestCase
             'password_confirmation' => 'password123',
         ]);
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('portal.dashboard'));
         $this->assertSame(1, User::where('email', 'contact@acme.test')->count());
         $this->assertSame($existingUser->id, $existingUser->fresh()->id);
         $this->assertSame($client->id, $existingUser->fresh()->client_id);
