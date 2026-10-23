@@ -4,6 +4,7 @@ import {
     ArrowRight,
     CalendarClock,
     CalendarPlus,
+    Camera,
     CircleDot,
     ImageIcon,
     Lightbulb,
@@ -19,7 +20,10 @@ import { today as businessToday } from '@/routes/business';
 import { index as accounts } from '@/routes/business/accounts';
 import { edit as brand } from '@/routes/business/brand';
 import { index as ideas } from '@/routes/business/ideas';
-import { create as createPost } from '@/routes/business/posts';
+import {
+    create as createPost,
+    quick as quickPost,
+} from '@/routes/business/posts';
 import { edit as editPost } from '@/routes/posts';
 
 type UpNext = {
@@ -107,6 +111,12 @@ export default function Today() {
                 actions={
                     <>
                         <Button variant="spark" asChild>
+                            <Link href={quickPost()}>
+                                <Camera />
+                                Quick post
+                            </Link>
+                        </Button>
+                        <Button variant="on-ink" asChild>
                             <Link href={createPost()} method="post" as="button">
                                 <Plus />
                                 New post

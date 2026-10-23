@@ -41,7 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Step 1.5: the Upload-Post webhook is a server-to-server call with no session/CSRF
         // token — it's verified instead via its own signature header (see
         // `UploadPostWebhookController`).
-        $middleware->validateCsrfTokens(except: ['webhooks/*']);
+        // Step B-7.3: the Web Share Target POST is initiated by the OS share sheet, so it can't carry
+        // a CSRF token. It stays safe behind `auth`/`verified`/`workspace:business` + media
+        // validation, and only ingests a file (no state change beyond creating an asset).
+        $middleware->validateCsrfTokens(except: ['webhooks/*', 'posts/quick/share']);
 
         $middleware->web(append: [
             // Step I-1.1: the preview owner is never a real session outside `/preview/*`.

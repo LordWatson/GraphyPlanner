@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $scheduled_local_time
  * @property Carbon|null $scheduled_at_utc
  * @property Carbon|null $reminder_sent_at
+ * @property Carbon|null $push_reminder_sent_at
  * @property PostTargetStatus $status
  * @property string|null $external_post_id
  * @property string|null $error
@@ -47,7 +48,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc',
-    'reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at', 'publish_correlation_id',
+    'reminder_sent_at', 'push_reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at', 'publish_correlation_id',
     'caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format',
     'vendor_request_id', 'platform_post_id', 'post_url', 'published_at', 'metrics_synced_at', 'metrics_error', 'latest_metrics_id',
 ])]
@@ -65,6 +66,7 @@ class PostTarget extends Model
             'scheduled_local_date' => 'date',
             'scheduled_at_utc' => 'datetime',
             'reminder_sent_at' => 'datetime',
+            'push_reminder_sent_at' => 'datetime',
             'publish_requested_at' => 'datetime',
             'published_at' => 'datetime',
             'metrics_synced_at' => 'datetime',

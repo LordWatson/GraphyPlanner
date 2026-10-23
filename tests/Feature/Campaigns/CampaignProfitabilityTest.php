@@ -36,7 +36,7 @@ class CampaignProfitabilityTest extends TestCase
         InvoiceItem::factory()->create(['invoice_id' => $sent->id, 'org_id' => $this->org->id, 'campaign_id' => $this->campaign->id, 'price' => 500, 'quantity' => 2]);
 
         foreach ([0.002, 0.003] as $cost) {
-            AiUsageLog::query()->create(['org_id' => $this->org->id, 'client_id' => $this->client->id, 'campaign_id' => $this->campaign->id, 'provider' => 'deepseek', 'model' => 'deepseek-chat', 'method' => 'planCampaign', 'succeeded' => true, 'cost_estimate' => $cost, 'duration_ms' => 100]);
+            AiUsageLog::query()->create(['org_id' => $this->org->id, 'client_id' => $this->client->id, 'campaign_id' => $this->campaign->id, 'provider' => 'deepseek', 'model' => 'deepseek-flash', 'method' => 'planCampaign', 'succeeded' => true, 'cost_estimate' => $cost, 'duration_ms' => 100]);
         }
     }
 

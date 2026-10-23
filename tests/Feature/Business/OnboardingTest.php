@@ -210,7 +210,7 @@ class OnboardingTest extends TestCase
             {
                 return AiBrandProfileDraft::fromArray([
                     'voice' => ['tone' => 'Warm', 'personality' => null, 'do_nots' => []],
-                ], succeeded: true, provider: 'deepseek', model: 'deepseek-chat');
+                ], succeeded: true, provider: 'deepseek', model: 'deepseek-flash');
             }
         });
 

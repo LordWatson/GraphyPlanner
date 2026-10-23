@@ -40,6 +40,10 @@ void createInertiaApp({
             // chrome, mobile-first) — no app sidebar.
             case name === 'business/onboarding':
                 return null;
+            // Step B-7.2: the phone-first quick post is a focused, standalone screen (its own top
+            // bar + back to Today), like onboarding — no app sidebar.
+            case name === 'business/posts/quick':
+                return null;
             case name.startsWith('portal/'):
                 return ClientPortalLayout;
             case name.startsWith('auth/'):

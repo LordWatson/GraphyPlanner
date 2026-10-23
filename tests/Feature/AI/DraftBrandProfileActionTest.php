@@ -77,7 +77,7 @@ class DraftBrandProfileActionTest extends TestCase
             'audience' => ['description' => 'Locals', 'demographics' => '25-45', 'pain_points' => ['No time']],
             'offer' => ['value_proposition' => 'Real bread', 'key_products' => ['Sourdough'], 'pricing_notes' => null],
             'content_pillars' => ['Behind the counter', 'Today bake'],
-        ], succeeded: true, provider: 'deepseek', model: 'deepseek-chat');
+        ], succeeded: true, provider: 'deepseek', model: 'deepseek-flash');
     }
 
     public function test_it_returns_a_draft_without_persisting_anything(): void

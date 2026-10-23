@@ -48,7 +48,7 @@ class GenerateBrandIdeasAction
             $ideas->ideas !== [],
             $startedAt,
             $deepSeek ? 'deepseek' : 'null',
-            $deepSeek ? (string) config('ai.deepseek.model', 'deepseek-chat') : 'none',
+            $deepSeek ? (string) config('ai.deepseek.model', 'deepseek-flash') : 'none',
             $deepSeek ? (float) config('ai.deepseek.estimated_cost_per_call', 0) : 0.0,
         );
 

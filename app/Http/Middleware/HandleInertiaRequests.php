@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Contracts\PushNotifier;
 use App\Enums\Role;
 use App\Models\User;
 use App\Services\Publishing\PlatformCapabilities;
@@ -64,6 +65,10 @@ class HandleInertiaRequests extends Middleware
             // is the business workspace's primary brand (null for an agency); `roleLabels` maps each
             // stored role to the label this workspace shows ("Manager"/"Creator" for business).
             'workspace' => fn (): ?array => self::sharedWorkspace($user()),
+            // Step B-7: the PWA + push config, shared only for business workspaces so agency pages
+            // are untouched. `pushPublicKey` is the VAPID application-server key the browser needs
+            // to subscribe; null when push isn't configured.
+            'pwa' => fn (): ?array => self::sharedPwa($user()),
             'client' => function () use ($user): ?array {
                 $current = $user();
 
@@ -147,6 +152,29 @@ class HandleInertiaRequests extends Middleware
             'roleLabels' => collect(Role::cases())
                 ->mapWithKeys(fn (Role $role) => [$role->value => $role->labelFor($organization->type)])
                 ->all(),
+        ];
+    }
+
+    /**
+     * Step B-7 — the business-only PWA shell flags. Returned only for a business org so agency
+     * responses carry nothing new. `pushEnabled` gates the opt-in UI; `pushPublicKey` is the VAPID
+     * key the browser subscribes with.
+     *
+     * @return array{pushEnabled: bool, pushPublicKey: string|null}|null
+     */
+    private static function sharedPwa(?User $user): ?array
+    {
+        $organization = $user?->organization;
+
+        if ($organization === null || ! $organization->isBusiness()) {
+            return null;
+        }
+
+        $notifier = app(PushNotifier::class);
+
+        return [
+            'pushEnabled' => $notifier->isConfigured(),
+            'pushPublicKey' => $notifier->publicKey(),
         ];
     }
 

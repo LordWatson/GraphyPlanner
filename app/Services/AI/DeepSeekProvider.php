@@ -284,7 +284,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
      */
     public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
     {
-        $model = (string) config('ai.deepseek.model', 'deepseek-chat');
+        $model = (string) config('ai.deepseek.model', 'deepseek-flash');
 
         $payload = $this->requestStructured(
             method: 'draftBrandProfile',
@@ -799,7 +799,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
      */
     private function requestStructured(string $method, string $systemPrompt, string $userPrompt, callable $validator, array $context, ?string $model = null, ?int $maxTokens = null): ?array
     {
-        $model ??= (string) config('ai.deepseek.model', 'deepseek-chat');
+        $model ??= (string) config('ai.deepseek.model', 'deepseek-flash');
         $context = [...$context, 'method' => $method, 'model' => $model];
 
         $maxTokens ??= (int) config('ai.deepseek.max_tokens', 1024);

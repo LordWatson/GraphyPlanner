@@ -27,7 +27,7 @@ class DeepSeekProviderTest extends TestCase
         parent::setUp();
 
         Config::set('ai.deepseek.api_key', 'sk-super-secret-key');
-        Config::set('ai.deepseek.model', 'deepseek-chat');
+        Config::set('ai.deepseek.model', 'deepseek-flash');
         Config::set('ai.deepseek.base_url', 'https://api.deepseek.test');
         Config::set('ai.deepseek.timeout', 5);
     }
@@ -70,7 +70,7 @@ class DeepSeekProviderTest extends TestCase
         Http::assertSent(function ($request) {
             return $request->url() === 'https://api.deepseek.test/chat/completions'
                 && $request->hasHeader('Authorization', 'Bearer sk-super-secret-key')
-                && $request['model'] === 'deepseek-chat'
+                && $request['model'] === 'deepseek-flash'
                 && $request['response_format'] === ['type' => 'json_object'];
         });
     }

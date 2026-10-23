@@ -25,6 +25,10 @@ $safely = function (Event $event, string $command): Event {
 // Warns organization users by email about posts due to publish in the next few days.
 $safely(Schedule::command('posts:send-upcoming-reminders')->dailyAt('08:00'), 'posts:send-upcoming-reminders');
 
+// Step B-7.4: web-push "your post goes out in ~30 minutes" for business workspaces. Every five
+// minutes so a target is caught inside its lead window; idempotent via `push_reminder_sent_at`.
+$safely(Schedule::command('push:send-post-reminders')->everyFiveMinutes(), 'push:send-post-reminders');
+
 // Step 1.5 fallback: catches any post stuck in `publishing` because the Upload-Post webhook
 // never arrived.
 $safely(Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes(), 'publishing:poll-pending-statuses');

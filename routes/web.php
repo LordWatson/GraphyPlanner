@@ -19,6 +19,7 @@ use App\Http\Controllers\Business\InsightController as BusinessInsightController
 use App\Http\Controllers\Business\MediaController as BusinessMediaController;
 use App\Http\Controllers\Business\OnboardingController as BusinessOnboardingController;
 use App\Http\Controllers\Business\PostController as BusinessPostController;
+use App\Http\Controllers\Business\QuickPostController as BusinessQuickPostController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\Campaigns\CampaignAiController;
@@ -66,6 +67,7 @@ use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\Portal\PortalReportController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PublicConnectController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
@@ -240,6 +242,19 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
 
         // Insights (single-brand; publishing consistency today, reach/engagement with Phase B-8).
         Route::get('insights', [BusinessInsightController::class, 'index'])->name('insights.index');
+
+        // Step B-7.2: the phone-first quick post flow (camera → caption → accounts → schedule).
+        Route::get('posts/quick', [BusinessQuickPostController::class, 'create'])->name('posts.quick');
+        Route::post('posts/quick', [BusinessQuickPostController::class, 'store'])->name('posts.quick.store');
+        // Step B-7.3: Web Share Target — "Share → Alima" from the phone gallery lands here with the
+        // media attached, then redirects into the quick post flow. POST, multipart (see the manifest).
+        Route::post('posts/quick/share', [BusinessQuickPostController::class, 'share'])
+            ->middleware('throttle:30,1')
+            ->name('posts.quick.share');
+
+        // Step B-7.4: per-user, per-browser push opt-in / opt-out (reminders). Business-only.
+        Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
+        Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
     });
 
 // The organization workspace. `org.member` (Step 15.1) sends org-less super admins to

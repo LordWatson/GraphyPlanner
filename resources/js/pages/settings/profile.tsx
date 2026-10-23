@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
+import { PushRemindersCard } from '@/components/pwa/push-reminders-card';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,6 +123,8 @@ export default function Profile({
                     )}
                 </Form>
             </div>
+
+            <PushRemindersCard />
 
             <DeleteUser />
         </>

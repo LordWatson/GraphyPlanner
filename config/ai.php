@@ -29,7 +29,7 @@ return [
     */
     'deepseek' => [
         'api_key' => env('DEEPSEEK_API_KEY'),
-        'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-flash'),
         'base_url' => env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
         'timeout' => (int) env('DEEPSEEK_TIMEOUT', 30),
         'max_tokens' => (int) env('DEEPSEEK_MAX_TOKENS', 1024),

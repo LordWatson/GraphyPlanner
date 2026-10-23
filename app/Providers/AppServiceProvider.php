@@ -15,6 +15,7 @@ use App\Contracts\MusicProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Contracts\PublishCredentials;
+use App\Contracts\PushNotifier;
 use App\Contracts\VirusScanner;
 use App\Contracts\VisionProvider;
 use App\Contracts\WebsiteSummarizer;
@@ -72,6 +73,7 @@ use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Services\Push\WebPushNotifier;
 use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
@@ -113,6 +115,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);
+
+        // Step B-7.4: web push for business workspaces — delivery behind a contract so the VAPID
+        // transport can be swapped and faked. The default logs when no transport is installed.
+        $this->app->bind(PushNotifier::class, WebPushNotifier::class);
 
         // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
         // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private

@@ -119,7 +119,7 @@ trait SeedsCampaignShowcase
                     'campaign_id' => $live->id,
                     'user_id' => $owner->id,
                     'provider' => 'deepseek',
-                    'model' => 'deepseek-chat',
+                    'model' => 'deepseek-flash',
                     'method' => $method,
                     'succeeded' => true,
                     'cost_estimate' => 0.002,
