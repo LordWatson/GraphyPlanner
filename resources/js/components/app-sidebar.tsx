@@ -1,5 +1,4 @@
 import { Link, usePage } from '@inertiajs/react';
-import { ClipboardCheck } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { Peek } from '@/components/brand-poster';
 import { NavMain } from '@/components/nav-main';
@@ -172,12 +171,7 @@ function studioGroups(
             items: [
                 navItem(chapters.overview, dashboard()),
                 navItem(chapters.attention, needsAttention()),
-                // Step M-5.4: "My work" — the signed-in person's own posts across clients.
-                {
-                    title: 'My work',
-                    href: myWorkIndex(),
-                    icon: ClipboardCheck,
-                },
+                navItem(chapters.myWork, myWorkIndex()),
                 navItem(chapters.calendar, calendar()),
                 {
                     ...navItem(chapters.clients, clientsIndex()),

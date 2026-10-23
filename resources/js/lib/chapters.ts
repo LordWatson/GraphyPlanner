@@ -3,6 +3,7 @@ import {
     AtSign,
     Building2,
     CalendarDays,
+    ClipboardCheck,
     FileBarChart,
     Image,
     LayoutGrid,
@@ -27,6 +28,7 @@ import {
 export type ChapterKey =
     | 'overview'
     | 'attention'
+    | 'myWork'
     | 'calendar'
     | 'clients'
     | 'invoices'
@@ -92,9 +94,19 @@ export const chapters: Record<ChapterKey, Chapter> = {
         swatch: 'bg-lilac',
         prefixes: ['/home'],
     },
+    // Step M-5.4: "My work" — the signed-in person's own posts across clients.
+    myWork: {
+        key: 'myWork',
+        number: '03',
+        title: 'My work',
+        summary: 'Your posts: assigned, to review, due soon, mentioned.',
+        icon: ClipboardCheck,
+        swatch: 'bg-signal',
+        prefixes: ['/my-work'],
+    },
     calendar: {
         key: 'calendar',
-        number: '03',
+        number: '04',
         title: 'Calendar',
         summary: 'Every scheduled post, by month, week, day or list.',
         icon: CalendarDays,
@@ -103,7 +115,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     clients: {
         key: 'clients',
-        number: '04',
+        number: '05',
         title: 'Clients',
         summary: 'The roster — brands, campaigns, posts and Brand Brain.',
         icon: Building2,
@@ -124,7 +136,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     invoices: {
         key: 'invoices',
-        number: '05',
+        number: '06',
         title: 'Invoices',
         summary: 'The ledger — raised, sent, paid and overdue.',
         icon: Receipt,
@@ -134,7 +146,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     // Phase 17: the studio's own analytics. Every staff role sees it (sections are gated inside).
     analytics: {
         key: 'analytics',
-        number: '06',
+        number: '07',
         title: 'Analytics',
         summary:
             'How the studio is tracking — output, approvals, billing and AI.',
@@ -144,7 +156,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     staff: {
         key: 'staff',
-        number: '07',
+        number: '08',
         title: 'Staff',
         summary: 'The team, their roles and invitations.',
         icon: UsersRound,
@@ -153,7 +165,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     settings: {
         key: 'settings',
-        number: '08',
+        number: '09',
         title: 'Settings',
         summary: 'Profile, security, appearance and organization.',
         icon: Settings2,

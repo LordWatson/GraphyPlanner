@@ -1,7 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
-    ClipboardCheck,
     CornerDownLeft,
     LayoutGrid,
     Megaphone,
@@ -157,13 +156,8 @@ function useCommands(close: () => void): Command[] {
             chapterCommand(chapters.overview, dashboard()),
             chapterCommand(chapters.attention, needsAttention()),
             {
-                id: 'my-work',
-                group: 'Chapters',
-                label: 'My work',
-                hint: 'Your posts: assigned, to review, due soon, mentioned.',
+                ...chapterCommand(chapters.myWork, myWorkIndex()),
                 keywords: 'my work assigned mine review due mentioned tasks',
-                icon: ClipboardCheck,
-                run: visit(myWorkIndex()),
             },
             chapterCommand(chapters.calendar, calendar()),
             chapterCommand(chapters.clients, clientsIndex()),
