@@ -17,6 +17,7 @@ use App\Notifications\PostNoteMentioned;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
 use App\Services\PostNotificationService;
+use App\Services\Posts\PostRevisionService;
 use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\VendorScheduleService;
 use App\Support\CommentMentionParser;
@@ -218,6 +219,12 @@ class TransitionPostStatusAction
             ]);
 
             $locked->refresh();
+
+            // Step M-5.3: snapshot the version the client is shown, so a later re-review can show
+            // "what changed since you last saw it".
+            if ($to === PostStatus::WaitingClient) {
+                app(PostRevisionService::class)->record($locked, $user, shared: true);
+            }
 
             DB::afterCommit(function () use ($locked, $to, $user, $comment, $notifications) {
                 // Step 1.4: nothing calls the vendor until this point — the §6 checklist is

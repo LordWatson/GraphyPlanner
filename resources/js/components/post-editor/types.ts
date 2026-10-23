@@ -111,6 +111,12 @@ export type PostData = {
     id: number;
     client_id: number;
     campaign_id: number | null;
+    /** Step M-5.3: when the post was last saved (the "Saved · HH:MM" indicator). */
+    updated_at: string | null;
+    /** Step M-5.4: assignment and the internal due date. */
+    assignee_id: number | null;
+    reviewer_id: number | null;
+    due_at: string | null;
     campaign_name: string | null;
     campaign: CampaignChipData | null;
     status: string;

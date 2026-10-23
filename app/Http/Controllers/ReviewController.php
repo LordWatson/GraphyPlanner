@@ -13,6 +13,7 @@ use App\Http\Requests\ReviewDecisionRequest;
 use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\ReviewToken;
+use App\Services\Posts\PostRevisionService;
 use App\Support\Grids\GridPlanPresenter;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
@@ -34,7 +35,7 @@ class ReviewController extends Controller
     /**
      * Show the post (or grid) waiting on this token's client for review.
      */
-    public function show(string $token, GridPlanPresenter $grids): Response
+    public function show(string $token, GridPlanPresenter $grids, PostRevisionService $revisions): Response
     {
         $reviewToken = $this->resolveToken($token);
 
@@ -86,6 +87,10 @@ class ReviewController extends Controller
                 'can_comment' => $isPreview && $reviewToken->allow_comments,
                 // Step 18.9: the look was already approved in a grid, so the client only signs off the words.
                 'grid_name' => $post->gridTile?->plan?->name,
+                // Step M-5.3: what changed since the client last reviewed it (never on a preview link).
+                'changes_since_review' => ! $isPreview && $post->status === PostStatus::WaitingClient
+                    ? $revisions->changesSinceLastReview($post)
+                    : null,
                 'comments' => $post->comments
                     ->where('internal_only', false)
                     ->sortByDesc('created_at')

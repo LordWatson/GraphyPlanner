@@ -12,6 +12,7 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Validator;
 
 class UpdatePostRequest extends FormRequest
@@ -40,6 +41,10 @@ class UpdatePostRequest extends FormRequest
             // Step B-1.4: client approval isn't a concept in a business workspace.
             'approval_mode' => ['nullable', new Enum(ApprovalMode::class), $this->rejectClientApprovalForBusiness()],
             'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
+            // Step M-5.4: assignee/reviewer (internal staff) and the internal due date.
+            'assignee_id' => ['nullable', 'integer', $this->staffRule()],
+            'reviewer_id' => ['nullable', 'integer', $this->staffRule()],
+            'due_at' => ['nullable', 'date'],
             'master_caption' => ['nullable', 'string', 'max:65000'],
             'review_message' => ['nullable', 'string'],
             'hashtags' => ['nullable', 'array'],
@@ -95,6 +100,16 @@ class UpdatePostRequest extends FormRequest
             // Step I-3.2 / M-2.3: checked against the account's platform in `after()`.
             'targets.*.format' => ['nullable', 'string', 'max:32'],
         ];
+    }
+
+    /**
+     * Step M-5.4 — an assignee/reviewer must be an internal staff member of this organization.
+     */
+    private function staffRule(): Exists
+    {
+        return Rule::exists('users', 'id')
+            ->where('org_id', (int) $this->user()->org_id)
+            ->whereIn('role', ['owner', 'strategist', 'designer', 'viewer']);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
 use App\Actions\Posts\CreateSharePreviewAction;
 use App\Actions\Posts\DeletePostAction;
+use App\Actions\Posts\DuplicatePostAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Actions\Posts\QuickSchedulePostAction;
 use App\Actions\Posts\ReschedulePostAction;
@@ -38,6 +39,7 @@ use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Models\User;
 use App\Services\Analytics\BestTimeService;
 use App\Services\ClientHashtagService;
 use App\Services\Grids\GridPlanService;
@@ -68,6 +70,22 @@ class PostController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Post created.')]);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step M-5.2 — duplicate a post into a fresh `draft` for the same client (content, media and
+     * target accounts, but never the schedule or publish state), then open the copy in the editor.
+     */
+    public function duplicate(Request $request, Post $post, DuplicatePostAction $action): RedirectResponse
+    {
+        $this->authorize('view', $post);
+        $this->authorize('create', [Post::class, $post->client]);
+
+        $copy = $action($post, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post duplicated. Set its schedule and send it on.')]);
+
+        return to_route('posts.edit', $copy);
     }
 
     /**
@@ -164,6 +182,8 @@ class PostController extends Controller
                 // Step M-2.9: approve without the client (Owner, with a reason).
                 'override_approval' => $user->can('overrideApproval', $post),
                 'delete' => $user->can('delete', $post),
+                // Step M-5.2: duplicate needs create rights on the client (not update).
+                'duplicate' => $user->can('create', [Post::class, $client]),
                 'create_asset' => $user->can('create', [Asset::class, $client]),
                 // Step B-3.2 / B-3.4: the one-tap schedule and the share-preview link.
                 'quick_schedule' => $user->can('transition', [$post, PostStatus::Scheduled]),
@@ -189,6 +209,14 @@ class PostController extends Controller
                 'id' => $mentionable->id,
                 'name' => $mentionable->name,
             ])->values(),
+            // Step M-5.4: internal staff who can be assigned the post or set as its reviewer.
+            'staff' => User::query()
+                ->where('org_id', $post->org_id)
+                ->whereIn('role', [Role::Owner, Role::Strategist, Role::Designer, Role::Viewer])
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (User $member) => ['id' => $member->id, 'name' => $member->name])
+                ->all(),
             'ai' => [
                 'enabled' => (bool) config('ai.enabled', false),
                 'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
@@ -208,7 +236,7 @@ class PostController extends Controller
      */
     public function update(UpdatePostRequest $request, Post $post, UpdatePostAction $action): RedirectResponse
     {
-        $action($post, $request->validated());
+        $action($post, $request->validated(), $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Post saved.')]);
 
@@ -484,6 +512,12 @@ class PostController extends Controller
             'id' => $post->id,
             'client_id' => $post->client_id,
             'campaign_id' => $post->campaign_id,
+            // Step M-5.3: the "Saved · HH:MM" indicator reads this.
+            'updated_at' => $post->updated_at?->toIso8601String(),
+            // Step M-5.4: assignment and the internal due date.
+            'assignee_id' => $post->assignee_id,
+            'reviewer_id' => $post->reviewer_id,
+            'due_at' => $post->due_at?->toIso8601String(),
             'campaign_name' => $post->campaign?->name,
             'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'status' => $post->status->value,

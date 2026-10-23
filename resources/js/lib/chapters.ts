@@ -114,6 +114,8 @@ export const chapters: Record<ChapterKey, Chapter> = {
             '/campaigns',
             '/campaign-templates',
             '/posts',
+            // Step M-5.1: the content hub (table + board across every client).
+            '/content',
             // Phase 18: the Instagram grid planner.
             '/grids',
             '/ai-trends',

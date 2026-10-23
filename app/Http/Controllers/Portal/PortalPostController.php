@@ -10,6 +10,7 @@ use App\Http\Requests\Portal\PortalPostDecisionRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Models\Post;
 use App\Services\PostNotificationService;
+use App\Services\Posts\PostRevisionService;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,7 @@ class PortalPostController extends Controller
         ]);
     }
 
-    public function show(Request $request, Post $post, PostNotificationService $notifications): Response
+    public function show(Request $request, Post $post, PostNotificationService $notifications, PostRevisionService $revisions): Response
     {
         $user = $request->user();
         $post->load(['targets.socialAccount', 'assets', 'comments.user', 'comments.mentionedUsers', 'gridTile.plan']);
@@ -70,6 +71,10 @@ class PortalPostController extends Controller
                 'review_message' => $post->review_message,
                 // Step 18.9: the look was approved in a grid; this review is about the words.
                 'grid_name' => $post->gridTile?->plan?->name,
+                // Step M-5.3: what changed since the client last reviewed it (null on a first review).
+                'changes_since_review' => $post->status === PostStatus::WaitingClient
+                    ? $revisions->changesSinceLastReview($post)
+                    : null,
                 'hashtags' => $post->hashtags ?? [],
                 'music' => $post->music,
                 'location' => $post->location,
@@ -80,7 +85,7 @@ class PortalPostController extends Controller
                     'thumbnail_url' => $asset->thumbnailUrl(),
                     'original_filename' => $asset->original_filename,
                     'type' => $asset->type?->value,
-                    'source' => $asset->source?->value,
+                    'source' => $asset->source->value,
                     'mime_type' => $asset->mime_type,
                     ...PostMediaPresenter::framing($asset),
                 ])->values(),

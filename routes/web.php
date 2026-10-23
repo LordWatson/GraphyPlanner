@@ -43,6 +43,7 @@ use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
 use App\Http\Controllers\ClientTabController;
 use App\Http\Controllers\ConnectInviteController;
+use App\Http\Controllers\ContentHubController;
 use App\Http\Controllers\DailyBriefController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Grids\GridAiController;
@@ -55,6 +56,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\MediaKitShareController;
+use App\Http\Controllers\MyWorkController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Organizations\BusinessRegistrationController;
 use App\Http\Controllers\Organizations\RegistrationController;
@@ -68,9 +70,11 @@ use App\Http\Controllers\Portal\PortalInvoiceController;
 use App\Http\Controllers\Portal\PortalPostController;
 use App\Http\Controllers\Portal\PortalReportController;
 use App\Http\Controllers\PostController;
+use App\Http\Controllers\PostRevisionController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SavedPostViewController;
 use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationAcceptController;
@@ -501,6 +505,20 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::delete('campaigns/{campaign}/share-links/{shareLink}', [CampaignShareLinkController::class, 'destroy'])->scopeBindings()->name('campaigns.share-links.destroy');
     Route::post('campaigns/{campaign}/invoice', CampaignInvoiceController::class)->middleware('campaign.feature:invoicing')->name('campaigns.invoice');
 
+    // Step M-5.4: "My work" — the signed-in staff member's own posts across clients. Staff only.
+    Route::get('my-work', [MyWorkController::class, 'index'])->middleware('portal.redirect')->name('my-work.index');
+
+    // Step M-5.1: the content hub — every client's posts as a table or status board, with a
+    // bulk-action bar, CSV export and personal saved filter views. Agency-only (a business org is
+    // redirected to its own `/posts`); a client reviewer is sent to the portal.
+    Route::middleware(['portal.redirect', 'workspace:agency'])->group(function () {
+        Route::get('content', [ContentHubController::class, 'index'])->name('content.index');
+        Route::get('content/export', [ContentHubController::class, 'export'])->name('content.csv');
+        Route::post('content/bulk', [ContentHubController::class, 'bulk'])->name('content.bulk');
+        Route::post('content/views', [SavedPostViewController::class, 'store'])->name('content.views.store');
+        Route::delete('content/views/{savedView}', [SavedPostViewController::class, 'destroy'])->name('content.views.destroy');
+    });
+
     // Phase 18: the Instagram grid planner - plans per client, the planner page, tiles, the
     // workflow (Step 18.7), turning tiles into posts and scheduling the sequence (18.9-18.11).
     // The org-wide grids hub (a section of 04 Clients, like the campaigns hub).
@@ -567,6 +585,15 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->name('posts.destroy');
     Route::post('posts/{post}/transition', [PostController::class, 'transition'])
         ->name('posts.transition');
+    // Step M-5.2: duplicate a post into a fresh draft (content + media + targets, no schedule).
+    Route::post('posts/{post}/duplicate', [PostController::class, 'duplicate'])
+        ->name('posts.duplicate');
+    // Step M-5.3: content history — list versions (JSON, for the editor drawer) and restore one.
+    Route::get('posts/{post}/revisions', [PostRevisionController::class, 'index'])
+        ->name('posts.revisions.index');
+    Route::post('posts/{post}/revisions/{revision}/restore', [PostRevisionController::class, 'restore'])
+        ->scopeBindings()
+        ->name('posts.revisions.restore');
     // Step B-3.2: one-tap "Schedule" / "Post now" / "Send for review" for a solo owner or team.
     Route::post('posts/{post}/quick-schedule', [PostController::class, 'quickSchedule'])
         ->name('posts.quick-schedule');

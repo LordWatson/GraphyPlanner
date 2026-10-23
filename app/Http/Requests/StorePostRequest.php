@@ -10,6 +10,7 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\Exists;
 
 class StorePostRequest extends FormRequest
 {
@@ -37,6 +38,10 @@ class StorePostRequest extends FormRequest
             // Step B-1.4: client approval isn't a concept in a business workspace.
             'approval_mode' => ['nullable', new Enum(ApprovalMode::class), $this->rejectClientApprovalForBusiness()],
             'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
+            // Step M-5.4: assignee/reviewer must be staff in this org; due_at is the internal deadline.
+            'assignee_id' => ['nullable', 'integer', $this->staffRule()],
+            'reviewer_id' => ['nullable', 'integer', $this->staffRule()],
+            'due_at' => ['nullable', 'date'],
             'master_caption' => ['nullable', 'string'],
             'hashtags' => ['nullable', 'array'],
             'hashtags.*' => ['string'],
@@ -48,6 +53,17 @@ class StorePostRequest extends FormRequest
             'targets.*.scheduled_local_date' => ['nullable', 'date'],
             'targets.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
         ];
+    }
+
+    /**
+     * Step M-5.4 — an assignee/reviewer must be an internal staff member of this organization
+     * (never a client reviewer or another org's user).
+     */
+    private function staffRule(): Exists
+    {
+        return Rule::exists('users', 'id')
+            ->where('org_id', (int) $this->user()->org_id)
+            ->whereIn('role', ['owner', 'strategist', 'designer', 'viewer']);
     }
 
     /**

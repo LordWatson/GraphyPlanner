@@ -6,6 +6,8 @@ use App\Models\CampaignDeliverable;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Models\User;
+use App\Services\Posts\PostRevisionService;
 use App\Services\Publishing\VendorScheduleService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -48,8 +50,10 @@ class UpdatePostAction
     public function __invoke(
         Post $post,
         array $data,
+        ?User $actor = null,
         EvaluatePostChecklistAction $evaluateChecklist = new EvaluatePostChecklistAction,
         TransitionPostStatusAction $transition = new TransitionPostStatusAction,
+        PostRevisionService $revisions = new PostRevisionService,
     ): Post {
         // Step I-3.6 / M-2.5: editing a post the vendor is holding for later recalls those
         // channels first (the edit is refused if the vendor says it's too late), and re-submits
@@ -57,7 +61,7 @@ class UpdatePostAction
         $vendor = app(VendorScheduleService::class);
         $recalled = $post->canBeRecalled() || $post->isHeldByVendor() ? $vendor->recall($post, 'targets') : [];
 
-        return DB::transaction(function () use ($post, $data, $evaluateChecklist, $transition, $vendor, $recalled) {
+        return DB::transaction(function () use ($post, $data, $actor, $evaluateChecklist, $transition, $revisions, $vendor, $recalled) {
             DB::afterCommit(fn () => $vendor->resubmit($post, $recalled));
 
             if (array_key_exists('media_format', $data)) {
@@ -83,6 +87,10 @@ class UpdatePostAction
 
             $post->refresh();
             $post->update(['checklist_snapshot' => $evaluateChecklist($post)]);
+
+            // Step M-5.3: record a content revision (no-op when nothing content-level changed).
+            $post->load(['targets.socialAccount', 'assets']);
+            $revisions->record($post, $actor);
 
             // Recalled channels of a `scheduled` post go back to the vendor with the new schedule.
             if (array_key_exists('targets', $data) || $recalled !== []) {

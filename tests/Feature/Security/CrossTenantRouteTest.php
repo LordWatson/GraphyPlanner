@@ -28,6 +28,8 @@ use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Models\PostRevision;
+use App\Models\SavedPostView;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
 use App\Models\TaxRate;
@@ -215,6 +217,10 @@ class CrossTenantRouteTest extends TestCase
             AiImageVariant::class => AiImageVariant::factory()->create(['generation_id' => $generation->id, 'org_id' => $org->id]),
             GridPlan::class => $grid,
             GridTile::class => GridTile::factory()->create(['grid_plan_id' => $grid->id]),
+            // Step M-5.1: a saved content-hub view owned by the other org's owner.
+            SavedPostView::class => SavedPostView::factory()->create(['org_id' => $org->id, 'user_id' => $owner->id]),
+            // Step M-5.3: a content revision of the other org's post.
+            PostRevision::class => PostRevision::factory()->create(['org_id' => $org->id, 'post_id' => $post->id]),
         ];
     }
 }

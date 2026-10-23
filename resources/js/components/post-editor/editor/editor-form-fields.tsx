@@ -33,6 +33,10 @@ export function EditorFormFields() {
                 name="approval_mode"
                 value={state.approvalMode}
             />
+            {/* Step M-5.4: assignment and the internal due date. */}
+            <input type="hidden" name="assignee_id" value={state.assigneeId} />
+            <input type="hidden" name="reviewer_id" value={state.reviewerId} />
+            <input type="hidden" name="due_at" value={state.dueDate} />
             {/* Image format + framing are set from the preview rail. */}
             {Object.entries(state.mediaFormat).map(([platform, ratio]) => (
                 <input

@@ -1,6 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
+    ClipboardCheck,
     CornerDownLeft,
     LayoutGrid,
     Megaphone,
@@ -48,7 +49,9 @@ import {
 } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
+import { index as contentIndex } from '@/routes/content';
 import { index as gridsIndex } from '@/routes/grids';
+import { index as myWorkIndex } from '@/routes/my-work';
 import { create as createAnalyticsReport } from '@/routes/analytics/reports';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
@@ -153,6 +156,15 @@ function useCommands(close: () => void): Command[] {
         const studioCommands: Command[] = [
             chapterCommand(chapters.overview, dashboard()),
             chapterCommand(chapters.attention, needsAttention()),
+            {
+                id: 'my-work',
+                group: 'Chapters',
+                label: 'My work',
+                hint: 'Your posts: assigned, to review, due soon, mentioned.',
+                keywords: 'my work assigned mine review due mentioned tasks',
+                icon: ClipboardCheck,
+                run: visit(myWorkIndex()),
+            },
             chapterCommand(chapters.calendar, calendar()),
             chapterCommand(chapters.clients, clientsIndex()),
             {
@@ -293,6 +305,23 @@ function useCommands(close: () => void): Command[] {
                 keywords: 'new client brand onboard',
                 icon: Plus,
                 run: visit(createClient()),
+            });
+        }
+
+        // Step M-5.2: the producing roles can start a post from anywhere; the content hub's
+        // "New post" picker chooses the client (per-client create is re-checked server-side).
+        if (
+            !isBusiness &&
+            ['owner', 'strategist', 'designer'].includes(auth.user.role ?? '')
+        ) {
+            list.push({
+                id: 'create-post',
+                group: 'Create',
+                label: 'New post',
+                hint: 'Start a post for any client.',
+                keywords: 'new post create draft content',
+                icon: Plus,
+                run: visit(contentIndex()),
             });
         }
 

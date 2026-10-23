@@ -57,6 +57,8 @@ class EnsureWorkspaceType
             // The client page's tabs → the matching business shell page.
             'clients.show' => 'business.accounts.index',
             'clients.posts.index' => 'business.posts.index',
+            // The agency content hub → the business shell's own posts list.
+            'content.index' => 'business.posts.index',
             'clients.media' => 'business.media.index',
             'clients.campaigns.index' => 'business.collections.index',
             'clients.ai.index' => 'business.ideas.index',

@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import { ClipboardCheck } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { Peek } from '@/components/brand-poster';
 import { NavMain } from '@/components/nav-main';
@@ -27,6 +28,8 @@ import { index as businessInsights } from '@/routes/business/insights';
 import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
 import { index as campaignsIndex } from '@/routes/campaigns';
+import { index as contentIndex } from '@/routes/content';
+import { index as myWorkIndex } from '@/routes/my-work';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -169,12 +172,20 @@ function studioGroups(
             items: [
                 navItem(chapters.overview, dashboard()),
                 navItem(chapters.attention, needsAttention()),
+                // Step M-5.4: "My work" — the signed-in person's own posts across clients.
+                {
+                    title: 'My work',
+                    href: myWorkIndex(),
+                    icon: ClipboardCheck,
+                },
                 navItem(chapters.calendar, calendar()),
                 {
                     ...navItem(chapters.clients, clientsIndex()),
                     // Campaigns enhancement C-1.1: the hub is a section of 04 Clients (no renumber).
                     // Phase 18: the grids hub is another section of 04 Clients.
                     subItems: [
+                        // Step M-5.1: the content hub — posts across every client.
+                        { title: 'Posts', href: contentIndex() },
                         { title: 'Campaigns', href: campaignsIndex() },
                         { title: 'Grids', href: gridsIndex() },
                     ],

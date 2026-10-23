@@ -38,10 +38,19 @@ class StartPostFromDeliverableAction
             $campaign = $locked->campaign;
             $account = $this->account($locked, $socialAccountId);
 
+            // Step M-5.4: the deliverable's assignee and its work-ready due date (planned date less
+            // the client's approval lead time) carry onto the post.
+            $dueAt = $locked->planned_for
+                ?->copy()
+                ->subDays((int) $campaign->client->approval_lead_days)
+                ->toDateString();
+
             $post = ($this->createPost)($campaign->client, [
                 'status' => PostStatus::Idea,
                 'campaign_id' => $campaign->id,
                 'created_by' => $user->id,
+                'assignee_id' => $locked->assignee_id,
+                'due_at' => $dueAt,
                 'master_caption' => $locked->title,
                 'targets' => $account === null ? [] : [[
                     'social_account_id' => $account->id,

@@ -33,6 +33,10 @@ export type EditorState = {
     thumbOffsetMs: number | null;
     /** Step M-2.9: whether the client must approve this post. */
     approvalMode: string;
+    /** Step M-5.4: who owns the work, the internal reviewer, and the internal due date (YYYY-MM-DD). */
+    assigneeId: string;
+    reviewerId: string;
+    dueDate: string;
 };
 
 export type EditorSection =
@@ -120,6 +124,9 @@ export function initialEditorState(
         coverAssetId: post.cover_asset_id,
         thumbOffsetMs: post.thumb_offset_ms,
         approvalMode: post.approval_mode,
+        assigneeId: post.assignee_id ? String(post.assignee_id) : '',
+        reviewerId: post.reviewer_id ? String(post.reviewer_id) : '',
+        dueDate: post.due_at ? post.due_at.slice(0, 10) : '',
     };
 }
 

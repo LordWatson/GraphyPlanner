@@ -5,12 +5,14 @@ import { useState } from 'react';
 import type { AssetPreviewData } from '@/components/asset-preview';
 import InputError from '@/components/input-error';
 import { platformIcon } from '@/components/platform-icon';
+import { ReviewChanges } from '@/components/posts/review-changes';
 import { PublicShell, PublicTitle } from '@/components/public-shell';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
 import type { MediaFormat } from '@/lib/media-format';
+import type { RevisionDiff } from '@/lib/post-diff';
 import { cn } from '@/lib/utils';
 import { decide, previewFeedback } from '@/routes/review';
 
@@ -51,6 +53,8 @@ type PostData = {
     can_comment?: boolean;
     /** Step 18.9: the grid whose look the client already approved. */
     grid_name?: string | null;
+    /** Step M-5.3: what changed since the client last reviewed it (null on a first review). */
+    changes_since_review?: RevisionDiff | null;
     comments: CommentData[];
 };
 
@@ -139,6 +143,8 @@ export default function ReviewShow({
                         . This review is about the words.
                     </p>
                 )}
+
+                <ReviewChanges changes={post.changes_since_review ?? null} />
 
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
                     {post.review_message && (

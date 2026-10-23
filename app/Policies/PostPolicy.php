@@ -243,4 +243,15 @@ class PostPolicy
             Role::Viewer,
         ], true);
     }
+
+    /**
+     * Step M-5.1 — the org-wide content hub (`/content`): every post across every client, as a
+     * table or a status board. An internal working surface (filter, bulk-move, assign), so a
+     * `Role::ClientReviewer` is excluded, the same as Home. The hub query re-applies the org scope,
+     * and each bulk move is re-checked through `transition()`.
+     */
+    public function viewHub(User $user): bool
+    {
+        return $this->viewHome($user);
+    }
 }

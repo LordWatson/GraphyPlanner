@@ -35,6 +35,9 @@ use Illuminate\Support\Facades\DB;
  * @property int $client_id
  * @property int|null $campaign_id
  * @property int|null $created_by
+ * @property int|null $assignee_id
+ * @property int|null $reviewer_id
+ * @property Carbon|null $due_at
  * @property PostStatus $status
  * @property string|null $publish_dispatch_id
  * @property ApprovalMode $approval_mode
@@ -54,7 +57,8 @@ use Illuminate\Support\Facades\DB;
  * @property Carbon|null $deleted_at
  */
 #[Fillable([
-    'org_id', 'client_id', 'campaign_id', 'created_by', 'status', 'publish_dispatch_id', 'approval_mode',
+    'org_id', 'client_id', 'campaign_id', 'created_by', 'assignee_id', 'reviewer_id', 'due_at',
+    'status', 'publish_dispatch_id', 'approval_mode',
     'master_caption', 'review_message', 'hashtags', 'music', 'location', 'media_format', 'checklist_snapshot',
     'link_url', 'first_comment', 'cover_asset_id', 'thumb_offset_ms',
 ])]
@@ -76,6 +80,7 @@ class Post extends Model
             'location' => 'array',
             'media_format' => 'array',
             'checklist_snapshot' => 'array',
+            'due_at' => 'datetime',
         ];
     }
 
@@ -197,11 +202,39 @@ class Post extends Model
     }
 
     /**
+     * Step M-5.4: the person doing the work, and the internal reviewer.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewer_id');
+    }
+
+    /**
      * @return HasMany<PostTarget, $this>
      */
     public function targets(): HasMany
     {
         return $this->hasMany(PostTarget::class);
+    }
+
+    /**
+     * Step M-5.3: the content history — one revision per content-changing save, newest last.
+     *
+     * @return HasMany<PostRevision, $this>
+     */
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(PostRevision::class);
     }
 
     /**

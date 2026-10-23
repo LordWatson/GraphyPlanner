@@ -6,14 +6,27 @@ import { cn } from '@/lib/utils';
 export function SaveBar({
     isDirty,
     processing,
+    autosaves = false,
+    savedAt = null,
     onDiscard,
     onShowShortcuts,
 }: {
     isDirty: boolean;
     processing: boolean;
+    /** Step M-5.3: whether this post autosaves (draft-like + editable). */
+    autosaves?: boolean;
+    /** Step M-5.3: when the post was last saved, for the "Saved · 12:04" indicator. */
+    savedAt?: string | null;
     onDiscard: () => void;
     onShowShortcuts: () => void;
 }) {
+    const savedTime = savedAt
+        ? new Date(savedAt).toLocaleTimeString('en-GB', {
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : null;
+
     return (
         <div
             className={cn(
@@ -29,14 +42,22 @@ export function SaveBar({
                     <>
                         <span className="bg-warning size-2 rounded-full" />
                         Unsaved changes
-                        <kbd className="text-muted-foreground hidden font-mono text-[11px] sm:inline">
-                            Ctrl/⌘ S
-                        </kbd>
+                        {autosaves ? (
+                            <span className="text-muted-foreground hidden text-xs sm:inline">
+                                Autosaving…
+                            </span>
+                        ) : (
+                            <kbd className="text-muted-foreground hidden font-mono text-[11px] sm:inline">
+                                Ctrl/⌘ S
+                            </kbd>
+                        )}
                     </>
                 ) : (
                     <span className="text-muted-foreground flex items-center gap-1.5">
                         <Check className="text-success size-4" />
-                        All changes saved
+                        {savedTime
+                            ? `Saved · ${savedTime}`
+                            : 'All changes saved'}
                     </span>
                 )}
             </span>
