@@ -17,6 +17,7 @@ use App\Services\Campaigns\Health\LaunchingWithUnapprovedWorkRule;
 use App\Services\Grids\GridOrderRiskService;
 use App\Support\Campaigns\CampaignClock;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,7 @@ class GetNeedsAttentionItemsAction
      *     missingMedia: array{items: list<array<string, mixed>>, total: int},
      *     campaigns: array{items: list<array<string, mixed>>, total: int},
      *     gridRisks: array{items: list<array<string, mixed>>, total: int},
+     *     recyclingSuggestions: array{items: list<array<string, mixed>>, total: int},
      *     disconnectedAccounts: array{items: list<array<string, mixed>>, total: int},
      * }
      */
@@ -118,6 +120,10 @@ class GetNeedsAttentionItemsAction
             'gridRisks' => $user->role === Role::ClientReviewer
                 ? ['items' => [], 'total' => 0]
                 : $this->gridRisks($user, $limit),
+            // Step M-5.8 (Phase 11): evergreen posts past their recycle window and not yet recycled.
+            'recyclingSuggestions' => $user->role === Role::ClientReviewer
+                ? ['items' => [], 'total' => 0]
+                : $this->recyclingSuggestions($user, $limit),
             'disconnectedAccounts' => [
                 'items' => array_values((clone $accountsQuery)
                     ->with('client:id,name')
@@ -142,6 +148,43 @@ class GetNeedsAttentionItemsAction
                     ->all()),
                 'total' => $accountsQuery->count(),
             ],
+        ];
+    }
+
+    /**
+     * Step M-5.8 (Phase 11.2) — evergreen posts ready to repost: flagged `is_recyclable`, published,
+     * past their `recycle_after_days` window (measured from the latest channel's publish time), and
+     * not yet recycled (`recycledInto` empty). Candidates are few (recycling is opt-in per post), so
+     * the window is applied in PHP over a bounded set to stay portable across MySQL and SQLite.
+     *
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    private function recyclingSuggestions(User $user, int $limit): array
+    {
+        $candidates = $this->posts($user)
+            ->where('is_recyclable', true)
+            ->whereNotNull('recycle_after_days')
+            ->where('status', PostStatus::Published)
+            ->whereDoesntHave('recycledInto')
+            ->whereHas('targets', fn (Builder $target) => $target->whereNotNull('published_at'))
+            ->with(['client:id,name', 'targets:id,post_id,social_account_id,published_at', 'targets.socialAccount:id,platform,handle'])
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get(['id', 'org_id', 'client_id', 'status', 'master_caption', 'recycle_after_days']);
+
+        $due = $candidates->filter(function (Post $post) {
+            $publishedAt = $post->targets->max('published_at');
+
+            return $publishedAt instanceof CarbonInterface
+                && $publishedAt->copy()->addDays((int) $post->recycle_after_days)->lte(now());
+        })->values();
+
+        return [
+            'items' => array_values($due->take($limit)->map(fn (Post $post) => [
+                ...$this->transformPost($post, 'Ready to recycle'),
+                'recycle_after_days' => (int) $post->recycle_after_days,
+            ])->all()),
+            'total' => $due->count(),
         ];
     }
 

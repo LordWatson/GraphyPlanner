@@ -42,6 +42,8 @@ final class SchedulerHeartbeat
         'grids:prune' => ['label' => 'Grid plan prune', 'interval_minutes' => 10080],
         // Phase M-4.3: daily retainer draft generation.
         'invoices:generate-retainer-drafts' => ['label' => 'Retainer drafts', 'interval_minutes' => 1440],
+        // Step M-5.8: daily recurring-post draft generation.
+        'posts:generate-recurring-drafts' => ['label' => 'Recurring post drafts', 'interval_minutes' => 1440],
         // Step B-8.2: weekly business Insights digest, swept hourly (acts Monday morning per tz).
         'business:send-insights-digest' => ['label' => 'Weekly insights digest', 'interval_minutes' => 60],
     ];

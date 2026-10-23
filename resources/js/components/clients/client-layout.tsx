@@ -161,10 +161,12 @@ export function TabHeading({
     icon: Icon,
     title,
     description,
+    actions,
 }: {
     icon: LucideIcon;
     title: string;
     description: string;
+    actions?: ReactNode;
 }) {
     return (
         <div className="relative flex items-center gap-3 overflow-hidden">
@@ -175,6 +177,7 @@ export function TabHeading({
                 <h2 className="text-[15px] font-semibold">{title}</h2>
                 <p className="text-muted-foreground text-xs">{description}</p>
             </div>
+            {actions && <div className="ml-auto shrink-0">{actions}</div>}
         </div>
     );
 }

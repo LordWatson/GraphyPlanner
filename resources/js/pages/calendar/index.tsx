@@ -1,10 +1,14 @@
 import { Head, router } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { CalendarNewPostDialog } from '@/components/calendar/calendar-new-post-dialog';
+import type { NewPostSlot } from '@/components/calendar/calendar-new-post-dialog';
 import { confirmDialog } from '@/components/confirm-dialog';
 import type {
     CalendarPayload,
     Occurrence,
+    PostMove,
+    TargetMove,
 } from '@/components/content-calendar';
 import { ContentCalendar } from '@/components/content-calendar';
 import { Page, PageHeader } from '@/components/page';
@@ -15,6 +19,7 @@ import { UnscheduledPostsSheet } from '@/components/unscheduled-posts-sheet';
 import { formatDate } from '@/lib/dates';
 import { calendar } from '@/routes';
 import { edit as editPost, reschedule as reschedulePost } from '@/routes/posts';
+import { reschedule as rescheduleTarget } from '@/routes/posts/targets';
 
 /**
  * The internal (staff) content calendar. Client portal contacts are redirected to
@@ -38,13 +43,12 @@ export default function Calendar({
         () => new Set(props.reschedulablePostIds ?? []),
         [props.reschedulablePostIds],
     );
+    const [newPostSlot, setNewPostSlot] = useState<NewPostSlot | null>(null);
 
     // A dropped chip only moves after an explicit confirm, so a slip of the mouse never
-    // reschedules anything. The whole post moves: every target shifts by the same days.
-    const handleReschedule = async (
-        occurrence: Occurrence,
-        move: { from: string; to: string; days: number },
-    ) => {
+    // reschedules anything. The month view moves the whole post: every target shifts by the
+    // same days.
+    const handleReschedule = async (occurrence: Occurrence, move: PostMove) => {
         const channels = props.occurrences.filter(
             (other) => other.post_id === occurrence.post_id,
         ).length;
@@ -72,6 +76,46 @@ export default function Calendar({
                 preserveState: true,
                 onError: (errors) =>
                     toast.error(errors.days ?? 'The post couldn’t be moved.'),
+            },
+        );
+    };
+
+    // Step M-5.7 / I-5.1: the week/day time grid moves one channel to an exact slot, leaving the
+    // post's other channels where they are.
+    const handleRescheduleTarget = async (
+        occurrence: Occurrence,
+        move: TargetMove,
+    ) => {
+        const name =
+            occurrence.client_name ?? occurrence.master_caption ?? 'This post';
+        const channel =
+            occurrence.handle ?? occurrence.platform ?? 'this channel';
+        const when = move.time
+            ? `${formatDate(move.date)} at ${move.time}`
+            : formatDate(move.date);
+
+        const confirmed = await confirmDialog({
+            title: `Move ${channel} to ${when}?`,
+            description: `Only ${name}’s ${channel} channel moves. Its other channels stay where they are.`,
+            confirmLabel: 'Move channel',
+        });
+
+        if (!confirmed) return;
+
+        router.post(
+            rescheduleTarget(occurrence.target_id).url,
+            {
+                scheduled_local_date: move.date,
+                scheduled_local_time: move.time,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: (errors) =>
+                    toast.error(
+                        errors.scheduled_local_date ??
+                            'The channel couldn’t be moved.',
+                    ),
             },
         );
     };
@@ -104,8 +148,15 @@ export default function Calendar({
                         reschedulable.has(occurrence.post_id)
                     }
                     onReschedule={handleReschedule}
+                    onRescheduleTarget={handleRescheduleTarget}
+                    onCreateAt={(slot) => setNewPostSlot(slot)}
                 />
             </Page>
+            <CalendarNewPostDialog
+                slot={newPostSlot}
+                clients={props.filterOptions.clients}
+                onClose={() => setNewPostSlot(null)}
+            />
         </>
     );
 }

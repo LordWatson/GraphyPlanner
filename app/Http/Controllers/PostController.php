@@ -10,7 +10,9 @@ use App\Actions\Posts\DeletePostAction;
 use App\Actions\Posts\DuplicatePostAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Actions\Posts\QuickSchedulePostAction;
+use App\Actions\Posts\RecyclePostAction;
 use App\Actions\Posts\ReschedulePostAction;
+use App\Actions\Posts\RescheduleTargetAction;
 use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
@@ -27,6 +29,7 @@ use App\Http\Requests\CreateSharePreviewRequest;
 use App\Http\Requests\OverridePostApprovalRequest;
 use App\Http\Requests\QuickSchedulePostRequest;
 use App\Http\Requests\ReschedulePostRequest;
+use App\Http\Requests\RescheduleTargetRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\TransitionPostRequest;
@@ -84,6 +87,21 @@ class PostController extends Controller
         $copy = $action($post, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Post duplicated. Set its schedule and send it on.')]);
+
+        return to_route('posts.edit', $copy);
+    }
+
+    /**
+     * Step M-5.8 (Phase 11) — recycle a published, reusable post into a fresh `idea` for the same
+     * client (content, media and channels, never the schedule), then open it in the editor.
+     */
+    public function recycle(Request $request, Post $post, RecyclePostAction $action): RedirectResponse
+    {
+        $this->authorize('recycle', $post);
+
+        $copy = $action($post, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post recycled. Pick fresh dates and send it on.')]);
 
         return to_route('posts.edit', $copy);
     }
@@ -327,6 +345,25 @@ class PostController extends Controller
     }
 
     /**
+     * Step M-5.7 / I-5.1 — move a single channel to a new local date (and, from the week/day time
+     * grid, a new local time), leaving the post's other channels where they are. Redirects back so
+     * the calendar keeps its filters and scroll position.
+     */
+    public function rescheduleTarget(RescheduleTargetRequest $request, PostTarget $target, RescheduleTargetAction $action): RedirectResponse
+    {
+        $action(
+            $target,
+            $request->string('scheduled_local_date')->toString(),
+            $request->filled('scheduled_local_time') ? $request->string('scheduled_local_time')->toString() : null,
+            $request->user(),
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Channel moved.')]);
+
+        return back();
+    }
+
+    /**
      * Step I-1.5 — delete (soft) a post that never went out. Published posts can only be
      * archived, through the regular `archived` transition.
      */
@@ -518,6 +555,10 @@ class PostController extends Controller
             'assignee_id' => $post->assignee_id,
             'reviewer_id' => $post->reviewer_id,
             'due_at' => $post->due_at?->toIso8601String(),
+            // Step M-5.8: evergreen reuse and repeat.
+            'is_recyclable' => $post->is_recyclable,
+            'recycle_after_days' => $post->recycle_after_days,
+            'recurrence' => $post->recurrence?->value,
             'campaign_name' => $post->campaign?->name,
             'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'status' => $post->status->value,

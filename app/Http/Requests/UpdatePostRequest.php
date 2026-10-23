@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\ApprovalMode;
 use App\Enums\MediaRatio;
 use App\Enums\Platform;
+use App\Enums\PostRecurrence;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Support\Media\CropBox;
@@ -57,6 +58,11 @@ class UpdatePostRequest extends FormRequest
             'thumb_offset_ms' => ['nullable', 'integer', 'min:0', 'max:86400000'],
             'music' => ['nullable', 'array'],
             'location' => ['nullable', 'array'],
+            // Step M-5.8: evergreen reuse and repeat. `recycle_after_days` is how long after
+            // publishing to suggest recycling; `recurrence` drops the next occurrence as a draft.
+            'is_recyclable' => ['boolean'],
+            'recycle_after_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'recurrence' => ['nullable', new Enum(PostRecurrence::class)],
 
             // Image format per channel — only the formats that channel offers.
             'media_format' => ['nullable', 'array:'.implode(',', $platforms)],

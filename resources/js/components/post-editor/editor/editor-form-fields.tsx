@@ -37,6 +37,18 @@ export function EditorFormFields() {
             <input type="hidden" name="assignee_id" value={state.assigneeId} />
             <input type="hidden" name="reviewer_id" value={state.reviewerId} />
             <input type="hidden" name="due_at" value={state.dueDate} />
+            {/* Step M-5.8: evergreen reuse and repeat. */}
+            <input
+                type="hidden"
+                name="is_recyclable"
+                value={state.isRecyclable ? '1' : '0'}
+            />
+            <input
+                type="hidden"
+                name="recycle_after_days"
+                value={state.isRecyclable ? state.recycleAfterDays : ''}
+            />
+            <input type="hidden" name="recurrence" value={state.recurrence} />
             {/* Image format + framing are set from the preview rail. */}
             {Object.entries(state.mediaFormat).map(([platform, ratio]) => (
                 <input

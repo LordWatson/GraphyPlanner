@@ -6,6 +6,7 @@ use App\Enums\ApprovalMode;
 use App\Enums\AssetType;
 use App\Enums\MediaRatio;
 use App\Enums\Platform;
+use App\Enums\PostRecurrence;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Jobs\RecomputeClientHealthJob;
@@ -52,6 +53,10 @@ use Illuminate\Support\Facades\DB;
  * @property array<string, mixed>|null $location
  * @property array<string, string>|null $media_format
  * @property array<string, mixed>|null $checklist_snapshot
+ * @property bool $is_recyclable
+ * @property int|null $recycle_after_days
+ * @property int|null $recycled_from_post_id
+ * @property PostRecurrence|null $recurrence
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -61,6 +66,7 @@ use Illuminate\Support\Facades\DB;
     'status', 'publish_dispatch_id', 'approval_mode',
     'master_caption', 'review_message', 'hashtags', 'music', 'location', 'media_format', 'checklist_snapshot',
     'link_url', 'first_comment', 'cover_asset_id', 'thumb_offset_ms',
+    'is_recyclable', 'recycle_after_days', 'recycled_from_post_id', 'recurrence',
 ])]
 class Post extends Model
 {
@@ -81,6 +87,8 @@ class Post extends Model
             'media_format' => 'array',
             'checklist_snapshot' => 'array',
             'due_at' => 'datetime',
+            'is_recyclable' => 'boolean',
+            'recurrence' => PostRecurrence::class,
         ];
     }
 
@@ -225,6 +233,27 @@ class Post extends Model
     public function targets(): HasMany
     {
         return $this->hasMany(PostTarget::class);
+    }
+
+    /**
+     * Step M-5.8 — the post this one was recycled or recurred from (null for an original).
+     *
+     * @return BelongsTo<Post, $this>
+     */
+    public function recycledFrom(): BelongsTo
+    {
+        return $this->belongsTo(Post::class, 'recycled_from_post_id');
+    }
+
+    /**
+     * Step M-5.8 — posts recycled or recurred from this one. A recurring chain's "leaf" is the one
+     * with no (non-trashed) child.
+     *
+     * @return HasMany<Post, $this>
+     */
+    public function recycledInto(): HasMany
+    {
+        return $this->hasMany(Post::class, 'recycled_from_post_id');
     }
 
     /**

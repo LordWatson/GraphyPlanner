@@ -163,6 +163,18 @@ class PostPolicy
     }
 
     /**
+     * Step M-5.8 (Phase 11) — recycle an evergreen post. Only a published, `is_recyclable` post can
+     * be recycled, by a producing role in its own org.
+     */
+    public function recycle(User $user, Post $post): bool
+    {
+        return $post->is_recyclable
+            && in_array($post->status, [PostStatus::Published, PostStatus::PartiallyPublished], true)
+            && $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
      * Step I-3.8 / M-2.9: approve a `client_required` post without the client — Owners only, from
      * internal review, with a reason (`TransitionPostStatusAction::overrideApproval()`).
      */

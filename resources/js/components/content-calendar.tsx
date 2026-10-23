@@ -1,8 +1,26 @@
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { Link, router } from '@inertiajs/react';
-import { CalendarX2, ChevronLeft, ChevronRight, Grid3x3 } from 'lucide-react';
-import type { DragEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import {
+    DndContext,
+    DragOverlay,
+    PointerSensor,
+    TouchSensor,
+    useDraggable,
+    useDroppable,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+    type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+    CalendarX2,
+    ChevronLeft,
+    ChevronRight,
+    Grid3x3,
+    Plus,
+} from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
     CalendarGhost,
     CampaignLayer,
@@ -13,6 +31,7 @@ import {
     useCampaignLayerToggle,
 } from '@/components/campaigns/calendar-layer';
 import { CampaignSwatch } from '@/components/campaigns/campaign-chip';
+import { ReschedulePopover } from '@/components/calendar/reschedule-popover';
 import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { resolveStatus, toneBgClass, toneTextClass } from '@/lib/status';
@@ -90,6 +109,11 @@ export type CalendarPayload = {
     campaignLayer?: CampaignLayer;
 };
 
+/** A whole-post move (month view / month popover): every channel shifts by the same days. */
+export type PostMove = { from: string; to: string; days: number };
+/** A single-channel move (week/day time grid): one target lands on an exact day + time. */
+export type TargetMove = { date: string; time: string | null };
+
 type ContentCalendarProps = CalendarPayload & {
     /** URL the filter selects re-request (with the filters as query params). */
     baseUrl: string;
@@ -100,20 +124,32 @@ type ContentCalendarProps = CalendarPayload & {
      * each chip with the client name; in portal mode chips lead with the caption instead.
      */
     multiClient?: boolean;
-    /** Whether an occurrence's chip can be dragged to another day (month/week views). */
+    /** Whether an occurrence's chip can be moved (month: whole post; week/day: that channel). */
     canReschedule?: (occurrence: Occurrence) => boolean;
     /**
-     * Called when a chip is dropped on a different, non-past day. `days` is the whole-day shift
-     * from the chip's displayed date; the caller confirms and persists the move.
+     * Month view: the whole post shifts by whole days. `days` is the shift from the chip's
+     * displayed date; the caller confirms and persists.
      */
-    onReschedule?: (
-        occurrence: Occurrence,
-        move: { from: string; to: string; days: number },
-    ) => void;
+    onReschedule?: (occurrence: Occurrence, move: PostMove) => void;
+    /**
+     * Week/day time grid: a single channel moves to an exact day + time, leaving its siblings
+     * where they are. The caller confirms and persists.
+     */
+    onRescheduleTarget?: (occurrence: Occurrence, move: TargetMove) => void;
+    /**
+     * "Click an empty slot to create a post there": month cells pass a date, the time grid passes
+     * a date + `HH:00`. With no handler, empty slots offer nothing.
+     */
+    onCreateAt?: (slot: TargetMove) => void;
 };
 
 type View = 'month' | 'week' | 'day' | 'list';
 type TimezoneMode = 'account' | 'org';
+
+/** The hours shown in the week/day time grid (a row each). */
+const GRID_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+/** Scroll the time grid here on open, so the working day is in view without hunting. */
+const GRID_SCROLL_HOUR = 7;
 
 function parseLocalDate(dateStr: string): Date {
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -141,6 +177,22 @@ function addDays(date: Date, days: number): Date {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
     return result;
+}
+
+/** The hour (0–23) of an `HH:MM` display time, or `null` for an untimed target. */
+function hourOf(time: string | null): number | null {
+    if (!time) return null;
+    const hour = Number(time.slice(0, 2));
+    return Number.isFinite(hour) ? hour : null;
+}
+
+const hourFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    hour12: true,
+});
+
+function hourLabel(hour: number): string {
+    return hourFormatter.format(new Date(2026, 0, 1, hour));
 }
 
 /**
@@ -178,11 +230,25 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
 });
+const monthTitleFormatter = new Intl.DateTimeFormat('en-US', { month: 'long' });
+
+/** A droppable `day:` (month) or `slot:` (time grid) id. */
+function dayDropId(key: string): string {
+    return `day:${key}`;
+}
+function slotDropId(key: string, hour: number): string {
+    return `slot:${key}:${hour}`;
+}
 
 /**
  * The content calendar (month / week / day / list, account-local vs org timezone, filters) used
  * by both the internal staff calendar and the client portal calendar. All timezone maths happens
  * server-side (`BuildCalendarOccurrencesAction`); this only groups and renders.
+ *
+ * Step M-5.7 / I-5.1: drag-and-drop runs on `@dnd-kit` (pointer + touch), and every movable chip
+ * also carries a keyboard-accessible "Reschedule" popover. The week and day views are real time
+ * grids, so a single channel can be dropped on an exact hour; the month view still shifts the
+ * whole post by whole days. Empty slots offer "New post" here.
  */
 export function ContentCalendar({
     occurrences,
@@ -195,6 +261,8 @@ export function ContentCalendar({
     multiClient = true,
     canReschedule,
     onReschedule,
+    onRescheduleTarget,
+    onCreateAt,
     campaignLayer,
 }: ContentCalendarProps) {
     const [showCampaigns, setShowCampaigns] = useCampaignLayerToggle();
@@ -229,7 +297,8 @@ export function ContentCalendar({
     const [loadingWindow, setLoadingWindow] = useState(false);
     const visibleWindow = gridWindow(anchor);
     const [dragging, setDragging] = useState<Occurrence | null>(null);
-    const [dropKey, setDropKey] = useState<string | null>(null);
+
+    const today = toDateKey(new Date());
 
     const display = (occurrence: Occurrence): OccurrenceDisplay =>
         tzMode === 'account'
@@ -239,16 +308,21 @@ export function ContentCalendar({
     const occurrencesByDate = useMemo(() => {
         const map = new Map<string, Occurrence[]>();
         for (const occurrence of occurrences) {
-            const date = display(occurrence).date;
+            const date =
+                tzMode === 'account'
+                    ? occurrence.account_local.date
+                    : occurrence.org_timezone.date;
             if (!date) continue;
             const list = map.get(date) ?? [];
             list.push(occurrence);
             map.set(date, list);
         }
+        const timeOf = (occurrence: Occurrence) =>
+            (tzMode === 'account'
+                ? occurrence.account_local.time
+                : occurrence.org_timezone.time) ?? '';
         for (const list of map.values()) {
-            list.sort((a, b) =>
-                (display(a).time ?? '').localeCompare(display(b).time ?? ''),
-            );
+            list.sort((a, b) => timeOf(a).localeCompare(timeOf(b)));
         }
         return map;
     }, [occurrences, tzMode]);
@@ -292,157 +366,87 @@ export function ContentCalendar({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visibleWindow.from, visibleWindow.to]);
 
-    const today = toDateKey(new Date());
+    // A click/tap that doesn't travel 8px stays a link click; past that it's a drag. Touch waits
+    // a beat so the page can still be scrolled with a finger.
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 8 },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: { delay: 220, tolerance: 6 },
+        }),
+    );
 
-    // Drag-to-reschedule: only the month/week grids have day cells to drop on, and a post can't
-    // be dropped on its own day or into the past (the server re-checks the exact time).
+    const movable = (occurrence: Occurrence): boolean =>
+        canReschedule?.(occurrence) ?? false;
+    const isTimeGrid = view === 'week' || view === 'day';
+    // A move either shifts the whole post by days (month) or drops one channel on a slot (grid).
     const dragEnabled =
-        onReschedule !== undefined && (view === 'month' || view === 'week');
+        (view === 'month' && onReschedule !== undefined) ||
+        (isTimeGrid && onRescheduleTarget !== undefined);
 
-    const canDropOn = (key: string): boolean => {
-        const from = dragging ? display(dragging).date : null;
-
-        return from !== null && key !== from && key >= today;
-    };
-
-    const endDrag = () => {
-        setDragging(null);
-        setDropKey(null);
-    };
-
-    const dropZoneProps = (key: string) =>
-        dragEnabled
-            ? {
-                  onDragOver: (event: DragEvent<HTMLDivElement>) => {
-                      if (!canDropOn(key)) return;
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = 'move';
-                      setDropKey(key);
-                  },
-                  onDragLeave: (event: DragEvent<HTMLDivElement>) => {
-                      if (
-                          !event.currentTarget.contains(
-                              event.relatedTarget as Node | null,
-                          )
-                      ) {
-                          setDropKey((current) =>
-                              current === key ? null : current,
-                          );
-                      }
-                  },
-                  onDrop: (event: DragEvent<HTMLDivElement>) => {
-                      event.preventDefault();
-                      const occurrence = dragging;
-                      const from = occurrence ? display(occurrence).date : null;
-                      const allowed = canDropOn(key);
-                      endDrag();
-                      if (occurrence && from && allowed) {
-                          onReschedule?.(occurrence, {
-                              from,
-                              to: key,
-                              days: daysBetween(from, key),
-                          });
-                      }
-                  },
-              }
-            : {};
-
-    const dropZoneClass = (key: string) =>
-        dropKey === key && 'ring-primary bg-primary/5 ring-2 ring-inset';
-
-    const renderOccurrenceChip = (occurrence: Occurrence) => {
-        const time = display(occurrence).time?.slice(0, 5);
-        const tone = resolveStatus('post', occurrence.status).tone;
-        const draggable = dragEnabled && (canReschedule?.(occurrence) ?? false);
-
-        return (
-            <Link
-                key={occurrence.target_id}
-                href={postHref(occurrence.post_id)}
-                title={`${occurrence.status_label} — ${(multiClient ? occurrence.client_name : occurrence.master_caption) ?? ''}${draggable ? ' · drag to move' : ''}`}
-                draggable={draggable}
-                onDragStart={
-                    draggable
-                        ? (event: DragEvent<HTMLAnchorElement>) => {
-                              event.dataTransfer.effectAllowed = 'move';
-                              event.dataTransfer.setData(
-                                  'text/plain',
-                                  String(occurrence.post_id),
-                              );
-                              setDragging(occurrence);
-                          }
-                        : undefined
-                }
-                onDragEnd={draggable ? endDrag : undefined}
-                className={cn(
-                    'group/chip bg-card hover:border-foreground/20 relative flex min-w-0 flex-col gap-0.5 overflow-hidden rounded-lg border py-1.5 pr-2 pl-3 text-xs transition-colors',
-                    draggable && 'cursor-grab active:cursor-grabbing',
-                    // Every target of the dragged post moves together, so dim them all.
-                    dragging?.post_id === occurrence.post_id && 'opacity-50',
-                )}
-            >
-                <span
-                    aria-hidden
-                    className={cn(
-                        'absolute inset-y-1.5 left-1 w-[3px] rounded-full',
-                        toneBgClass[tone],
-                    )}
-                />
-                <span className="flex items-center justify-between gap-1.5">
-                    <span className="font-mono text-[11px] tabular-nums">
-                        {time ?? '—'}
-                    </span>
-                    <span
-                        className={cn(
-                            'truncate text-[10.5px] font-medium',
-                            toneTextClass[tone],
-                        )}
-                    >
-                        {occurrence.status_label}
-                    </span>
-                </span>
-                <span className="group-hover/chip:text-primary truncate font-medium">
-                    {multiClient
-                        ? occurrence.client_name
-                        : (occurrence.master_caption ?? 'Untitled post')}
-                </span>
-                <span className="text-muted-foreground flex min-w-0 items-center gap-1.5">
-                    {occurrence.grid_plan_id && (
-                        <span
-                            className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px]"
-                            title={`From a grid · tile ${occurrence.grid_tile_position}`}
-                        >
-                            <Grid3x3 className="size-2.5" aria-hidden />
-                            <span className="sr-only">Grid tile</span>
-                            {occurrence.grid_tile_position}
-                        </span>
-                    )}
-                    {occurrence.campaign_id !== null && (
-                        <span
-                            className="inline-flex shrink-0 items-center gap-1"
-                            title={occurrence.campaign_name ?? undefined}
-                        >
-                            <CampaignSwatch
-                                colour={occurrence.campaign_colour}
-                                className="size-2"
-                            />
-                            {occurrence.campaign_code && (
-                                <span className="font-mono text-[10px]">
-                                    {occurrence.campaign_code}
-                                </span>
-                            )}
-                        </span>
-                    )}
-                    <span className="truncate">
-                        {occurrence.handle ?? occurrence.platform ?? '—'}
-                        {multiClient && occurrence.master_caption
-                            ? ` · ${occurrence.master_caption}`
-                            : ''}
-                    </span>
-                </span>
-            </Link>
+    const handleDragStart = (event: DragStartEvent) => {
+        setDragging(
+            (event.active.data.current?.occurrence as Occurrence) ?? null,
         );
     };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const occurrence = event.active.data.current?.occurrence as
+            | Occurrence
+            | undefined;
+        const overId = event.over?.id;
+        setDragging(null);
+        if (!occurrence || typeof overId !== 'string') return;
+
+        const from = display(occurrence).date;
+        if (!from) return;
+
+        if (overId.startsWith('day:')) {
+            const to = overId.slice(4);
+            if (to === from || to < today) return;
+            onReschedule?.(occurrence, {
+                from,
+                to,
+                days: daysBetween(from, to),
+            });
+            return;
+        }
+
+        if (overId.startsWith('slot:')) {
+            const [, date, hourStr] = overId.split(':');
+            if (date < today) return;
+            const time = `${String(Number(hourStr)).padStart(2, '0')}:00`;
+            // Dropping on the exact same slot is a no-op.
+            if (
+                date === from &&
+                hourOf(display(occurrence).time) === Number(hourStr)
+            ) {
+                return;
+            }
+            onRescheduleTarget?.(occurrence, { date, time });
+        }
+    };
+
+    const chipProps = {
+        display: (o: Occurrence) => display(o),
+        postHref,
+        multiClient,
+        today,
+        view,
+        movable,
+        draggingPostId: dragging?.post_id ?? null,
+        onReschedule,
+        onRescheduleTarget,
+    } as const;
+
+    const renderOccurrenceChip = (occurrence: Occurrence) => (
+        <CalendarChip
+            key={occurrence.target_id}
+            occurrence={occurrence}
+            {...chipProps}
+        />
+    );
 
     const renderNav = (
         label: ReactNode,
@@ -500,10 +504,6 @@ export function ContentCalendar({
         );
     };
 
-    const monthTitleFormatter = new Intl.DateTimeFormat('en-US', {
-        month: 'long',
-    });
-
     const renderMonthView = () => {
         const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
         const gridStart = startOfWeek(monthStart);
@@ -539,19 +539,19 @@ export function ContentCalendar({
                                 const isCurrentMonth =
                                     day.getMonth() === monthStart.getMonth();
                                 return (
-                                    <div
+                                    <MonthDayCell
                                         key={key}
-                                        {...dropZoneProps(key)}
-                                        className={cn(
-                                            'flex min-h-28 flex-col gap-1 p-1.5 transition-colors',
-                                            // Opaque canvas, not a tint: a /50 tint over the
-                                            // hairline grid's border colour read heavier than
-                                            // the real days.
-                                            isCurrentMonth
-                                                ? 'bg-card'
-                                                : 'bg-background',
-                                            dropZoneClass(key),
-                                        )}
+                                        dateKey={key}
+                                        dropEnabled={dragEnabled}
+                                        isCurrentMonth={isCurrentMonth}
+                                        isPast={key < today}
+                                        canCreate={onCreateAt !== undefined}
+                                        onCreate={() =>
+                                            onCreateAt?.({
+                                                date: key,
+                                                time: null,
+                                            })
+                                        }
                                     >
                                         {renderDayNumber(day, !isCurrentMonth)}
                                         <CampaignDayBands
@@ -572,7 +572,7 @@ export function ContentCalendar({
                                                 ),
                                             )}
                                         </div>
-                                    </div>
+                                    </MonthDayCell>
                                 );
                             })}
                         </div>
@@ -581,6 +581,26 @@ export function ContentCalendar({
             </div>
         );
     };
+
+    const renderTimeGrid = (days: Date[]) => (
+        <TimeGrid
+            days={days}
+            today={today}
+            bands={bands}
+            ghostsByDate={ghostsByDate}
+            occurrencesByDate={occurrencesByDate}
+            displayTime={(o) => display(o).time}
+            renderChip={renderOccurrenceChip}
+            dropEnabled={dragEnabled}
+            canCreate={onCreateAt !== undefined}
+            onCreate={(date, hour) =>
+                onCreateAt?.({
+                    date,
+                    time: `${String(hour).padStart(2, '0')}:00`,
+                })
+            }
+        />
+    );
 
     const renderWeekView = () => {
         const weekStart = startOfWeek(anchor);
@@ -599,80 +619,25 @@ export function ContentCalendar({
                     () => setAnchor(addDays(weekStart, 7)),
                     'week',
                 )}
-                <div className="overflow-x-auto">
-                    <div className="bg-border grid min-w-[760px] grid-cols-7 gap-px overflow-hidden rounded-xl border">
-                        {days.map((day) => {
-                            const key = toDateKey(day);
-                            const dayOccurrences =
-                                occurrencesByDate.get(key) ?? [];
-                            return (
-                                <div
-                                    key={key}
-                                    {...dropZoneProps(key)}
-                                    className={cn(
-                                        'bg-card flex min-h-72 flex-col gap-1.5 p-2 transition-colors',
-                                        dropZoneClass(key),
-                                    )}
-                                >
-                                    <div className="flex items-center justify-between pb-1">
-                                        <span className="eyebrow text-muted-foreground">
-                                            {weekdayFormatter.format(day)}
-                                        </span>
-                                        {renderDayNumber(day)}
-                                    </div>
-                                    <CampaignDayBands
-                                        bands={bands}
-                                        day={key}
-                                        labelled
-                                    />
-                                    {dayOccurrences.map(renderOccurrenceChip)}
-                                    {(ghostsByDate.get(key) ?? []).map(
-                                        (ghost) => (
-                                            <GhostChip
-                                                key={`g-${ghost.id}`}
-                                                ghost={ghost}
-                                            />
-                                        ),
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                {renderTimeGrid(days)}
             </div>
         );
     };
 
-    const renderDayView = () => {
-        const key = toDateKey(anchor);
-        const dayOccurrences = occurrencesByDate.get(key) ?? [];
-
-        return (
-            <div className="flex flex-col">
-                {renderNav(
-                    <>
-                        {weekdayLongFormatter.format(anchor)}{' '}
-                        <em>{shortDateFormatter.format(anchor)}</em>
-                    </>,
-                    () => setAnchor(addDays(anchor, -1)),
-                    () => setAnchor(addDays(anchor, 1)),
-                    'day',
-                )}
-                {dayOccurrences.length === 0 ? (
-                    <EmptyState
-                        compact
-                        icon={CalendarX2}
-                        title="Nothing scheduled."
-                        description="No posts are going out on this day."
-                    />
-                ) : (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {dayOccurrences.map(renderOccurrenceChip)}
-                    </div>
-                )}
-            </div>
-        );
-    };
+    const renderDayView = () => (
+        <div className="flex flex-col">
+            {renderNav(
+                <>
+                    {weekdayLongFormatter.format(anchor)}{' '}
+                    <em>{shortDateFormatter.format(anchor)}</em>
+                </>,
+                () => setAnchor(addDays(anchor, -1)),
+                () => setAnchor(addDays(anchor, 1)),
+                'day',
+            )}
+            {renderTimeGrid([anchor])}
+        </div>
+    );
 
     const renderListView = () => {
         // Step I-2.3: the list pages by month, like the grid, instead of listing all history.
@@ -943,18 +908,495 @@ export function ContentCalendar({
                     loadingWindow && 'opacity-60',
                 )}
             >
-                {view === 'month' && renderMonthView()}
-                {view === 'week' && renderWeekView()}
-                {view === 'day' && renderDayView()}
-                {view === 'list' && renderListView()}
+                <DndContext
+                    sensors={sensors}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={() => setDragging(null)}
+                >
+                    {view === 'month' && renderMonthView()}
+                    {view === 'week' && renderWeekView()}
+                    {view === 'day' && renderDayView()}
+                    {view === 'list' && renderListView()}
+                    <DragOverlay dropAnimation={null}>
+                        {dragging ? (
+                            <ChipBody
+                                occurrence={dragging}
+                                time={display(dragging).time}
+                                multiClient={multiClient}
+                                className="shadow-lg"
+                            />
+                        ) : null}
+                    </DragOverlay>
+                </DndContext>
                 {dragEnabled &&
                     canReschedule &&
                     occurrences.some(canReschedule) && (
                         <p className="text-muted-foreground pt-3 text-xs">
-                            Drag a post to another day to move it — you’ll be
-                            asked to confirm first.
+                            {isTimeGrid
+                                ? 'Drag a post to another day or hour, or use the clock button on it. One channel moves at a time.'
+                                : 'Drag a post to another day, or use the clock button on it. The whole post moves together.'}
                         </p>
                     )}
+            </div>
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Chips                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** The visual body of an occurrence chip — shared by the live chip and the drag overlay. */
+function ChipBody({
+    occurrence,
+    time,
+    multiClient,
+    className,
+}: {
+    occurrence: Occurrence;
+    time: string | null;
+    multiClient: boolean;
+    className?: string;
+}) {
+    const tone = resolveStatus('post', occurrence.status).tone;
+
+    return (
+        <div
+            className={cn(
+                'bg-card relative flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden rounded-lg border py-1.5 pr-2 pl-3 text-xs',
+                className,
+            )}
+        >
+            <span
+                aria-hidden
+                className={cn(
+                    'absolute inset-y-1.5 left-1 w-[3px] rounded-full',
+                    toneBgClass[tone],
+                )}
+            />
+            <span className="flex items-center justify-between gap-1.5">
+                <span className="font-mono text-[11px] tabular-nums">
+                    {time?.slice(0, 5) ?? '—'}
+                </span>
+                <span
+                    className={cn(
+                        'truncate text-[10.5px] font-medium',
+                        toneTextClass[tone],
+                    )}
+                >
+                    {occurrence.status_label}
+                </span>
+            </span>
+            <span className="truncate font-medium">
+                {multiClient
+                    ? occurrence.client_name
+                    : (occurrence.master_caption ?? 'Untitled post')}
+            </span>
+            <span className="text-muted-foreground flex min-w-0 items-center gap-1.5">
+                {occurrence.grid_plan_id && (
+                    <span
+                        className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px]"
+                        title={`From a grid · tile ${occurrence.grid_tile_position}`}
+                    >
+                        <Grid3x3 className="size-2.5" aria-hidden />
+                        <span className="sr-only">Grid tile</span>
+                        {occurrence.grid_tile_position}
+                    </span>
+                )}
+                {occurrence.campaign_id !== null && (
+                    <span
+                        className="inline-flex shrink-0 items-center gap-1"
+                        title={occurrence.campaign_name ?? undefined}
+                    >
+                        <CampaignSwatch
+                            colour={occurrence.campaign_colour}
+                            className="size-2"
+                        />
+                        {occurrence.campaign_code && (
+                            <span className="font-mono text-[10px]">
+                                {occurrence.campaign_code}
+                            </span>
+                        )}
+                    </span>
+                )}
+                <span className="truncate">
+                    {occurrence.handle ?? occurrence.platform ?? '—'}
+                    {multiClient && occurrence.master_caption
+                        ? ` · ${occurrence.master_caption}`
+                        : ''}
+                </span>
+            </span>
+        </div>
+    );
+}
+
+type ChipSharedProps = {
+    display: (o: Occurrence) => OccurrenceDisplay;
+    postHref: (postId: number) => NonNullable<InertiaLinkProps['href']>;
+    multiClient: boolean;
+    today: string;
+    view: View;
+    movable: (o: Occurrence) => boolean;
+    draggingPostId: number | null;
+    onReschedule?: (occurrence: Occurrence, move: PostMove) => void;
+    onRescheduleTarget?: (occurrence: Occurrence, move: TargetMove) => void;
+};
+
+/**
+ * One occurrence chip: a link to the post, draggable by pointer/touch (`@dnd-kit`), with a
+ * keyboard-accessible reschedule popover. The month view moves the whole post by whole days; the
+ * week/day time grid moves this one channel to an exact slot.
+ */
+function CalendarChip({
+    occurrence,
+    display,
+    postHref,
+    multiClient,
+    today,
+    view,
+    movable,
+    draggingPostId,
+    onReschedule,
+    onRescheduleTarget,
+}: ChipSharedProps & { occurrence: Occurrence }) {
+    const canMove = movable(occurrence);
+    const slot = display(occurrence);
+    const isTimeGrid = view === 'week' || view === 'day';
+
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        isDragging,
+    } = useDraggable({
+        id: `occ:${occurrence.target_id}`,
+        data: { occurrence },
+        disabled: !canMove || view === 'list',
+    });
+
+    const movePost = (move: TargetMove) => {
+        if (!slot.date) return;
+        onReschedule?.(occurrence, {
+            from: slot.date,
+            to: move.date,
+            days: daysBetween(slot.date, move.date),
+        });
+    };
+
+    const title = `${occurrence.status_label} — ${
+        (multiClient ? occurrence.client_name : occurrence.master_caption) ?? ''
+    }${canMove ? ' · drag to move' : ''}`;
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(
+                'group/chip hover:border-foreground/20 relative flex min-w-0 items-stretch gap-1 rounded-lg transition-colors',
+                // Every target of the dragged post dims together.
+                draggingPostId === occurrence.post_id && 'opacity-50',
+                isDragging && 'opacity-40',
+            )}
+        >
+            <Link
+                ref={canMove ? setActivatorNodeRef : undefined}
+                href={postHref(occurrence.post_id)}
+                title={title}
+                {...(canMove ? listeners : {})}
+                {...(canMove ? attributes : {})}
+                // dnd-kit sets role=button on the activator; keep it a link for the a11y tree.
+                role={undefined}
+                className={cn(
+                    'focus-visible:ring-primary min-w-0 flex-1 rounded-lg outline-none focus-visible:ring-2',
+                    canMove && 'cursor-grab touch-none active:cursor-grabbing',
+                )}
+            >
+                <ChipBody
+                    occurrence={occurrence}
+                    time={slot.time}
+                    multiClient={multiClient}
+                />
+            </Link>
+            {canMove && (
+                <div className="absolute top-1 right-1">
+                    <ReschedulePopover
+                        label={`Reschedule — ${
+                            (multiClient
+                                ? occurrence.client_name
+                                : occurrence.master_caption) ?? 'post'
+                        }`}
+                        withTime={isTimeGrid}
+                        defaultDate={slot.date}
+                        defaultTime={slot.time}
+                        minDate={today}
+                        onSubmit={(move) =>
+                            isTimeGrid
+                                ? onRescheduleTarget?.(occurrence, move)
+                                : movePost(move)
+                        }
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Drop cells                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** A month day cell: a drop target for whole-post day moves, with a hover "New post" button. */
+function MonthDayCell({
+    dateKey,
+    dropEnabled,
+    isCurrentMonth,
+    isPast,
+    canCreate,
+    onCreate,
+    children,
+}: {
+    dateKey: string;
+    dropEnabled: boolean;
+    isCurrentMonth: boolean;
+    isPast: boolean;
+    canCreate: boolean;
+    onCreate: () => void;
+    children: ReactNode;
+}) {
+    const { setNodeRef, isOver, active } = useDroppable({
+        id: dayDropId(dateKey),
+        disabled: !dropEnabled,
+    });
+    // Only glow for a drop that would actually land (not the chip's own past day).
+    const canDrop = active !== null && !isPast;
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(
+                'group/cell relative flex min-h-28 flex-col gap-1 p-1.5 transition-colors',
+                isCurrentMonth ? 'bg-card' : 'bg-background',
+                isOver &&
+                    canDrop &&
+                    'ring-primary bg-primary/5 ring-2 ring-inset',
+            )}
+        >
+            {children}
+            {canCreate && !isPast && (
+                <button
+                    type="button"
+                    aria-label={`New post on ${dateKey}`}
+                    onClick={onCreate}
+                    className="text-muted-foreground hover:bg-primary/10 hover:text-primary absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within/cell:opacity-100 group-hover/cell:opacity-100 focus-visible:opacity-100"
+                >
+                    <Plus className="size-4" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+/** One (day, hour) cell in the week/day time grid — a drop target with a hover "New post". */
+function TimeSlotCell({
+    dateKey,
+    hour,
+    dropEnabled,
+    isPast,
+    canCreate,
+    onCreate,
+    children,
+}: {
+    dateKey: string;
+    hour: number;
+    dropEnabled: boolean;
+    isPast: boolean;
+    canCreate: boolean;
+    onCreate: () => void;
+    children: ReactNode;
+}) {
+    const { setNodeRef, isOver, active } = useDroppable({
+        id: slotDropId(dateKey, hour),
+        disabled: !dropEnabled,
+    });
+    const canDrop = active !== null && !isPast;
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(
+                'group/slot relative flex min-h-12 flex-col gap-1 border-t p-1',
+                isOver &&
+                    canDrop &&
+                    'bg-primary/5 ring-primary ring-2 ring-inset',
+            )}
+        >
+            {children}
+            {canCreate && !isPast && (
+                <button
+                    type="button"
+                    aria-label={`New post at ${hourLabel(hour)} on ${dateKey}`}
+                    onClick={onCreate}
+                    className="text-muted-foreground hover:bg-primary/10 hover:text-primary absolute top-1 right-1 flex size-5 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within/slot:opacity-100 group-hover/slot:opacity-100 focus-visible:opacity-100"
+                >
+                    <Plus className="size-3.5" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Time grid (week / day)                                                      */
+/* -------------------------------------------------------------------------- */
+
+function TimeGrid({
+    days,
+    today,
+    bands,
+    ghostsByDate,
+    occurrencesByDate,
+    displayTime,
+    renderChip,
+    dropEnabled,
+    canCreate,
+    onCreate,
+}: {
+    days: Date[];
+    today: string;
+    bands: CampaignLayer['bands'];
+    ghostsByDate: Map<string, CalendarGhost[]>;
+    occurrencesByDate: Map<string, Occurrence[]>;
+    displayTime: (o: Occurrence) => string | null;
+    renderChip: (occurrence: Occurrence) => ReactNode;
+    dropEnabled: boolean;
+    canCreate: boolean;
+    onCreate: (date: string, hour: number) => void;
+}) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const columns = days.length;
+
+    // Open with the working day in view rather than at midnight.
+    useEffect(() => {
+        const node = scrollRef.current;
+        if (!node) return;
+        const row = node.querySelector<HTMLElement>(
+            `[data-hour="${GRID_SCROLL_HOUR}"]`,
+        );
+        if (row) node.scrollTop = row.offsetTop;
+    }, []);
+
+    // Untimed targets (a date but no time) can't sit on an hour row, so they get an "All day" rail.
+    const untimedByDate = (key: string) =>
+        (occurrencesByDate.get(key) ?? []).filter(
+            (o) => hourOf(displayTime(o)) === null,
+        );
+    const timedAt = (key: string, hour: number) =>
+        (occurrencesByDate.get(key) ?? []).filter(
+            (o) => hourOf(displayTime(o)) === hour,
+        );
+
+    const hasUntimed = days.some(
+        (day) => untimedByDate(toDateKey(day)).length > 0,
+    );
+
+    return (
+        <div className="overflow-hidden rounded-xl border">
+            {/* Day headers */}
+            <div
+                className="bg-muted/40 grid border-b"
+                style={{ gridTemplateColumns: `4rem repeat(${columns}, 1fr)` }}
+            >
+                <div aria-hidden className="border-r" />
+                {days.map((day) => {
+                    const key = toDateKey(day);
+                    return (
+                        <div
+                            key={key}
+                            className="flex items-center justify-between gap-1 px-2 py-2"
+                        >
+                            <span className="eyebrow text-muted-foreground">
+                                {weekdayFormatter.format(day)}
+                            </span>
+                            <span
+                                className={cn(
+                                    'flex size-7 items-center justify-center rounded-full font-mono text-[11px] tabular-nums',
+                                    key === today &&
+                                        'bg-primary text-primary-foreground font-medium',
+                                )}
+                            >
+                                {day.getDate()}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* All-day / untimed rail and campaign bands */}
+            {(hasUntimed || bands.length > 0) && (
+                <div
+                    className="bg-card grid border-b"
+                    style={{
+                        gridTemplateColumns: `4rem repeat(${columns}, 1fr)`,
+                    }}
+                >
+                    <div className="text-muted-foreground border-r px-2 py-1 text-[10px] uppercase">
+                        All day
+                    </div>
+                    {days.map((day) => {
+                        const key = toDateKey(day);
+                        return (
+                            <div key={key} className="flex flex-col gap-1 p-1">
+                                <CampaignDayBands
+                                    bands={bands}
+                                    day={key}
+                                    labelled
+                                />
+                                {untimedByDate(key).map(renderChip)}
+                                {(ghostsByDate.get(key) ?? []).map((ghost) => (
+                                    <GhostChip
+                                        key={`g-${ghost.id}`}
+                                        ghost={ghost}
+                                    />
+                                ))}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Hour rows */}
+            <div ref={scrollRef} className="max-h-[32rem] overflow-y-auto">
+                {GRID_HOURS.map((hour) => (
+                    <div
+                        key={hour}
+                        data-hour={hour}
+                        className="grid"
+                        style={{
+                            gridTemplateColumns: `4rem repeat(${columns}, 1fr)`,
+                        }}
+                    >
+                        <div className="text-muted-foreground border-t border-r px-2 py-1 text-right font-mono text-[10px]">
+                            {hourLabel(hour)}
+                        </div>
+                        {days.map((day) => {
+                            const key = toDateKey(day);
+                            return (
+                                <TimeSlotCell
+                                    key={key}
+                                    dateKey={key}
+                                    hour={hour}
+                                    dropEnabled={dropEnabled}
+                                    isPast={key < today}
+                                    canCreate={canCreate}
+                                    onCreate={() => onCreate(key, hour)}
+                                >
+                                    {timedAt(key, hour).map(renderChip)}
+                                </TimeSlotCell>
+                            );
+                        })}
+                    </div>
+                ))}
             </div>
         </div>
     );

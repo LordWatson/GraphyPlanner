@@ -6,7 +6,9 @@ use App\Actions\Clients\BuildClientPageHeaderAction;
 use App\Actions\Posts\ListClientPostsAction;
 use App\Contracts\CampaignFeatures;
 use App\Enums\CampaignFeature;
+use App\Enums\DesignImportProvider;
 use App\Enums\PostStatus;
+use App\Enums\Role;
 use App\Http\Requests\ClientBillingTabRequest;
 use App\Http\Requests\ClientPostsTabRequest;
 use App\Models\Asset;
@@ -14,10 +16,12 @@ use App\Models\Campaign;
 use App\Models\CampaignTemplate;
 use App\Models\Client;
 use App\Models\ClientInvitation;
+use App\Models\DesignImportConnection;
 use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Services\CampaignHealthService;
+use App\Services\DesignImports\DesignImportManager;
 use App\Services\InvoiceLedgerService;
 use App\Support\Campaigns\CampaignClock;
 use App\Support\Campaigns\CampaignPresenter;
@@ -76,12 +80,29 @@ class ClientTabController extends Controller
      * The Assets tab renders only the header (its stat card carries the asset count); the library
      * itself is browsed through the paged `clients.assets.index` dialog, so no asset rows load here.
      */
-    public function media(Request $request, Client $client): Response
+    public function media(Request $request, Client $client, DesignImportManager $imports): Response
     {
         $this->authorize('viewAny', [Asset::class, $client]);
 
+        $user = $request->user();
+        // Step M-5.9: enabled design/cloud sources + whether this org has a live connection.
+        $connections = $user->can('create', [Asset::class, $client])
+            ? DesignImportConnection::query()->where('org_id', $user->org_id)->live()->get()->keyBy(fn ($c) => $c->provider->value)
+            : collect();
+
         return Inertia::render('clients/tabs/media', [
-            ...($this->header)($client, $request->user(), 'media'),
+            ...($this->header)($client, $user, 'media'),
+            'designImports' => [
+                'can_import' => $user->can('create', [Asset::class, $client]),
+                'can_connect' => in_array($user->role, [Role::Owner, Role::Strategist], true),
+                'providers' => array_map(fn (DesignImportProvider $provider) => [
+                    'value' => $provider->value,
+                    'label' => $provider->label(),
+                    'connected' => $connections->has($provider->value),
+                    'connection_id' => $connections->get($provider->value)?->id,
+                    'connect_url' => route('design-imports.connect', ['provider' => $provider->value]),
+                ], $imports->enabled()),
+            ],
         ]);
     }
 

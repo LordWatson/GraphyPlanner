@@ -117,6 +117,10 @@ export type PostData = {
     assignee_id: number | null;
     reviewer_id: number | null;
     due_at: string | null;
+    /** Step M-5.8: evergreen reuse and repeat. */
+    is_recyclable: boolean;
+    recycle_after_days: number | null;
+    recurrence: string | null;
     campaign_name: string | null;
     campaign: CampaignChipData | null;
     status: string;

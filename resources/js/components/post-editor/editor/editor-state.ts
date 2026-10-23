@@ -37,6 +37,10 @@ export type EditorState = {
     assigneeId: string;
     reviewerId: string;
     dueDate: string;
+    /** Step M-5.8: evergreen reuse and repeat. */
+    isRecyclable: boolean;
+    recycleAfterDays: string;
+    recurrence: string;
 };
 
 export type EditorSection =
@@ -127,6 +131,11 @@ export function initialEditorState(
         assigneeId: post.assignee_id ? String(post.assignee_id) : '',
         reviewerId: post.reviewer_id ? String(post.reviewer_id) : '',
         dueDate: post.due_at ? post.due_at.slice(0, 10) : '',
+        isRecyclable: post.is_recyclable ?? false,
+        recycleAfterDays: post.recycle_after_days
+            ? String(post.recycle_after_days)
+            : '',
+        recurrence: post.recurrence ?? '',
     };
 }
 

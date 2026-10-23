@@ -4,6 +4,7 @@ import InputError from '@/components/input-error';
 import { Panel } from '@/components/page';
 import { CampaignField } from '@/components/post-editor/campaign-field';
 import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
+import { RepeatReusePanel } from '@/components/post-editor/editor/repeat-reuse-panel';
 import { MusicField } from '@/components/post-editor/music-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -184,6 +185,8 @@ export function SettingsSection({
                     <InputError message={errors.due_at} />
                 </div>
             </Panel>
+
+            <RepeatReusePanel errors={errors} />
         </div>
     );
 }

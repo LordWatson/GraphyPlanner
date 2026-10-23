@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Security;
 
+use App\Enums\DesignImportProvider;
 use App\Enums\GridPlanStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -20,6 +21,7 @@ use App\Models\Client;
 use App\Models\ClientInvitation;
 use App\Models\ClientReport;
 use App\Models\ConnectInvite;
+use App\Models\DesignImportConnection;
 use App\Models\GridPlan;
 use App\Models\GridTile;
 use App\Models\Invoice;
@@ -29,6 +31,7 @@ use App\Models\OrganizationReport;
 use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\PostRevision;
+use App\Models\PostTarget;
 use App\Models\SavedPostView;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
@@ -187,6 +190,9 @@ class CrossTenantRouteTest extends TestCase
         $idea = AiPostIdea::create(['org_id' => $org->id, 'client_id' => $client->id, 'title' => 'Idea', 'description' => 'Description', 'platforms' => ['instagram']]);
         $campaign = Campaign::factory()->for($client)->create(['org_id' => $org->id]);
         $grid = GridPlan::factory()->create(['client_id' => $client->id, 'status' => GridPlanStatus::WaitingClient]);
+        $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]);
+        // Step M-5.7: a single channel of the other org's post (post-targets/{target}/reschedule).
+        $target = $post->targets()->create(['social_account_id' => $account->id]);
 
         return [
             Organization::class => $org,
@@ -200,7 +206,15 @@ class CrossTenantRouteTest extends TestCase
             CampaignShareLink::class => CampaignShareLink::query()->create(['campaign_id' => $campaign->id, 'token_hash' => hash('sha256', 'foreign'), 'expires_at' => now()->addDay()]),
             CampaignTemplate::class => CampaignTemplate::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'name' => 'Their template', 'duration_days' => 14, 'phases' => [], 'deliverables' => []]),
             Asset::class => Asset::factory()->for($client)->create(['org_id' => $org->id]),
-            SocialAccount::class => SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]),
+            SocialAccount::class => $account,
+            PostTarget::class => $target,
+            // Step M-5.9: the other org's design/cloud connection (design-imports/{connection}).
+            DesignImportConnection::class => DesignImportConnection::create([
+                'org_id' => $org->id,
+                'provider' => DesignImportProvider::Canva,
+                'access_token' => 'foreign-token',
+                'created_by' => $owner->id,
+            ]),
             ConnectInvite::class => ConnectInvite::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'client_id' => $client->id, 'token_hash' => hash('sha256', 'foreign-connect'), 'expires_at' => now()->addDay()]),
             Invoice::class => $invoice,
             InvoiceItem::class => InvoiceItem::factory()->create(['invoice_id' => $invoice->id, 'org_id' => $org->id]),

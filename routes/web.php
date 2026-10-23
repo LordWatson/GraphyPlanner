@@ -9,6 +9,7 @@ use App\Http\Controllers\Analytics\ReportController as OrganizationReportControl
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BrandBrainController;
+use App\Http\Controllers\BulkPostImportController;
 use App\Http\Controllers\Business\AccountController as BusinessAccountController;
 use App\Http\Controllers\Business\BrandController as BusinessBrandController;
 use App\Http\Controllers\Business\CollectionController as BusinessCollectionController;
@@ -46,6 +47,7 @@ use App\Http\Controllers\ConnectInviteController;
 use App\Http\Controllers\ContentHubController;
 use App\Http\Controllers\DailyBriefController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DesignImportController;
 use App\Http\Controllers\Grids\GridAiController;
 use App\Http\Controllers\Grids\GridPlanController;
 use App\Http\Controllers\Grids\GridPlanIndexController;
@@ -287,6 +289,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         Route::get('dashboard', DashboardController::class)->middleware('workspace:agency')->name('dashboard');
 
         Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
+        // Step M-5.7 / I-5.1: the accounts + open campaigns for a client, so "click an empty slot
+        // to create a post" can offer them without loading every client's accounts up front.
+        Route::get('calendar/new-post-options', [CalendarController::class, 'newPostOptions'])->name('calendar.new-post-options');
 
         Route::get('home', [HomeController::class, 'index'])->middleware('workspace:agency')->name('needs-attention');
     });
@@ -298,6 +303,21 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step B-4.1: the client-page tabs that have a brand-implicit business equivalent are
     // agency-only too — a business org is redirected to its own shell page (see `EnsureWorkspaceType`).
     Route::get('clients/{client}/posts', [ClientTabController::class, 'posts'])->middleware('workspace:agency')->name('clients.posts.index');
+    // Step M-5.8 (Phase 10): bulk CSV import of posts for a client.
+    Route::middleware('workspace:agency')->group(function () {
+        Route::get('clients/{client}/posts/bulk-import', [BulkPostImportController::class, 'index'])->name('clients.posts.bulk-import');
+        Route::get('clients/{client}/posts/bulk-import/template', [BulkPostImportController::class, 'template'])->name('clients.posts.bulk-import.template');
+        Route::post('clients/{client}/posts/bulk-import/preview', [BulkPostImportController::class, 'preview'])->name('clients.posts.bulk-import.preview');
+        Route::post('clients/{client}/posts/bulk-import', [BulkPostImportController::class, 'store'])->name('clients.posts.bulk-store');
+    });
+    // Step M-5.9 (per I-15.2): connect and import from design/cloud sources (Canva, Drive, Dropbox).
+    Route::middleware('workspace:agency')->group(function () {
+        Route::get('design-imports/{provider}/connect', [DesignImportController::class, 'connect'])->name('design-imports.connect');
+        Route::get('design-imports/{provider}/callback', [DesignImportController::class, 'callback'])->name('design-imports.callback');
+        Route::delete('design-imports/{connection}', [DesignImportController::class, 'disconnect'])->name('design-imports.disconnect');
+        Route::get('clients/{client}/design-imports/files', [DesignImportController::class, 'files'])->name('clients.design-imports.files');
+        Route::post('clients/{client}/design-imports/import', [DesignImportController::class, 'import'])->name('clients.design-imports.import');
+    });
     Route::get('clients/{client}/media', [ClientTabController::class, 'media'])->middleware('workspace:agency')->name('clients.media');
     Route::get('clients/{client}/campaigns', [ClientTabController::class, 'campaigns'])->middleware('workspace:agency')->name('clients.campaigns.index');
     Route::get('clients/{client}/billing', [ClientTabController::class, 'billing'])->middleware('workspace:agency')->name('clients.billing');
@@ -588,6 +608,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step M-5.2: duplicate a post into a fresh draft (content + media + targets, no schedule).
     Route::post('posts/{post}/duplicate', [PostController::class, 'duplicate'])
         ->name('posts.duplicate');
+    // Step M-5.8: recycle an evergreen published post into a fresh idea (no schedule).
+    Route::post('posts/{post}/recycle', [PostController::class, 'recycle'])
+        ->name('posts.recycle');
     // Step M-5.3: content history — list versions (JSON, for the editor drawer) and restore one.
     Route::get('posts/{post}/revisions', [PostRevisionController::class, 'index'])
         ->name('posts.revisions.index');
@@ -605,6 +628,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::post('posts/{post}/override-approval', [PostController::class, 'overrideApproval'])->name('posts.override-approval');
     Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])
         ->name('posts.reschedule');
+    // Step M-5.7 / I-5.1: move a single channel to a new day (and, from the time grid, a new time).
+    Route::post('post-targets/{target}/reschedule', [PostController::class, 'rescheduleTarget'])
+        ->name('posts.targets.reschedule');
     // Step I-1.3: resend only the failed targets of a failed/partially published post.
     Route::post('posts/{post}/retry-failed-targets', [PostController::class, 'retryFailedTargets'])
         ->name('posts.retry-failed-targets');
@@ -913,6 +939,8 @@ Route::prefix('preview')->name('preview.')->middleware(['preview'])->group(funct
         ->name('posts.transition');
     Route::post('posts/{post}/reschedule', [PostController::class, 'reschedule'])
         ->name('posts.reschedule');
+    Route::post('post-targets/{target}/reschedule', [PostController::class, 'rescheduleTarget'])
+        ->name('posts.targets.reschedule');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])

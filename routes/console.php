@@ -85,3 +85,7 @@ $safely(Schedule::command('invoices:generate-retainer-drafts')->dailyAt('06:30')
 // Step B-8.2: weekly business Insights digest. Hourly so each timezone's Monday morning is caught
 // from one schedule; idempotent per org and ISO week. See SendWeeklyInsightsDigestCommand.
 $safely(Schedule::command('business:send-insights-digest')->hourlyAt(40), 'business:send-insights-digest');
+
+// Step M-5.8: drop the next occurrence of each recurring post as a draft once the current one has
+// published. Idempotent (a leaf with a recurrence child is skipped). See GenerateRecurringPostDraftsAction.
+$safely(Schedule::command('posts:generate-recurring-drafts')->dailyAt('06:45'), 'posts:generate-recurring-drafts');

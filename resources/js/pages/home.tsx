@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
     AlertTriangle,
@@ -8,16 +8,18 @@ import {
     Grid3x3,
     ImageOff,
     Megaphone,
+    Recycle,
     WifiOff,
 } from 'lucide-react';
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { Page, PageHeader, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
+import { Button } from '@/components/ui/button';
 import { needsAttention } from '@/routes';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
 import { edit as editGrid } from '@/routes/grids';
-import { edit as editPost } from '@/routes/posts';
+import { edit as editPost, recycle as recyclePost } from '@/routes/posts';
 import { cn } from '@/lib/utils';
 
 type PostRow = {
@@ -48,6 +50,9 @@ type DisconnectedAccountRow = {
 /** Step I-2.2: each lane carries a bounded page of rows plus the lane's full count. */
 type Bucket<Row> = { items: Row[]; total: number };
 
+/** Step M-5.8: an evergreen post past its recycle window, ready to repost. */
+type RecycleRow = PostRow & { recycle_after_days: number };
+
 type NeedsAttentionItems = {
     failedPublishes: Bucket<PostRow>;
     internalReviews: Bucket<PostRow>;
@@ -57,6 +62,8 @@ type NeedsAttentionItems = {
     campaigns: Bucket<CampaignRow>;
     /** Step 18.11: grids whose publish order is at risk. */
     gridRisks?: Bucket<GridRiskRow>;
+    /** Step M-5.8: evergreen posts ready to recycle. */
+    recyclingSuggestions?: Bucket<RecycleRow>;
 };
 
 type GridRiskRow = {
@@ -212,8 +219,10 @@ export default function Home({ items }: HomeProps) {
         items.missingMedia.total +
         items.disconnectedAccounts.total +
         items.campaigns.total +
-        (items.gridRisks?.total ?? 0);
+        (items.gridRisks?.total ?? 0) +
+        (items.recyclingSuggestions?.total ?? 0);
     const gridRisks = items.gridRisks ?? { items: [], total: 0 };
+    const recycling = items.recyclingSuggestions ?? { items: [], total: 0 };
 
     const lanes = [
         {
@@ -251,6 +260,12 @@ export default function Home({ items }: HomeProps) {
             label: '06 Campaigns',
             caption: 'At risk',
             count: items.campaigns.total,
+        },
+        {
+            id: 'lane-recycle',
+            label: '07 Recycle',
+            caption: 'Ready to repost',
+            count: recycling.total,
         },
     ];
 
@@ -488,6 +503,54 @@ export default function Home({ items }: HomeProps) {
                                         label={row.status_label}
                                     />
                                 </Link>
+                            </li>
+                        ))}
+                    </Lane>
+                    <Lane
+                        id="lane-recycle"
+                        index="07 — Recycle"
+                        icon={Recycle}
+                        title="Ready to recycle"
+                        description="Evergreen posts past their reuse window — repost them in one tap"
+                        count={recycling.total}
+                        shown={recycling.items.length}
+                        accentClassName="bg-success/12 text-success"
+                        emptyLabel="Nothing is waiting to be recycled."
+                    >
+                        {recycling.items.map((row) => (
+                            <li key={row.post_id}>
+                                <div className="group hover:bg-muted/50 flex items-center justify-between gap-3 px-5 py-3.5 transition-colors">
+                                    <Link
+                                        href={editPost(row.post_id)}
+                                        className="flex min-w-0 flex-1 flex-col gap-1"
+                                    >
+                                        <span className="group-hover:text-primary truncate text-sm font-medium">
+                                            {row.master_caption ??
+                                                'Untitled post'}
+                                        </span>
+                                        <span className="text-muted-foreground truncate text-xs">
+                                            {row.client_name} · published over{' '}
+                                            {row.recycle_after_days} day
+                                            {row.recycle_after_days === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            ago
+                                        </span>
+                                    </Link>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="shrink-0"
+                                        onClick={() =>
+                                            router.post(
+                                                recyclePost(row.post_id).url,
+                                            )
+                                        }
+                                    >
+                                        <Recycle className="size-3.5" />
+                                        Recycle
+                                    </Button>
+                                </div>
                             </li>
                         ))}
                     </Lane>

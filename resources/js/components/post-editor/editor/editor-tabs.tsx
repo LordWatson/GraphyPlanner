@@ -43,6 +43,9 @@ export function tabForErrorKey(key: string): EditorTab {
     if (
         key === 'campaign_id' ||
         key === 'approval_mode' ||
+        key === 'recurrence' ||
+        key === 'recycle_after_days' ||
+        key === 'is_recyclable' ||
         key.startsWith('location')
     ) {
         return 'settings';
