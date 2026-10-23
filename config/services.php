@@ -35,15 +35,21 @@ return [
         ],
     ],
 
-    // Upload-Post (Phase 1 publish vendor, spec §7/§7.1). The per-request API key comes from
-    // each organization's `upload_post_key` (Step 0.15), not from an env var here. Likewise,
-    // the webhook signing secret (Step 1.5) comes from each organization's
-    // `upload_post_webhook_secret` — Upload-Post issues one secret per account, not a single
-    // app-wide one, so there's no env var/config key for it here.
+    // Upload-Post (Phase 1 publish vendor, spec §7/§7.1). In "byo" mode (today's agency default)
+    // the per-request API key comes from each organization's own `upload_post_key` (Step 0.15),
+    // and the webhook signing secret (Step 1.5) from its `upload_post_webhook_secret` — Upload-Post
+    // issues one secret per account. In "managed" mode (Step B-5.1, business workspaces) there is
+    // no per-org key: Alima authenticates with ONE platform key below, and each org is isolated as
+    // its own Upload-Post profile (`organizations.upload_post_profile`). The platform's single
+    // webhook secret signs every managed org's deliveries. All three are resolved through
+    // `App\Contracts\PublishCredentials`, never read directly, and are never logged.
     'upload_post' => [
         // Step M-2.5: the notifications (webhook registration) endpoint lives on the app host.
         'app_base_url' => env('UPLOAD_POST_APP_BASE_URL', 'https://app.upload-post.com/api'),
         'base_url' => env('UPLOAD_POST_BASE_URL', 'https://api.upload-post.com/api'),
+        // Step B-5.1: managed-mode platform credentials (shared by every business workspace).
+        'platform_key' => env('UPLOAD_POST_PLATFORM_KEY'),
+        'platform_webhook_secret' => env('UPLOAD_POST_PLATFORM_WEBHOOK_SECRET'),
     ],
 
     // Meta Graph API direct integration (Step 1.9), used only for Instagram audio search

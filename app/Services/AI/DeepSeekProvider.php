@@ -4,22 +4,28 @@ namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
+use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
+use App\Contracts\InsightsSummarizer;
+use App\Contracts\LocalIdeaProvider;
 use App\Enums\Platform;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\Post;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrend;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Campaigns\AiCampaignBriefDraft;
 use App\Support\AI\Campaigns\AiCampaignWrapDraft;
 use App\Support\AI\Campaigns\AiDeliverableSuggestion;
 use App\Support\AI\ClientContextBuilder;
+use App\Support\AI\IdeaContext;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\BrandImageBriefFactory;
 use App\Support\AI\Images\ImageBriefInput;
@@ -37,7 +43,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
+class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -106,7 +112,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
             return new AiPostIdeas;
         }
 
-        $ideas = collect($payload['ideas'] ?? [])
+        $ideas = collect((array) ($payload['ideas'] ?? []))
             ->take(self::IDEAS_PER_REQUEST)
             ->map(fn (array $item): AiPostIdea => new AiPostIdea(
                 title: (string) ($item['title'] ?? ''),
@@ -119,6 +125,123 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
             ->all();
 
         return new AiPostIdeas($ideas);
+    }
+
+    /**
+     * Step B-6.1: the local/seasonal idea engine. The same grounded system prompt as
+     * {@see recommendPosts()}, with the brand's place-and-moment context ({@see IdeaContext}:
+     * location, season, upcoming local dates, recent posts to avoid) added to the user prompt so the
+     * ideas feel like this brand, this week. Falls back to empty ideas on failure.
+     */
+    public function recommendLocalPosts(Client $client, IdeaContext $context): AiPostIdeas
+    {
+        $payload = $this->requestStructured(
+            method: 'recommendLocalPosts',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildRecommendLocalPostsUserPrompt($context),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'ideas', ['title', 'description']),
+            context: ['org_id' => $client->org_id, 'client_id' => $client->id],
+        );
+
+        if ($payload === null) {
+            return new AiPostIdeas;
+        }
+
+        $ideas = collect((array) ($payload['ideas'] ?? []))
+            ->take(self::IDEAS_PER_REQUEST)
+            ->map(fn (array $item): AiPostIdea => new AiPostIdea(
+                title: (string) ($item['title'] ?? ''),
+                description: (string) ($item['description'] ?? ''),
+                platforms: array_values(array_map('strval', $item['platforms'] ?? [])),
+                suggestedCaption: isset($item['suggestedCaption']) ? (string) $item['suggestedCaption'] : null,
+                suggestedPostAt: isset($item['suggestedPostAt']) ? (string) $item['suggestedPostAt'] : null,
+            ))
+            ->values()
+            ->all();
+
+        return new AiPostIdeas($ideas);
+    }
+
+    /**
+     * Step B-6.4: rewrite the post's master caption natively for each platform. Strict JSON, the
+     * same grounded prompt + one-retry path. Caption-length/hashtag limits are stated in the prompt
+     * and enforced again by the Action, so a variant can never exceed a platform's cap.
+     *
+     * @param  array<int, string>  $platforms
+     * @return array<string, array{caption: string, hashtags: list<string>, firstComment: string|null}>
+     */
+    public function repurpose(Post $post, array $platforms): array
+    {
+        $client = $post->client;
+        $platforms = array_values(array_unique($platforms));
+
+        if ($platforms === [] || $client === null) {
+            return [];
+        }
+
+        $payload = $this->requestStructured(
+            method: 'repurpose',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildRepurposeUserPrompt($post, $platforms),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'variants', ['platform', 'caption']),
+            context: ['org_id' => $post->org_id, 'client_id' => $post->client_id, 'post_id' => $post->id],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $variants = [];
+
+        foreach ((array) ($payload['variants'] ?? []) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $platform = strtolower(trim((string) ($item['platform'] ?? '')));
+
+            if (! in_array($platform, $platforms, true) || isset($variants[$platform])) {
+                continue;
+            }
+
+            $variants[$platform] = [
+                'caption' => trim((string) ($item['caption'] ?? '')),
+                'hashtags' => array_values(array_map('strval', is_array($item['hashtags'] ?? null) ? $item['hashtags'] : [])),
+                'firstComment' => isset($item['firstComment']) && is_string($item['firstComment']) ? $item['firstComment'] : null,
+            ];
+        }
+
+        return $variants;
+    }
+
+    public function summarizeInsights(Client $brand, array $facts): array
+    {
+        $payload = $this->requestStructured(
+            method: 'summarizeInsights',
+            systemPrompt: $this->buildSummarizeInsightsSystemPrompt($brand),
+            userPrompt: $this->buildSummarizeInsightsUserPrompt($facts),
+            validator: fn (array $data): ?string => isset($data['takeaways']) && is_array($data['takeaways']) ? null : 'missing takeaways',
+            context: ['org_id' => $brand->org_id, 'client_id' => $brand->id],
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $takeaways = [];
+
+        foreach ((array) ($payload['takeaways'] ?? []) as $line) {
+            if (is_string($line) && trim($line) !== '') {
+                $takeaways[] = trim($line);
+            }
+
+            if (count($takeaways) === 3) {
+                break;
+            }
+        }
+
+        return $takeaways;
     }
 
     public function discoverTrends(Client $client, array $platforms): AiTrends
@@ -181,6 +304,32 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         ]);
 
         return $this->briefs->finalize($client, $brief->with(['subject' => $this->briefs->stripHashtags($brief->subject)]), $input);
+    }
+
+    /**
+     * Step B-2.4: draft a business/creator's Brand Brain from the plain facts they gave onboarding.
+     * No `Client` exists yet, so the system prompt carries no company context; everything the model
+     * grounds on is in the user prompt. Falls back to an empty draft if DeepSeek fails, so the
+     * wizard never dead-ends.
+     */
+    public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+    {
+        $model = (string) config('ai.deepseek.model', 'deepseek-flash');
+
+        $payload = $this->requestStructured(
+            method: 'draftBrandProfile',
+            systemPrompt: $this->buildBrandProfileSystemPrompt(),
+            userPrompt: $this->buildBrandProfileUserPrompt($input),
+            validator: fn (array $data): ?string => is_array($data['voice'] ?? null) ? null : 'voice must be an object',
+            context: ['brand_name' => $input->name],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null) {
+            return AiBrandProfileDraft::empty();
+        }
+
+        return AiBrandProfileDraft::fromArray($payload, succeeded: true, provider: 'deepseek', model: $model);
     }
 
     /**
@@ -429,6 +578,46 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         return implode("\n", $lines);
     }
 
+    private function buildBrandProfileSystemPrompt(): string
+    {
+        return implode("\n", [
+            'You are a brand strategist helping a small business or creator set up their social media brand profile in Alima Planner.',
+            'They have just signed up and given you a few plain facts. Draft a concise, practical brand profile they can accept or tweak.',
+            'Write in plain, warm, second-person British English. Be specific to the facts given; never invent products, prices, awards or locations that were not provided.',
+            'Always respond with a single, strictly valid JSON object matching the schema in the user message — no prose, no markdown fences.',
+        ]);
+    }
+
+    private function buildBrandProfileUserPrompt(BrandProfileInput $input): string
+    {
+        $lines = [
+            'Draft a brand profile from these facts:',
+            '- Brand name: '.$this->guardrail->scrub($input->name),
+        ];
+
+        if (filled($input->oneLiner)) {
+            $lines[] = '- What they do: '.$this->guardrail->scrub((string) $input->oneLiner);
+        }
+
+        if (filled($input->location)) {
+            $lines[] = '- Location: '.$this->guardrail->scrub((string) $input->location);
+        }
+
+        if (filled($input->websiteText)) {
+            $lines[] = '- Text from their website: '.$this->guardrail->scrub((string) $input->websiteText);
+        }
+
+        if (filled($input->bioText)) {
+            $lines[] = '- Their social bio: '.$this->guardrail->scrub((string) $input->bioText);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Keep every list to 3-5 short items. Content pillars are the 3-5 recurring themes they should post about.';
+        $lines[] = 'Respond with JSON: {"voice": {"tone": string, "personality": string, "do_nots": string[]}, "audience": {"description": string, "demographics": string, "pain_points": string[]}, "offer": {"value_proposition": string, "key_products": string[], "pricing_notes": string|null}, "content_pillars": string[]}';
+
+        return implode("\n", $lines);
+    }
+
     private function buildImageBriefUserPrompt(ImageBriefInput $input): string
     {
         $lines = [
@@ -562,6 +751,77 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         return implode("\n", $lines);
     }
 
+    private function buildRecommendLocalPostsUserPrompt(IdeaContext $context): string
+    {
+        $lines = [
+            'Recommend exactly '.self::IDEAS_PER_REQUEST.' fresh post ideas for this brand for the days ahead.',
+            'Each description must name the content pillar it serves and the audience pain point or offer it speaks to.',
+            'Use the local & seasonal context below: where it fits the brand naturally, tie an idea to an upcoming date or the season — never force a tenuous link, and never repeat a recently covered angle.',
+            '',
+            $this->guardrail->scrub($context->toPromptBlock()),
+            '',
+            'Respond with JSON: {"ideas": [{"title": string, "description": string, "platforms": string[], "suggestedCaption": string|null, "suggestedPostAt": string|null}]}',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, string>  $platforms
+     */
+    private function buildRepurposeUserPrompt(Post $post, array $platforms): string
+    {
+        $lines = [
+            'Rewrite this post natively for each platform below — do not just copy the same text. Keep the meaning and the brand voice, but suit each platform\'s format and audience.',
+            'Guidance: TikTok/Reels — a punchy first-line hook, then a very short caption; Instagram — a warm caption with relevant hashtags; LinkedIn — a longer, professional, value-led post with few or no hashtags; Facebook — conversational, medium length; X — one tight line.',
+            'Stay within each platform\'s caption limit (including hashtags). Never invent facts, offers or prices not in the original.',
+            'Original caption: '.$this->guardrail->scrub($post->master_caption ?: '(none — write from the brand context)'),
+        ];
+
+        if (! empty($post->hashtags)) {
+            $lines[] = 'Existing hashtags: '.implode(', ', $post->hashtags);
+        }
+
+        $lines[] = 'Platforms and their caption limits (characters) / hashtag norms:';
+
+        foreach ($platforms as $value) {
+            $platform = Platform::tryFrom($value);
+
+            if ($platform !== null) {
+                $lines[] = "- {$platform->value}: limit {$platform->captionLimit()}, up to {$platform->maxHashtags()} hashtags".($platform->allowsLinksInCaption() ? '' : ', links in the caption are not clickable');
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"variants": [{"platform": string (one of the values above), "caption": string, "hashtags": string[], "firstComment": string|null}]}';
+
+        return implode("\n", $lines);
+    }
+
+    private function buildSummarizeInsightsSystemPrompt(Client $brand): string
+    {
+        return implode("\n", [
+            'You are a friendly social-media coach for a small business or creator called "'.$brand->name.'".',
+            'You read their own posting stats and explain, in plain English, what is working and what to do next.',
+            'Rules: write for a non-marketer; be concrete and encouraging; use the real numbers given; never invent figures;',
+            'each takeaway is one short sentence (max ~20 words); no jargon, no emojis, no hashtags.',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $facts
+     */
+    private function buildSummarizeInsightsUserPrompt(array $facts): string
+    {
+        return implode("\n", [
+            'Here are this brand\'s stats for the recent period (omit any that are missing or zero):',
+            $this->guardrail->scrub((string) json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)),
+            '',
+            'Write up to three short, specific, encouraging takeaways grounded only in these numbers. If a figure is missing, do not mention it.',
+            'Respond with JSON: {"takeaways": string[]} (one to three sentences).',
+        ]);
+    }
+
     /**
      * @param  array<int, string>  $platforms
      */
@@ -593,7 +853,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
      */
     private function requestStructured(string $method, string $systemPrompt, string $userPrompt, callable $validator, array $context, ?string $model = null, ?int $maxTokens = null): ?array
     {
-        $model ??= (string) config('ai.deepseek.model', 'deepseek-chat');
+        $model ??= (string) config('ai.deepseek.model', 'deepseek-flash');
         $context = [...$context, 'method' => $method, 'model' => $model];
 
         $maxTokens ??= (int) config('ai.deepseek.max_tokens', 1024);

@@ -163,6 +163,18 @@ class PostPolicy
     }
 
     /**
+     * Step M-5.8 (Phase 11) — recycle an evergreen post. Only a published, `is_recyclable` post can
+     * be recycled, by a producing role in its own org.
+     */
+    public function recycle(User $user, Post $post): bool
+    {
+        return $post->is_recyclable
+            && in_array($post->status, [PostStatus::Published, PostStatus::PartiallyPublished], true)
+            && $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
      * Step I-3.8 / M-2.9: approve a `client_required` post without the client — Owners only, from
      * internal review, with a reason (`TransitionPostStatusAction::overrideApproval()`).
      */
@@ -189,6 +201,17 @@ class PostPolicy
     public function comment(User $user, Post $post): bool
     {
         return $this->view($user, $post);
+    }
+
+    /**
+     * Step B-3.4 — mint a read-only "Share preview" link (a partner/sponsor link). Sharing a post
+     * outside the workspace is a trust action, so it's limited to Owners and Managers
+     * (`Role::Strategist`) in the post's own org, never a Creator/Viewer or another org.
+     */
+    public function sharePreview(User $user, Post $post): bool
+    {
+        return $user->org_id === $post->org_id
+            && in_array($user->role, [Role::Owner, Role::Strategist], true);
     }
 
     /**
@@ -231,5 +254,16 @@ class PostPolicy
             Role::Designer,
             Role::Viewer,
         ], true);
+    }
+
+    /**
+     * Step M-5.1 — the org-wide content hub (`/content`): every post across every client, as a
+     * table or a status board. An internal working surface (filter, bulk-move, assign), so a
+     * `Role::ClientReviewer` is excluded, the same as Home. The hub query re-applies the org scope,
+     * and each bulk move is re-checked through `transition()`.
+     */
+    public function viewHub(User $user): bool
+    {
+        return $this->viewHome($user);
     }
 }

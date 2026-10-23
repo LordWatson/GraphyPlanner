@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Grids\DecideGridPlanAction;
+use App\Actions\Posts\RecordPreviewFeedbackAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Enums\GridPlanStatus;
 use App\Enums\PostStatus;
 use App\Http\Requests\Grids\GridDecisionRequest;
+use App\Http\Requests\PreviewFeedbackRequest;
 use App\Http\Requests\ReviewDecisionRequest;
 use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\ReviewToken;
+use App\Services\Posts\PostRevisionService;
 use App\Support\Grids\GridPlanPresenter;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +35,7 @@ class ReviewController extends Controller
     /**
      * Show the post (or grid) waiting on this token's client for review.
      */
-    public function show(string $token, GridPlanPresenter $grids): Response
+    public function show(string $token, GridPlanPresenter $grids, PostRevisionService $revisions): Response
     {
         $reviewToken = $this->resolveToken($token);
 
@@ -42,15 +45,20 @@ class ReviewController extends Controller
 
         $post = $this->resolvePost($reviewToken);
 
+        // Step B-3.4: a "Share preview" link (a partner/sponsor) reads differently — brand copy,
+        // no agency "studio" voice, decisions only if the owner enabled them, and no status move.
+        $isPreview = $this->isPreview($reviewToken, $post);
+
         return Inertia::render('review/show', [
             'token' => $token,
             'client' => ['name' => $post->client->name],
+            'mode' => $isPreview ? 'preview' : 'client',
             'post' => [
                 'id' => $post->id,
                 'status' => $post->status->value,
                 'status_label' => $post->status->label(),
                 'master_caption' => $post->master_caption,
-                'review_message' => $post->review_message,
+                'review_message' => $isPreview ? null : $post->review_message,
                 'hashtags' => $post->hashtags ?? [],
                 'music' => $post->music,
                 'location' => $post->location,
@@ -72,9 +80,17 @@ class ReviewController extends Controller
                     'scheduled_local_time' => $target->scheduled_local_time,
                     ...PostMediaPresenter::channelPreview($target->setRelation('post', $post)),
                 ])->values(),
-                'can_decide' => $post->status === PostStatus::WaitingClient,
+                'can_decide' => $isPreview
+                    ? $reviewToken->allow_approval
+                    : $post->status === PostStatus::WaitingClient,
+                // Step B-3.4: a comment-only / approval-enabled preview lets the viewer leave a note.
+                'can_comment' => $isPreview && $reviewToken->allow_comments,
                 // Step 18.9: the look was already approved in a grid, so the client only signs off the words.
                 'grid_name' => $post->gridTile?->plan?->name,
+                // Step M-5.3: what changed since the client last reviewed it (never on a preview link).
+                'changes_since_review' => ! $isPreview && $post->status === PostStatus::WaitingClient
+                    ? $revisions->changesSinceLastReview($post)
+                    : null,
                 'comments' => $post->comments
                     ->where('internal_only', false)
                     ->sortByDesc('created_at')
@@ -103,6 +119,10 @@ class ReviewController extends Controller
 
         $post = $this->resolvePost($reviewToken);
 
+        // Step B-3.4: a share-preview link (and any business-post link) never runs the status
+        // machine — its feedback goes through `previewFeedback()` so this stays the agency path.
+        abort_if($this->isPreview($reviewToken, $post), 404);
+
         $action(
             $post,
             PostStatus::from($request->validated('decision')),
@@ -111,6 +131,46 @@ class ReviewController extends Controller
         );
 
         return to_route('review.show', $token);
+    }
+
+    /**
+     * Step B-3.4 — record a "Share preview" viewer's feedback (a partner/sponsor comment and/or a
+     * sponsor sign-off), strictly within what the token allows. It never transitions the post: a
+     * business post has no `waiting_client` stage, so a decision is recorded, not acted on.
+     */
+    public function previewFeedback(
+        PreviewFeedbackRequest $request,
+        string $token,
+        RecordPreviewFeedbackAction $action,
+    ): RedirectResponse {
+        $reviewToken = $this->resolveToken($token);
+
+        abort_if($reviewToken->grid_plan_id !== null, 404);
+
+        $post = $this->resolvePost($reviewToken);
+
+        abort_unless($this->isPreview($reviewToken, $post), 404);
+
+        $decision = $request->filled('decision') ? PostStatus::from($request->validated('decision')) : null;
+
+        // Honour only what the token granted; a decision on a comment-only link, or a comment on a
+        // view-only link, is silently ignored by the action but rejected loudly here first.
+        abort_if($decision !== null && ! $reviewToken->allow_approval, 403);
+        abort_if($request->filled('comment') && ! $reviewToken->allow_comments, 403);
+
+        $action($reviewToken, $post, $decision, $request->validated('comment'));
+
+        return to_route('review.show', $token);
+    }
+
+    /**
+     * Step B-3.4 — whether this link is a read-only "Share preview" rather than the agency
+     * client-review flow. True for any widened token, and for any token on a business post (a
+     * business workspace has no `waiting_client` stage, so its links never run the status machine).
+     */
+    private function isPreview(ReviewToken $reviewToken, Post $post): bool
+    {
+        return $reviewToken->isSharePreview() || $post->organization->isBusiness();
     }
 
     /**
@@ -186,7 +246,7 @@ class ReviewController extends Controller
      */
     private function resolvePost(ReviewToken $reviewToken): Post
     {
-        $with = ['client', 'targets.socialAccount', 'assets', 'comments.user', 'gridTile.plan'];
+        $with = ['client', 'organization', 'targets.socialAccount', 'assets', 'comments.user', 'gridTile.plan'];
 
         $post = $reviewToken->post_id
             ? $reviewToken->post()->with($with)->first()

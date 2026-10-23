@@ -4,14 +4,22 @@ namespace App\Providers;
 
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
+use App\Contracts\CaptionRepurposer;
 use App\Contracts\EngagementSource;
+use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
 use App\Contracts\ImageProvider;
+use App\Contracts\InsightsSummarizer;
+use App\Contracts\LocalIdeaProvider;
 use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
+use App\Contracts\PublishCredentials;
+use App\Contracts\PushNotifier;
 use App\Contracts\VirusScanner;
+use App\Contracts\VisionProvider;
+use App\Contracts\WebsiteSummarizer;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
 use App\Models\BrandBrain;
@@ -49,21 +57,29 @@ use App\Policies\StaffPolicy;
 use App\Policies\SuperAdminReportPolicy;
 use App\Policies\TaxRatePolicy;
 use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\GeminiVisionProvider;
 use App\Services\AI\Images\GeminiImageProvider;
 use App\Services\AI\Images\NullImageProvider;
 use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
+use App\Services\AI\NullVisionProvider;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\Engagement\UploadPostEngagementSource;
+use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
+use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
+use App\Services\Publishing\OrganizationOrPlatformCredentials;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Services\Push\WebPushNotifier;
 use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
+use App\Services\Web\HttpWebsiteSummarizer;
+use App\Services\Workspace\CurrentWorkspace;
 use App\Support\Queues;
 use App\Support\RateLimits;
 use Carbon\CarbonImmutable;
@@ -84,6 +100,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Step B-1.3: one workspace resolver per request, so the primary brand is resolved and
+        // cached once (bound `scoped` so it never leaks across requests under Octane/queue reuse).
+        $this->app->scoped(CurrentWorkspace::class);
+
+        // Step B-3.1: the per-org-type post workflow resolver. Stateless, so a singleton is safe;
+        // its two workflow implementations are stateless too. No caller reads
+        // `PostStatusTransitionMap` directly for "allowed next steps" any more — they ask this.
+        $this->app->singleton(PostWorkflowResolver::class);
+
         // Local disk today (config('assets.disk'), "public" by default); swap this
         // binding for an S3-backed implementation once Phase 1/2 needs signed-URL
         // uploads (spec §10) — no caller of App\Contracts\AssetStorage needs to change.
@@ -91,6 +116,15 @@ class AppServiceProvider extends ServiceProvider
 
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);
+
+        // Step B-7.4: web push for business workspaces — delivery behind a contract so the VAPID
+        // transport can be swapped and faked. The default logs when no transport is installed.
+        $this->app->bind(PushNotifier::class, WebPushNotifier::class);
+
+        // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
+        // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private
+        // address) and returns null on any failure. Faked in tests.
+        $this->app->bind(WebsiteSummarizer::class, HttpWebsiteSummarizer::class);
 
         // Step I-16.2 / M-1.2: upload virus scanning — ClamAV when configured, otherwise none.
         $this->app->bind(VirusScanner::class, fn () => config('security.uploads.virus_scanner') === 'clamav'
@@ -101,6 +135,12 @@ class AppServiceProvider extends ServiceProvider
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule
         // endpoint, webhook sync, and health integration still land in Steps 1.3-1.6.
         $this->app->bind(PublishAdapter::class, UploadPostAdapter::class);
+
+        // Step B-5.1: the single seam for vendor credentials — byo (the org's own key) for
+        // agencies, managed (Alima's platform key + a per-org profile) for business workspaces.
+        // The adapter, the webhook verifier and the music/engagement readers all resolve keys and
+        // the publish profile through this contract, never from the model directly.
+        $this->app->bind(PublishCredentials::class, OrganizationOrPlatformCredentials::class);
 
         // Step M-3.1: engagement metrics (M-0.2 audit — Upload-Post reports all nine networks).
         $this->app->bind(EngagementSource::class, UploadPostEngagementSource::class);
@@ -137,6 +177,43 @@ class AppServiceProvider extends ServiceProvider
             return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
                 ? $this->app->make(DeepSeekProvider::class)
                 : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-6.1: the business shell's local/seasonal idea engine — same DeepSeek-or-Null rule,
+        // kept as its own contract so the agency AiProvider path (and its test doubles) is untouched.
+        $this->app->bind(LocalIdeaProvider::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-6.4: repurpose-across-platforms — same DeepSeek-or-Null rule, its own contract.
+        $this->app->bind(CaptionRepurposer::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-8.2: plain-language insight takeaways — same DeepSeek-or-Null rule, its own contract.
+        $this->app->bind(InsightsSummarizer::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-6.1: upcoming local holidays/awareness days that ground the idea engine. A static
+        // dataset first (open question §5.5); swappable for a paid API behind the same contract.
+        $this->app->singleton(EventCalendar::class, StaticEventCalendar::class);
+
+        // Step B-6.2: "caption from a photo" — Gemini (the image vendor's multimodal models) only
+        // when AI is enabled, the vision provider is `gemini` and a key is set; else the Null
+        // provider (empty suggestions, no vendor call), so the editor degrades gracefully.
+        $this->app->bind(VisionProvider::class, function () {
+            $usable = (bool) config('ai.enabled', false)
+                && config('ai.vision.provider') === 'gemini'
+                && (string) config('ai.vision.api_key', '') !== '';
+
+            return $usable ? $this->app->make(GeminiVisionProvider::class) : $this->app->make(NullVisionProvider::class);
         });
 
         // ImageProvider contract (Step 16.1) resolves to the configured vendor (Gemini, Step 16.6,

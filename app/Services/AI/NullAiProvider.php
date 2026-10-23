@@ -4,16 +4,22 @@ namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
+use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
+use App\Contracts\InsightsSummarizer;
+use App\Contracts\LocalIdeaProvider;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\Post;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Campaigns\AiCampaignBriefDraft;
 use App\Support\AI\Campaigns\AiCampaignWrapDraft;
+use App\Support\AI\IdeaContext;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\BrandImageBriefFactory;
 use App\Support\AI\Images\ImageBriefInput;
@@ -25,7 +31,7 @@ use Illuminate\Support\Facades\Log;
  * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
-class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
+class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider
 {
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
@@ -48,6 +54,27 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         return new AiTrends;
     }
 
+    public function recommendLocalPosts(Client $client, IdeaContext $context): AiPostIdeas
+    {
+        $this->logDisabled('recommendLocalPosts', ['client_id' => $client->id, 'org_id' => $client->org_id]);
+
+        return new AiPostIdeas;
+    }
+
+    public function repurpose(Post $post, array $platforms): array
+    {
+        $this->logDisabled('repurpose', ['post_id' => $post->id, 'client_id' => $post->client_id, 'org_id' => $post->org_id]);
+
+        return [];
+    }
+
+    public function summarizeInsights(Client $brand, array $facts): array
+    {
+        $this->logDisabled('summarizeInsights', ['client_id' => $brand->id, 'org_id' => $brand->org_id]);
+
+        return [];
+    }
+
     /**
      * No vendor call: a deterministic brief built from the Brand Brain, so the Image Studio still
      * works end to end without DeepSeek (Step 16.5).
@@ -57,6 +84,13 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         $this->logDisabled('draftImageBrief', ['client_id' => $client->id, 'org_id' => $client->org_id]);
 
         return (new BrandImageBriefFactory)->defaults($client, $input);
+    }
+
+    public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
+    {
+        $this->logDisabled('draftBrandProfile', ['brand_name' => $input->name]);
+
+        return AiBrandProfileDraft::empty();
     }
 
     public function draftCampaignBrief(Campaign $campaign): AiCampaignBriefDraft

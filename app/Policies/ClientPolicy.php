@@ -35,9 +35,17 @@ class ClientPolicy
 
     /**
      * Determine whether the user can create clients.
+     *
+     * Step B-1.4: a business workspace has exactly one (primary) brand created with the org — it
+     * never creates clients, so this is denied for it regardless of role (defence in depth behind
+     * the `workspace:agency` route guard).
      */
     public function create(User $user): bool
     {
+        if ($user->organization?->isBusiness() === true) {
+            return false;
+        }
+
         return in_array($user->role, [Role::Owner, Role::Strategist], true);
     }
 
@@ -52,9 +60,16 @@ class ClientPolicy
 
     /**
      * Determine whether the user can archive ("delete") a client — Step I-1.5: a soft delete.
+     *
+     * Step B-1.4: a primary brand can never be deleted — it's a business workspace's whole account,
+     * removed only by deleting the workspace itself (Step B-13.2).
      */
     public function delete(User $user, Client $client): bool
     {
+        if ($client->is_primary) {
+            return false;
+        }
+
         return $user->org_id === $client->org_id && $user->role === Role::Owner;
     }
 

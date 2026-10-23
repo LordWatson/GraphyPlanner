@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Platform;
 use App\Enums\Role;
+use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
@@ -74,6 +75,28 @@ class PostControllerTest extends TestCase
             $londonTarget->scheduled_at_utc->toIso8601String(),
             $dubaiTarget->scheduled_at_utc->toIso8601String(),
         );
+    }
+
+    /**
+     * Step M-5.2 — creating a post prefilled with a campaign (the campaign page / content-hub entry
+     * points) lands on the editor with that campaign attached.
+     */
+    public function test_a_post_can_be_created_prefilled_with_a_campaign(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $campaign = Campaign::factory()->for($client)->create(['org_id' => $org->id]);
+
+        $response = $this->actingAs($owner)->post(route('clients.posts.store', $client), [
+            'master_caption' => 'From the campaign',
+            'campaign_id' => $campaign->id,
+        ]);
+
+        $post = Post::firstOrFail();
+
+        $response->assertRedirect(route('posts.edit', $post));
+        $this->assertSame($campaign->id, $post->campaign_id);
     }
 
     public function test_designer_cannot_create_a_post_outside_their_org(): void

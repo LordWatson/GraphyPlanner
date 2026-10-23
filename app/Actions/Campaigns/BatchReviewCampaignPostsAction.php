@@ -55,7 +55,17 @@ class BatchReviewCampaignPostsAction
                 continue;
             }
 
-            if (! $post->updated_at?->equalTo(CarbonImmutable::parse($decision['seen_at']))) {
+            // Step M-5.3: judge staleness by the content the client reviewed, not any save. A
+            // post with history (`post_revisions`) is stale only if its content changed after the
+            // client opened it — so a schedule tweak or autosave no longer forces a re-review.
+            // Posts with no history yet fall back to `updated_at`.
+            $seenAt = CarbonImmutable::parse($decision['seen_at']);
+            $latestRevision = $post->revisions()->latest('id')->first();
+            $changedAfterSeen = $latestRevision !== null
+                ? ($latestRevision->created_at?->greaterThan($seenAt) ?? false)
+                : (! $post->updated_at?->lessThanOrEqualTo($seenAt));
+
+            if ($changedAfterSeen) {
                 $result['stale'][] = ['id' => $post->id, 'reason' => 'The studio changed it after you opened it. Take another look.'];
 
                 continue;

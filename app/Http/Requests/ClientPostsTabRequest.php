@@ -4,22 +4,22 @@ namespace App\Http\Requests;
 
 use App\Enums\Platform;
 use App\Enums\PostStatus;
-use App\Models\Client;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Models\Post;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
  * The client page's Posts tab query string: caption search, status, campaign and channel filters.
+ * Step B-4.1: also serves the business shell's `/posts`, where the brand is implicit.
  */
 class ClientPostsTabRequest extends FormRequest
 {
+    use ResolvesWorkspaceBrand;
+
     public function authorize(): bool
     {
-        /** @var Client $client */
-        $client = $this->route('client');
-
-        return $this->user()->can('viewAny', [Post::class, $client]);
+        return $this->user()->can('viewAny', [Post::class, $this->brand()]);
     }
 
     /**

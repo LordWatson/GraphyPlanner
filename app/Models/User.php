@@ -93,6 +93,16 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(StaffActivityLog::class, 'user_id');
     }
 
+    /**
+     * Step B-7.4 — the user's browser push subscriptions (one per device/browser).
+     *
+     * @return HasMany<PushSubscription, $this>
+     */
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
+
     public function isOwner(): bool
     {
         return $this->role === Role::Owner;

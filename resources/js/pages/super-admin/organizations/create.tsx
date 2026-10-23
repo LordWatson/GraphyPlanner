@@ -30,12 +30,15 @@ type Option = { value: string; label: string };
 export default function CreateOrganization({
     timezones,
     currencies,
+    organizationTypes,
 }: {
     timezones: Option[];
     currencies: Option[];
+    organizationTypes: Option[];
 }) {
     const [timezone, setTimezone] = useState('UTC');
     const [currency, setCurrency] = useState('USD');
+    const [type, setType] = useState(organizationTypes[0]?.value ?? 'agency');
 
     return (
         <>
@@ -78,6 +81,46 @@ export default function CreateOrganization({
                                         <InputError
                                             message={errors.organization_name}
                                         />
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="type">
+                                            Workspace type
+                                        </Label>
+                                        <input
+                                            type="hidden"
+                                            name="type"
+                                            value={type}
+                                        />
+                                        <Select
+                                            value={type}
+                                            onValueChange={setType}
+                                        >
+                                            <SelectTrigger
+                                                id="type"
+                                                className="w-full"
+                                            >
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {organizationTypes.map(
+                                                    (option) => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError message={errors.type} />
+                                        <p className="text-muted-foreground text-xs text-pretty">
+                                            A business workspace gets one brand
+                                            created with it; an agency manages
+                                            many clients.
+                                        </p>
                                     </div>
 
                                     <div className="grid gap-5 sm:grid-cols-2">

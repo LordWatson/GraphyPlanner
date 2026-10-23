@@ -3,6 +3,7 @@
 namespace App\Services\Analytics\Engagement;
 
 use App\Contracts\EngagementSource;
+use App\Contracts\PublishCredentials;
 use App\Enums\Platform;
 use App\Exceptions\Analytics\EngagementSourceException;
 use App\Models\PostTarget;
@@ -179,7 +180,8 @@ class UploadPostEngagementSource implements EngagementSource
 
     private function client(SocialAccount $account): PendingRequest
     {
-        $apiKey = $account->organization->upload_post_key ?? '';
+        // Step B-5.1: byo (the org's own key) or managed (Alima's platform key), via the contract.
+        $apiKey = app(PublishCredentials::class)->apiKeyFor($account);
 
         return VendorHttp::forReads(
             Http::baseUrl($this->baseUrl ?? (string) config('services.upload_post.base_url', 'https://api.upload-post.com/api'))

@@ -25,6 +25,10 @@ $safely = function (Event $event, string $command): Event {
 // Warns organization users by email about posts due to publish in the next few days.
 $safely(Schedule::command('posts:send-upcoming-reminders')->dailyAt('08:00'), 'posts:send-upcoming-reminders');
 
+// Step B-7.4: web-push "your post goes out in ~30 minutes" for business workspaces. Every five
+// minutes so a target is caught inside its lead window; idempotent via `push_reminder_sent_at`.
+$safely(Schedule::command('push:send-post-reminders')->everyFiveMinutes(), 'push:send-post-reminders');
+
 // Step 1.5 fallback: catches any post stuck in `publishing` because the Upload-Post webhook
 // never arrived.
 $safely(Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes(), 'publishing:poll-pending-statuses');
@@ -36,6 +40,10 @@ $safely(Schedule::command('social-accounts:check-health')->hourly(), 'social-acc
 // Step 2.5: nightly AI "Daily Brief" per active client (trends + fresh post ideas), emailed to
 // Owners/Strategists — idempotent per client/day, see GenerateDailyBriefsAction.
 $safely(Schedule::command('ai:generate-daily-briefs')->dailyAt('06:00'), 'ai:generate-daily-briefs');
+
+// Step B-6.1: fills each business brand's "Idea of the day" at ~6am in the brand's own timezone.
+// Hourly so every timezone is caught from one schedule; idempotent (cached per brand/local day).
+$safely(Schedule::command('business:generate-daily-ideas')->hourlyAt(10), 'business:generate-daily-ideas');
 
 // Step 16.13: deletes files of AI Image Studio variants discarded or never selected after
 // `ai.images.prune_after_days` (30 by default). Images attached to a post are always kept.
@@ -73,3 +81,11 @@ $safely(Schedule::command('campaigns:send-due-reminders')->dailyAt('08:15'), 'ca
 // and period (computed in the org timezone), so a daily run only ever creates a period's draft
 // once; the team reviews, finalizes and sends — nothing auto-sends. See GenerateRetainerDraftsAction.
 $safely(Schedule::command('invoices:generate-retainer-drafts')->dailyAt('06:30'), 'invoices:generate-retainer-drafts');
+
+// Step B-8.2: weekly business Insights digest. Hourly so each timezone's Monday morning is caught
+// from one schedule; idempotent per org and ISO week. See SendWeeklyInsightsDigestCommand.
+$safely(Schedule::command('business:send-insights-digest')->hourlyAt(40), 'business:send-insights-digest');
+
+// Step M-5.8: drop the next occurrence of each recurring post as a draft once the current one has
+// published. Idempotent (a leaf with a recurrence child is skipped). See GenerateRecurringPostDraftsAction.
+$safely(Schedule::command('posts:generate-recurring-drafts')->dailyAt('06:45'), 'posts:generate-recurring-drafts');

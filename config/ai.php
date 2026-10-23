@@ -29,7 +29,7 @@ return [
     */
     'deepseek' => [
         'api_key' => env('DEEPSEEK_API_KEY'),
-        'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-flash'),
         'base_url' => env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
         'timeout' => (int) env('DEEPSEEK_TIMEOUT', 30),
         'max_tokens' => (int) env('DEEPSEEK_MAX_TOKENS', 1024),
@@ -53,6 +53,62 @@ return [
     'daily_briefs' => [
         'quiet_hours_start' => env('AI_DAILY_BRIEF_QUIET_HOURS_START', 21),
         'quiet_hours_end' => env('AI_DAILY_BRIEF_QUIET_HOURS_END', 7),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Local & seasonal idea engine (Step B-6.1)
+    |--------------------------------------------------------------------------
+    |
+    | Tunes the business shell's idea generator (App\Services\AI\IdeaContextBuilder +
+    | App\Actions\AI\GenerateBrandIdeasAction) and the nightly "Idea of the day"
+    | (business:generate-daily-ideas). `event_window_days` is how far ahead the
+    | App\Contracts\EventCalendar looks for local holidays/awareness days; `default_country` is the
+    | ISO alpha-2 code used when a brand has set no country (open question §5.5 — launch countries are
+    | GB and US, with a global set every brand gets); `daily_hour` is the brand-local hour the daily
+    | idea is generated at; `event_cache_ttl_hours` caches a resolved calendar year.
+    |
+    */
+    'ideas' => [
+        'event_window_days' => (int) env('AI_IDEA_EVENT_WINDOW_DAYS', 21),
+        'default_country' => env('AI_IDEA_DEFAULT_COUNTRY', 'GB'),
+        'daily_hour' => (int) env('AI_IDEA_DAILY_HOUR', 6),
+        'event_cache_ttl_hours' => (int) env('AI_IDEA_EVENT_CACHE_TTL_HOURS', 168),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Caption from a photo (Step B-6.2)
+    |--------------------------------------------------------------------------
+    |
+    | App\Contracts\VisionProvider resolves to App\Services\AI\GeminiVisionProvider only when
+    | `ai.enabled` is true AND `vision.provider` is `gemini` AND a key is set; otherwise the Null
+    | provider (empty suggestions, no vendor call). Gemini is the project's image vendor and its
+    | multimodal models read photos (open question §5.4). The key/base_url default to the same
+    | GEMINI_* env the Image Studio uses.
+    |
+    */
+    /*
+    |--------------------------------------------------------------------------
+    | Plan my week (Step B-6.3)
+    |--------------------------------------------------------------------------
+    |
+    | App\Actions\AI\GenerateWeeklyPlanAction fills the posting goal's gaps for the next 7 days.
+    | `default_hour` is the local posting hour used for a day with no data-backed best time (the
+    | brand's own engagement, via App\Services\Analytics\BestTimeService, is preferred where there's
+    | enough of it).
+    |
+    */
+    'plan' => [
+        'default_hour' => (int) env('AI_PLAN_DEFAULT_HOUR', 9),
+    ],
+
+    'vision' => [
+        'provider' => env('AI_VISION_PROVIDER', 'null'),
+        'model' => env('GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
+        'api_key' => env('GEMINI_API_KEY'),
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        'timeout' => (int) env('AI_VISION_TIMEOUT', 45),
     ],
 
     /*

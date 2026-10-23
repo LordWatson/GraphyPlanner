@@ -17,11 +17,13 @@ import {
 } from '@/components/mention-textarea';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
+import { ReviewChanges } from '@/components/posts/review-changes';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
 import type { MediaFormat } from '@/lib/media-format';
+import type { RevisionDiff } from '@/lib/post-diff';
 import { cn } from '@/lib/utils';
 import {
     decide as decideOnPortalPost,
@@ -57,6 +59,8 @@ type PostData = {
     review_message: string | null;
     /** Step 18.9: the grid whose look the client already approved. */
     grid_name?: string | null;
+    /** Step M-5.3: what changed since the client last reviewed it (null on a first review). */
+    changes_since_review?: RevisionDiff | null;
     hashtags: string[];
     music: { name?: string } | null;
     location: { id?: string; name?: string } | null;
@@ -229,6 +233,9 @@ export default function PortalPostShow({
                     </section>
 
                     <div className="flex flex-col gap-5">
+                        <ReviewChanges
+                            changes={post.changes_since_review ?? null}
+                        />
                         {post.grid_name && (
                             <p className="border-border bg-card text-muted-foreground rounded-xl border px-4 py-3 text-sm">
                                 You approved how this looks in{' '}

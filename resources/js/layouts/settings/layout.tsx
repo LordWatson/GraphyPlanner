@@ -8,7 +8,10 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editOrganization } from '@/routes/organization';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
+import { edit as editWorkspace } from '@/routes/workspace-settings';
 import type { Auth, NavItem } from '@/types';
+
+type WorkspaceProp = { type: string } | null;
 
 const sidebarNavItems: NavItem[] = [
     {
@@ -30,24 +33,38 @@ const sidebarNavItems: NavItem[] = [
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
-    const { auth } = usePage<{ auth: Auth }>().props;
+    const { auth, workspace } = usePage<{
+        auth: Auth;
+        workspace: WorkspaceProp;
+    }>().props;
 
-    const navItems: NavItem[] =
-        auth.user.role === 'owner'
-            ? [
-                  ...sidebarNavItems,
-                  {
-                      title: 'Organization',
-                      href: editOrganization(),
-                      icon: null,
-                  },
-                  {
-                      title: 'AI usage',
-                      href: editAiUsage(),
-                      icon: null,
-                  },
-              ]
-            : sidebarNavItems;
+    const isOwner = auth.user.role === 'owner';
+    const isBusiness = workspace?.type === 'business';
+
+    // Step B-3.3: a business owner edits the workspace's own settings (the review switch) in place
+    // of the agency-only Organization page (API keys, invoicing — concepts a business org doesn't
+    // have); AI usage stays for both.
+    const navItems: NavItem[] = isOwner
+        ? [
+              ...sidebarNavItems,
+              isBusiness
+                  ? {
+                        title: 'Workspace',
+                        href: editWorkspace(),
+                        icon: null,
+                    }
+                  : {
+                        title: 'Organization',
+                        href: editOrganization(),
+                        icon: null,
+                    },
+              {
+                  title: 'AI usage',
+                  href: editAiUsage(),
+                  icon: null,
+              },
+          ]
+        : sidebarNavItems;
 
     return (
         <Page>

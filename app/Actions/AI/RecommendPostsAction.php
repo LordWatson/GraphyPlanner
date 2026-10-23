@@ -33,8 +33,17 @@ class RecommendPostsAction
             'org_id' => $client->org_id,
         ]);
 
-        $ideas = $this->ai->recommendPosts($client);
+        return $this->filterAndPersist($client, $this->ai->recommendPosts($client));
+    }
 
+    /**
+     * Run a freshly generated set of ideas through the guardrail and upsert the survivors. Shared by
+     * the agency path ({@see __invoke()}) and the business local/seasonal engine
+     * ({@see GenerateBrandIdeasAction}, Step B-6.1) so both filter and persist
+     * identically — only the provider call that produced the ideas differs.
+     */
+    public function filterAndPersist(Client $client, AiPostIdeas $ideas): AiPostIdeas
+    {
         $filtered = $this->guardrail->filterPostIdeas($client->brandBrain, $ideas, [
             'client_id' => $client->id,
             'org_id' => $client->org_id,

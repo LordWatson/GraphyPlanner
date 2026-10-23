@@ -29,12 +29,16 @@ class OrganizationWelcomeMail extends Mailable implements ShouldQueue
     public function build(): self
     {
         $organization = $this->owner->organization;
+        $isBusiness = $organization?->isBusiness() ?? false;
 
         return $this
             ->subject("Welcome to Alima — {$organization?->name} is ready")
             ->view('emails.organization-welcome', [
                 'organizationName' => $organization?->name,
-                'dashboardUrl' => route('dashboard'),
+                // Step B-2.1: a business/creator workspace sees no agency language ("client",
+                // "studio"). Its call to action points at the guided setup, not the agency dashboard.
+                'isBusiness' => $isBusiness,
+                'dashboardUrl' => $isBusiness ? route('business.onboarding') : route('dashboard'),
                 'forgotPasswordUrl' => route('password.request'),
             ]);
     }

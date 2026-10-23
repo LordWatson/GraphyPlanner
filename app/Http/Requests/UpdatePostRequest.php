@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\ApprovalMode;
 use App\Enums\MediaRatio;
 use App\Enums\Platform;
+use App\Enums\PostRecurrence;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Support\Media\CropBox;
@@ -12,6 +13,7 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Validator;
 
 class UpdatePostRequest extends FormRequest
@@ -37,8 +39,13 @@ class UpdatePostRequest extends FormRequest
         $platforms = array_map(fn (Platform $platform) => $platform->value, Platform::cases());
 
         return [
-            'approval_mode' => ['nullable', new Enum(ApprovalMode::class)],
+            // Step B-1.4: client approval isn't a concept in a business workspace.
+            'approval_mode' => ['nullable', new Enum(ApprovalMode::class), $this->rejectClientApprovalForBusiness()],
             'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $clientId)],
+            // Step M-5.4: assignee/reviewer (internal staff) and the internal due date.
+            'assignee_id' => ['nullable', 'integer', $this->staffRule()],
+            'reviewer_id' => ['nullable', 'integer', $this->staffRule()],
+            'due_at' => ['nullable', 'date'],
             'master_caption' => ['nullable', 'string', 'max:65000'],
             'review_message' => ['nullable', 'string'],
             'hashtags' => ['nullable', 'array'],
@@ -51,6 +58,11 @@ class UpdatePostRequest extends FormRequest
             'thumb_offset_ms' => ['nullable', 'integer', 'min:0', 'max:86400000'],
             'music' => ['nullable', 'array'],
             'location' => ['nullable', 'array'],
+            // Step M-5.8: evergreen reuse and repeat. `recycle_after_days` is how long after
+            // publishing to suggest recycling; `recurrence` drops the next occurrence as a draft.
+            'is_recyclable' => ['boolean'],
+            'recycle_after_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'recurrence' => ['nullable', new Enum(PostRecurrence::class)],
 
             // Image format per channel — only the formats that channel offers.
             'media_format' => ['nullable', 'array:'.implode(',', $platforms)],
@@ -94,6 +106,29 @@ class UpdatePostRequest extends FormRequest
             // Step I-3.2 / M-2.3: checked against the account's platform in `after()`.
             'targets.*.format' => ['nullable', 'string', 'max:32'],
         ];
+    }
+
+    /**
+     * Step M-5.4 — an assignee/reviewer must be an internal staff member of this organization.
+     */
+    private function staffRule(): Exists
+    {
+        return Rule::exists('users', 'id')
+            ->where('org_id', (int) $this->user()->org_id)
+            ->whereIn('role', ['owner', 'strategist', 'designer', 'viewer']);
+    }
+
+    /**
+     * Step B-1.4 — a business workspace has no client to approve posts, so `ApprovalMode::
+     * ClientRequired` is rejected for it (agencies are unaffected).
+     */
+    private function rejectClientApprovalForBusiness(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === ApprovalMode::ClientRequired->value && $this->user()?->organization?->isBusiness() === true) {
+                $fail(__('Client approval isn’t available in this workspace.'));
+            }
+        };
     }
 
     /**

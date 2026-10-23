@@ -2,7 +2,7 @@ import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import type { CampaignChipData } from '@/components/campaigns/types';
 import { Link } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Plus, Send } from 'lucide-react';
+import { Plus, Send, Upload } from 'lucide-react';
 import type { PostTargetAccount } from '@/components/posts/new-post-dialog';
 import { NewPostDialog } from '@/components/posts/new-post-dialog';
 import { StatusPill } from '@/components/status-pill';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
 import { calendar } from '@/routes';
 import { index } from '@/routes/clients';
-import { index as postsIndex } from '@/routes/clients/posts';
+import { index as postsIndex, bulkImport } from '@/routes/clients/posts';
 import { edit as editPost } from '@/routes/posts';
 import type { ClientPageProps } from '@/components/clients/client-layout';
 import {
@@ -180,17 +180,25 @@ export default function ClientPostsTab({
                             </Link>
                         </Button>
                         {can.createPost && (
-                            <NewPostDialog
-                                clientId={client.id}
-                                targetAccounts={targetAccounts}
-                                campaigns={filterOptions.campaigns}
-                                trigger={
-                                    <Button size="sm">
-                                        <Plus />
-                                        New post
-                                    </Button>
-                                }
-                            />
+                            <>
+                                <Button size="sm" variant="outline" asChild>
+                                    <Link href={bulkImport(client.id)}>
+                                        <Upload />
+                                        Import CSV
+                                    </Link>
+                                </Button>
+                                <NewPostDialog
+                                    clientId={client.id}
+                                    targetAccounts={targetAccounts}
+                                    campaigns={filterOptions.campaigns}
+                                    trigger={
+                                        <Button size="sm">
+                                            <Plus />
+                                            New post
+                                        </Button>
+                                    }
+                                />
+                            </>
                         )}
                     </div>
                 </div>

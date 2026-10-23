@@ -65,13 +65,18 @@ export function Page({
 
 /** The chapter the current page belongs to, or null (portal, public pages). */
 export function useChapter(): Chapter | null {
-    const { url, props } = usePage<{ auth?: { user?: { role?: string } } }>();
+    const { url, props } = usePage<{
+        auth?: { user?: { role?: string } };
+        workspace?: { type?: string } | null;
+    }>();
     const shellPadded = useContext(ShellPaddedContext);
 
     return shellPadded
         ? null
         : chapterForPath(url, {
               platform: props.auth?.user?.role === 'super_admin',
+              // Phase B-4: the business shell reads from its own book (`businessChapters`).
+              business: props.workspace?.type === 'business',
           });
 }
 

@@ -1,13 +1,20 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+    AtSign,
     Building2,
     CalendarDays,
+    ClipboardCheck,
     FileBarChart,
+    Image,
     LayoutGrid,
     LineChart,
     ListChecks,
     Receipt,
+    Send,
     Settings2,
+    Sparkles,
+    Sun,
+    SwatchBook,
     UsersRound,
 } from 'lucide-react';
 
@@ -21,11 +28,29 @@ import {
 export type ChapterKey =
     | 'overview'
     | 'attention'
+    | 'myWork'
     | 'calendar'
     | 'clients'
     | 'invoices'
     | 'analytics'
     | 'staff'
+    | 'settings';
+
+/**
+ * Phase B-4: the business workspace shell is its own book (see `businessChapters`) — Today,
+ * Calendar, Posts, Ideas, Media, Insights, Brand, Accounts, then Team/Settings — with no agency
+ * clients, invoices or portal chapters.
+ */
+export type BusinessChapterKey =
+    | 'today'
+    | 'calendar'
+    | 'posts'
+    | 'ideas'
+    | 'media'
+    | 'insights'
+    | 'brand'
+    | 'accounts'
+    | 'team'
     | 'settings';
 
 /** Phase 15: the super admin console is its own, shorter book (see `platformChapters`). */
@@ -37,7 +62,7 @@ export type PlatformChapterKey =
     | 'platformSettings';
 
 export type Chapter = {
-    key: ChapterKey | PlatformChapterKey;
+    key: ChapterKey | PlatformChapterKey | BusinessChapterKey;
     number: string;
     title: string;
     /** One line for the command palette. */
@@ -69,9 +94,19 @@ export const chapters: Record<ChapterKey, Chapter> = {
         swatch: 'bg-lilac',
         prefixes: ['/home'],
     },
+    // Step M-5.4: "My work" — the signed-in person's own posts across clients.
+    myWork: {
+        key: 'myWork',
+        number: '03',
+        title: 'My work',
+        summary: 'Your posts: assigned, to review, due soon, mentioned.',
+        icon: ClipboardCheck,
+        swatch: 'bg-signal',
+        prefixes: ['/my-work'],
+    },
     calendar: {
         key: 'calendar',
-        number: '03',
+        number: '04',
         title: 'Calendar',
         summary: 'Every scheduled post, by month, week, day or list.',
         icon: CalendarDays,
@@ -80,7 +115,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     clients: {
         key: 'clients',
-        number: '04',
+        number: '05',
         title: 'Clients',
         summary: 'The roster — brands, campaigns, posts and Brand Brain.',
         icon: Building2,
@@ -91,6 +126,8 @@ export const chapters: Record<ChapterKey, Chapter> = {
             '/campaigns',
             '/campaign-templates',
             '/posts',
+            // Step M-5.1: the content hub (table + board across every client).
+            '/content',
             // Phase 18: the Instagram grid planner.
             '/grids',
             '/ai-trends',
@@ -99,7 +136,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     invoices: {
         key: 'invoices',
-        number: '05',
+        number: '06',
         title: 'Invoices',
         summary: 'The ledger — raised, sent, paid and overdue.',
         icon: Receipt,
@@ -109,7 +146,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     // Phase 17: the studio's own analytics. Every staff role sees it (sections are gated inside).
     analytics: {
         key: 'analytics',
-        number: '06',
+        number: '07',
         title: 'Analytics',
         summary:
             'How the studio is tracking — output, approvals, billing and AI.',
@@ -119,7 +156,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     staff: {
         key: 'staff',
-        number: '07',
+        number: '08',
         title: 'Staff',
         summary: 'The team, their roles and invitations.',
         icon: UsersRound,
@@ -128,7 +165,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     settings: {
         key: 'settings',
-        number: '08',
+        number: '09',
         title: 'Settings',
         summary: 'Profile, security, appearance and organization.',
         icon: Settings2,
@@ -191,6 +228,107 @@ export const platformChapters: Record<PlatformChapterKey, Chapter> = {
     },
 };
 
+/**
+ * Phase B-4: the business workspace's book. Same Contents-style numbering as the studio, but a
+ * calmer, brand-owner set — no clients, invoices, portal or staff-analytics chapters. "Collections"
+ * (campaigns, renamed) is a section of Posts, so `/collections` resolves to the Posts chapter.
+ */
+export const businessChapters: Record<BusinessChapterKey, Chapter> = {
+    today: {
+        key: 'today',
+        number: '01',
+        title: 'Today',
+        summary: "What's going out, what needs you, where the gaps are.",
+        icon: Sun,
+        swatch: 'bg-lime',
+        prefixes: ['/today'],
+    },
+    calendar: {
+        key: 'calendar',
+        number: '02',
+        title: 'Calendar',
+        summary: 'Everything you have scheduled, by month, week or day.',
+        icon: CalendarDays,
+        swatch: 'bg-electric',
+        prefixes: ['/calendar'],
+    },
+    posts: {
+        key: 'posts',
+        number: '03',
+        title: 'Posts',
+        summary:
+            'Every post — drafts, scheduled and published — and your collections.',
+        icon: Send,
+        swatch: 'bg-teal dark:ring-1 dark:ring-inset dark:ring-cream/50',
+        prefixes: ['/posts', '/collections'],
+    },
+    ideas: {
+        key: 'ideas',
+        number: '04',
+        title: 'Ideas',
+        summary: 'Fresh post ideas and trends for your brand.',
+        icon: Sparkles,
+        swatch: 'bg-lilac',
+        prefixes: ['/ideas'],
+    },
+    media: {
+        key: 'media',
+        number: '05',
+        title: 'Media',
+        summary: 'Your photos and videos, ready to drop into a post.',
+        icon: Image,
+        swatch: 'bg-signal',
+        // The Image Studio (B-6.5) lives under Media — generated images become media.
+        prefixes: ['/media', '/studio'],
+    },
+    insights: {
+        key: 'insights',
+        number: '06',
+        title: 'Insights',
+        summary:
+            'How your posting is tracking — consistency, reach and your best times.',
+        icon: LineChart,
+        swatch: 'bg-electric',
+        prefixes: ['/insights'],
+    },
+    brand: {
+        key: 'brand',
+        number: '07',
+        title: 'Brand',
+        summary: 'Your voice, audience, look and posting goal.',
+        icon: SwatchBook,
+        swatch: 'bg-teal dark:ring-1 dark:ring-inset dark:ring-cream/50',
+        prefixes: ['/brand'],
+    },
+    accounts: {
+        key: 'accounts',
+        number: '08',
+        title: 'Accounts',
+        summary: 'Connect and reconnect your social accounts.',
+        icon: AtSign,
+        swatch: 'bg-lime',
+        prefixes: ['/accounts'],
+    },
+    team: {
+        key: 'team',
+        number: '09',
+        title: 'Team',
+        summary: 'The people you work with and their roles.',
+        icon: UsersRound,
+        swatch: 'bg-lilac',
+        prefixes: ['/staff'],
+    },
+    settings: {
+        key: 'settings',
+        number: '10',
+        title: 'Settings',
+        summary: 'Profile, security, appearance, workspace and plan.',
+        icon: Settings2,
+        swatch: 'bg-cream ring-1 ring-inset ring-foreground/25',
+        prefixes: ['/settings'],
+    },
+};
+
 function matches(chapter: Chapter, path: string): boolean {
     return chapter.prefixes.some(
         (prefix) => path === prefix || path.startsWith(`${prefix}/`),
@@ -203,7 +341,10 @@ function matches(chapter: Chapter, path: string): boolean {
  */
 export function chapterForPath(
     path: string,
-    { platform = false }: { platform?: boolean } = {},
+    {
+        platform = false,
+        business = false,
+    }: { platform?: boolean; business?: boolean } = {},
 ): Chapter | null {
     const normalised = path.replace(/^\/preview(?=\/|$)/, '').split('?')[0];
 
@@ -218,6 +359,14 @@ export function chapterForPath(
         ];
 
         return ordered.find((chapter) => matches(chapter, normalised)) ?? null;
+    }
+
+    if (business) {
+        return (
+            Object.values(businessChapters).find((chapter) =>
+                matches(chapter, normalised),
+            ) ?? null
+        );
     }
 
     return (

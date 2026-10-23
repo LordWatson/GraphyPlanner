@@ -5,12 +5,14 @@ namespace App\Models;
 use App\Actions\Clients\RecomputeClientHealthAction;
 use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
+use App\Enums\BrandKind;
 use App\Enums\ClientHealth;
 use App\Enums\ClientReportSchedule;
 use App\Enums\ClientStatus;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\ClientHealthService;
+use App\Support\Workspace\PostingGoal;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,8 +30,12 @@ use Illuminate\Support\Carbon;
  * @property string|null $legal_name
  * @property string|null $website
  * @property string|null $industry
+ * @property string|null $location
  * @property array<int, string>|null $countries
  * @property ClientStatus $status
+ * @property bool $is_primary
+ * @property int|null $primary_org_id
+ * @property BrandKind|null $brand_kind
  * @property ApprovalMode $default_approval_mode
  * @property int|null $owner_user_id
  * @property Carbon|null $start_date
@@ -51,17 +57,19 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $health_computed_at
  * @property int $approval_lead_days
  * @property int|null $target_posts_per_week
+ * @property array<string, mixed>|null $posting_goal
  * @property ClientReportSchedule $report_schedule
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
 #[Fillable([
-    'org_id', 'name', 'legal_name', 'website', 'industry', 'countries', 'status',
+    'org_id', 'name', 'legal_name', 'website', 'industry', 'location', 'countries', 'status', 'is_primary', 'brand_kind',
     'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
     'approval_lead_days', 'default_approval_mode', 'report_schedule', 'target_posts_per_week',
+    'posting_goal',
 ])]
 class Client extends Model
 {
@@ -74,6 +82,8 @@ class Client extends Model
     protected $attributes = [
         // Step M-3.3: mirrors the column default.
         'report_schedule' => 'review',
+        // Step B-1.2: an ordinary client is not a business workspace's primary brand.
+        'is_primary' => false,
     ];
 
     /**
@@ -85,6 +95,8 @@ class Client extends Model
             'countries' => 'array',
             'tags' => 'array',
             'status' => ClientStatus::class,
+            'is_primary' => 'boolean',
+            'brand_kind' => BrandKind::class,
             'default_approval_mode' => ApprovalMode::class,
             'billing_cycle' => BillingCycle::class,
             'start_date' => 'date',
@@ -94,8 +106,19 @@ class Client extends Model
             'health_computed_at' => 'datetime',
             'health_reasons' => 'array',
             'target_posts_per_week' => 'integer',
+            // Step B-4.5: the richer weekly posting goal for a business workspace's primary brand.
+            'posting_goal' => 'array',
             'report_schedule' => ClientReportSchedule::class,
         ];
+    }
+
+    /**
+     * Step B-4.5 — the brand's posting goal as a value object (how many posts a week, which days),
+     * parsed defensively from the `posting_goal` JSON. Empty for a brand that never set one.
+     */
+    public function postingGoal(): PostingGoal
+    {
+        return PostingGoal::fromArray($this->posting_goal);
     }
 
     /**

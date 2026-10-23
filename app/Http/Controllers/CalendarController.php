@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Campaigns\GetCalendarCampaignLayerAction;
 use App\Actions\Posts\BuildCalendarOccurrencesAction;
 use App\Actions\Posts\GetCalendarPostsAction;
+use App\Enums\CampaignStatus;
 use App\Enums\GridPlanStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -14,6 +15,10 @@ use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\Post;
+use App\Models\SocialAccount;
+use App\Support\Clients\ClientTabPresenter;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -96,6 +101,39 @@ class CalendarController extends Controller
                     Platform::cases(),
                 ),
             ],
+        ]);
+    }
+
+    /**
+     * Step M-5.7 / I-5.1 — the target accounts and open campaigns for one client, fetched lazily
+     * when "New post" is opened on an empty calendar slot. Scoped and authorized exactly like
+     * creating a post for that client, so a client reviewer or another org never sees them.
+     */
+    public function newPostOptions(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'client' => ['required', 'integer'],
+        ]);
+
+        $client = Client::query()
+            ->where('org_id', $request->user()->org_id)
+            ->whereKey($validated['client'])
+            ->firstOrFail();
+
+        $this->authorize('create', [Post::class, $client]);
+
+        return response()->json([
+            'accounts' => $client->socialAccounts()
+                ->latest()
+                ->get()
+                ->map(fn (SocialAccount $account) => ClientTabPresenter::targetAccount($account))
+                ->all(),
+            'campaigns' => $client->campaigns()
+                ->whereIn('status', CampaignStatus::open())
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Campaign $campaign) => ['value' => (string) $campaign->id, 'label' => $campaign->name])
+                ->all(),
         ]);
     }
 }

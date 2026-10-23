@@ -31,7 +31,18 @@ void createInertiaApp({
             // stands alone (`PublicShell`) — a locked-out member gets no app chrome.
             case name === 'organizations/register':
                 return AuthLayout;
+            // Step B-2.1: the business/creator signup is an auth page too.
+            case name === 'organizations/start':
+                return AuthLayout;
             case name === 'organizations/suspended':
+                return null;
+            // Step B-2.3: the business onboarding wizard is a focused, standalone flow (its own
+            // chrome, mobile-first) — no app sidebar.
+            case name === 'business/onboarding':
+                return null;
+            // Step B-7.2: the phone-first quick post is a focused, standalone screen (its own top
+            // bar + back to Today), like onboarding — no app sidebar.
+            case name === 'business/posts/quick':
                 return null;
             case name.startsWith('portal/'):
                 return ClientPortalLayout;

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\OrganizationType;
 use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -23,8 +24,20 @@ class OrganizationFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1000, 9999),
+            'type' => OrganizationType::Agency,
             'default_timezone' => 'UTC',
         ];
+    }
+
+    /**
+     * Step B-1.1 — a one-brand business/creator workspace. Pair with `Client::factory()->primary()`
+     * (or `CreatePrimaryBrandAction`) to give it its single brand.
+     */
+    public function business(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => OrganizationType::Business,
+        ]);
     }
 
     /**

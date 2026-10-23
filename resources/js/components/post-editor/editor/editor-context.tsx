@@ -15,7 +15,9 @@ export type PostEditorPageData = {
     campaignOptions: CampaignOption[];
     hashtagSuggestions: string[];
     mediaFormatOptions: MediaFormatOptions;
-    can: { update: boolean; create_asset: boolean };
+    /** Step M-5.4: internal staff for the assignee/reviewer pickers. */
+    staff: { id: number; name: string }[];
+    can: { update: boolean; create_asset: boolean; duplicate: boolean };
 };
 
 type PostEditorContextValue = {

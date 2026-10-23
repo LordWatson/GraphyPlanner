@@ -26,7 +26,7 @@ class CampaignAiUsage
             'campaign_id' => $campaign->id,
             'user_id' => $user?->id,
             'provider' => $isDeepSeek ? 'deepseek' : 'null',
-            'model' => $isDeepSeek ? (string) config('ai.deepseek.model', 'deepseek-chat') : 'none',
+            'model' => $isDeepSeek ? (string) config('ai.deepseek.model', 'deepseek-flash') : 'none',
             'method' => $method,
             'succeeded' => $succeeded,
             'error_code' => $succeeded ? null : 'empty_response',

@@ -13,11 +13,22 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import { useWorkspace } from '@/hooks/use-workspace';
 import type { Chapter } from '@/lib/chapters';
-import { chapters, platformChapters } from '@/lib/chapters';
+import { businessChapters, chapters, platformChapters } from '@/lib/chapters';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
+import { today as businessToday } from '@/routes/business';
+import { index as businessAccounts } from '@/routes/business/accounts';
+import { edit as businessBrand } from '@/routes/business/brand';
+import { index as businessCollections } from '@/routes/business/collections';
+import { index as businessIdeas } from '@/routes/business/ideas';
+import { index as businessInsights } from '@/routes/business/insights';
+import { index as businessMedia } from '@/routes/business/media';
+import { index as businessPosts } from '@/routes/business/posts';
 import { index as campaignsIndex } from '@/routes/campaigns';
+import { index as contentIndex } from '@/routes/content';
+import { index as myWorkIndex } from '@/routes/my-work';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -45,6 +56,7 @@ function navItem(
 
 export function AppSidebar() {
     const { auth } = usePage<{ auth: Auth }>().props;
+    const { isBusiness } = useWorkspace();
     const { currentUrl } = useCurrentUrl();
     const isSuperAdmin = auth.user.role === 'super_admin';
     const onSettings = currentUrl
@@ -53,6 +65,7 @@ export function AppSidebar() {
 
     // Phase 15: platform super admins have no organization — they get the console's own book
     // instead of the studio chapters (which `org.member` would redirect them away from anyway).
+    // Phase B-4: a business workspace gets its own, calmer book (no clients/invoices/portal).
     const groups: { label: string; items: NavItem[] }[] = isSuperAdmin
         ? [
               {
@@ -85,7 +98,9 @@ export function AppSidebar() {
                   ],
               },
           ]
-        : studioGroups(auth, onSettings);
+        : isBusiness
+          ? businessGroups(auth, onSettings)
+          : studioGroups(auth, onSettings);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -101,7 +116,9 @@ export function AppSidebar() {
                                 href={
                                     isSuperAdmin
                                         ? superAdminDashboard()
-                                        : dashboard()
+                                        : isBusiness
+                                          ? businessToday()
+                                          : dashboard()
                                 }
                                 prefetch
                             >
@@ -154,12 +171,15 @@ function studioGroups(
             items: [
                 navItem(chapters.overview, dashboard()),
                 navItem(chapters.attention, needsAttention()),
+                navItem(chapters.myWork, myWorkIndex()),
                 navItem(chapters.calendar, calendar()),
                 {
                     ...navItem(chapters.clients, clientsIndex()),
                     // Campaigns enhancement C-1.1: the hub is a section of 04 Clients (no renumber).
                     // Phase 18: the grids hub is another section of 04 Clients.
                     subItems: [
+                        // Step M-5.1: the content hub — posts across every client.
+                        { title: 'Posts', href: contentIndex() },
                         { title: 'Campaigns', href: campaignsIndex() },
                         { title: 'Grids', href: gridsIndex() },
                     ],
@@ -181,6 +201,46 @@ function studioGroups(
                     ? [navItem(chapters.staff, staffIndex())]
                     : []),
                 navItem(chapters.settings, editProfile(), onSettings),
+            ],
+        },
+    ];
+}
+
+/**
+ * Phase B-4: the business workspace shell — a calmer book for a brand owner. No clients, invoices,
+ * portal or staff-analytics chapters; "Collections" is a section of Posts.
+ */
+function businessGroups(
+    auth: Auth,
+    onSettings: boolean,
+): { label: string; items: NavItem[] }[] {
+    return [
+        {
+            label: 'Your brand',
+            items: [
+                navItem(businessChapters.today, businessToday()),
+                navItem(businessChapters.calendar, calendar()),
+                {
+                    ...navItem(businessChapters.posts, businessPosts()),
+                    subItems: [
+                        { title: 'Collections', href: businessCollections() },
+                    ],
+                },
+                navItem(businessChapters.ideas, businessIdeas()),
+                navItem(businessChapters.media, businessMedia()),
+                navItem(businessChapters.insights, businessInsights()),
+                navItem(businessChapters.brand, businessBrand()),
+                navItem(businessChapters.accounts, businessAccounts()),
+            ],
+        },
+        {
+            label: 'Team',
+            items: [
+                // Owner-only — see `StaffPolicy::viewAny`. "Team" is the business label for Staff.
+                ...(auth.user.role === 'owner'
+                    ? [navItem(businessChapters.team, staffIndex())]
+                    : []),
+                navItem(businessChapters.settings, editProfile(), onSettings),
             ],
         },
     ];

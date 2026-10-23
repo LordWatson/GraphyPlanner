@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AI\DiscoverTrendsAction;
 use App\Actions\AI\RecommendPostsAction;
+use App\Actions\AI\RepurposeCaptionsForPostAction;
 use App\Actions\AI\SuggestCaptionsForPostAction;
 use App\Enums\Platform;
 use App\Enums\Role;
@@ -91,6 +92,19 @@ class AiController extends Controller
             ->all();
 
         return response()->json(['suggestions' => $suggestions, 'policyWarnings' => $policyWarnings]);
+    }
+
+    /**
+     * Step B-6.4 — repurpose the post's caption natively for each of its platforms. Same gate as
+     * captions; returns one variant per platform for the editor's per-platform override fields.
+     */
+    public function repurpose(Request $request, Post $post, RepurposeCaptionsForPostAction $action): JsonResponse
+    {
+        abort_unless((bool) config('ai.enabled', false), 404);
+        $this->authorize('view', $post);
+        $this->authorizeAiUse($request, $post->org_id);
+
+        return response()->json(['variants' => $action($post)]);
     }
 
     /**

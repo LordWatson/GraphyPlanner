@@ -26,17 +26,31 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useAppearance } from '@/hooks/use-appearance';
+import { useWorkspace } from '@/hooks/use-workspace';
 import type { Chapter } from '@/lib/chapters';
-import { chapters, platformChapters } from '@/lib/chapters';
+import { businessChapters, chapters, platformChapters } from '@/lib/chapters';
 import { cn, toUrl } from '@/lib/utils';
 import { calendar, dashboard, needsAttention } from '@/routes';
+import { today as businessToday } from '@/routes/business';
+import { index as businessAccounts } from '@/routes/business/accounts';
+import { edit as businessBrand } from '@/routes/business/brand';
+import { index as businessCollections } from '@/routes/business/collections';
+import { index as businessIdeas } from '@/routes/business/ideas';
+import { index as businessInsights } from '@/routes/business/insights';
+import { index as businessMedia } from '@/routes/business/media';
+import {
+    create as createBusinessPost,
+    index as businessPosts,
+} from '@/routes/business/posts';
 import {
     create as createClient,
     index as clientsIndex,
 } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
+import { index as contentIndex } from '@/routes/content';
 import { index as gridsIndex } from '@/routes/grids';
+import { index as myWorkIndex } from '@/routes/my-work';
 import { create as createAnalyticsReport } from '@/routes/analytics/reports';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
@@ -109,6 +123,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 
 function useCommands(close: () => void): Command[] {
     const { auth } = usePage<{ auth: Auth }>().props;
+    const { isBusiness } = useWorkspace();
     const { resolvedAppearance, updateAppearance } = useAppearance();
 
     return useMemo(() => {
@@ -140,6 +155,10 @@ function useCommands(close: () => void): Command[] {
         const studioCommands: Command[] = [
             chapterCommand(chapters.overview, dashboard()),
             chapterCommand(chapters.attention, needsAttention()),
+            {
+                ...chapterCommand(chapters.myWork, myWorkIndex()),
+                keywords: 'my work assigned mine review due mentioned tasks',
+            },
             chapterCommand(chapters.calendar, calendar()),
             chapterCommand(chapters.clients, clientsIndex()),
             {
@@ -171,6 +190,44 @@ function useCommands(close: () => void): Command[] {
                 : []),
             ...(isOwner ? [chapterCommand(chapters.staff, staffIndex())] : []),
             chapterCommand(chapters.settings, editProfile()),
+        ];
+
+        // Phase B-4: a business workspace gets its own, calmer set of destinations.
+        const businessCommands: Command[] = [
+            chapterCommand(businessChapters.today, businessToday()),
+            chapterCommand(businessChapters.calendar, calendar()),
+            chapterCommand(businessChapters.posts, businessPosts()),
+            {
+                id: 'section-collections',
+                group: 'Chapters',
+                label: 'Collections',
+                hint: 'Group related posts — a launch, a season.',
+                keywords: 'campaign collection group launch season',
+                icon: Megaphone,
+                chapter: businessChapters.posts,
+                run: visit(businessCollections()),
+            },
+            chapterCommand(businessChapters.ideas, businessIdeas()),
+            chapterCommand(businessChapters.media, businessMedia()),
+            chapterCommand(businessChapters.insights, businessInsights()),
+            chapterCommand(businessChapters.brand, businessBrand()),
+            chapterCommand(businessChapters.accounts, businessAccounts()),
+            ...(isOwner
+                ? [chapterCommand(businessChapters.team, staffIndex())]
+                : []),
+            chapterCommand(businessChapters.settings, editProfile()),
+            {
+                id: 'create-post',
+                group: 'Create',
+                label: 'New post',
+                hint: 'Start a fresh post for your brand.',
+                keywords: 'new post create draft schedule',
+                icon: Plus,
+                run: () => {
+                    close();
+                    router.post(toUrl(createBusinessPost()));
+                },
+            },
         ];
 
         // Phase 15: super admins navigate the platform console, not the studio.
@@ -216,10 +273,12 @@ function useCommands(close: () => void): Command[] {
                           run: visit(createReport()),
                       },
                   ]
-                : studioCommands;
+                : isBusiness
+                  ? businessCommands
+                  : studioCommands;
 
         // Saved reports are built by Owners/Strategists (`OrganizationReportPolicy::create`).
-        if (isBilling && canViewAnalytics) {
+        if (!isBusiness && isBilling && canViewAnalytics) {
             list.push({
                 id: 'create-analytics-report',
                 group: 'Create',
@@ -231,7 +290,7 @@ function useCommands(close: () => void): Command[] {
             });
         }
 
-        if (isBilling) {
+        if (!isBusiness && isBilling) {
             list.push({
                 id: 'create-client',
                 group: 'Create',
@@ -240,6 +299,23 @@ function useCommands(close: () => void): Command[] {
                 keywords: 'new client brand onboard',
                 icon: Plus,
                 run: visit(createClient()),
+            });
+        }
+
+        // Step M-5.2: the producing roles can start a post from anywhere; the content hub's
+        // "New post" picker chooses the client (per-client create is re-checked server-side).
+        if (
+            !isBusiness &&
+            ['owner', 'strategist', 'designer'].includes(auth.user.role ?? '')
+        ) {
+            list.push({
+                id: 'create-post',
+                group: 'Create',
+                label: 'New post',
+                hint: 'Start a post for any client.',
+                keywords: 'new post create draft content',
+                icon: Plus,
+                run: visit(contentIndex()),
             });
         }
 
@@ -262,6 +338,7 @@ function useCommands(close: () => void): Command[] {
     }, [
         auth.user.role,
         auth.can?.viewAnalytics,
+        isBusiness,
         close,
         resolvedAppearance,
         updateAppearance,

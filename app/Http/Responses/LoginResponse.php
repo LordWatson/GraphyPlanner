@@ -29,11 +29,21 @@ class LoginResponse implements LoginResponseContract
 
         $user = $request->user();
 
+        $organization = $user?->organization;
+
         $home = match ($user?->role) {
             Role::ClientReviewer => '/portal',
             // Step 15.1: platform staff have no org workspace — they land on their own console.
             Role::SuperAdmin => '/super-admin',
-            default => '/dashboard',
+            // Step B-2.2: a business workspace that hasn't finished (or skipped) its guided setup
+            // lands there first.
+            default => match (true) {
+                $organization?->needsOnboarding() => '/welcome-setup',
+                // Step B-4.2: a business workspace lands on its own "Today" home, never the
+                // agency dashboard.
+                $organization?->isBusiness() === true => '/today',
+                default => '/dashboard',
+            },
         };
 
         return redirect()->intended($home);

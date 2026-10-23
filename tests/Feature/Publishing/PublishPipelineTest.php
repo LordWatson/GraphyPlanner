@@ -190,6 +190,54 @@ class PublishPipelineTest extends TestCase
         $this->assertSame(PostStatus::Published, $post->refresh()->status);
     }
 
+    public function test_retrying_a_single_failed_target_leaves_the_other_failed_channels_untouched(): void
+    {
+        $owner = User::factory()->for($this->org, 'organization')->role(Role::Owner)->create();
+        [$post, $accounts] = $this->postWithTargets(PostStatus::Failed, ['2026-10-18 10:00:00', '2026-10-18 10:00:00']);
+        $post->targets()->where('social_account_id', $accounts[0]->id)->update(['status' => PostTargetStatus::Failed, 'error' => 'Rate limit exceeded']);
+        $post->targets()->where('social_account_id', $accounts[1]->id)->update(['status' => PostTargetStatus::Failed, 'error' => 'Token expired']);
+
+        $retryTargetId = $post->targets()->where('social_account_id', $accounts[1]->id)->value('id');
+
+        // Only the one retried channel is handed to the vendor.
+        $adapter = Mockery::mock(PublishAdapter::class);
+        $adapter->shouldReceive('publish')
+            ->once()
+            ->withArgs(fn (Post $p, Collection $targets) => $targets->pluck('id')->all() === [$accounts[1]->id])
+            ->andReturn(collect([new TargetResult(accountId: $accounts[1]->id, ok: true, externalPostId: 'ext-retry')]));
+        $this->app->instance(PublishAdapter::class, $adapter);
+
+        $this->actingAs($owner)
+            ->post(route('posts.retry-failed-targets', $post), ['target' => $retryTargetId])
+            ->assertRedirect(route('posts.edit', $post));
+
+        $post->refresh();
+        $this->assertSame(PostStatus::Publishing, $post->status);
+
+        // The retried channel was reset and resent; the other failed channel is left as it was.
+        $retried = $post->targets()->where('social_account_id', $accounts[1]->id)->sole();
+        $this->assertSame('ext-retry', $retried->external_post_id);
+        $this->assertNull($retried->error);
+
+        $untouched = $post->targets()->where('social_account_id', $accounts[0]->id)->sole();
+        $this->assertSame(PostTargetStatus::Failed, $untouched->status);
+        $this->assertSame('Rate limit exceeded', $untouched->error);
+    }
+
+    public function test_retrying_a_target_from_another_post_is_rejected(): void
+    {
+        $owner = User::factory()->for($this->org, 'organization')->role(Role::Owner)->create();
+        [$post] = $this->postWithTargets(PostStatus::Failed, ['2026-10-18 10:00:00']);
+        $post->targets()->update(['status' => PostTargetStatus::Failed, 'error' => 'Token expired']);
+
+        [$otherPost] = $this->postWithTargets(PostStatus::Failed, ['2026-10-18 10:00:00']);
+        $foreignTargetId = $otherPost->targets()->value('id');
+
+        $this->actingAs($owner)
+            ->post(route('posts.retry-failed-targets', $post), ['target' => $foreignTargetId])
+            ->assertNotFound();
+    }
+
     public function test_retry_is_forbidden_for_viewers_and_for_posts_that_did_not_fail(): void
     {
         $viewer = User::factory()->for($this->org, 'organization')->role(Role::Viewer)->create();

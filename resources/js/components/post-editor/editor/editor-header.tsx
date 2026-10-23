@@ -1,13 +1,17 @@
-import { Link } from '@inertiajs/react';
-import { ArrowLeft, Grid3x3 } from 'lucide-react';
+import { Link, router } from '@inertiajs/react';
+import { ArrowLeft, Copy, Grid3x3 } from 'lucide-react';
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { PageHeader } from '@/components/page';
+import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
+import { PostHistoryDrawer } from '@/components/post-editor/post-history-drawer';
 import type { PostData } from '@/components/post-editor/types';
 import { StatusPill } from '@/components/status-pill';
+import { Button } from '@/components/ui/button';
 import { ordinal } from '@/lib/grid-layout';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
 import { edit as editGrid } from '@/routes/grids';
+import { duplicate as duplicatePost } from '@/routes/posts';
 
 export type EditorGridLink = {
     id: number;
@@ -29,6 +33,8 @@ export function EditorHeader({
     client: { id: number; name: string };
     grid: EditorGridLink | null;
 }) {
+    const { page } = usePostEditorContext();
+
     return (
         <>
             <div className="-mb-4">
@@ -46,6 +52,25 @@ export function EditorHeader({
                 title={
                     <>
                         {client.name} <em>post</em>
+                    </>
+                }
+                actions={
+                    <>
+                        <PostHistoryDrawer
+                            postId={post.id}
+                            canRestore={page.can.update}
+                        />
+                        {page.can.duplicate && (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.post(duplicatePost(post.id).url)
+                                }
+                            >
+                                <Copy />
+                                Duplicate
+                            </Button>
+                        )}
                     </>
                 }
                 meta={

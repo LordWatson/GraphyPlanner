@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\ReferenceImageRole;
-use App\Models\Client;
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Policies\BrandBrainPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,12 +13,13 @@ use Illuminate\Validation\Rule;
  */
 class UpdateBrandReferencesRequest extends FormRequest
 {
+    use ResolvesWorkspaceBrand;
+
     public function authorize(BrandBrainPolicy $policy): bool
     {
-        /** @var Client $client */
-        $client = $this->route('client');
+        $client = $this->brand();
 
-        return $this->user() !== null && $policy->update($this->user(), $client);
+        return $this->user() !== null && $client !== null && $policy->update($this->user(), $client);
     }
 
     /**

@@ -1,9 +1,12 @@
 import { router } from '@inertiajs/react';
-import { FileImage } from 'lucide-react';
+import { FileImage, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import type { DesignImportsConfig } from '@/components/clients/design-import-dialog';
+import { DesignImportDialog } from '@/components/clients/design-import-dialog';
 import { confirmDialog } from '@/components/confirm-dialog';
 import type { ClientPageProps } from '@/components/clients/client-layout';
+import { Button } from '@/components/ui/button';
 import {
     ClientLayout,
     TabHeading,
@@ -28,11 +31,17 @@ import { destroy as destroyAsset } from '@/routes/assets';
  * `AssetLibraryDialog` (`manage` mode), so this page loads no asset rows at all. Files uploaded
  * here show below the tiles until the page is left.
  */
-export default function ClientMediaTab(page: ClientPageProps) {
-    const { client, can, stats } = page;
+export default function ClientMediaTab(
+    page: ClientPageProps & { designImports?: DesignImportsConfig },
+) {
+    const { client, can, stats, designImports } = page;
     const [browsing, setBrowsing] = useState(false);
+    const [importing, setImporting] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [uploaded, setUploaded] = useState<AssetData[]>([]);
+    const canImport =
+        (designImports?.can_import ?? false) &&
+        (designImports?.providers.length ?? 0) > 0;
 
     const refreshCount = () => router.reload({ only: ['stats'] });
 
@@ -97,6 +106,18 @@ export default function ClientMediaTab(page: ClientPageProps) {
                     icon={FileImage}
                     title="Assets"
                     description={`${stats.assets.toLocaleString()} ${stats.assets === 1 ? 'asset' : 'assets'} in this client's library`}
+                    actions={
+                        canImport ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setImporting(true)}
+                            >
+                                <Sparkles />
+                                Import from Canva / Drive / Dropbox
+                            </Button>
+                        ) : undefined
+                    }
                 />
 
                 <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
@@ -144,6 +165,15 @@ export default function ClientMediaTab(page: ClientPageProps) {
                 onDelete={handleDelete}
                 description="Every asset uploaded for this client. Open one to view it full size."
             />
+
+            {designImports && (
+                <DesignImportDialog
+                    clientId={client.id}
+                    config={designImports}
+                    open={importing}
+                    onOpenChange={setImporting}
+                />
+            )}
         </ClientLayout>
     );
 }

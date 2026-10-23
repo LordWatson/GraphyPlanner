@@ -5,10 +5,14 @@ namespace App\Http\Controllers;
 use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
+use App\Actions\Posts\CreateSharePreviewAction;
 use App\Actions\Posts\DeletePostAction;
+use App\Actions\Posts\DuplicatePostAction;
 use App\Actions\Posts\EvaluatePostChecklistAction;
-use App\Actions\Posts\PostStatusTransitionMap;
+use App\Actions\Posts\QuickSchedulePostAction;
+use App\Actions\Posts\RecyclePostAction;
 use App\Actions\Posts\ReschedulePostAction;
+use App\Actions\Posts\RescheduleTargetAction;
 use App\Actions\Posts\ResendClientReviewEmailAction;
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
@@ -17,10 +21,15 @@ use App\Actions\Publishing\SearchMusicAction;
 use App\Enums\CampaignStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
+use App\Enums\PublishFailureReason;
 use App\Enums\Role;
 use App\Exceptions\Publishing\MusicProviderUnavailableException;
+use App\Http\Requests\CreateSharePreviewRequest;
 use App\Http\Requests\OverridePostApprovalRequest;
+use App\Http\Requests\QuickSchedulePostRequest;
 use App\Http\Requests\ReschedulePostRequest;
+use App\Http\Requests\RescheduleTargetRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\TransitionPostRequest;
@@ -33,10 +42,12 @@ use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Models\User;
 use App\Services\Analytics\BestTimeService;
 use App\Services\ClientHashtagService;
 use App\Services\Grids\GridPlanService;
 use App\Services\PostNotificationService;
+use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
@@ -65,6 +76,37 @@ class PostController extends Controller
     }
 
     /**
+     * Step M-5.2 — duplicate a post into a fresh `draft` for the same client (content, media and
+     * target accounts, but never the schedule or publish state), then open the copy in the editor.
+     */
+    public function duplicate(Request $request, Post $post, DuplicatePostAction $action): RedirectResponse
+    {
+        $this->authorize('view', $post);
+        $this->authorize('create', [Post::class, $post->client]);
+
+        $copy = $action($post, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post duplicated. Set its schedule and send it on.')]);
+
+        return to_route('posts.edit', $copy);
+    }
+
+    /**
+     * Step M-5.8 (Phase 11) — recycle a published, reusable post into a fresh `idea` for the same
+     * client (content, media and channels, never the schedule), then open it in the editor.
+     */
+    public function recycle(Request $request, Post $post, RecyclePostAction $action): RedirectResponse
+    {
+        $this->authorize('recycle', $post);
+
+        $copy = $action($post, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Post recycled. Pick fresh dates and send it on.')]);
+
+        return to_route('posts.edit', $copy);
+    }
+
+    /**
      * Show the full editor UI for a post (Step 0.10): caption/hashtags/music/location, per-target
      * schedule rows, attached media, the §6 checklist, transition controls, comments, and the
      * activity log.
@@ -80,11 +122,14 @@ class PostController extends Controller
         PlatformRolloutGate $rollout,
         GridPlanService $grids,
         BestTimeService $bestTime,
+        PostWorkflowResolver $workflows,
     ): Response {
         $this->authorize('view', $post);
 
         $user = $request->user();
         $post->load([
+            // Step B-3.1: the workspace workflow needs the org type (business vs agency).
+            'organization',
             // Step I-2.6: the editor reads the client and its brand brain (hashtag policy).
             'client.brandBrain',
             'targets.socialAccount',
@@ -98,8 +143,11 @@ class PostController extends Controller
         ]);
 
         $client = $post->client;
+        // Step B-3.1: the legal next steps come from this workspace's workflow (agency keeps the
+        // full client-approval lifecycle; a business workspace self-approves or opts into review),
+        // then narrowed to the ones this user is authorized to make.
         $allowedTransitions = array_values(array_filter(
-            PostStatusTransitionMap::allowedFor($post),
+            $workflows->forPost($post)->allowedTransitions($post, $user),
             fn (PostStatus $to) => $user->can('transition', [$post, $to]),
         ));
 
@@ -152,7 +200,22 @@ class PostController extends Controller
                 // Step M-2.9: approve without the client (Owner, with a reason).
                 'override_approval' => $user->can('overrideApproval', $post),
                 'delete' => $user->can('delete', $post),
+                // Step M-5.2: duplicate needs create rights on the client (not update).
+                'duplicate' => $user->can('create', [Post::class, $client]),
                 'create_asset' => $user->can('create', [Asset::class, $client]),
+                // Step B-3.2 / B-3.4: the one-tap schedule and the share-preview link.
+                'quick_schedule' => $user->can('transition', [$post, PostStatus::Scheduled]),
+                'share_preview' => $user->can('sharePreview', $post),
+            ],
+            // Step B-3.2: the business editor's one-tap primary action reads this to pick its label
+            // ("Schedule"/"Post now" when review is off, "Send for review" when it's on).
+            'workflow' => [
+                'is_business' => $post->organization->isBusiness(),
+                'requires_review' => $workflows->forPost($post)->requiresReview($post->organization),
+                // "Schedule" needs a time on every target; "Post now" doesn't. Lets the bar disable
+                // "Schedule" with a hint rather than bounce the user off a checklist failure.
+                'has_times' => $post->targets->isNotEmpty()
+                    && $post->targets->every(fn (PostTarget $target) => $target->scheduled_at_utc !== null),
             ],
             'hashtagSuggestions' => $hashtagSuggestions,
             // The image formats each channel offers (the preview's "Format" picker).
@@ -164,6 +227,14 @@ class PostController extends Controller
                 'id' => $mentionable->id,
                 'name' => $mentionable->name,
             ])->values(),
+            // Step M-5.4: internal staff who can be assigned the post or set as its reviewer.
+            'staff' => User::query()
+                ->where('org_id', $post->org_id)
+                ->whereIn('role', [Role::Owner, Role::Strategist, Role::Designer, Role::Viewer])
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (User $member) => ['id' => $member->id, 'name' => $member->name])
+                ->all(),
             'ai' => [
                 'enabled' => (bool) config('ai.enabled', false),
                 'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
@@ -183,7 +254,7 @@ class PostController extends Controller
      */
     public function update(UpdatePostRequest $request, Post $post, UpdatePostAction $action): RedirectResponse
     {
-        $action($post, $request->validated());
+        $action($post, $request->validated(), $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Post saved.')]);
 
@@ -208,6 +279,43 @@ class PostController extends Controller
         ]);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step B-3.2 — the solo owner's one-tap schedule. Thin: it hands the post, actor and "when"
+     * ("schedule" uses the post's own times, "now" retimes every target to publish immediately) to
+     * `QuickSchedulePostAction`, which self-approves + schedules (review off) or sends for review
+     * (review on). A not-ready post surfaces as a normal validation error on the editor.
+     */
+    public function quickSchedule(QuickSchedulePostRequest $request, Post $post, QuickSchedulePostAction $action): RedirectResponse
+    {
+        $post = $action($post, $request->user(), $request->validated('when') ?? QuickSchedulePostAction::WHEN_SCHEDULED);
+
+        $message = $post->status === PostStatus::InternalReview
+            ? __('Sent for review.')
+            : __('Scheduled. We’ll post it for you.');
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
+
+        return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step B-3.4 — mint a read-only "Share preview" link (a partner/sponsor link) for this post and
+     * return the plain URL once as JSON (it's hashed at rest, so it's never recoverable afterwards).
+     */
+    public function sharePreview(CreateSharePreviewRequest $request, Post $post, CreateSharePreviewAction $action): JsonResponse
+    {
+        $days = $request->integer('expires_in_days') ?: 14;
+
+        $result = $action(
+            $post,
+            $request->boolean('allow_comments'),
+            $request->boolean('allow_approval'),
+            now()->addDays($days),
+        );
+
+        return response()->json(['url' => route('review.show', $result['token'])]);
     }
 
     /**
@@ -237,6 +345,25 @@ class PostController extends Controller
     }
 
     /**
+     * Step M-5.7 / I-5.1 — move a single channel to a new local date (and, from the week/day time
+     * grid, a new local time), leaving the post's other channels where they are. Redirects back so
+     * the calendar keeps its filters and scroll position.
+     */
+    public function rescheduleTarget(RescheduleTargetRequest $request, PostTarget $target, RescheduleTargetAction $action): RedirectResponse
+    {
+        $action(
+            $target,
+            $request->string('scheduled_local_date')->toString(),
+            $request->filled('scheduled_local_time') ? $request->string('scheduled_local_time')->toString() : null,
+            $request->user(),
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Channel moved.')]);
+
+        return back();
+    }
+
+    /**
      * Step I-1.5 — delete (soft) a post that never went out. Published posts can only be
      * archived, through the regular `archived` transition.
      */
@@ -259,9 +386,21 @@ class PostController extends Controller
     {
         $this->authorize('retryFailedTargets', $post);
 
-        $action($post, $request->user());
+        // Step B-5.3: an optional `target` retries just that one failed channel, leaving the
+        // others. The id must belong to this post (a channel from another post can't be retried).
+        $validated = $request->validate([
+            'target' => ['nullable', 'integer'],
+        ]);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Retrying the failed channels.')]);
+        $only = isset($validated['target'])
+            ? ($post->targets()->whereKey($validated['target'])->first() ?? abort(404))
+            : null;
+
+        $action($post, $request->user(), $only);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $only !== null
+            ? __('Retrying this channel.')
+            : __('Retrying the failed channels.')]);
 
         return to_route('posts.edit', $post);
     }
@@ -410,6 +549,16 @@ class PostController extends Controller
             'id' => $post->id,
             'client_id' => $post->client_id,
             'campaign_id' => $post->campaign_id,
+            // Step M-5.3: the "Saved · HH:MM" indicator reads this.
+            'updated_at' => $post->updated_at?->toIso8601String(),
+            // Step M-5.4: assignment and the internal due date.
+            'assignee_id' => $post->assignee_id,
+            'reviewer_id' => $post->reviewer_id,
+            'due_at' => $post->due_at?->toIso8601String(),
+            // Step M-5.8: evergreen reuse and repeat.
+            'is_recyclable' => $post->is_recyclable,
+            'recycle_after_days' => $post->recycle_after_days,
+            'recurrence' => $post->recurrence?->value,
             'campaign_name' => $post->campaign?->name,
             'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'status' => $post->status->value,
@@ -443,6 +592,12 @@ class PostController extends Controller
                 'status_label' => $target->status->label(),
                 'external_post_id' => $target->external_post_id,
                 'error' => $target->error,
+                // Step B-5.3: a plain-language reading of a failed channel's vendor error, with a
+                // fix action and whether a bare retry will help.
+                'failure' => $target->status === PostTargetStatus::Failed && filled($target->error)
+                    ? PublishFailureReason::classify($target->error, $target->socialAccount?->platform)
+                        ->describe($target->socialAccount?->platform)
+                    : null,
             ])->values(),
             'activity_logs' => $post->activityLogs->sortByDesc('created_at')->map(fn ($log) => [
                 'id' => $log->id,

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { login } from '@/routes';
+import { start } from '@/routes/organizations';
 
 type Option = { value: string; label: string };
 
@@ -258,9 +259,15 @@ export default function RegisterOrganization({
                             </p>
                         </div>
 
-                        <div className="text-muted-foreground text-center text-sm">
-                            Already have an account?{' '}
-                            <TextLink href={login()}>Log in</TextLink>
+                        <div className="text-muted-foreground flex flex-col gap-1 text-center text-sm">
+                            <span>
+                                Already have an account?{' '}
+                                <TextLink href={login()}>Log in</TextLink>
+                            </span>
+                            <span>
+                                Managing your own brand?{' '}
+                                <TextLink href={start()}>Start here</TextLink>
+                            </span>
                         </div>
                     </>
                 )}

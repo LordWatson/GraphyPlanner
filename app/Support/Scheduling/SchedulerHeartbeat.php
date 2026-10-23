@@ -24,8 +24,12 @@ final class SchedulerHeartbeat
     public const COMMANDS = [
         'posts:send-upcoming-reminders' => ['label' => 'Upcoming-post reminders', 'interval_minutes' => 1440],
         'publishing:poll-pending-statuses' => ['label' => 'Publish status poll', 'interval_minutes' => 5],
+        // Step B-7.4: web-push "goes out soon" reminders, every five minutes.
+        'push:send-post-reminders' => ['label' => 'Push post reminders', 'interval_minutes' => 5],
         'social-accounts:check-health' => ['label' => 'Social account health check', 'interval_minutes' => 60],
         'ai:generate-daily-briefs' => ['label' => 'Daily AI briefs', 'interval_minutes' => 1440],
+        // Step B-6.1: hourly (each timezone's 6am is caught from one schedule).
+        'business:generate-daily-ideas' => ['label' => 'Daily brand ideas', 'interval_minutes' => 60],
         'ai-images:prune' => ['label' => 'AI image prune', 'interval_minutes' => 1440],
         // Step M-3.4: hourly.
         'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 60],
@@ -38,6 +42,10 @@ final class SchedulerHeartbeat
         'grids:prune' => ['label' => 'Grid plan prune', 'interval_minutes' => 10080],
         // Phase M-4.3: daily retainer draft generation.
         'invoices:generate-retainer-drafts' => ['label' => 'Retainer drafts', 'interval_minutes' => 1440],
+        // Step M-5.8: daily recurring-post draft generation.
+        'posts:generate-recurring-drafts' => ['label' => 'Recurring post drafts', 'interval_minutes' => 1440],
+        // Step B-8.2: weekly business Insights digest, swept hourly (acts Monday morning per tz).
+        'business:send-insights-digest' => ['label' => 'Weekly insights digest', 'interval_minutes' => 60],
     ];
 
     public static function record(string $command): void

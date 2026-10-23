@@ -4,9 +4,11 @@ namespace App\Contracts;
 
 use App\Models\Client;
 use App\Models\Post;
+use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\ImageBriefInput;
 
@@ -45,4 +47,12 @@ interface AiProvider
      * never throws: implementations fall back to a deterministic, brand-derived brief.
      */
     public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief;
+
+    /**
+     * Step B-2.4: draft a business/creator's Brand Brain (voice, audience, offer, content pillars)
+     * from the plain facts they gave the onboarding quick-start. Suggestion only — nothing is
+     * persisted until the owner accepts. Never throws: a failed or disabled provider returns
+     * `AiBrandProfileDraft::empty()` so the wizard falls back to an editable blank form.
+     */
+    public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft;
 }

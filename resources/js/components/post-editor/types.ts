@@ -40,6 +40,14 @@ export type TargetData = {
     status_label: string;
     external_post_id: string | null;
     error: string | null;
+    /** Step B-5.3: a plain-language reading of a failed channel's vendor error. */
+    failure?: {
+        reason: string;
+        message: string;
+        fix: string;
+        retryable: boolean;
+        needs_reconnect: boolean;
+    } | null;
     /** Step M-2.2: this channel's overrides (null = uses the master). */
     caption_override: string | null;
     hashtags_override: string[] | null;
@@ -103,6 +111,16 @@ export type PostData = {
     id: number;
     client_id: number;
     campaign_id: number | null;
+    /** Step M-5.3: when the post was last saved (the "Saved · HH:MM" indicator). */
+    updated_at: string | null;
+    /** Step M-5.4: assignment and the internal due date. */
+    assignee_id: number | null;
+    reviewer_id: number | null;
+    due_at: string | null;
+    /** Step M-5.8: evergreen reuse and repeat. */
+    is_recyclable: boolean;
+    recycle_after_days: number | null;
+    recurrence: string | null;
     campaign_name: string | null;
     campaign: CampaignChipData | null;
     status: string;

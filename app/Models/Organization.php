@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\OrganizationType;
+use App\Enums\PublishMode;
 use App\Enums\Role;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,6 +21,10 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $name
  * @property string $slug
+ * @property OrganizationType $type
+ * @property Carbon|null $onboarding_completed_at
+ * @property bool $require_post_review
+ * @property bool $insights_digest_opt_out
  * @property string $default_timezone
  * @property string $default_currency
  * @property string|null $billing_details
@@ -28,6 +34,8 @@ use Illuminate\Support\Carbon;
  * @property int $invoice_payment_terms_days
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
+ * @property PublishMode|null $publish_mode
+ * @property string|null $upload_post_profile
  * @property string|null $xai_key
  * @property int|null $ai_monthly_image_quota
  * @property array<string, bool>|null $campaign_features
@@ -38,7 +46,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -52,6 +60,18 @@ class Organization extends Model
     public const PREVIEW_SLUG = 'preview-studio';
 
     /**
+     * Step B-1.1: mirrors the column default so an unsaved org (e.g. `factory()->make()`) already
+     * reads as an agency rather than a null type.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'type' => 'agency',
+        'require_post_review' => false,
+        'insights_digest_opt_out' => false,
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -59,8 +79,13 @@ class Organization extends Model
     protected function casts(): array
     {
         return [
+            'type' => OrganizationType::class,
+            'onboarding_completed_at' => 'datetime',
+            'require_post_review' => 'boolean',
+            'insights_digest_opt_out' => 'boolean',
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
+            'publish_mode' => PublishMode::class,
             'xai_key' => 'encrypted',
             'invoice_payment_terms_days' => 'integer',
             'ai_monthly_image_quota' => 'integer',
@@ -95,6 +120,18 @@ class Organization extends Model
     public function clients(): HasMany
     {
         return $this->hasMany(Client::class, 'org_id');
+    }
+
+    /**
+     * Step B-1.2 — a business workspace's single primary brand (an ordinary `Client` row with
+     * `is_primary = true`). Null for an agency, which has no single brand. `CurrentWorkspace`
+     * resolves and caches it per request.
+     *
+     * @return HasOne<Client, $this>
+     */
+    public function primaryBrand(): HasOne
+    {
+        return $this->hasOne(Client::class, 'org_id')->where('is_primary', true);
     }
 
     /**
@@ -153,6 +190,52 @@ class Organization extends Model
     public function isSuspended(): bool
     {
         return $this->suspended_at !== null;
+    }
+
+    /**
+     * Step B-1.1 — a one-brand business/creator workspace (see `OrganizationType`).
+     */
+    public function isBusiness(): bool
+    {
+        return $this->type === OrganizationType::Business;
+    }
+
+    /**
+     * Step B-1.1 — a multi-client agency studio (the default).
+     */
+    public function isAgency(): bool
+    {
+        return $this->type === OrganizationType::Agency;
+    }
+
+    /**
+     * Step B-2.2 — whether this business workspace still needs the guided setup. True only for a
+     * business org that hasn't finished or skipped onboarding; agencies never onboard this way.
+     */
+    public function needsOnboarding(): bool
+    {
+        return $this->isBusiness() && $this->onboarding_completed_at === null;
+    }
+
+    /**
+     * Step B-8.2 — whether this workspace should receive the weekly Insights email digest: a
+     * business org that has finished onboarding and hasn't opted out. Agencies never receive it.
+     */
+    public function wantsInsightsDigest(): bool
+    {
+        return $this->isBusiness()
+            && $this->onboarding_completed_at !== null
+            && ! $this->insights_digest_opt_out;
+    }
+
+    /**
+     * Step B-1.1 — organizations of one workspace type (super-admin segmentation, scheduled work).
+     *
+     * @param  Builder<Organization>  $query
+     */
+    public function scopeOfType(Builder $query, OrganizationType $type): void
+    {
+        $query->where('type', $type->value);
     }
 
     public function isPreviewFixture(): bool

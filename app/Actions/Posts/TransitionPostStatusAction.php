@@ -17,6 +17,8 @@ use App\Notifications\PostNoteMentioned;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
 use App\Services\PostNotificationService;
+use App\Services\Posts\PostRevisionService;
+use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\VendorScheduleService;
 use App\Support\CommentMentionParser;
 use Illuminate\Support\Carbon;
@@ -55,13 +57,24 @@ class TransitionPostStatusAction
         return $result;
     }
 
-    private function allowed(Post $post, PostStatus $to, ?PostStatus $from = null): bool
+    /**
+     * Whether `$to` is a legal next status for `$post` right now. The override path is the one
+     * Owner-only agency move that normal legality forbids (approving a `client_required` post
+     * without the client); everything else is asked of the per-org-type workflow (Step B-3.1), so
+     * a business post follows its own lifecycle while agency behaviour is unchanged.
+     *
+     * `$from` is always `$post->status` at every call site (the first check, and the re-check
+     * against the row locked inside the transaction), so the workflow's `$post->status`-based
+     * answer is correct for both.
+     */
+    private function allowed(Post $post, PostStatus $to, ?User $user = null): bool
     {
-        $from ??= $post->status;
+        if ($this->overriding) {
+            return PostStatusTransitionMap::isAllowed($post->status, $to)
+                && PostStatusTransitionMap::needsClientApproval($post, $post->status, $to);
+        }
 
-        return $this->overriding
-            ? PostStatusTransitionMap::isAllowed($from, $to) && PostStatusTransitionMap::needsClientApproval($post, $from, $to)
-            : PostStatusTransitionMap::isAllowedFor($post, $to, $from);
+        return in_array($to, app(PostWorkflowResolver::class)->forPost($post)->allowedTransitions($post, $user), true);
     }
 
     /**
@@ -103,7 +116,7 @@ class TransitionPostStatusAction
         SendClientReviewRequestedEmailAction $sendClientReviewRequestedEmail = new SendClientReviewRequestedEmailAction,
         PostNotificationService $notifications = new PostNotificationService,
     ): Post {
-        if (! $this->allowed($post, $to)) {
+        if (! $this->allowed($post, $to, $user)) {
             throw new InvalidPostTransitionException($post->id, $post->status, $to);
         }
 
@@ -130,7 +143,7 @@ class TransitionPostStatusAction
             $locked = Post::query()->whereKey($post->id)->lockForUpdate()->firstOrFail();
             $from = $locked->status;
 
-            if (! $this->allowed($locked, $to, $from)) {
+            if (! $this->allowed($locked, $to, $user)) {
                 Log::warning('Post transition rejected: status changed concurrently', [
                     'post_id' => $locked->id,
                     'user_id' => $user?->id,
@@ -207,6 +220,12 @@ class TransitionPostStatusAction
 
             $locked->refresh();
 
+            // Step M-5.3: snapshot the version the client is shown, so a later re-review can show
+            // "what changed since you last saw it".
+            if ($to === PostStatus::WaitingClient) {
+                app(PostRevisionService::class)->record($locked, $user, shared: true);
+            }
+
             DB::afterCommit(function () use ($locked, $to, $user, $comment, $notifications) {
                 // Step 1.4: nothing calls the vendor until this point — the §6 checklist is
                 // already re-validated server-side before `scheduled` is even a legal
@@ -251,7 +270,8 @@ class TransitionPostStatusAction
     private function notify(Post $post, PostStatus $to, ?User $user, PostNotificationService $notifications, Collection $excludeIds = new Collection): void
     {
         if ($to === PostStatus::InternalReview) {
-            $recipients = $notifications->orgRecipients($post, $user)->whereNotIn('id', $excludeIds);
+            // Step B-3.3: in a business workspace this is Owners/Managers only; agency unchanged.
+            $recipients = $notifications->internalReviewRecipients($post, $user)->whereNotIn('id', $excludeIds);
 
             $notifications->send($recipients, new PostWaitingForInternalReview($post));
 

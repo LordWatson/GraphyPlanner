@@ -6,6 +6,7 @@ use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Actions\Posts\PostStatusTransitionMap;
 use App\Enums\PostStatus;
 use App\Models\Post;
+use App\Services\Posts\PostWorkflowResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
 
@@ -47,7 +48,9 @@ class TransitionPostRequest extends FormRequest
                         return;
                     }
 
-                    if ($to !== null && ! PostStatusTransitionMap::isAllowedFor($post, $to)) {
+                    // Step B-3.1: legality is the workspace's workflow, not the raw map — a business
+                    // post may self-approve (`draft → approved`) where an agency post may not.
+                    if ($to !== null && ! in_array($to, app(PostWorkflowResolver::class)->forPost($post)->allowedTransitions($post, $this->user()), true)) {
                         $fail("Cannot transition this post from {$post->status->value} to {$to->value}.");
 
                         return;

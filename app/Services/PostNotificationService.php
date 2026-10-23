@@ -33,6 +33,45 @@ class PostNotificationService
     }
 
     /**
+     * Step B-3.3 — who hears that a post is waiting for internal review. In an agency that's every
+     * internal user (`orgRecipients`, unchanged). In a business workspace with review turned on,
+     * only the people who can act on it — Owners and Managers (`Role::Strategist`) — so a Creator
+     * isn't pinged about work they can't approve.
+     *
+     * @return Collection<int, User>
+     */
+    public function internalReviewRecipients(Post $post, ?User $exclude = null): Collection
+    {
+        $post->loadMissing('organization');
+
+        if (! $post->organization->isBusiness()) {
+            // Step M-5.4: if the post has an internal reviewer and/or assignee, ping just them
+            // instead of the whole org; otherwise fall back to every internal user (unchanged).
+            $responsible = array_values(array_filter([$post->reviewer_id, $post->assignee_id]));
+
+            if ($responsible !== []) {
+                $targeted = User::query()
+                    ->where('org_id', $post->org_id)
+                    ->whereIn('id', $responsible)
+                    ->when($exclude, fn ($query) => $query->whereKeyNot($exclude->id))
+                    ->get();
+
+                if ($targeted->isNotEmpty()) {
+                    return $targeted;
+                }
+            }
+
+            return $this->orgRecipients($post, $exclude);
+        }
+
+        return User::query()
+            ->where('org_id', $post->org_id)
+            ->whereIn('role', [Role::Owner, Role::Strategist])
+            ->when($exclude, fn ($query) => $query->whereKeyNot($exclude->id))
+            ->get();
+    }
+
+    /**
      * Every client-portal user (`Role::ClientReviewer`) scoped to this post's client,
      * optionally excluding one user.
      *

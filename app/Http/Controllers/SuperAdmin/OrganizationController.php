@@ -10,6 +10,7 @@ use App\Actions\SuperAdmin\ListOrganizationsAction;
 use App\Actions\SuperAdmin\ReinstateOrganizationAction;
 use App\Actions\SuperAdmin\SuspendOrganizationAction;
 use App\Actions\SuperAdmin\UpdateOrganizationAction;
+use App\Enums\OrganizationType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SuperAdmin\AnalyticsFilterRequest;
 use App\Http\Requests\SuperAdmin\DeleteOrganizationRequest;
@@ -74,6 +75,11 @@ class OrganizationController extends Controller
         return Inertia::render('super-admin/organizations/create', [
             'timezones' => TimezoneOptions::options(),
             'currencies' => CurrencyOptions::options(),
+            // Step B-2.1: onboard an agency or a business/creator workspace.
+            'organizationTypes' => array_map(fn (OrganizationType $type) => [
+                'value' => $type->value,
+                'label' => $type->label(),
+            ], OrganizationType::cases()),
         ]);
     }
 

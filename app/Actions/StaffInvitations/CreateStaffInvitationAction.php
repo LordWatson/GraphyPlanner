@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Throwable;
 
 class CreateStaffInvitationAction
@@ -24,6 +25,12 @@ class CreateStaffInvitationAction
      */
     public function __invoke(Organization $organization, string $email, Role $role, User $invitedBy): StaffInvitation
     {
+        // Step B-1.5: never invite a role the organization type can't assign (defence in depth
+        // behind `StoreStaffInvitationRequest` — e.g. a `SuperAdmin` into a business workspace).
+        if (! in_array($role, Role::assignableFor($organization->type), true)) {
+            throw new InvalidArgumentException("Role [{$role->value}] can't be assigned in a {$organization->type->value} workspace.");
+        }
+
         $invitation = DB::transaction(function () use ($organization, $email, $role, $invitedBy) {
             $plainToken = Str::random(64);
 
