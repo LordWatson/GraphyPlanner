@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Security;
 
+use App\Enums\AiTextJobKind;
+use App\Enums\AiTextJobStatus;
 use App\Enums\DesignImportProvider;
 use App\Enums\GridPlanStatus;
 use App\Enums\Platform;
@@ -10,6 +12,7 @@ use App\Enums\Role;
 use App\Models\AiImageGeneration;
 use App\Models\AiImageVariant;
 use App\Models\AiPostIdea;
+use App\Models\AiTextJob;
 use App\Models\AiTrend;
 use App\Models\Asset;
 use App\Models\Campaign;
@@ -239,6 +242,15 @@ class CrossTenantRouteTest extends TestCase
             ClientReport::class => ClientReport::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'client_id' => $client->id, 'period_start' => '2026-09-01', 'period_end' => '2026-09-30', 'status' => 'published', 'published_at' => now(), 'snapshot' => []]),
             AiTrend::class => $trend,
             AiPostIdea::class => $idea,
+            // Step M-7.2: an async text job of the other org (ai-text-jobs/{aiTextJob}[/cancel]).
+            AiTextJob::class => AiTextJob::query()->withoutGlobalScopes()->create([
+                'org_id' => $org->id,
+                'user_id' => $owner->id,
+                'client_id' => $client->id,
+                'post_id' => $post->id,
+                'kind' => AiTextJobKind::Captions,
+                'status' => AiTextJobStatus::Queued,
+            ]),
             AiImageGeneration::class => $generation,
             AiImageVariant::class => AiImageVariant::factory()->create(['generation_id' => $generation->id, 'org_id' => $org->id]),
             GridPlan::class => $grid,

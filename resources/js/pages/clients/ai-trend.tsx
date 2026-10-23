@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
+import AiFeedbackController from '@/actions/App/Http/Controllers/AiFeedbackController';
+import { AiFeedbackButtons } from '@/components/ai/ai-feedback-buttons';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { show as showClient } from '@/routes/clients';
@@ -13,6 +15,7 @@ type TrendData = {
     summary: string | null;
     platforms: string[];
     confidence: number;
+    source: string | null;
     created_at: string | null;
 };
 
@@ -42,11 +45,31 @@ export default function AiTrendShow({
                 <PageHeader
                     eyebrow={`AI trend — ${client.name}${trend.created_at ? ` · ${formatDateTime(trend.created_at)}` : ''}`}
                     title={trend.title}
-                    meta={trend.platforms.map((platform, i) => (
-                        <Badge key={i} variant="outline" className="capitalize">
-                            {platform}
-                        </Badge>
-                    ))}
+                    meta={[
+                        ...(trend.source
+                            ? [
+                                  <Badge
+                                      key="source"
+                                      variant={
+                                          trend.source === 'AI hypothesis'
+                                              ? 'outline'
+                                              : 'success'
+                                      }
+                                  >
+                                      {trend.source}
+                                  </Badge>,
+                              ]
+                            : []),
+                        ...trend.platforms.map((platform, i) => (
+                            <Badge
+                                key={i}
+                                variant="outline"
+                                className="capitalize"
+                            >
+                                {platform}
+                            </Badge>
+                        )),
+                    ]}
                 />
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_15rem]">
@@ -62,6 +85,17 @@ export default function AiTrendShow({
                                 </span>
                             )}
                         </p>
+                        {trend.source === 'AI hypothesis' && (
+                            <p className="text-muted-foreground mt-3 text-xs">
+                                This is an AI hypothesis, not live data — a
+                                starting point to check against what you know.
+                            </p>
+                        )}
+                        <AiFeedbackButtons
+                            url={AiFeedbackController.trend(trend.id).url}
+                            label="Was this trend useful?"
+                            className="mt-5"
+                        />
                     </Panel>
                     <div className="bg-ink text-ink-foreground flex flex-col justify-between gap-6 rounded-2xl p-5">
                         <span className="eyebrow opacity-70">Confidence</span>

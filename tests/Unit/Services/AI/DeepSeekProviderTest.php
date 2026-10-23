@@ -254,32 +254,33 @@ class DeepSeekProviderTest extends TestCase
             && $context['finish_reason'] === 'length');
     }
 
-    public function test_recommend_posts_asks_for_and_keeps_at_most_three_ideas(): void
+    public function test_recommend_posts_asks_for_and_keeps_at_most_the_configured_number(): void
     {
+        // Step M-7.5 lifted the cap to `ai.suggestions.per_request` (default 6).
         Http::fake([
             '*/chat/completions' => Http::response($this->chatResponse([
-                'ideas' => array_map(fn (int $i) => ['title' => "Idea {$i}", 'description' => 'Desc'], range(1, 5)),
+                'ideas' => array_map(fn (int $i) => ['title' => "Idea {$i}", 'description' => 'Desc'], range(1, 8)),
             ]), 200),
         ]);
 
         $result = (new DeepSeekProvider)->recommendPosts(Client::factory()->create());
 
-        $this->assertSame(['Idea 1', 'Idea 2', 'Idea 3'], array_map(fn ($idea) => $idea->title, $result->ideas));
-        Http::assertSent(fn ($request) => str_contains($request['messages'][1]['content'], 'Recommend exactly 3 fresh post ideas'));
+        $this->assertCount(6, $result->ideas);
+        Http::assertSent(fn ($request) => str_contains($request['messages'][1]['content'], 'Recommend exactly 6 fresh post ideas'));
     }
 
-    public function test_discover_trends_asks_for_and_keeps_at_most_three_trends(): void
+    public function test_discover_trends_asks_for_and_keeps_at_most_the_configured_number(): void
     {
         Http::fake([
             '*/chat/completions' => Http::response($this->chatResponse([
-                'trends' => array_map(fn (int $i) => ['title' => "Trend {$i}", 'summary' => 'Sum', 'platforms' => ['tiktok'], 'confidence' => 0.5], range(1, 5)),
+                'trends' => array_map(fn (int $i) => ['title' => "Trend {$i}", 'summary' => 'Sum', 'platforms' => ['tiktok'], 'confidence' => 0.5], range(1, 8)),
             ]), 200),
         ]);
 
         $result = (new DeepSeekProvider)->discoverTrends(Client::factory()->create(), ['tiktok']);
 
-        $this->assertSame(['Trend 1', 'Trend 2', 'Trend 3'], array_map(fn ($trend) => $trend->title, $result->trends));
-        Http::assertSent(fn ($request) => str_contains($request['messages'][1]['content'], 'Discover exactly 3 current trends'));
+        $this->assertCount(6, $result->trends);
+        Http::assertSent(fn ($request) => str_contains($request['messages'][1]['content'], 'Discover exactly 6 current trends'));
     }
 
     public function test_a_retry_after_running_out_of_tokens_doubles_max_tokens(): void

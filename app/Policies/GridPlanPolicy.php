@@ -8,6 +8,7 @@ use App\Enums\Role;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\User;
+use App\Services\AI\AiAccess;
 
 /**
  * Phase 18 — who may see and change a grid plan. Staff are scoped to their organization; a
@@ -110,9 +111,10 @@ class GridPlanPolicy
      */
     public function useAi(User $user, GridPlan $plan): bool
     {
-        return (bool) config('ai.enabled', false)
-            && $user->org_id === $plan->org_id
-            && in_array($user->role, [Role::Owner, Role::Strategist], true);
+        // Step M-7.1: `canUse` folds in the platform flag, the per-org toggle and the role; the org
+        // match keeps a user from driving AI on another org's grid.
+        return (new AiAccess)->canUse($user)
+            && $user->org_id === $plan->org_id;
     }
 
     public function delete(User $user, GridPlan $plan): bool

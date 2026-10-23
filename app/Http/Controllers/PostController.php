@@ -44,6 +44,7 @@ use App\Models\PostActivityLog;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\AI\AiAccess;
 use App\Services\Analytics\BestTimeService;
 use App\Services\ClientHashtagService;
 use App\Services\Grids\GridPlanService;
@@ -125,6 +126,7 @@ class PostController extends Controller
         GridPlanService $grids,
         BestTimeService $bestTime,
         PostWorkflowResolver $workflows,
+        AiAccess $aiAccess,
     ): Response {
         $this->authorize('view', $post);
 
@@ -238,14 +240,14 @@ class PostController extends Controller
                 ->map(fn (User $member) => ['id' => $member->id, 'name' => $member->name])
                 ->all(),
             'ai' => [
-                'enabled' => (bool) config('ai.enabled', false),
-                'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
+                'enabled' => $aiAccess->enabledForUser($user),
+                'canUse' => $aiAccess->canUse($user),
             ],
             // Phase 16: the AI Image Studio tab (Owner/Strategist generate, Designer read-only).
             // A closure so the studio's partial reloads (`only: ['imageStudio']`) skip the rest.
             // Step 18.9: "From grid: {name} · Tile 4 · Goes out 3rd", for a post made from a tile.
             'grid' => GridLibrary::postChip($post, $grids),
-            'imageStudio' => fn () => (bool) config('ai.enabled', false) && $user->can('viewAnyForClient', [AiImageGeneration::class, $client])
+            'imageStudio' => fn () => $aiAccess->enabledForUser($user) && $user->can('viewAnyForClient', [AiImageGeneration::class, $client])
                 ? $studio->forPost($post, $user)
                 : null,
         ]);

@@ -5,10 +5,10 @@ namespace App\Actions\Campaigns;
 use App\Contracts\CampaignFeatures;
 use App\Enums\CampaignFeature;
 use App\Enums\PostStatus;
-use App\Enums\Role;
 use App\Models\Campaign;
 use App\Models\CampaignShareLink;
 use App\Models\User;
+use App\Services\AI\AiAccess;
 use App\Services\CampaignHealthService;
 use App\Services\CampaignReadinessService;
 use App\Support\Campaigns\CampaignClock;
@@ -59,7 +59,7 @@ class BuildCampaignWorkspaceHeaderAction
             'transition' => $user->can('transition', $campaign),
             'produce' => $user->can('produce', $campaign),
             'viewBilling' => $user->can('viewBilling', $campaign),
-            'useAi' => (bool) config('ai.enabled', false) && in_array($user->role, [Role::Owner, Role::Strategist], true),
+            'useAi' => (new AiAccess)->canUse($user),
         ];
         // C-9.4: gated features fold into `can`, so pages never read the feature set directly.
         $features = $this->features->all($user->organization);

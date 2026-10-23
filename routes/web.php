@@ -2,6 +2,7 @@
 
 use App\Enums\Platform;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiFeedbackController;
 use App\Http\Controllers\AiImageController;
 use App\Http\Controllers\Analytics\AnalyticsController as OrganizationAnalyticsController;
 use App\Http\Controllers\Analytics\ClientReportController;
@@ -679,7 +680,22 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
         // Step B-6.4: repurpose the caption natively per platform (fills the per-platform overrides).
         Route::post('posts/{post}/ai/repurpose', [AiController::class, 'repurpose'])
             ->name('posts.ai.repurpose');
+        // Step M-7.3: inline writing tools (shorten / change tone / adapt to platform).
+        Route::post('posts/{post}/ai/rewrite', [AiController::class, 'rewrite'])
+            ->name('posts.ai.rewrite');
+        // Step M-7.3: suggest alt text for one of a post's image assets (multimodal).
+        Route::post('posts/{post}/ai/alt-text/{asset}', [AiController::class, 'altText'])
+            ->name('posts.ai.alt-text');
     });
+
+    // Step M-7.2: async AI — poll a queued text job (captions/trends/ideas) or cancel it. The poll
+    // is a cheap DB read, deliberately outside `throttle:ai` so 2s polling isn't rate-limited.
+    Route::get('ai-text-jobs/{aiTextJob}', [AiController::class, 'jobStatus'])
+        ->whereUuid('aiTextJob')
+        ->name('ai-text-jobs.status');
+    Route::post('ai-text-jobs/{aiTextJob}/cancel', [AiController::class, 'cancelJob'])
+        ->whereUuid('aiTextJob')
+        ->name('ai-text-jobs.cancel');
 
     // Trends & Ideas now persist (Step 2.4 follow-up) so each discovered trend/idea gets its
     // own detail page, the same list → detail pattern as the rest of the app.
@@ -689,6 +705,15 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
         ->name('ai-post-ideas.show');
     Route::post('ai-post-ideas/{aiPostIdea}/persist', [AiController::class, 'persistIdea'])
         ->name('ai-post-ideas.persist');
+
+    // Step M-7.1 (dev plan Step 2.9): thumbs up/down on an AI suggestion. Idempotent per
+    // user/subject; Owner/Strategist only, in the subject's own org (gated by AiFeedbackController).
+    Route::post('ai-trends/{aiTrend}/feedback', [AiFeedbackController::class, 'trend'])
+        ->name('ai-trends.feedback');
+    Route::post('ai-post-ideas/{aiPostIdea}/feedback', [AiFeedbackController::class, 'idea'])
+        ->name('ai-post-ideas.feedback');
+    Route::post('posts/{post}/ai/feedback', [AiFeedbackController::class, 'caption'])
+        ->name('posts.ai.feedback');
 
     // Phase 16: AI Image Studio — see AiImageController, gated behind config('ai.enabled') and
     // AiImageGenerationPolicy (Owner/Strategist write, Designer read-only, clients never).

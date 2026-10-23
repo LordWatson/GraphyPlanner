@@ -1,5 +1,7 @@
+import { Loader2, Sparkles } from 'lucide-react';
 import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
 import type { AssetData } from '@/components/post-editor/types';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -34,6 +36,8 @@ export function MediaDetails({
     thumbOffsetMs,
     onThumbOffsetChange,
     altTextPlatforms,
+    onSuggestAltText,
+    suggestingAltTextFor,
 }: {
     assets: AssetData[];
     altTexts: Record<number, string>;
@@ -44,6 +48,10 @@ export function MediaDetails({
     onThumbOffsetChange: (ms: number | null) => void;
     /** Labels of the selected channels that publish alt text. */
     altTextPlatforms: string[];
+    /** Step M-7.3: when set, show an AI "suggest alt text" button per image. */
+    onSuggestAltText?: (assetId: number) => void;
+    /** The image id currently having alt text generated, if any. */
+    suggestingAltTextFor?: number | null;
 }) {
     const images = assets.filter(isImage);
     const video = assets.find(isVideo);
@@ -166,6 +174,27 @@ export function MediaDetails({
                                     }
                                     placeholder="e.g. A flat white on a marble counter, morning light"
                                 />
+                                {onSuggestAltText && (
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-9 shrink-0"
+                                        aria-label={`Suggest alt text for image ${index + 1} with AI`}
+                                        disabled={
+                                            suggestingAltTextFor === image.id
+                                        }
+                                        onClick={() =>
+                                            onSuggestAltText(image.id)
+                                        }
+                                    >
+                                        {suggestingAltTextFor === image.id ? (
+                                            <Loader2 className="animate-spin" />
+                                        ) : (
+                                            <Sparkles />
+                                        )}
+                                    </Button>
+                                )}
                             </li>
                         ))}
                     </ul>

@@ -23,10 +23,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $summary
  * @property array<int, string>|null $platforms
  * @property float $confidence
+ * @property string|null $source
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['org_id', 'client_id', 'title', 'summary', 'platforms', 'confidence'])]
+#[Fillable(['org_id', 'client_id', 'title', 'summary', 'platforms', 'confidence', 'source'])]
 class AiTrend extends Model
 {
     use BelongsToOrganization;

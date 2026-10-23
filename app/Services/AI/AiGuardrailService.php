@@ -107,6 +107,7 @@ class AiGuardrailService
                 summary: $this->scrub($trend->summary),
                 platforms: $trend->platforms,
                 confidence: $trend->confidence,
+                source: $trend->source,
             ))
             ->values()
             ->all();

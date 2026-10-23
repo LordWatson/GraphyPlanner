@@ -48,6 +48,7 @@ export function FeedbackBoard({
     routes,
     canComment,
     mode,
+    hideHeader = false,
 }: {
     assets: FeedbackAsset[];
     caption: string;
@@ -55,6 +56,9 @@ export function FeedbackBoard({
     routes: FeedbackRoutes;
     canComment: boolean;
     mode: 'reviewer' | 'staff';
+    /** Suppress the internal "Feedback" title row — used when a collapsible wrapper already
+        provides the header (e.g. the post editor). Defaults false so the portal/review link keep it. */
+    hideHeader?: boolean;
 }) {
     const mediaAssets = assets.filter(
         (a) => a.url !== null && (isImage(a) || isVideo(a)),
@@ -137,12 +141,16 @@ export function FeedbackBoard({
 
     return (
         <div className="grid gap-4">
-            <div className="flex items-center justify-between">
-                <span className="eyebrow text-muted-foreground">Feedback</span>
-                {unresolved > 0 && (
-                    <Badge variant="warning">{unresolved} to resolve</Badge>
-                )}
-            </div>
+            {!hideHeader && (
+                <div className="flex items-center justify-between">
+                    <span className="eyebrow text-muted-foreground">
+                        Feedback
+                    </span>
+                    {unresolved > 0 && (
+                        <Badge variant="warning">{unresolved} to resolve</Badge>
+                    )}
+                </div>
+            )}
 
             {activeAsset && (
                 <div className="grid gap-2">

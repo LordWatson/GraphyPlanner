@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { Lightbulb, TrendingUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { http } from '@/lib/http';
+import { runAiTextJob } from '@/lib/ai-text-job';
 import { show as showAiPostIdea } from '@/routes/ai-post-ideas';
 import { show as showAiTrend } from '@/routes/ai-trends';
 import aiClients from '@/routes/clients/ai';
@@ -12,6 +12,7 @@ export type AiTrendData = {
     summary: string | null;
     platforms: string[];
     confidence: number;
+    source: string | null;
 };
 
 export type AiIdeaData = {
@@ -28,24 +29,25 @@ export type AiInsight =
     | { type: 'idea'; item: AiIdeaData };
 
 /**
- * Ask the AI for fresh trends and ideas (Step 2.4). Both endpoints call a paid vendor and save
- * their results (Step I-1.7: POST); the caller reloads the deferred `trends`/`ideas` props after.
- * Throws with the server's message on failure.
+ * Ask the AI for fresh trends and ideas (Step 2.4). Step M-7.2: both run as queued jobs we poll, so
+ * a slow vendor never blocks the panel; each saves its results server-side, and the caller reloads
+ * the deferred `trends`/`ideas` props once this resolves. Throws with the server's message on
+ * failure (budget, provider error) so the panel can show it.
  */
 export async function requestAiInsights(
     clientId: number,
     platforms: string[],
 ): Promise<void> {
     const [trends, ideas] = await Promise.all([
-        http.post(aiClients.trends.url(clientId), { platforms }),
-        http.post(aiClients.ideas.url(clientId)),
+        runAiTextJob(aiClients.trends.url(clientId), { platforms }),
+        runAiTextJob(aiClients.ideas.url(clientId), {}),
     ]);
 
-    if (!trends.ok) {
+    if (!trends.ok && !trends.cancelled) {
         throw new Error(trends.message);
     }
 
-    if (!ideas.ok) {
+    if (!ideas.ok && !ideas.cancelled) {
         throw new Error(ideas.message);
     }
 }
@@ -65,6 +67,17 @@ export function AiInsightCard({ insight }: { insight: AiInsight }) {
                 <div className="flex items-center gap-2">
                     {!isTrend && insight.item.post_id && (
                         <Badge variant="success">Draft created</Badge>
+                    )}
+                    {isTrend && insight.item.source && (
+                        <Badge
+                            variant={
+                                insight.item.source === 'AI hypothesis'
+                                    ? 'outline'
+                                    : 'success'
+                            }
+                        >
+                            {insight.item.source}
+                        </Badge>
                     )}
                     <Badge
                         variant="outline"

@@ -2,28 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Role;
 use App\Models\Client;
 use App\Models\DailyBrief;
+use App\Services\AI\AiAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * Thin controller behind the Clients module's "Daily Briefs" tab (Step 2.5), listing the
  * client-scoped `DailyBrief` rows generated nightly by `GenerateDailyBriefsAction`. Gated the
- * same way as `AiController`: 404 when AI is disabled, 403 unless Owner/Strategist in the
- * client's own organization.
+ * same way as `AiController` via {@see AiAccess}: 404 when AI is disabled for the org, 403 unless
+ * Owner/Strategist in the client's own organization.
  */
 class DailyBriefController extends Controller
 {
+    public function __construct(private readonly AiAccess $access) {}
+
     /**
      * List a client's Daily Briefs, optionally filtered by date range/pillar/campaign.
      */
     public function index(Request $request, Client $client): JsonResponse
     {
-        abort_unless((bool) config('ai.enabled', false), 404);
+        $this->access->authorize($request->user());
         $this->authorize('view', $client);
-        $this->authorizeAiUse($request, $client->org_id);
 
         $query = DailyBrief::query()
             ->where('client_id', $client->id)
@@ -77,18 +78,5 @@ class DailyBriefController extends Controller
             'ideas' => $brief->ideas ?? [],
             'notified_at' => $brief->notified_at?->toIso8601String(),
         ];
-    }
-
-    /**
-     * AI features are Owner/Strategist only by default (mirrors AiController::authorizeAiUse()).
-     */
-    private function authorizeAiUse(Request $request, int $orgId): void
-    {
-        $user = $request->user();
-
-        abort_unless(
-            $user && $user->org_id === $orgId && in_array($user->role, [Role::Owner, Role::Strategist], true),
-            403,
-        );
     }
 }

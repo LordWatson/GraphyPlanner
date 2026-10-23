@@ -16,6 +16,7 @@ use App\Models\AiImageVariant;
 use App\Models\AiPostIdea;
 use App\Models\Client;
 use App\Models\Post;
+use App\Services\AI\AiAccess;
 use App\Support\AI\Images\ImageStudioPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -141,7 +142,9 @@ class AiImageController extends Controller
 
     private function guard(): void
     {
-        abort_unless((bool) config('ai.enabled', false), 404);
+        // Step M-7.1: the per-org toggle (not just the platform flag) hides the Image Studio too.
+        // No role check here — Designers may view/download (policies enforce that per endpoint).
+        abort_unless((new AiAccess)->enabledForUser(request()->user()), 404);
     }
 
     private function guardVariant(AiImageVariant $variant): void

@@ -215,6 +215,7 @@ class ClientTabController extends Controller
                 'summary' => $trend->summary,
                 'platforms' => $trend->platforms ?? [],
                 'confidence' => $trend->confidence,
+                'source' => $trend->source,
             ])->values()),
             'ideas' => Inertia::defer(fn () => $client->aiPostIdeas()->latest()->latest('id')->get()->map(fn ($idea) => [
                 'id' => $idea->id,

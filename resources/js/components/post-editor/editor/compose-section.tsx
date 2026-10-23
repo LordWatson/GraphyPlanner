@@ -6,6 +6,7 @@ import { ChannelScopeBar, Composer } from '@/components/post-editor/composer';
 import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
 import { useAiCaptions } from '@/components/post-editor/editor/use-ai-captions';
 import { useAiRepurpose } from '@/components/post-editor/editor/use-ai-repurpose';
+import { WritingToolsMenu } from '@/components/post-editor/editor/writing-tools-menu';
 import { isCustomized } from '@/components/post-editor/types';
 import { Button } from '@/components/ui/button';
 
@@ -61,6 +62,13 @@ export function ComposeSection({
                     showAi &&
                     nav.activeScope === 'all' && (
                         <div className="flex gap-2">
+                            <WritingToolsMenu
+                                postId={page.post.id}
+                                caption={editor.state.caption}
+                                onRewrite={(next) =>
+                                    editor.update({ caption: next })
+                                }
+                            />
                             {platforms.size >= 2 && (
                                 <Button
                                     type="button"
@@ -85,6 +93,16 @@ export function ComposeSection({
                                 <Sparkles />
                                 {ai.loading ? 'Thinking…' : 'Suggest with AI'}
                             </Button>
+                            {ai.loading && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => ai.cancel()}
+                                >
+                                    Cancel
+                                </Button>
+                            )}
                         </div>
                     )
                 }
@@ -118,6 +136,7 @@ export function ComposeSection({
                             <AiCaptionSuggestions
                                 suggestions={ai.suggestions}
                                 policyWarnings={ai.policyWarnings}
+                                brandFit={ai.brandFit}
                                 appliedIndex={ai.appliedIndex}
                                 expanded={ai.expanded}
                                 onToggleExpanded={ai.toggleExpanded}

@@ -24,13 +24,15 @@ use Illuminate\Support\Carbon;
  * @property string|null $quality_tier
  * @property string $cost_estimate
  * @property int|null $duration_ms
+ * @property int|null $prompt_tokens
+ * @property int|null $completion_tokens
  * @property int|null $ai_image_variant_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'user_id', 'provider', 'model', 'method', 'succeeded', 'error_code', 'quality_tier',
-    'cost_estimate', 'duration_ms', 'ai_image_variant_id',
+    'cost_estimate', 'duration_ms', 'prompt_tokens', 'completion_tokens', 'ai_image_variant_id',
 ])]
 class AiUsageLog extends Model
 {
@@ -45,6 +47,8 @@ class AiUsageLog extends Model
             'succeeded' => 'boolean',
             'cost_estimate' => 'decimal:4',
             'duration_ms' => 'integer',
+            'prompt_tokens' => 'integer',
+            'completion_tokens' => 'integer',
         ];
     }
 

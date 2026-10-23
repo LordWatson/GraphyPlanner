@@ -55,6 +55,8 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step 16.11: Owner-only AI usage (images this month vs quota, estimated cost).
     Route::get('settings/ai-usage', [AiUsageController::class, 'edit'])->name('ai-usage.edit');
     Route::put('settings/ai-usage', [AiUsageController::class, 'update'])->name('ai-usage.update');
+    // Step M-7.1: the per-org AI enable toggle + monthly token budget.
+    Route::put('settings/ai-settings', [AiUsageController::class, 'updateSettings'])->name('ai-settings.update');
 
     // Step M-4.1: the organization's tax-rate list (Owner-only, via TaxRatePolicy). The settings
     // page has already confirmed the password, so these mutations aren't re-gated.

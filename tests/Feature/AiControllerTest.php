@@ -33,7 +33,7 @@ class AiControllerTest extends TestCase
         Config::set('ai.enabled', true);
     }
 
-    public function test_trends_endpoint_returns_structured_data_for_an_owner(): void
+    public function test_trends_endpoint_queues_a_job_and_the_poll_returns_structured_data(): void
     {
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -41,11 +41,17 @@ class AiControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->postJson(route('clients.ai.trends', $client), ['platforms' => ['instagram']]);
 
-        $response->assertOk();
-        $response->assertJsonStructure(['trends']);
+        $response->assertAccepted();
+        $response->assertJsonStructure(['request_id', 'status']);
+
+        // Sync queue runs the job during dispatch, so the poll already has the result.
+        $poll = $this->actingAs($owner)->getJson(route('ai-text-jobs.status', $response->json('request_id')));
+        $poll->assertOk();
+        $poll->assertJsonPath('status', 'completed');
+        $poll->assertJsonStructure(['result' => ['trends']]);
     }
 
-    public function test_ideas_endpoint_returns_structured_data_for_a_strategist(): void
+    public function test_ideas_endpoint_queues_a_job_for_a_strategist(): void
     {
         $org = Organization::factory()->create();
         $strategist = User::factory()->for($org, 'organization')->role(Role::Strategist)->create();
@@ -53,11 +59,14 @@ class AiControllerTest extends TestCase
 
         $response = $this->actingAs($strategist)->postJson(route('clients.ai.ideas', $client));
 
-        $response->assertOk();
-        $response->assertJsonStructure(['ideas']);
+        $response->assertAccepted();
+        $response->assertJsonStructure(['request_id', 'status']);
+
+        $poll = $this->actingAs($strategist)->getJson(route('ai-text-jobs.status', $response->json('request_id')));
+        $poll->assertOk()->assertJsonPath('status', 'completed')->assertJsonStructure(['result' => ['ideas']]);
     }
 
-    public function test_captions_endpoint_returns_structured_data_for_an_owner(): void
+    public function test_captions_endpoint_queues_a_job_for_an_owner(): void
     {
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -66,15 +75,16 @@ class AiControllerTest extends TestCase
 
         $response = $this->actingAs($owner)->postJson(route('posts.ai.captions', $post));
 
-        $response->assertOk();
-        $response->assertJsonStructure(['suggestions']);
+        $response->assertAccepted();
+        $poll = $this->actingAs($owner)->getJson(route('ai-text-jobs.status', $response->json('request_id')));
+        $poll->assertOk()->assertJsonPath('status', 'completed')->assertJsonStructure(['result' => ['suggestions', 'policyWarnings']]);
     }
 
     /**
      * Regression: with several targets, `Post::targetPlatforms()` walked `targets → socialAccount`
-     * lazily and tripped `Model::preventLazyLoading()` ("Attempted to lazy load [socialAccount]").
+     * lazily and tripped `Model::preventLazyLoading()`. The job loads the relations first.
      */
-    public function test_captions_endpoint_works_for_a_post_with_multiple_targets(): void
+    public function test_captions_job_works_for_a_post_with_multiple_targets(): void
     {
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -87,9 +97,10 @@ class AiControllerTest extends TestCase
         }
 
         $response = $this->actingAs($owner)->postJson(route('posts.ai.captions', $post));
+        $response->assertAccepted();
 
-        $response->assertOk();
-        $response->assertJsonStructure(['suggestions', 'policyWarnings']);
+        $poll = $this->actingAs($owner)->getJson(route('ai-text-jobs.status', $response->json('request_id')));
+        $poll->assertOk()->assertJsonPath('status', 'completed')->assertJsonStructure(['result' => ['suggestions', 'policyWarnings']]);
     }
 
     public function test_designer_is_forbidden_from_ai_endpoints(): void

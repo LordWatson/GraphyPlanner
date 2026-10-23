@@ -4,9 +4,12 @@ namespace App\Actions\AI;
 
 use App\Contracts\AiProvider;
 use App\Models\Post;
+use App\Services\AI\AiCallMeter;
 use App\Services\AI\AiGuardrailService;
+use App\Services\AI\AiUsageGuard;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -21,6 +24,8 @@ class SuggestCaptionsForPostAction
     public function __construct(
         private readonly AiProvider $ai,
         private readonly AiGuardrailService $guardrail,
+        private readonly AiUsageGuard $budget = new AiUsageGuard,
+        private readonly AiCallMeter $meter = new AiCallMeter(new RecordAiUsageAction),
     ) {}
 
     public function __invoke(Post $post): AiCaptionSuggestions
@@ -31,7 +36,14 @@ class SuggestCaptionsForPostAction
             'org_id' => $post->org_id,
         ]);
 
+        // Step M-7.1: enforce the monthly token allowance, then meter the real call.
+        $this->budget->ensureWithinBudget($post->organization);
+
         $suggestions = $this->ai->suggestCaptions($post);
+
+        if (($client = $post->client) !== null) {
+            $this->meter->record($this->ai, $client, Auth::user(), 'suggestCaptions', $suggestions->suggestions !== []);
+        }
 
         return $this->guardrail->filterCaptionSuggestions($post->client?->brandBrain, $suggestions, [
             'post_id' => $post->id,

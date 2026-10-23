@@ -9,6 +9,7 @@ use App\Actions\Campaigns\StartCampaignPlanAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Campaigns\AcceptCampaignPlanRequest;
 use App\Models\Campaign;
+use App\Services\AI\AiAccess;
 use App\Services\Campaigns\CampaignPlanRuns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -71,7 +72,8 @@ class CampaignAiController extends Controller
 
     private function guard(Request $request, Campaign $campaign): void
     {
-        abort_unless((bool) config('ai.enabled', false), 404);
+        // Step M-7.1: honour the per-org AI toggle; `update` keeps the Owner/Strategist gate.
+        abort_unless((new AiAccess)->enabledForUser($request->user()), 404);
         $this->authorize('update', $campaign);
     }
 }

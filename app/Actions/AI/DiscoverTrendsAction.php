@@ -3,11 +3,17 @@
 namespace App\Actions\AI;
 
 use App\Contracts\AiProvider;
+use App\Contracts\TrendSource;
 use App\Models\AiTrend;
 use App\Models\Client;
+use App\Services\AI\AiCallMeter;
 use App\Services\AI\AiGuardrailService;
+use App\Services\AI\AiUsageGuard;
+use App\Services\AI\Trends\NullTrendSource;
+use App\Support\AI\AiTrend as AiTrendDto;
 use App\Support\AI\AiTrends;
 use App\Support\AI\ClientContextBuilder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,11 +32,27 @@ class DiscoverTrendsAction
      */
     private const CACHE_TTL_SECONDS = 2 * 60 * 60;
 
+    /**
+     * How each source labels DeepSeek's model trends (as opposed to live signal).
+     */
+    private const MODEL_SOURCE = 'AI hypothesis';
+
     public function __construct(
         private readonly AiProvider $ai,
         private readonly AiGuardrailService $guardrail,
+        private readonly AiUsageGuard $budget = new AiUsageGuard,
+        private readonly AiCallMeter $meter = new AiCallMeter(new RecordAiUsageAction),
+        private readonly TrendSource $signalSource = new NullTrendSource,
         private readonly ClientContextBuilder $context = new ClientContextBuilder,
     ) {}
+
+    /**
+     * Step M-7.5: the total trends to surface (model + real signal), lifting the old cap of 3.
+     */
+    private function cap(): int
+    {
+        return max(1, min(10, (int) config('ai.suggestions.per_request', 6)));
+    }
 
     /**
      * @param  array<int, string>  $platforms
@@ -42,6 +64,8 @@ class DiscoverTrendsAction
         $cached = Cache::get($cacheKey);
 
         if ($cached instanceof AiTrends) {
+            // A cached result is free — no vendor call, so it neither meters nor counts against
+            // the budget (Step M-7.1).
             return $cached;
         }
 
@@ -76,9 +100,24 @@ class DiscoverTrendsAction
             'platforms' => $platforms,
         ]);
 
-        $trends = $this->ai->discoverTrends($client, $platforms);
+        // Step M-7.1: this only runs on a cache miss, i.e. a real vendor call — so budget-gate and
+        // meter it here rather than in __invoke().
+        $this->budget->ensureWithinBudget($client->organization);
 
-        $filtered = $this->guardrail->filterTrends($client->brandBrain, $trends, [
+        $cap = $this->cap();
+
+        // Step M-7.5: the model's hypotheses, clearly labelled as such...
+        $model = $this->ai->discoverTrends($client, $platforms);
+        $this->meter->record($this->ai, $client, Auth::user(), 'discoverTrends', $model->trends !== []);
+        $modelTrends = array_map(fn (AiTrendDto $trend) => $trend->withSource(self::MODEL_SOURCE), $model->trends);
+
+        // ...plus the client's own real signal (top posts), which leads the list. No vendor call.
+        $signalTrends = $this->signalSource->discover($client, $platforms, $cap)->trends;
+        $signalTrends = array_slice($signalTrends, 0, intdiv($cap, 2));
+
+        $merged = array_slice([...$signalTrends, ...$modelTrends], 0, $cap);
+
+        $filtered = $this->guardrail->filterTrends($client->brandBrain, new AiTrends($merged), [
             'client_id' => $client->id,
             'org_id' => $client->org_id,
             'platforms' => $platforms,
@@ -108,6 +147,7 @@ class DiscoverTrendsAction
                         'summary' => $trend->summary,
                         'platforms' => $trend->platforms,
                         'confidence' => $trend->confidence,
+                        'source' => $trend->source,
                     ],
                 );
             }
