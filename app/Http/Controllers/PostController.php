@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
+use App\Actions\Posts\Approvals\GenerateApprovalCertificatePdfAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
 use App\Actions\Posts\CreateSharePreviewAction;
@@ -43,6 +44,7 @@ use App\Models\PostActivityLog;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\AI\AiAccess;
 use App\Services\Analytics\BestTimeService;
 use App\Services\ClientHashtagService;
 use App\Services\Grids\GridPlanService;
@@ -52,6 +54,7 @@ use App\Services\Publishing\PlatformRolloutGate;
 use App\Support\AI\Images\ImageStudioPresenter;
 use App\Support\Campaigns\CampaignPresenter;
 use App\Support\Grids\GridLibrary;
+use App\Support\Posts\PostFeedbackPresenter;
 use App\Support\Posts\PostMediaPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -123,6 +126,7 @@ class PostController extends Controller
         GridPlanService $grids,
         BestTimeService $bestTime,
         PostWorkflowResolver $workflows,
+        AiAccess $aiAccess,
     ): Response {
         $this->authorize('view', $post);
 
@@ -163,7 +167,7 @@ class PostController extends Controller
         $bestTimes = $bestTime->forAccounts(array_values(array_map('intval', $accounts->modelKeys())));
 
         return Inertia::render('posts/edit', [
-            'post' => $this->transformPostForEditor($post, $evaluateChecklist),
+            'post' => $this->transformPostForEditor($post, $evaluateChecklist, $user),
             'client' => ['id' => $client->id, 'name' => $client->name],
             // Per-platform limits travel with every selectable account (not just the post's saved
             // targets) so the editor can show caption/hashtag usage and a live readiness check the
@@ -236,14 +240,14 @@ class PostController extends Controller
                 ->map(fn (User $member) => ['id' => $member->id, 'name' => $member->name])
                 ->all(),
             'ai' => [
-                'enabled' => (bool) config('ai.enabled', false),
-                'canUse' => in_array($user->role, [Role::Owner, Role::Strategist], true),
+                'enabled' => $aiAccess->enabledForUser($user),
+                'canUse' => $aiAccess->canUse($user),
             ],
             // Phase 16: the AI Image Studio tab (Owner/Strategist generate, Designer read-only).
             // A closure so the studio's partial reloads (`only: ['imageStudio']`) skip the rest.
             // Step 18.9: "From grid: {name} · Tile 4 · Goes out 3rd", for a post made from a tile.
             'grid' => GridLibrary::postChip($post, $grids),
-            'imageStudio' => fn () => (bool) config('ai.enabled', false) && $user->can('viewAnyForClient', [AiImageGeneration::class, $client])
+            'imageStudio' => fn () => $aiAccess->enabledForUser($user) && $user->can('viewAnyForClient', [AiImageGeneration::class, $client])
                 ? $studio->forPost($post, $user)
                 : null,
         ]);
@@ -329,6 +333,21 @@ class PostController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Approved without the client. The reason is on the activity log.')]);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * Step M-6.3 — download the approval certificate for an approved post (staff view). Only once
+     * the post is approved; the policy/approvers/content-hash come from its approval steps.
+     */
+    public function approvalCertificate(Post $post, GenerateApprovalCertificatePdfAction $action): \Illuminate\Http\Response
+    {
+        $this->authorize('view', $post);
+        abort_unless($post->status === PostStatus::Approved, 404);
+
+        return response($action($post), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="approval-certificate-post-'.$post->id.'.pdf"',
+        ]);
     }
 
     /**
@@ -418,6 +437,10 @@ class PostController extends Controller
             $request->user(),
             $request->validated('body'),
             (bool) $request->validated('internal_only'),
+            anchorType: $request->anchorType(),
+            anchor: $request->anchorPayload(),
+            parentId: $request->validated('parent_id') !== null ? (int) $request->validated('parent_id') : null,
+            suggestedEdit: $request->validated('suggested_edit'),
         );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Comment posted.')]);
@@ -543,7 +566,7 @@ class PostController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function transformPostForEditor(Post $post, EvaluatePostChecklistAction $evaluateChecklist): array
+    private function transformPostForEditor(Post $post, EvaluatePostChecklistAction $evaluateChecklist, User $viewer): array
     {
         return [
             'id' => $post->id,
@@ -624,6 +647,10 @@ class PostController extends Controller
                 'mentioned_user_ids' => $comment->mentionedUsers->pluck('id')->values(),
                 'created_at' => $comment->created_at?->toIso8601String(),
             ])->values(),
+            // Step M-6.4: visual-feedback threads (pins, caption notes, suggested edits) for the
+            // staff feedback board — unresolved ones block approval.
+            'feedback' => PostFeedbackPresenter::threads($post, $viewer, forClient: false),
+            'unresolved_feedback' => $post->unresolvedFeedback()->count(),
         ];
     }
 }

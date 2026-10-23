@@ -3,6 +3,7 @@
 namespace App\Actions\Posts;
 
 use App\Actions\Campaigns\MarkCampaignWentLiveAction;
+use App\Actions\Posts\Approvals\BuildApprovalStepsAction;
 use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
@@ -120,6 +121,14 @@ class TransitionPostStatusAction
             throw new InvalidPostTransitionException($post->id, $post->status, $to);
         }
 
+        // Step M-6.4: unresolved visual-feedback threads (pins / suggested edits) block approval —
+        // the team resolves them first, or an Owner overrides (`overrideApproval()`).
+        if ($to === PostStatus::Approved && ! $this->overriding && $post->hasUnresolvedFeedback()) {
+            throw ValidationException::withMessages([
+                'to' => __('There’s unresolved feedback on this post. Resolve every pin and suggestion (or an Owner can override) before approving.'),
+            ]);
+        }
+
         // Step I-3.6 / M-2.5: unscheduling a `publishing` post cancels its vendor-held channels
         // before anything changes here — if the vendor says it's too late, nothing moves.
         if (PostStatusTransitionMap::isRecallMove($post->status, $to)) {
@@ -222,8 +231,11 @@ class TransitionPostStatusAction
 
             // Step M-5.3: snapshot the version the client is shown, so a later re-review can show
             // "what changed since you last saw it".
+            // Step M-6.3: (re)build the approval steps from the client's approver contacts + policy,
+            // so each review round starts from a clean set for `any`/`all`/`sequential` approval.
             if ($to === PostStatus::WaitingClient) {
                 app(PostRevisionService::class)->record($locked, $user, shared: true);
+                app(BuildApprovalStepsAction::class)($locked);
             }
 
             DB::afterCommit(function () use ($locked, $to, $user, $comment, $notifications) {

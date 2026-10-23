@@ -5,6 +5,7 @@ namespace App\Actions\Portal;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\User;
+use App\Services\PostApprovalSlaService;
 use Illuminate\Support\Carbon;
 
 /**
@@ -32,19 +33,26 @@ class GetPortalDashboardItemsAction
             ->with(['targets' => fn ($q) => $q->orderBy('scheduled_at_utc'), 'targets.socialAccount'])
             ->get();
 
+        // Step M-6.5: which of this client's open approvals are past the org's SLA (overdue).
+        $overdueIds = app(PostApprovalSlaService::class)
+            ->overdueQuery($user->organization)
+            ->where('client_id', $user->client_id)
+            ->pluck('id')
+            ->all();
+
         $waitingApprovals = $posts
             ->filter(fn (Post $post) => $post->status === PostStatus::WaitingClient)
-            ->map(fn (Post $post) => $this->transformPost($post, 'Waiting on your approval'))
+            ->map(fn (Post $post) => $this->transformPost($post, 'Waiting on your approval', in_array($post->id, $overdueIds, true)))
             ->values()
             ->all();
 
         $changesRequested = $posts
             ->filter(fn (Post $post) => $post->status === PostStatus::ChangesRequested)
-            ->map(fn (Post $post) => $this->transformPost($post, 'Changes requested'))
+            ->map(fn (Post $post) => $this->transformPost($post, 'Changes requested', in_array($post->id, $overdueIds, true)))
             ->values()
             ->all();
 
-        $orgTimezone = $user->organization?->default_timezone ?? 'UTC';
+        $orgTimezone = $user->organization->default_timezone;
         $now = Carbon::now();
         $upcomingPosts = [];
 
@@ -87,7 +95,7 @@ class GetPortalDashboardItemsAction
     /**
      * @return array<string, mixed>
      */
-    private function transformPost(Post $post, string $reason): array
+    private function transformPost(Post $post, string $reason, bool $overdue = false): array
     {
         $target = $post->targets->first();
         $account = $target?->socialAccount;
@@ -97,6 +105,7 @@ class GetPortalDashboardItemsAction
             'status' => $post->status->value,
             'status_label' => $post->status->label(),
             'reason' => $reason,
+            'overdue' => $overdue,
             'master_caption' => $post->master_caption,
             'platform' => $account?->platform?->value,
             'handle' => $account?->handle,

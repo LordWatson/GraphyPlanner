@@ -111,8 +111,10 @@ class CampaignControllerTest extends TestCase
         $this->assertSoftDeleted($campaign);
     }
 
-    public function test_client_reviewer_sees_campaigns_scoped_to_their_client(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_campaigns_tab_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): the internal campaigns tab is staff-only — a reviewer uses the portal's
+        // own campaigns area (`portal.campaigns.*`), reached via the portal.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         Campaign::factory()->for($client)->create(['org_id' => $org->id]);
@@ -120,10 +122,7 @@ class CampaignControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.campaigns.index', $client));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->has('campaigns.data', 1));
+        $this->actingAs($reviewer)->get(route('clients.campaigns.index', $client))->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_viewer_can_view_a_campaign_show_page_with_its_posts(): void

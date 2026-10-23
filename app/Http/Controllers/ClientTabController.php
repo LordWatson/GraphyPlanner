@@ -6,6 +6,7 @@ use App\Actions\Clients\BuildClientPageHeaderAction;
 use App\Actions\Posts\ListClientPostsAction;
 use App\Contracts\CampaignFeatures;
 use App\Enums\CampaignFeature;
+use App\Enums\ClientContactRole;
 use App\Enums\DesignImportProvider;
 use App\Enums\PostStatus;
 use App\Enums\Role;
@@ -15,6 +16,7 @@ use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\CampaignTemplate;
 use App\Models\Client;
+use App\Models\ClientContact;
 use App\Models\ClientInvitation;
 use App\Models\DesignImportConnection;
 use App\Models\Invoice;
@@ -179,6 +181,17 @@ class ClientTabController extends Controller
                 ->latest('id')
                 ->paginate(self::PER_PAGE)
                 ->through(fn (ClientInvitation $invitation) => ClientTabPresenter::invitation($invitation, $user)),
+            // Step M-6.1: named contacts, managed inline above the portal invitations.
+            'contacts' => $client->contacts()
+                ->orderByRaw("CASE role WHEN 'approver' THEN 0 WHEN 'billing' THEN 1 WHEN 'marketing_lead' THEN 2 ELSE 3 END")
+                ->orderBy('id')
+                ->get()
+                ->map(fn (ClientContact $contact) => ClientTabPresenter::contact($contact, $user))
+                ->values(),
+            'contactRoles' => collect(ClientContactRole::cases())
+                ->map(fn (ClientContactRole $role) => ['value' => $role->value, 'label' => $role->label()])
+                ->values(),
+            'canManageContacts' => $user->can('create', [ClientContact::class, $client]),
         ]);
     }
 
@@ -202,6 +215,7 @@ class ClientTabController extends Controller
                 'summary' => $trend->summary,
                 'platforms' => $trend->platforms ?? [],
                 'confidence' => $trend->confidence,
+                'source' => $trend->source,
             ])->values()),
             'ideas' => Inertia::defer(fn () => $client->aiPostIdeas()->latest()->latest('id')->get()->map(fn ($idea) => [
                 'id' => $idea->id,

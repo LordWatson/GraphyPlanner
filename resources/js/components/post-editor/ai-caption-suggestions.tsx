@@ -15,9 +15,28 @@ export type AiCaptionSuggestion = {
  * explicit click, and applying still needs a normal save. Once one is applied the list collapses
  * to a one-line summary that can be re-expanded to compare.
  */
+type BrandFit = { score: number; reason: string };
+
+/** A small 0–100 brand-fit badge (Step M-7.4), coloured by how on-brand the caption scores. */
+function BrandFitBadge({ fit }: { fit: BrandFit }) {
+    const variant =
+        fit.score >= 75 ? 'success' : fit.score >= 50 ? 'secondary' : 'outline';
+
+    return (
+        <Badge
+            variant={variant}
+            className="shrink-0 tabular-nums"
+            title={fit.reason}
+        >
+            {fit.score}/100 on-brand
+        </Badge>
+    );
+}
+
 export function AiCaptionSuggestions({
     suggestions,
     policyWarnings,
+    brandFit,
     appliedIndex,
     expanded,
     onToggleExpanded,
@@ -25,6 +44,7 @@ export function AiCaptionSuggestions({
 }: {
     suggestions: AiCaptionSuggestion[];
     policyWarnings: string[][];
+    brandFit: BrandFit[];
     appliedIndex: number | null;
     expanded: boolean;
     onToggleExpanded: () => void;
@@ -66,6 +86,7 @@ export function AiCaptionSuggestions({
                 suggestions.map((suggestion, i) => {
                     const applied = appliedIndex === i;
                     const warnings = policyWarnings[i] ?? [];
+                    const fit = brandFit[i];
 
                     return (
                         <div
@@ -75,6 +96,14 @@ export function AiCaptionSuggestions({
                                 applied ? 'border-primary' : 'border-border',
                             )}
                         >
+                            {fit && (
+                                <div className="flex items-center justify-between gap-2">
+                                    <BrandFitBadge fit={fit} />
+                                    <span className="text-muted-foreground truncate text-xs">
+                                        {fit.reason}
+                                    </span>
+                                </div>
+                            )}
                             <p
                                 dir="auto"
                                 className="text-sm whitespace-pre-wrap"

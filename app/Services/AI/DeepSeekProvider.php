@@ -8,7 +8,9 @@ use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
 use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
+use App\Contracts\WritingAssistant;
 use App\Enums\Platform;
+use App\Enums\WritingTool;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
@@ -43,7 +45,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider
+class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, WritingAssistant
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -56,18 +58,39 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     private const MAX_TOKENS_CEILING = 16000;
 
     /**
-     * How many ideas/trends each request asks for (and keeps, if the model overshoots). Kept
-     * small so a reasoning model's answer stays well inside max_tokens and responses stay fast.
+     * How many ideas/trends each request asks for (and keeps, if the model overshoots). Step M-7.5
+     * lifts this from the interim 3 to Step 2.13's 5–10 target, configurable via
+     * `ai.suggestions.per_request` and clamped to a sane 1–10.
      */
-    private const IDEAS_PER_REQUEST = 3;
+    private function perRequest(): int
+    {
+        return max(1, min(10, (int) config('ai.suggestions.per_request', 6)));
+    }
 
-    private const TRENDS_PER_REQUEST = 3;
+    /**
+     * Token usage + latency of the most recent {@see requestStructured()} call, so callers on the
+     * agency text path can meter real tokens (Step M-7.1) without the provider knowing about usage
+     * logging. Null until the first call. Overwritten by each call, so read it immediately after.
+     *
+     * @var array{prompt_tokens: int|null, completion_tokens: int|null, duration_ms: int|null}|null
+     */
+    private ?array $lastUsage = null;
 
     public function __construct(
         private readonly AiGuardrailService $guardrail = new AiGuardrailService,
         private readonly ClientContextBuilder $context = new ClientContextBuilder,
         private readonly BrandImageBriefFactory $briefs = new BrandImageBriefFactory,
     ) {}
+
+    /**
+     * Token usage + latency of the most recent structured call, or null if none has run yet.
+     *
+     * @return array{prompt_tokens: int|null, completion_tokens: int|null, duration_ms: int|null}|null
+     */
+    public function lastUsage(): ?array
+    {
+        return $this->lastUsage;
+    }
 
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
@@ -113,7 +136,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         }
 
         $ideas = collect((array) ($payload['ideas'] ?? []))
-            ->take(self::IDEAS_PER_REQUEST)
+            ->take($this->perRequest())
             ->map(fn (array $item): AiPostIdea => new AiPostIdea(
                 title: (string) ($item['title'] ?? ''),
                 description: (string) ($item['description'] ?? ''),
@@ -148,7 +171,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         }
 
         $ideas = collect((array) ($payload['ideas'] ?? []))
-            ->take(self::IDEAS_PER_REQUEST)
+            ->take($this->perRequest())
             ->map(fn (array $item): AiPostIdea => new AiPostIdea(
                 title: (string) ($item['title'] ?? ''),
                 description: (string) ($item['description'] ?? ''),
@@ -215,6 +238,63 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         return $variants;
     }
 
+    /**
+     * Step M-7.3: rewrite a caption with one editor writing tool, in the brand voice. Returns the
+     * rewritten text, or the original unchanged if DeepSeek fails (the editor stays usable). The
+     * Action guardrails and length-clamps the result, so this just asks for the rewrite.
+     */
+    public function rewrite(Client $client, string $text, WritingTool $tool, ?Platform $platform = null, ?string $tone = null): string
+    {
+        $trimmed = trim($text);
+
+        if ($trimmed === '') {
+            return $text;
+        }
+
+        $payload = $this->requestStructured(
+            method: 'rewrite',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildRewriteUserPrompt($trimmed, $tool, $platform, $tone),
+            validator: fn (array $data): ?string => is_string($data['text'] ?? null) ? null : 'text must be a string',
+            context: ['org_id' => $client->org_id, 'client_id' => $client->id, 'tool' => $tool->value],
+            maxTokens: max(1500, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null || trim((string) $payload['text']) === '') {
+            return $text;
+        }
+
+        return trim((string) $payload['text']);
+    }
+
+    private function buildRewriteUserPrompt(string $text, WritingTool $tool, ?Platform $platform, ?string $tone): string
+    {
+        $instruction = match ($tool) {
+            WritingTool::Shorten => 'Rewrite this caption so it is noticeably shorter and punchier, keeping the key message and the brand voice.',
+            WritingTool::Expand => 'Rewrite this caption a little longer, adding useful detail without padding, keeping the brand voice.',
+            WritingTool::ChangeTone => 'Rewrite this caption in a '.($tone !== null && trim($tone) !== '' ? trim($tone) : 'fresh').' tone, keeping the meaning and the brand voice.',
+            WritingTool::Adapt => 'Rewrite this caption so it reads natively on '.($platform?->label() ?? 'the target platform').', suiting that platform\'s format and audience.',
+            WritingTool::AddCta => 'Rewrite this caption to end with one clear, natural call to action in the brand voice.',
+        };
+
+        $lines = [
+            $instruction,
+            'Keep any factual claims, offers and prices exactly as given — never invent new ones.',
+            'Do not add hashtags unless they are already present. Return only the rewritten caption text.',
+        ];
+
+        if ($platform !== null) {
+            $lines[] = "Stay within {$platform->label()}'s caption limit of {$platform->captionLimit()} characters.";
+        }
+
+        $lines[] = '';
+        $lines[] = 'Caption: '.$this->guardrail->scrub($text);
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"text": string}';
+
+        return implode("\n", $lines);
+    }
+
     public function summarizeInsights(Client $brand, array $facts): array
     {
         $payload = $this->requestStructured(
@@ -259,7 +339,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         }
 
         $trends = collect($payload['trends'] ?? [])
-            ->take(self::TRENDS_PER_REQUEST)
+            ->take($this->perRequest())
             ->map(fn (array $item): AiTrend => new AiTrend(
                 title: (string) ($item['title'] ?? ''),
                 summary: (string) ($item['summary'] ?? ''),
@@ -742,7 +822,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     private function buildRecommendPostsUserPrompt(): string
     {
         $lines = [
-            'Recommend exactly '.self::IDEAS_PER_REQUEST.' fresh post ideas for this client, tied to their current campaigns and content pillars.',
+            'Recommend exactly '.$this->perRequest().' fresh post ideas for this client, tied to their current campaigns and content pillars.',
             'Each description must name the content pillar it serves and the audience pain point or offer it speaks to.',
             '',
             'Respond with JSON: {"ideas": [{"title": string, "description": string, "platforms": string[], "suggestedCaption": string|null, "suggestedPostAt": string|null}]}',
@@ -754,7 +834,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     private function buildRecommendLocalPostsUserPrompt(IdeaContext $context): string
     {
         $lines = [
-            'Recommend exactly '.self::IDEAS_PER_REQUEST.' fresh post ideas for this brand for the days ahead.',
+            'Recommend exactly '.$this->perRequest().' fresh post ideas for this brand for the days ahead.',
             'Each description must name the content pillar it serves and the audience pain point or offer it speaks to.',
             'Use the local & seasonal context below: where it fits the brand naturally, tie an idea to an upcoming date or the season — never force a tenuous link, and never repeat a recently covered angle.',
             '',
@@ -828,7 +908,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     private function buildDiscoverTrendsUserPrompt(Client $client, array $platforms): string
     {
         $lines = [
-            'Discover exactly '.self::TRENDS_PER_REQUEST.' current trends relevant to this client across the given platforms.',
+            'Discover exactly '.$this->perRequest().' current trends relevant to this client across the given platforms.',
             'Only include trends that fit the client\'s industry, markets, audience, and content pillars; each summary must explain how this specific brand could use the trend in its own voice.',
             'Platforms: '.implode(', ', $platforms),
             'If you cannot browse the web, propose trend hypotheses and mark each with a confidence score (0.0-1.0).',
@@ -868,6 +948,13 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
             $result = $this->callChatCompletions($systemPrompt, $userPrompt, [...$context, 'attempt' => $attempt, 'max_tokens' => $maxTokens], $model, $maxTokens);
+
+            // Capture the most recent round trip's tokens/latency for metering (Step M-7.1).
+            $this->lastUsage = [
+                'prompt_tokens' => isset($result['meta']['usage']['prompt_tokens']) ? (int) $result['meta']['usage']['prompt_tokens'] : null,
+                'completion_tokens' => isset($result['meta']['usage']['completion_tokens']) ? (int) $result['meta']['usage']['completion_tokens'] : null,
+                'duration_ms' => isset($result['meta']['duration_ms']) ? (int) $result['meta']['duration_ms'] : null,
+            ];
 
             if ($result['payload'] !== null) {
                 $failure = $validator($result['payload']);

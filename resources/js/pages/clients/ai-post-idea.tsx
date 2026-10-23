@@ -1,5 +1,7 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, CalendarClock, Lightbulb } from 'lucide-react';
+import AiFeedbackController from '@/actions/App/Http/Controllers/AiFeedbackController';
+import { AiFeedbackButtons } from '@/components/ai/ai-feedback-buttons';
 import { ImageStudio } from '@/components/image-studio/image-studio';
 import type { ImageStudioData } from '@/components/image-studio/types';
 import { Page, PageHeader, Panel } from '@/components/page';
@@ -83,6 +85,11 @@ export default function AiPostIdeaShow({
                                 </span>
                             )}
                         </p>
+                        <AiFeedbackButtons
+                            url={AiFeedbackController.idea(idea.id).url}
+                            label="Was this idea useful?"
+                            className="mt-5"
+                        />
                     </Panel>
 
                     {(idea.suggestedCaption || idea.suggestedPostAt) && (

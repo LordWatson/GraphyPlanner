@@ -3,6 +3,8 @@ import { CheckCircle2, MessageSquareWarning } from 'lucide-react';
 import { useState } from 'react';
 
 import type { AssetPreviewData } from '@/components/asset-preview';
+import { FeedbackBoard } from '@/components/feedback/feedback-board';
+import type { FeedbackThread } from '@/components/feedback/types';
 import InputError from '@/components/input-error';
 import { platformIcon } from '@/components/platform-icon';
 import { ReviewChanges } from '@/components/posts/review-changes';
@@ -56,6 +58,8 @@ type PostData = {
     /** Step M-5.3: what changed since the client last reviewed it (null on a first review). */
     changes_since_review?: RevisionDiff | null;
     comments: CommentData[];
+    /** Step M-6.4: visual-feedback threads (pins, caption notes), rendered read-only here. */
+    feedback: FeedbackThread[];
 };
 
 /**
@@ -358,24 +362,19 @@ export default function ReviewShow({
                             </div>
                         )}
 
-                        {post.comments.length > 0 && (
+                        {post.feedback.length > 0 && (
                             <section className="flex flex-col gap-3">
                                 <h2 className="eyebrow text-muted-foreground border-foreground/85 border-b pb-2.5">
-                                    Conversation
+                                    Feedback
                                 </h2>
-                                {post.comments.map((comment) => (
-                                    <div
-                                        key={comment.id}
-                                        className="border-border bg-card rounded-2xl rounded-tl-sm border p-4 text-sm"
-                                    >
-                                        <p className="whitespace-pre-wrap">
-                                            {comment.body}
-                                        </p>
-                                        <p className="text-muted-foreground mt-2 text-xs">
-                                            — {comment.user_name ?? 'Team'}
-                                        </p>
-                                    </div>
-                                ))}
+                                <FeedbackBoard
+                                    assets={post.assets}
+                                    caption={post.master_caption ?? ''}
+                                    threads={post.feedback}
+                                    canComment={false}
+                                    mode="reviewer"
+                                    routes={{ create: '#', resolve: () => '#' }}
+                                />
                             </section>
                         )}
                     </div>

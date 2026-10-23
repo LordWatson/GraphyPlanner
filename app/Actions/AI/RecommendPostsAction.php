@@ -8,9 +8,12 @@ use App\Enums\PostStatus;
 use App\Models\AiPostIdea as PersistedAiPostIdea;
 use App\Models\Client;
 use App\Models\Post;
+use App\Services\AI\AiCallMeter;
 use App\Services\AI\AiGuardrailService;
+use App\Services\AI\AiUsageGuard;
 use App\Support\AI\AiPostIdea;
 use App\Support\AI\AiPostIdeas;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -24,6 +27,8 @@ class RecommendPostsAction
     public function __construct(
         private readonly AiProvider $ai,
         private readonly AiGuardrailService $guardrail,
+        private readonly AiUsageGuard $budget = new AiUsageGuard,
+        private readonly AiCallMeter $meter = new AiCallMeter(new RecordAiUsageAction),
     ) {}
 
     public function __invoke(Client $client): AiPostIdeas
@@ -33,7 +38,14 @@ class RecommendPostsAction
             'org_id' => $client->org_id,
         ]);
 
-        return $this->filterAndPersist($client, $this->ai->recommendPosts($client));
+        // Step M-7.1: refuse when the org has spent its monthly token allowance (throws
+        // AiBudgetExceededException for the controller to surface), then meter the real call.
+        $this->budget->ensureWithinBudget($client->organization);
+
+        $ideas = $this->ai->recommendPosts($client);
+        $this->meter->record($this->ai, $client, Auth::user(), 'recommendPosts', $ideas->ideas !== []);
+
+        return $this->filterAndPersist($client, $ideas);
     }
 
     /**

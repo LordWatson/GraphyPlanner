@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
 use App\Contracts\CaptionRepurposer;
+use App\Contracts\ChatNotifier;
 use App\Contracts\EngagementSource;
 use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
@@ -17,9 +18,11 @@ use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Contracts\PublishCredentials;
 use App\Contracts\PushNotifier;
+use App\Contracts\TrendSource;
 use App\Contracts\VirusScanner;
 use App\Contracts\VisionProvider;
 use App\Contracts\WebsiteSummarizer;
+use App\Contracts\WritingAssistant;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
 use App\Models\BrandBrain;
@@ -63,12 +66,14 @@ use App\Services\AI\Images\NullImageProvider;
 use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\AI\NullVisionProvider;
+use App\Services\AI\Trends\TopPostsTrendSource;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\Engagement\UploadPostEngagementSource;
 use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
+use App\Services\Notifications\NullChatNotifier;
 use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
@@ -120,6 +125,10 @@ class AppServiceProvider extends ServiceProvider
         // Step B-7.4: web push for business workspaces — delivery behind a contract so the VAPID
         // transport can be swapped and faked. The default logs when no transport is installed.
         $this->app->bind(PushNotifier::class, WebPushNotifier::class);
+
+        // Step M-6.7 (I-12.1): team-chat notifications behind a contract. The MVP is a no-op; a
+        // WhatsApp implementation (not Slack) drops in here later without touching callers.
+        $this->app->bind(ChatNotifier::class, NullChatNotifier::class);
 
         // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
         // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private
@@ -189,6 +198,17 @@ class AppServiceProvider extends ServiceProvider
 
         // Step B-6.4: repurpose-across-platforms — same DeepSeek-or-Null rule, its own contract.
         $this->app->bind(CaptionRepurposer::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step M-7.5: honest trends — the real-signal source is the client's own top posts. Its own
+        // contract so Google Trends / TikTok Creative Center can slot in later, and so tests swap it.
+        $this->app->bind(TrendSource::class, TopPostsTrendSource::class);
+
+        // Step M-7.3: editor writing tools (shorten/tone/adapt) — same DeepSeek-or-Null rule.
+        $this->app->bind(WritingAssistant::class, function () {
             return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
                 ? $this->app->make(DeepSeekProvider::class)
                 : $this->app->make(NullAiProvider::class);

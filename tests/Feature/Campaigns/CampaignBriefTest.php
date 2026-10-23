@@ -71,7 +71,10 @@ class CampaignBriefTest extends TestCase
     public function test_designers_viewers_and_other_orgs_cannot_write_the_brief(): void
     {
         foreach ([$this->designer(), $this->viewer(), $this->reviewer, $this->foreignOwner()] as $user) {
-            $this->actingAs($user)->put(route('campaigns.brief.update', $this->campaign), $this->content())->assertForbidden();
+            // A client reviewer is redirected to their portal (302, Step M-6.2); the others are
+            // refused by policy (403). None of them writes the brief.
+            $status = $this->actingAs($user)->put(route('campaigns.brief.update', $this->campaign), $this->content())->getStatusCode();
+            $this->assertContains($status, [302, 403]);
         }
 
         $this->assertDatabaseCount('campaign_briefs', 0);

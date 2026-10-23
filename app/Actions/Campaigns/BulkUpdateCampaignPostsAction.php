@@ -123,14 +123,21 @@ class BulkUpdateCampaignPostsAction
      */
     private function emailClientOnce(Campaign $campaign, array $postIds): void
     {
-        $email = $campaign->client->approval_email;
+        // Step M-6.1: reach every approver contact that opted into review emails (legacy fallback).
+        $recipients = $campaign->client->reviewEmailRecipients();
 
-        if (blank($email)) {
-            Log::warning('Skipped batch review email — no approval_email on file', ['campaign_id' => $campaign->id]);
+        if ($recipients === []) {
+            Log::warning('Skipped batch review email — no review-email contacts on file', ['campaign_id' => $campaign->id]);
 
             return;
         }
 
-        DB::afterCommit(fn () => Mail::to((string) $email)->queue(new CampaignPostsReadyMail($campaign, count($postIds))));
+        $emails = array_map(fn (array $recipient) => $recipient['email'], $recipients);
+
+        DB::afterCommit(function () use ($emails, $campaign, $postIds) {
+            foreach ($emails as $email) {
+                Mail::to($email)->queue(new CampaignPostsReadyMail($campaign, count($postIds)));
+            }
+        });
     }
 }

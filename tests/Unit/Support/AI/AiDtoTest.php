@@ -89,6 +89,8 @@ class AiDtoTest extends TestCase
             'summary' => 'Creators are posting quick how-to clips under 30 seconds.',
             'platforms' => ['tiktok'],
             'confidence' => 0.75,
+            // Step M-7.5: trends carry their source (null until tagged by the action/source).
+            'source' => null,
         ], $trend->jsonSerialize());
     }
 

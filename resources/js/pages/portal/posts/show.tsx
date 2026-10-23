@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     CalendarClock,
@@ -6,17 +6,15 @@ import {
     MessageSquareWarning,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { type AssetPreviewData } from '@/components/asset-preview';
+import { FeedbackBoard } from '@/components/feedback/feedback-board';
+import type { FeedbackThread } from '@/components/feedback/types';
 import InputError from '@/components/input-error';
-import {
-    MentionTextarea,
-    renderCommentBody,
-    type MentionableUser,
-} from '@/components/mention-textarea';
 import { Page, PageHeader, Panel } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
+import { SwipeToApprove } from '@/components/portal/swipe-to-approve';
 import { ReviewChanges } from '@/components/posts/review-changes';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
@@ -29,6 +27,7 @@ import {
     decide as decideOnPortalPost,
     index as portalPostsIndex,
 } from '@/routes/portal/posts';
+import { resolve as resolveComment } from '@/routes/portal/comments';
 import { store as commentOnPortalPost } from '@/routes/portal/posts/comments';
 
 type TargetData = {
@@ -114,26 +113,36 @@ const headlines: Record<string, ReactNode> = {
     ),
 };
 
-const commentDateFormatter = new Intl.DateTimeFormat('en-US', {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-});
-
 /**
  * Step 6.5 — the client portal's post detail/approval view: the authenticated counterpart to the
  * token-based `/review/:token` page. The post preview leads; the decision (when the post is
  * `waiting_client`) sits beside it with exactly two large, thumb-friendly choices (guidelines §7).
  */
+type ApprovalData = {
+    policy: string;
+    policy_label: string;
+    multi: boolean;
+    waiting_on: string[];
+    steps: Array<{
+        approver: string;
+        status: string;
+        is_turn: boolean;
+        decided_at: string | null;
+    }>;
+};
+
 export default function PortalPostShow({
     post,
     can,
-    mentionableUsers,
+    approval,
+    certificate_available,
+    feedback,
 }: {
     post: PostData;
     can: { decide: boolean; comment: boolean };
-    mentionableUsers: MentionableUser[];
+    approval: ApprovalData | null;
+    certificate_available: boolean;
+    feedback: FeedbackThread[];
 }) {
     const previewTargets = post.targets.map((t, i) => ({
         id: t.social_account_id ?? i,
@@ -144,6 +153,7 @@ export default function PortalPostShow({
         format: t.format,
     }));
 
+    const commentRef = useRef<HTMLTextAreaElement>(null);
     const [previewTargetId, setPreviewTargetId] = useState<
         number | string | null
     >(previewTargets[0]?.id ?? null);
@@ -262,6 +272,73 @@ export default function PortalPostShow({
                             </figure>
                         )}
 
+                        {approval && (
+                            <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-5">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="eyebrow text-muted-foreground">
+                                        Approvals · {approval.policy_label}
+                                    </span>
+                                    {approval.waiting_on.length > 0 ? (
+                                        <p className="text-sm">
+                                            Waiting on{' '}
+                                            {approval.waiting_on.join(', ')}.
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm">
+                                            Everyone has approved.
+                                        </p>
+                                    )}
+                                </div>
+                                <ol className="flex flex-col gap-2">
+                                    {approval.steps.map((step, i) => (
+                                        <li
+                                            key={i}
+                                            className="flex items-center gap-2.5 text-sm"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'flex size-5 shrink-0 items-center justify-center rounded-full text-xs',
+                                                    step.status === 'approved'
+                                                        ? 'bg-success/15 text-success'
+                                                        : step.status ===
+                                                            'changes_requested'
+                                                          ? 'bg-destructive/15 text-destructive'
+                                                          : step.is_turn
+                                                            ? 'bg-info/15 text-info'
+                                                            : 'bg-muted text-muted-foreground',
+                                                )}
+                                            >
+                                                {step.status === 'approved'
+                                                    ? '✓'
+                                                    : i + 1}
+                                            </span>
+                                            <span className="font-medium">
+                                                {step.approver}
+                                            </span>
+                                            {step.is_turn &&
+                                                step.status === 'pending' && (
+                                                    <span className="eyebrow text-info">
+                                                        Their turn
+                                                    </span>
+                                                )}
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        )}
+
+                        {certificate_available && (
+                            <a
+                                href={`/portal/posts/${post.id}/certificate`}
+                                target="_blank"
+                                rel="noopener"
+                                className="border-border bg-card hover:border-primary/30 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-colors"
+                            >
+                                <CheckCircle2 className="text-success size-4" />
+                                Download approval certificate
+                            </a>
+                        )}
+
                         {can.decide && (
                             <Form
                                 {...decideOnPortalPost.form(post.id)}
@@ -280,6 +357,7 @@ export default function PortalPostShow({
                                         </div>
                                         <div className="grid gap-1.5">
                                             <textarea
+                                                ref={commentRef}
                                                 name="comment"
                                                 rows={3}
                                                 aria-label="Note for the studio (optional)"
@@ -291,6 +369,42 @@ export default function PortalPostShow({
                                             />
                                         </div>
                                         <InputError message={errors.decision} />
+
+                                        {/* Step M-6.6: swipe to decide on a phone, additive to the
+                                            tap buttons below. */}
+                                        <SwipeToApprove
+                                            disabled={processing}
+                                            onApprove={() =>
+                                                router.post(
+                                                    decideOnPortalPost.url(
+                                                        post.id,
+                                                    ),
+                                                    {
+                                                        decision: 'approved',
+                                                        comment:
+                                                            commentRef.current
+                                                                ?.value ?? '',
+                                                    },
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                            onRequestChanges={() =>
+                                                router.post(
+                                                    decideOnPortalPost.url(
+                                                        post.id,
+                                                    ),
+                                                    {
+                                                        decision:
+                                                            'changes_requested',
+                                                        comment:
+                                                            commentRef.current
+                                                                ?.value ?? '',
+                                                    },
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        />
+
                                         <div className="flex flex-col gap-2.5">
                                             <Button
                                                 type="submit"
@@ -359,80 +473,23 @@ export default function PortalPostShow({
                             </Panel>
                         )}
 
-                        {(post.comments.length > 0 || can.comment) && (
-                            <Panel
-                                eyebrow="Conversation"
-                                title={
-                                    post.comments.length > 0
-                                        ? `${post.comments.length} comment${post.comments.length === 1 ? '' : 's'}`
-                                        : 'Start a conversation'
-                                }
-                                bodyClassName="flex flex-col gap-4"
-                            >
-                                {post.comments.length > 0 && (
-                                    <ol className="flex flex-col gap-3">
-                                        {post.comments.map((comment) => (
-                                            <li
-                                                key={comment.id}
-                                                className="border-border bg-background rounded-2xl rounded-tl-sm border p-3.5 text-sm"
-                                            >
-                                                <p className="whitespace-pre-wrap">
-                                                    {renderCommentBody(
-                                                        comment.body,
-                                                    )}
-                                                </p>
-                                                <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
-                                                    <span className="text-foreground/80 font-medium">
-                                                        {comment.user_name ??
-                                                            'Team'}
-                                                    </span>
-                                                    {comment.created_at && (
-                                                        <span className="font-mono text-[11px]">
-                                                            {commentDateFormatter.format(
-                                                                new Date(
-                                                                    comment.created_at,
-                                                                ),
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                </p>
-                                            </li>
-                                        ))}
-                                    </ol>
-                                )}
-
-                                {can.comment && (
-                                    <Form
-                                        {...commentOnPortalPost.form(post.id)}
-                                        resetOnSuccess={['body']}
-                                        className="flex flex-col gap-2.5"
-                                    >
-                                        {({ processing, errors }) => (
-                                            <>
-                                                <MentionTextarea
-                                                    name="body"
-                                                    rows={3}
-                                                    placeholder="Write to the team… type @ to mention someone"
-                                                    users={mentionableUsers}
-                                                />
-                                                <InputError
-                                                    message={errors.body}
-                                                />
-                                                <Button
-                                                    type="submit"
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    className="self-end"
-                                                    disabled={processing}
-                                                >
-                                                    Post comment
-                                                </Button>
-                                            </>
-                                        )}
-                                    </Form>
-                                )}
-                            </Panel>
-                        )}
+                        <Panel
+                            eyebrow="Conversation"
+                            title="Feedback & comments"
+                            bodyClassName="flex flex-col gap-4"
+                        >
+                            <FeedbackBoard
+                                assets={post.assets}
+                                caption={post.master_caption ?? ''}
+                                threads={feedback}
+                                canComment={can.comment}
+                                mode="reviewer"
+                                routes={{
+                                    create: commentOnPortalPost.url(post.id),
+                                    resolve: (id) => resolveComment.url(id),
+                                }}
+                            />
+                        </Panel>
                     </div>
                 </div>
             </Page>

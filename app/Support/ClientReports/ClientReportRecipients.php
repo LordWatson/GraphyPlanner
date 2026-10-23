@@ -8,7 +8,8 @@ use App\Models\User;
 
 /**
  * Step M-3.3 — who a published monthly report is emailed to: the client's portal reviewers, then
- * its approval email when that isn't already one of them (case-insensitive). Never staff.
+ * its review-email contacts (Step M-6.1, falling back to the legacy approval email), de-duplicated
+ * case-insensitively. Never staff.
  */
 final class ClientReportRecipients
 {
@@ -29,10 +30,8 @@ final class ClientReportRecipients
                 $recipients[strtolower($contact->email)] ??= ['name' => $contact->name, 'email' => $contact->email];
             });
 
-        $approval = trim((string) $client->approval_email);
-
-        if ($approval !== '' && filter_var($approval, FILTER_VALIDATE_EMAIL) !== false) {
-            $recipients[strtolower($approval)] ??= ['name' => null, 'email' => $approval];
+        foreach ($client->reviewEmailRecipients() as $contact) {
+            $recipients[strtolower($contact['email'])] ??= $contact;
         }
 
         return array_values($recipients);

@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property bool $insights_digest_opt_out
  * @property string $default_timezone
  * @property string $default_currency
+ * @property int|null $approval_sla_hours
  * @property string|null $billing_details
  * @property string|null $payment_instructions
  * @property string|null $tax_registration_number
@@ -38,6 +39,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $upload_post_profile
  * @property string|null $xai_key
  * @property int|null $ai_monthly_image_quota
+ * @property bool $ai_enabled
+ * @property int|null $ai_monthly_token_budget
  * @property array<string, bool>|null $campaign_features
  * @property Carbon|null $suspended_at
  * @property string|null $suspension_reason
@@ -46,7 +49,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -69,6 +72,7 @@ class Organization extends Model
         'type' => 'agency',
         'require_post_review' => false,
         'insights_digest_opt_out' => false,
+        'ai_enabled' => false,
     ];
 
     /**
@@ -88,7 +92,10 @@ class Organization extends Model
             'publish_mode' => PublishMode::class,
             'xai_key' => 'encrypted',
             'invoice_payment_terms_days' => 'integer',
+            'approval_sla_hours' => 'integer',
             'ai_monthly_image_quota' => 'integer',
+            'ai_enabled' => 'boolean',
+            'ai_monthly_token_budget' => 'integer',
             'suspended_at' => 'datetime',
             'campaign_features' => 'array',
         ];

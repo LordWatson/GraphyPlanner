@@ -156,9 +156,10 @@ class ClientReportsTest extends TestCase
             $this->actingAs($member)->put(route('clients.report-schedule.update', $this->client), ['report_schedule' => 'off'])->assertForbidden();
         }
 
-        // Client reviewers never reach the studio pages, published or not.
-        $this->actingAs($this->reviewer)->get(route('clients.reports.index', $this->client))->assertForbidden();
-        $this->actingAs($this->reviewer)->get(route('client-reports.show', $report))->assertForbidden();
+        // Client reviewers never reach the internal report studio — Step M-6.2 (I-8.1) redirects
+        // them to their portal (they read published reports via `portal.reports`).
+        $this->actingAs($this->reviewer)->get(route('clients.reports.index', $this->client))->assertRedirect();
+        $this->actingAs($this->reviewer)->get(route('client-reports.show', $report))->assertRedirect();
 
         // Another organization's owner can't open it.
         $stranger = User::factory()->for($this->engagementOrg(), 'organization')->role(Role::Owner)->create();

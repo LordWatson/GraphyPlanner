@@ -57,6 +57,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Suggestions volume (Step M-7.5 / dev plan Step 2.13)
+    |--------------------------------------------------------------------------
+    |
+    | How many trends/ideas a single request asks the model for. Step 2.13 targets 5–10 relevant
+    | ideas per client; the earlier interim cap of 3 (kept small for speed) is lifted here. The
+    | DeepSeek provider clamps to 1–10 whatever is configured.
+    |
+    */
+    'suggestions' => [
+        'per_request' => (int) env('AI_SUGGESTIONS_PER_REQUEST', 6),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Local & seasonal idea engine (Step B-6.1)
     |--------------------------------------------------------------------------
     |

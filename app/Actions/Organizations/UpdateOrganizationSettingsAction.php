@@ -17,7 +17,7 @@ class UpdateOrganizationSettingsAction
      * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
      * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
-     * @param  array{default_timezone: string, default_currency: string, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -46,6 +46,11 @@ class UpdateOrganizationSettingsAction
 
             if (isset($data['invoice_payment_terms_days'])) {
                 $organization->invoice_payment_terms_days = (int) $data['invoice_payment_terms_days'];
+            }
+
+            // Step M-6.5: the approval SLA can be set or cleared (null = no SLA, never overdue).
+            if (array_key_exists('approval_sla_hours', $data)) {
+                $organization->approval_sla_hours = $data['approval_sla_hours'] !== null ? (int) $data['approval_sla_hours'] : null;
             }
 
             if (! empty($data['upload_post_key'])) {

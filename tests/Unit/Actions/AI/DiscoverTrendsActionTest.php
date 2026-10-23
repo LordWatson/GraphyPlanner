@@ -30,7 +30,10 @@ class DiscoverTrendsActionTest extends TestCase
 
         $result = (new DiscoverTrendsAction($ai, new AiGuardrailService))($client, ['instagram']);
 
-        $this->assertEquals($trends, $result);
+        // Step M-7.5: the model's trend is returned, now labelled as a hypothesis.
+        $this->assertCount(1, $result->trends);
+        $this->assertSame('Trend', $result->trends[0]->title);
+        $this->assertSame('AI hypothesis', $result->trends[0]->source);
     }
 
     public function test_it_caches_the_result_per_client_and_platform_set(): void
@@ -46,7 +49,7 @@ class DiscoverTrendsActionTest extends TestCase
         $first = $action($client, ['instagram']);
         $second = $action($client, ['instagram']);
 
-        $this->assertEquals($trends, $first);
+        $this->assertSame('AI hypothesis', $first->trends[0]->source);
         $this->assertSame($first, $second);
     }
 

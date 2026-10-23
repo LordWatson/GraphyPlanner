@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AiUsageController;
+use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -29,6 +30,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
+    // Step M-6.7 (I-12.1): per-user notification preferences (in-app + daily digest, per category).
+    Route::get('settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('notifications.edit');
+    Route::put('settings/notifications', [NotificationPreferenceController::class, 'update'])->name('notifications.update');
+
 });
 
 // Organization-level settings need an organization: `org.member` (Step 15.1) sends org-less
@@ -50,6 +55,8 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     // Step 16.11: Owner-only AI usage (images this month vs quota, estimated cost).
     Route::get('settings/ai-usage', [AiUsageController::class, 'edit'])->name('ai-usage.edit');
     Route::put('settings/ai-usage', [AiUsageController::class, 'update'])->name('ai-usage.update');
+    // Step M-7.1: the per-org AI enable toggle + monthly token budget.
+    Route::put('settings/ai-settings', [AiUsageController::class, 'updateSettings'])->name('ai-settings.update');
 
     // Step M-4.1: the organization's tax-rate list (Owner-only, via TaxRatePolicy). The settings
     // page has already confirmed the password, so these mutations aren't re-gated.

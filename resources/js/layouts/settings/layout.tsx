@@ -6,6 +6,7 @@ import { cn, toUrl } from '@/lib/utils';
 import { edit as editAiUsage } from '@/routes/ai-usage';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editOrganization } from '@/routes/organization';
+import { edit as editNotifications } from '@/routes/notifications';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editWorkspace } from '@/routes/workspace-settings';
@@ -22,6 +23,11 @@ const sidebarNavItems: NavItem[] = [
     {
         title: 'Security',
         href: editSecurity(),
+        icon: null,
+    },
+    {
+        title: 'Notifications',
+        href: editNotifications(),
         icon: null,
     },
     {

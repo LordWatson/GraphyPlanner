@@ -33,6 +33,8 @@ type PostRow = {
     master_caption: string | null;
     platform: string | null;
     handle: string | null;
+    /** Step M-6.5: this approval has been waiting past the agency's SLA. */
+    overdue?: boolean;
 };
 
 type UpcomingPostRow = {
@@ -244,9 +246,16 @@ export default function PortalDashboard({
                                                         : ''}
                                                 </span>
                                             </span>
-                                            <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-semibold">
-                                                Review
-                                                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                                            <span className="flex shrink-0 items-center gap-2">
+                                                {row.overdue && (
+                                                    <span className="bg-warning/15 text-warning inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                                                        Overdue
+                                                    </span>
+                                                )}
+                                                <span className="text-primary inline-flex items-center gap-1 text-xs font-semibold">
+                                                    Review
+                                                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                                                </span>
                                             </span>
                                         </Link>
                                     </li>

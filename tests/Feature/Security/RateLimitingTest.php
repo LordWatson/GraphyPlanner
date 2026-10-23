@@ -53,7 +53,8 @@ class RateLimitingTest extends TestCase
 
     public function test_the_ai_limiter_trips_after_ten_calls_a_minute_with_a_structured_429(): void
     {
-        $this->assertTripsAfter(10, fn () => $this->actingAs($this->owner)->postJson(route('clients.ai.ideas', $this->client)))
+        // Step M-7.2: the AI endpoints now queue a job and answer 202 (accepted) before the limiter.
+        $this->assertTripsAfter(10, fn () => $this->actingAs($this->owner)->postJson(route('clients.ai.ideas', $this->client)), expectedStatus: 202)
             ->assertJsonStructure(['message', 'retry_after'])
             ->assertJsonPath('message', fn (string $message) => str_contains($message, 'AI limit'));
     }

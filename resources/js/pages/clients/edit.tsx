@@ -31,6 +31,7 @@ type ClientData = {
     retainer_amount: string | null;
     billing_cycle: string | null;
     default_approval_mode: string;
+    approval_policy: string;
     default_language: string | null;
     approval_email: string | null;
     target_posts_per_week: number | null;
@@ -47,6 +48,7 @@ export default function ClientEdit({
     client,
     statuses,
     approvalModes = [],
+    approvalPolicies = [],
     billingCycles,
     languages,
     owners,
@@ -56,6 +58,7 @@ export default function ClientEdit({
     client: ClientData;
     statuses: Option[];
     approvalModes?: Option[];
+    approvalPolicies?: Array<Option & { description?: string }>;
     billingCycles: Option[];
     languages: Option[];
     owners: Option[];
@@ -200,6 +203,42 @@ export default function ClientEdit({
                                 <InputError
                                     message={errors.default_approval_mode}
                                 />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="approval_policy">
+                                    When there are several approvers
+                                </Label>
+                                <Select
+                                    name="approval_policy"
+                                    defaultValue={client.approval_policy}
+                                >
+                                    <SelectTrigger
+                                        id="approval_policy"
+                                        className="w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {approvalPolicies.map((policy) => (
+                                            <SelectItem
+                                                key={policy.value}
+                                                value={policy.value}
+                                            >
+                                                {policy.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">
+                                    {approvalPolicies.find(
+                                        (policy) =>
+                                            policy.value ===
+                                            client.approval_policy,
+                                    )?.description ??
+                                        'How approvals combine across this client’s approver contacts.'}
+                                </p>
+                                <InputError message={errors.approval_policy} />
                             </div>
 
                             <div className="grid gap-2">

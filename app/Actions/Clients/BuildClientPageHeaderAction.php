@@ -4,7 +4,6 @@ namespace App\Actions\Clients;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\Platform;
-use App\Enums\Role;
 use App\Models\Asset;
 use App\Models\Campaign;
 use App\Models\Client;
@@ -15,6 +14,7 @@ use App\Models\Invoice;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\AI\AiAccess;
 use App\Support\Clients\ClientPresenter;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -101,11 +101,12 @@ class BuildClientPageHeaderAction
     }
 
     /**
-     * The AI tabs (Step 2.4/2.5): Owner/Strategist only, behind `config('ai.enabled')`.
+     * The AI tabs (Step 2.4/2.5): Owner/Strategist only, and only when AI is enabled for the org
+     * (the platform flag AND the per-org toggle — Step M-7.1).
      */
     public static function canUseAi(User $user): bool
     {
-        return (bool) config('ai.enabled', false) && in_array($user->role, [Role::Owner, Role::Strategist], true);
+        return (new AiAccess)->canUse($user);
     }
 
     /**

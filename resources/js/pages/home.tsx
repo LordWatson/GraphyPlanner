@@ -32,6 +32,8 @@ type PostRow = {
     master_caption: string | null;
     platform: string | null;
     handle: string | null;
+    /** Step M-6.5: past the org's approval SLA. */
+    overdue?: boolean;
 };
 
 type DisconnectedAccountRow = {
@@ -201,11 +203,18 @@ function PostRowItem({ row }: { row: PostRow }) {
                         {row.master_caption ? ` · ${row.master_caption}` : ''}
                     </span>
                 </span>
-                <StatusPill
-                    kind="post"
-                    value={row.status}
-                    label={row.status_label}
-                />
+                <span className="flex shrink-0 items-center gap-2">
+                    {row.overdue && (
+                        <span className="bg-warning/15 text-warning inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                            Overdue
+                        </span>
+                    )}
+                    <StatusPill
+                        kind="post"
+                        value={row.status}
+                        label={row.status_label}
+                    />
+                </span>
             </Link>
         </li>
     );

@@ -156,7 +156,8 @@ class InvoiceLedgerTest extends TestCase
 
         $this->actingAs($designer)->get(route('invoices.index'))->assertForbidden();
         $this->actingAs($designer)->get(route('invoices.export'))->assertForbidden();
-        $this->actingAs($reviewer)->get(route('invoices.index'))->assertForbidden();
+        // Step M-6.2 (I-8.1): a reviewer is redirected to their portal before the internal ledger.
+        $this->actingAs($reviewer)->get(route('invoices.index'))->assertRedirect();
     }
 
     public function test_the_ledger_exports_the_filtered_invoices_as_csv(): void
