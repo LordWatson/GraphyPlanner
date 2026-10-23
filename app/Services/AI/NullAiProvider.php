@@ -4,7 +4,9 @@ namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
+use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
+use App\Contracts\LocalIdeaProvider;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
@@ -16,6 +18,7 @@ use App\Support\AI\AiTrends;
 use App\Support\AI\BrandProfileInput;
 use App\Support\AI\Campaigns\AiCampaignBriefDraft;
 use App\Support\AI\Campaigns\AiCampaignWrapDraft;
+use App\Support\AI\IdeaContext;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\BrandImageBriefFactory;
 use App\Support\AI\Images\ImageBriefInput;
@@ -27,7 +30,7 @@ use Illuminate\Support\Facades\Log;
  * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
-class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
+class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, LocalIdeaProvider
 {
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
@@ -48,6 +51,20 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, GridAiProvider
         $this->logDisabled('discoverTrends', ['client_id' => $client->id, 'org_id' => $client->org_id, 'platforms' => $platforms]);
 
         return new AiTrends;
+    }
+
+    public function recommendLocalPosts(Client $client, IdeaContext $context): AiPostIdeas
+    {
+        $this->logDisabled('recommendLocalPosts', ['client_id' => $client->id, 'org_id' => $client->org_id]);
+
+        return new AiPostIdeas;
+    }
+
+    public function repurpose(Post $post, array $platforms): array
+    {
+        $this->logDisabled('repurpose', ['post_id' => $post->id, 'client_id' => $post->client_id, 'org_id' => $post->org_id]);
+
+        return [];
     }
 
     /**

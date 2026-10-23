@@ -24,11 +24,12 @@ use Illuminate\Support\Carbon;
  * @property array<int, string>|null $platforms
  * @property string|null $suggested_caption
  * @property string|null $suggested_post_at
+ * @property Carbon|null $planned_for
  * @property int|null $post_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['org_id', 'client_id', 'title', 'description', 'platforms', 'suggested_caption', 'suggested_post_at', 'post_id'])]
+#[Fillable(['org_id', 'client_id', 'title', 'description', 'platforms', 'suggested_caption', 'suggested_post_at', 'planned_for', 'post_id'])]
 class AiPostIdea extends Model
 {
     use BelongsToOrganization;
@@ -40,6 +41,8 @@ class AiPostIdea extends Model
     {
         return [
             'platforms' => 'array',
+            // Step B-6.3: the local day a weekly-plan item is planned for (null = an ordinary idea).
+            'planned_for' => 'date',
         ];
     }
 

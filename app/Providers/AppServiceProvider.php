@@ -4,15 +4,19 @@ namespace App\Providers;
 
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
+use App\Contracts\CaptionRepurposer;
 use App\Contracts\EngagementSource;
+use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
 use App\Contracts\ImageProvider;
+use App\Contracts\LocalIdeaProvider;
 use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Contracts\PublishCredentials;
 use App\Contracts\VirusScanner;
+use App\Contracts\VisionProvider;
 use App\Contracts\WebsiteSummarizer;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
@@ -51,12 +55,15 @@ use App\Policies\StaffPolicy;
 use App\Policies\SuperAdminReportPolicy;
 use App\Policies\TaxRatePolicy;
 use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\GeminiVisionProvider;
 use App\Services\AI\Images\GeminiImageProvider;
 use App\Services\AI\Images\NullImageProvider;
 use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
+use App\Services\AI\NullVisionProvider;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\Engagement\UploadPostEngagementSource;
+use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
@@ -163,6 +170,36 @@ class AppServiceProvider extends ServiceProvider
             return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
                 ? $this->app->make(DeepSeekProvider::class)
                 : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-6.1: the business shell's local/seasonal idea engine — same DeepSeek-or-Null rule,
+        // kept as its own contract so the agency AiProvider path (and its test doubles) is untouched.
+        $this->app->bind(LocalIdeaProvider::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-6.4: repurpose-across-platforms — same DeepSeek-or-Null rule, its own contract.
+        $this->app->bind(CaptionRepurposer::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-6.1: upcoming local holidays/awareness days that ground the idea engine. A static
+        // dataset first (open question §5.5); swappable for a paid API behind the same contract.
+        $this->app->singleton(EventCalendar::class, StaticEventCalendar::class);
+
+        // Step B-6.2: "caption from a photo" — Gemini (the image vendor's multimodal models) only
+        // when AI is enabled, the vision provider is `gemini` and a key is set; else the Null
+        // provider (empty suggestions, no vendor call), so the editor degrades gracefully.
+        $this->app->bind(VisionProvider::class, function () {
+            $usable = (bool) config('ai.enabled', false)
+                && config('ai.vision.provider') === 'gemini'
+                && (string) config('ai.vision.api_key', '') !== '';
+
+            return $usable ? $this->app->make(GeminiVisionProvider::class) : $this->app->make(NullVisionProvider::class);
         });
 
         // ImageProvider contract (Step 16.1) resolves to the configured vendor (Gemini, Step 16.6,

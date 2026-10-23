@@ -4,7 +4,9 @@ namespace App\Services\AI;
 
 use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
+use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
+use App\Contracts\LocalIdeaProvider;
 use App\Enums\Platform;
 use App\Models\Campaign;
 use App\Models\Client;
@@ -22,6 +24,7 @@ use App\Support\AI\Campaigns\AiCampaignBriefDraft;
 use App\Support\AI\Campaigns\AiCampaignWrapDraft;
 use App\Support\AI\Campaigns\AiDeliverableSuggestion;
 use App\Support\AI\ClientContextBuilder;
+use App\Support\AI\IdeaContext;
 use App\Support\AI\Images\AiImageBrief;
 use App\Support\AI\Images\BrandImageBriefFactory;
 use App\Support\AI\Images\ImageBriefInput;
@@ -39,7 +42,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
+class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, LocalIdeaProvider
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -108,7 +111,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
             return new AiPostIdeas;
         }
 
-        $ideas = collect($payload['ideas'] ?? [])
+        $ideas = collect((array) ($payload['ideas'] ?? []))
             ->take(self::IDEAS_PER_REQUEST)
             ->map(fn (array $item): AiPostIdea => new AiPostIdea(
                 title: (string) ($item['title'] ?? ''),
@@ -121,6 +124,94 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
             ->all();
 
         return new AiPostIdeas($ideas);
+    }
+
+    /**
+     * Step B-6.1: the local/seasonal idea engine. The same grounded system prompt as
+     * {@see recommendPosts()}, with the brand's place-and-moment context ({@see IdeaContext}:
+     * location, season, upcoming local dates, recent posts to avoid) added to the user prompt so the
+     * ideas feel like this brand, this week. Falls back to empty ideas on failure.
+     */
+    public function recommendLocalPosts(Client $client, IdeaContext $context): AiPostIdeas
+    {
+        $payload = $this->requestStructured(
+            method: 'recommendLocalPosts',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildRecommendLocalPostsUserPrompt($context),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'ideas', ['title', 'description']),
+            context: ['org_id' => $client->org_id, 'client_id' => $client->id],
+        );
+
+        if ($payload === null) {
+            return new AiPostIdeas;
+        }
+
+        $ideas = collect((array) ($payload['ideas'] ?? []))
+            ->take(self::IDEAS_PER_REQUEST)
+            ->map(fn (array $item): AiPostIdea => new AiPostIdea(
+                title: (string) ($item['title'] ?? ''),
+                description: (string) ($item['description'] ?? ''),
+                platforms: array_values(array_map('strval', $item['platforms'] ?? [])),
+                suggestedCaption: isset($item['suggestedCaption']) ? (string) $item['suggestedCaption'] : null,
+                suggestedPostAt: isset($item['suggestedPostAt']) ? (string) $item['suggestedPostAt'] : null,
+            ))
+            ->values()
+            ->all();
+
+        return new AiPostIdeas($ideas);
+    }
+
+    /**
+     * Step B-6.4: rewrite the post's master caption natively for each platform. Strict JSON, the
+     * same grounded prompt + one-retry path. Caption-length/hashtag limits are stated in the prompt
+     * and enforced again by the Action, so a variant can never exceed a platform's cap.
+     *
+     * @param  array<int, string>  $platforms
+     * @return array<string, array{caption: string, hashtags: list<string>, firstComment: string|null}>
+     */
+    public function repurpose(Post $post, array $platforms): array
+    {
+        $client = $post->client;
+        $platforms = array_values(array_unique($platforms));
+
+        if ($platforms === [] || $client === null) {
+            return [];
+        }
+
+        $payload = $this->requestStructured(
+            method: 'repurpose',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildRepurposeUserPrompt($post, $platforms),
+            validator: fn (array $data): ?string => $this->shapeError($data, 'variants', ['platform', 'caption']),
+            context: ['org_id' => $post->org_id, 'client_id' => $post->client_id, 'post_id' => $post->id],
+            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $variants = [];
+
+        foreach ((array) ($payload['variants'] ?? []) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $platform = strtolower(trim((string) ($item['platform'] ?? '')));
+
+            if (! in_array($platform, $platforms, true) || isset($variants[$platform])) {
+                continue;
+            }
+
+            $variants[$platform] = [
+                'caption' => trim((string) ($item['caption'] ?? '')),
+                'hashtags' => array_values(array_map('strval', is_array($item['hashtags'] ?? null) ? $item['hashtags'] : [])),
+                'firstComment' => isset($item['firstComment']) && is_string($item['firstComment']) ? $item['firstComment'] : null,
+            ];
+        }
+
+        return $variants;
     }
 
     public function discoverTrends(Client $client, array $platforms): AiTrends
@@ -626,6 +717,53 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, GridAiProvider
             '',
             'Respond with JSON: {"ideas": [{"title": string, "description": string, "platforms": string[], "suggestedCaption": string|null, "suggestedPostAt": string|null}]}',
         ];
+
+        return implode("\n", $lines);
+    }
+
+    private function buildRecommendLocalPostsUserPrompt(IdeaContext $context): string
+    {
+        $lines = [
+            'Recommend exactly '.self::IDEAS_PER_REQUEST.' fresh post ideas for this brand for the days ahead.',
+            'Each description must name the content pillar it serves and the audience pain point or offer it speaks to.',
+            'Use the local & seasonal context below: where it fits the brand naturally, tie an idea to an upcoming date or the season — never force a tenuous link, and never repeat a recently covered angle.',
+            '',
+            $this->guardrail->scrub($context->toPromptBlock()),
+            '',
+            'Respond with JSON: {"ideas": [{"title": string, "description": string, "platforms": string[], "suggestedCaption": string|null, "suggestedPostAt": string|null}]}',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, string>  $platforms
+     */
+    private function buildRepurposeUserPrompt(Post $post, array $platforms): string
+    {
+        $lines = [
+            'Rewrite this post natively for each platform below — do not just copy the same text. Keep the meaning and the brand voice, but suit each platform\'s format and audience.',
+            'Guidance: TikTok/Reels — a punchy first-line hook, then a very short caption; Instagram — a warm caption with relevant hashtags; LinkedIn — a longer, professional, value-led post with few or no hashtags; Facebook — conversational, medium length; X — one tight line.',
+            'Stay within each platform\'s caption limit (including hashtags). Never invent facts, offers or prices not in the original.',
+            'Original caption: '.$this->guardrail->scrub($post->master_caption ?: '(none — write from the brand context)'),
+        ];
+
+        if (! empty($post->hashtags)) {
+            $lines[] = 'Existing hashtags: '.implode(', ', $post->hashtags);
+        }
+
+        $lines[] = 'Platforms and their caption limits (characters) / hashtag norms:';
+
+        foreach ($platforms as $value) {
+            $platform = Platform::tryFrom($value);
+
+            if ($platform !== null) {
+                $lines[] = "- {$platform->value}: limit {$platform->captionLimit()}, up to {$platform->maxHashtags()} hashtags".($platform->allowsLinksInCaption() ? '' : ', links in the caption are not clickable');
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"variants": [{"platform": string (one of the values above), "caption": string, "hashtags": string[], "firstComment": string|null}]}';
 
         return implode("\n", $lines);
     }

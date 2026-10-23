@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Business;
 
+use App\Actions\AI\SuggestCaptionsFromMediaAction;
 use App\Actions\Assets\CreateAssetAction;
 use App\Actions\Assets\SearchClientAssetsAction;
 use App\Enums\AssetType;
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SearchAssetsRequest;
 use App\Http\Requests\StoreAssetRequest;
@@ -35,10 +37,39 @@ class MediaController extends Controller
                 fn (AssetType $type) => ['value' => $type->value, 'label' => $type->label()],
                 AssetType::cases(),
             ),
+            'aiEnabled' => (bool) config('ai.enabled', false),
             'can' => [
                 'create' => $request->user()->can('create', [Asset::class, $brand]),
+                'suggestCaptions' => $this->canSuggestCaptions($request),
             ],
         ]);
+    }
+
+    /**
+     * Step B-6.2 — suggest captions for one of the brand's photos (the "Caption from photo" button
+     * on an image tile). Thin: it checks the AI gate and the asset belongs to the brand, then hands
+     * off to {@see SuggestCaptionsFromMediaAction}, which never throws — an empty list is a valid,
+     * handled result the page shows as "nothing came back".
+     */
+    public function captions(Request $request, Asset $asset, CurrentWorkspace $workspace, SuggestCaptionsFromMediaAction $action): JsonResponse
+    {
+        abort_unless((bool) config('ai.enabled', false), 404);
+
+        $brand = $workspace->brand();
+        $this->authorize('view', $brand);
+        abort_unless($this->canSuggestCaptions($request), 403);
+        abort_unless($asset->client_id === $brand->id, 404);
+
+        return response()->json(['suggestions' => $action($brand, $asset)]);
+    }
+
+    /**
+     * Captions are a content-creation aid, so Owners, Managers (Strategist) and Creators (Designer)
+     * may use them; Viewers (and client reviewers) may not.
+     */
+    private function canSuggestCaptions(Request $request): bool
+    {
+        return in_array($request->user()->role, [Role::Owner, Role::Strategist, Role::Designer], true);
     }
 
     /**

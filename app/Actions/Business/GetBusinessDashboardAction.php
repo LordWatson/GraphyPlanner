@@ -2,6 +2,7 @@
 
 namespace App\Actions\Business;
 
+use App\Actions\AI\GenerateDailyIdeaAction;
 use App\Actions\Home\GetNeedsAttentionItemsAction;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
@@ -26,7 +27,7 @@ use Illuminate\Support\Str;
  *  - **gaps** — days in the next 14 the brand means to post on (its posting goal, B-4.5) but hasn't;
  *  - **needsYou** — failed publishes, accounts needing a reconnect, posts in review, stale drafts;
  *  - **thisWeek** — publishing consistency available today (richer engagement stats arrive with B-8);
- *  - **ideaOfTheDay** — reserved for the local/seasonal idea engine (B-6.1); null until it lands.
+ *  - **ideaOfTheDay** — today's cached local/seasonal idea (B-6.1); null until the nightly run fills it.
  */
 class GetBusinessDashboardAction
 {
@@ -42,6 +43,7 @@ class GetBusinessDashboardAction
     public function __construct(
         private readonly GetNeedsAttentionItemsAction $needsAttention,
         private readonly PostingGoalGapService $gapService,
+        private readonly GenerateDailyIdeaAction $dailyIdea,
     ) {}
 
     /**
@@ -57,9 +59,10 @@ class GetBusinessDashboardAction
             'gaps' => $this->gaps($brand, $timezone, $now),
             'needsYou' => $this->needsYou($user, $brand),
             'thisWeek' => $this->thisWeek($brand, $now),
-            // Reserved for B-6.1's local/seasonal idea engine; the page shows a "generate ideas"
-            // empty state until it lands.
-            'ideaOfTheDay' => null,
+            // Step B-6.1: today's cached local/seasonal idea (filled by the nightly
+            // business:generate-daily-ideas run). Read-only here — the page never triggers a vendor
+            // call; the empty state links to "Get ideas" when nothing is cached yet.
+            'ideaOfTheDay' => $this->dailyIdea->cached($brand, $timezone),
         ];
     }
 

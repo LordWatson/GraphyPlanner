@@ -37,6 +37,10 @@ $safely(Schedule::command('social-accounts:check-health')->hourly(), 'social-acc
 // Owners/Strategists — idempotent per client/day, see GenerateDailyBriefsAction.
 $safely(Schedule::command('ai:generate-daily-briefs')->dailyAt('06:00'), 'ai:generate-daily-briefs');
 
+// Step B-6.1: fills each business brand's "Idea of the day" at ~6am in the brand's own timezone.
+// Hourly so every timezone is caught from one schedule; idempotent (cached per brand/local day).
+$safely(Schedule::command('business:generate-daily-ideas')->hourlyAt(10), 'business:generate-daily-ideas');
+
 // Step 16.13: deletes files of AI Image Studio variants discarded or never selected after
 // `ai.images.prune_after_days` (30 by default). Images attached to a post are always kept.
 $safely(Schedule::command('ai-images:prune')->dailyAt('03:30'), 'ai-images:prune');

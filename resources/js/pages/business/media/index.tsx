@@ -1,11 +1,28 @@
-import { Head } from '@inertiajs/react';
-import { ImagePlus, Images, Loader2, Search, Trash2 } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import {
+    Check,
+    Copy,
+    ImagePlus,
+    Images,
+    Loader2,
+    Search,
+    Sparkles,
+    Trash2,
+    Wand2,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
 import { Pagination } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -17,10 +34,12 @@ import {
 import { http } from '@/lib/http';
 import { destroy as destroyAsset } from '@/routes/assets';
 import {
+    captions as mediaCaptions,
     index as mediaIndex,
     library as mediaLibrary,
     store as mediaStore,
 } from '@/routes/business/media';
+import { index as imageStudio } from '@/routes/business/studio';
 
 type Option = { value: string; label: string };
 
@@ -48,13 +67,23 @@ type LibraryPage = {
 
 const ALL = '__all__';
 
+type CaptionSuggestion = {
+    caption: string;
+    hashtags: string[];
+    altText: string | null;
+    firstComment: string | null;
+};
+
 export default function BusinessMedia({
     assetTypes,
+    aiEnabled,
     can,
 }: {
     assetTypes: Option[];
-    can: { create: boolean };
+    aiEnabled: boolean;
+    can: { create: boolean; suggestCaptions: boolean };
 }) {
+    const [captionsFor, setCaptionsFor] = useState<Asset | null>(null);
     const [search, setSearch] = useState('');
     const [debounced, setDebounced] = useState('');
     const [type, setType] = useState(ALL);
@@ -182,20 +211,30 @@ export default function BusinessMedia({
                 }
                 description="Every photo and video, ready to drop into a post."
                 actions={
-                    can.create && (
-                        <Button
-                            variant="brand"
-                            disabled={uploading}
-                            onClick={() => fileInput.current?.click()}
-                        >
-                            {uploading ? (
-                                <Loader2 className="animate-spin" />
-                            ) : (
-                                <ImagePlus />
-                            )}
-                            Upload
-                        </Button>
-                    )
+                    <>
+                        {aiEnabled && (
+                            <Button variant="outline" asChild>
+                                <Link href={imageStudio()}>
+                                    <Wand2 />
+                                    Create an image
+                                </Link>
+                            </Button>
+                        )}
+                        {can.create && (
+                            <Button
+                                variant="brand"
+                                disabled={uploading}
+                                onClick={() => fileInput.current?.click()}
+                            >
+                                {uploading ? (
+                                    <Loader2 className="animate-spin" />
+                                ) : (
+                                    <ImagePlus />
+                                )}
+                                Upload
+                            </Button>
+                        )}
+                    </>
                 }
             />
 
@@ -275,6 +314,12 @@ export default function BusinessMedia({
                                 <MediaTile
                                     key={asset.id}
                                     asset={asset}
+                                    canCaption={
+                                        aiEnabled &&
+                                        can.suggestCaptions &&
+                                        asset.type === 'image'
+                                    }
+                                    onCaption={() => setCaptionsFor(asset)}
                                     onRemove={() => void remove(asset)}
                                 />
                             ))}
@@ -290,15 +335,24 @@ export default function BusinessMedia({
                     onPageChange={setPage}
                 />
             )}
+
+            <CaptionsDialog
+                asset={captionsFor}
+                onClose={() => setCaptionsFor(null)}
+            />
         </Page>
     );
 }
 
 function MediaTile({
     asset,
+    canCaption,
+    onCaption,
     onRemove,
 }: {
     asset: Asset;
+    canCaption: boolean;
+    onCaption: () => void;
     onRemove: () => void;
 }) {
     const preview = asset.thumbnail_url ?? asset.url;
@@ -321,17 +375,163 @@ function MediaTile({
                     AI
                 </span>
             )}
-            {asset.can.delete && (
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    aria-label={`Remove ${asset.original_filename ?? 'media'}`}
-                    className="bg-ink/70 text-cream absolute top-2 right-2 flex size-7 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                >
-                    <Trash2 className="size-3.5" />
-                </button>
-            )}
+            <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                {canCaption && (
+                    <button
+                        type="button"
+                        onClick={onCaption}
+                        aria-label={`Caption ${asset.original_filename ?? 'this photo'} with AI`}
+                        className="bg-ink/70 text-cream hover:bg-ink flex size-7 items-center justify-center rounded-full transition-colors focus-visible:opacity-100"
+                    >
+                        <Sparkles className="size-3.5" />
+                    </button>
+                )}
+                {asset.can.delete && (
+                    <button
+                        type="button"
+                        onClick={onRemove}
+                        aria-label={`Remove ${asset.original_filename ?? 'media'}`}
+                        className="bg-ink/70 text-cream hover:bg-ink flex size-7 items-center justify-center rounded-full transition-colors focus-visible:opacity-100"
+                    >
+                        <Trash2 className="size-3.5" />
+                    </button>
+                )}
+            </div>
         </div>
+    );
+}
+
+function CaptionsDialog({
+    asset,
+    onClose,
+}: {
+    asset: Asset | null;
+    onClose: () => void;
+}) {
+    const [loading, setLoading] = useState(false);
+    const [suggestions, setSuggestions] = useState<CaptionSuggestion[]>([]);
+
+    useEffect(() => {
+        if (asset === null) {
+            return;
+        }
+
+        setSuggestions([]);
+        setLoading(true);
+        const controller = new AbortController();
+
+        void http
+            .post<{ suggestions: CaptionSuggestion[] }>(
+                mediaCaptions(asset.id).url,
+                {},
+                {
+                    signal: controller.signal,
+                    toastOnError: true,
+                    rateLimitMessage: 'Give it a moment before asking again.',
+                },
+            )
+            .then((response) => {
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+
+                    if (response.ok) {
+                        setSuggestions(response.data.suggestions ?? []);
+                    }
+                }
+            });
+
+        return () => controller.abort();
+    }, [asset]);
+
+    return (
+        <Dialog
+            open={asset !== null}
+            onOpenChange={(open) => !open && onClose()}
+        >
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Caption from photo</DialogTitle>
+                    <DialogDescription>
+                        Three options in your brand voice. Copy one, or use it
+                        as a starting point.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {loading ? (
+                    <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
+                        <Loader2 className="size-4 animate-spin" />
+                        Reading your photo…
+                    </div>
+                ) : suggestions.length === 0 ? (
+                    <EmptyState
+                        compact
+                        icon={Sparkles}
+                        title="Nothing came back."
+                        description="We couldn't write a caption for this one — try another photo, or write your own."
+                    />
+                ) : (
+                    <ul className="flex flex-col gap-3">
+                        {suggestions.map((suggestion, index) => (
+                            <CaptionCard key={index} suggestion={suggestion} />
+                        ))}
+                    </ul>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function CaptionCard({ suggestion }: { suggestion: CaptionSuggestion }) {
+    const [copied, setCopied] = useState(false);
+
+    const text = [
+        suggestion.caption,
+        suggestion.hashtags.map((tag) => `#${tag}`).join(' '),
+    ]
+        .filter(Boolean)
+        .join('\n\n');
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            toast.success('Caption copied.');
+            window.setTimeout(() => setCopied(false), 1500);
+        } catch {
+            toast.error('Could not copy — select and copy by hand.');
+        }
+    };
+
+    return (
+        <li className="border-border/70 bg-background/40 flex flex-col gap-2 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-sm whitespace-pre-wrap">
+                    {suggestion.caption}
+                </p>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copy()}
+                    aria-label="Copy caption"
+                >
+                    {copied ? (
+                        <Check className="size-4" />
+                    ) : (
+                        <Copy className="size-4" />
+                    )}
+                </Button>
+            </div>
+            {suggestion.hashtags.length > 0 && (
+                <p className="text-muted-foreground text-xs">
+                    {suggestion.hashtags.map((tag) => `#${tag}`).join(' ')}
+                </p>
+            )}
+            {suggestion.altText && (
+                <p className="text-muted-foreground text-xs italic">
+                    Alt text: {suggestion.altText}
+                </p>
+            )}
+        </li>
     );
 }
 

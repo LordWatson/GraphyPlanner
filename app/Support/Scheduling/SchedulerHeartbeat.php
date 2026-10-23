@@ -26,6 +26,8 @@ final class SchedulerHeartbeat
         'publishing:poll-pending-statuses' => ['label' => 'Publish status poll', 'interval_minutes' => 5],
         'social-accounts:check-health' => ['label' => 'Social account health check', 'interval_minutes' => 60],
         'ai:generate-daily-briefs' => ['label' => 'Daily AI briefs', 'interval_minutes' => 1440],
+        // Step B-6.1: hourly (each timezone's 6am is caught from one schedule).
+        'business:generate-daily-ideas' => ['label' => 'Daily brand ideas', 'interval_minutes' => 60],
         'ai-images:prune' => ['label' => 'AI image prune', 'interval_minutes' => 1440],
         // Step M-3.4: hourly.
         'clients:recompute-health' => ['label' => 'Client health sweep', 'interval_minutes' => 60],

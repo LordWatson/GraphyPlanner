@@ -14,6 +14,7 @@ use App\Http\Controllers\Business\BrandController as BusinessBrandController;
 use App\Http\Controllers\Business\CollectionController as BusinessCollectionController;
 use App\Http\Controllers\Business\DashboardController as BusinessDashboardController;
 use App\Http\Controllers\Business\IdeaController as BusinessIdeaController;
+use App\Http\Controllers\Business\ImageStudioController as BusinessImageStudioController;
 use App\Http\Controllers\Business\InsightController as BusinessInsightController;
 use App\Http\Controllers\Business\MediaController as BusinessMediaController;
 use App\Http\Controllers\Business\OnboardingController as BusinessOnboardingController;
@@ -190,11 +191,30 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::post('ideas/generate', [BusinessIdeaController::class, 'generate'])
             ->middleware('throttle:ai')
             ->name('ideas.generate');
+        // Step B-6.3: "Plan my week" — generate draft plan items for the goal's gaps, then bulk
+        // accept (→ draft posts) or discard them.
+        Route::post('plan/generate', [BusinessIdeaController::class, 'generatePlan'])
+            ->middleware('throttle:ai')
+            ->name('plan.generate');
+        Route::post('plan/accept', [BusinessIdeaController::class, 'acceptPlan'])->name('plan.accept');
+        Route::post('plan/discard', [BusinessIdeaController::class, 'discardPlan'])->name('plan.discard');
 
         // Media library.
         Route::get('media', [BusinessMediaController::class, 'index'])->name('media.index');
         Route::get('media/library', [BusinessMediaController::class, 'library'])->name('media.library');
         Route::post('media', [BusinessMediaController::class, 'store'])->name('media.store');
+        // Step B-6.2: caption a photo with AI (vision). Throttled like the other AI endpoints.
+        Route::post('media/{asset}/captions', [BusinessMediaController::class, 'captions'])
+            ->middleware('throttle:ai')
+            ->name('media.captions');
+
+        // Step B-6.5: the Image Studio — one-tap presets that generate on-brand images for the
+        // brand. The brand-agnostic `ai-image-*` routes (poll/use/refine/finalise/download) are
+        // shared with the agency studio. Generate is throttled like the agency image routes.
+        Route::get('studio', [BusinessImageStudioController::class, 'index'])->name('studio.index');
+        Route::post('studio/generate', [BusinessImageStudioController::class, 'generate'])
+            ->middleware('throttle:ai-images')
+            ->name('studio.generate');
 
         // Collections (campaigns, renamed in copy).
         Route::get('collections', [BusinessCollectionController::class, 'index'])->name('collections.index');
@@ -555,6 +575,9 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
             ->name('clients.ai.ideas');
         Route::post('posts/{post}/ai/captions', [AiController::class, 'captions'])
             ->name('posts.ai.captions');
+        // Step B-6.4: repurpose the caption natively per platform (fills the per-platform overrides).
+        Route::post('posts/{post}/ai/repurpose', [AiController::class, 'repurpose'])
+            ->name('posts.ai.repurpose');
     });
 
     // Trends & Ideas now persist (Step 2.4 follow-up) so each discovered trend/idea gets its

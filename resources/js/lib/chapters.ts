@@ -264,7 +264,8 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
         summary: 'Your photos and videos, ready to drop into a post.',
         icon: Image,
         swatch: 'bg-signal',
-        prefixes: ['/media'],
+        // The Image Studio (B-6.5) lives under Media — generated images become media.
+        prefixes: ['/media', '/studio'],
     },
     insights: {
         key: 'insights',

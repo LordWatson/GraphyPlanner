@@ -1,10 +1,13 @@
 import { Deferred, Head, router } from '@inertiajs/react';
 import {
     ArrowRight,
+    CalendarRange,
+    Check,
     Lightbulb,
     Loader2,
     Sparkles,
     TrendingUp,
+    X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +20,11 @@ import {
     generate as generateIdeas,
     index as ideasIndex,
 } from '@/routes/business/ideas';
+import {
+    accept as acceptPlan,
+    discard as discardPlan,
+    generate as generatePlan,
+} from '@/routes/business/plan';
 
 type Idea = {
     id: number;
@@ -35,15 +43,34 @@ type Trend = {
     confidence: number | null;
 };
 
+type PlanItem = {
+    id: number;
+    title: string;
+    description: string | null;
+    platforms: string[];
+    suggestedCaption: string | null;
+    slotLabel: string | null;
+    plannedFor: string | null;
+};
+
 type Props = {
     aiEnabled: boolean;
+    hasGoal: boolean;
     pillars: string[];
     ideas?: Idea[];
     trends?: Trend[];
+    plan?: PlanItem[];
 };
 
-export default function BusinessIdeas({ aiEnabled, ideas, trends }: Props) {
+export default function BusinessIdeas({
+    aiEnabled,
+    hasGoal,
+    ideas,
+    trends,
+    plan,
+}: Props) {
     const [generating, setGenerating] = useState(false);
+    const [planning, setPlanning] = useState(false);
 
     const generate = async () => {
         setGenerating(true);
@@ -66,6 +93,26 @@ export default function BusinessIdeas({ aiEnabled, ideas, trends }: Props) {
         }
     };
 
+    const planWeek = async () => {
+        setPlanning(true);
+
+        const response = await http.post(
+            generatePlan().url,
+            {},
+            {
+                toastOnError: true,
+                rateLimitMessage: 'Give it a moment before planning again.',
+            },
+        );
+
+        setPlanning(false);
+
+        if (response.ok) {
+            toast.success('Your week is planned.');
+            router.reload({ only: ['plan'] });
+        }
+    };
+
     return (
         <Page>
             <Head title="Ideas" />
@@ -80,21 +127,50 @@ export default function BusinessIdeas({ aiEnabled, ideas, trends }: Props) {
                 description="Post ideas and trends tuned to your brand — turn any into a draft in one tap."
                 actions={
                     aiEnabled && (
-                        <Button
-                            variant="brand"
-                            disabled={generating}
-                            onClick={() => void generate()}
-                        >
-                            {generating ? (
-                                <Loader2 className="animate-spin" />
-                            ) : (
-                                <Sparkles />
+                        <>
+                            {hasGoal && (
+                                <Button
+                                    variant="outline"
+                                    disabled={planning}
+                                    onClick={() => void planWeek()}
+                                >
+                                    {planning ? (
+                                        <Loader2 className="animate-spin" />
+                                    ) : (
+                                        <CalendarRange />
+                                    )}
+                                    Plan my week
+                                </Button>
                             )}
-                            More ideas
-                        </Button>
+                            <Button
+                                variant="brand"
+                                disabled={generating}
+                                onClick={() => void generate()}
+                            >
+                                {generating ? (
+                                    <Loader2 className="animate-spin" />
+                                ) : (
+                                    <Sparkles />
+                                )}
+                                More ideas
+                            </Button>
+                        </>
                     )
                 }
             />
+
+            {aiEnabled && hasGoal && (
+                <Panel
+                    icon={CalendarRange}
+                    eyebrow="Your week"
+                    title="This week's plan"
+                    description="Draft posts for the days you mean to post on. Add the ones you like."
+                >
+                    <Deferred data="plan" fallback={<ListSkeleton />}>
+                        <WeeklyPlan plan={plan ?? []} />
+                    </Deferred>
+                </Panel>
+            )}
 
             <Panel icon={Lightbulb} eyebrow="Ready to use" title="Post ideas">
                 <Deferred data="ideas" fallback={<ListSkeleton />}>
@@ -214,6 +290,139 @@ function TrendList({
                 </li>
             ))}
         </ul>
+    );
+}
+
+function WeeklyPlan({ plan }: { plan: PlanItem[] }) {
+    const [busy, setBusy] = useState(false);
+
+    if (plan.length === 0) {
+        return (
+            <EmptyState
+                compact
+                icon={CalendarRange}
+                title="Nothing planned yet."
+                description="Tap “Plan my week” and we’ll draft a post for each open day on your goal."
+            />
+        );
+    }
+
+    const act = async (route: string, ids: number[], done: string) => {
+        if (ids.length === 0) {
+            return;
+        }
+
+        setBusy(true);
+        const response = await http.post(
+            route,
+            { ids },
+            { toastOnError: true },
+        );
+        setBusy(false);
+
+        if (response.ok) {
+            toast.success(done);
+            router.reload({ only: ['plan', 'ideas'] });
+        }
+    };
+
+    const allIds = plan.map((item) => item.id);
+
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground text-sm">
+                    {plan.length} draft{plan.length === 1 ? '' : 's'} ready to
+                    add.
+                </span>
+                <div className="flex gap-2">
+                    <Button
+                        size="sm"
+                        variant="brand"
+                        disabled={busy}
+                        onClick={() =>
+                            void act(
+                                acceptPlan().url,
+                                allIds,
+                                'Added to your drafts.',
+                            )
+                        }
+                    >
+                        <Check />
+                        Add all
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() =>
+                            void act(discardPlan().url, allIds, 'Plan cleared.')
+                        }
+                    >
+                        Clear
+                    </Button>
+                </div>
+            </div>
+
+            <ul className="flex flex-col gap-3">
+                {plan.map((item) => (
+                    <li
+                        key={item.id}
+                        className="border-border/70 bg-background/40 flex flex-col gap-2 rounded-xl border p-4"
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex min-w-0 flex-col gap-1">
+                                <span className="font-medium">
+                                    {item.title}
+                                </span>
+                                {item.slotLabel && (
+                                    <span className="eyebrow text-muted-foreground normal-case">
+                                        {item.slotLabel}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex shrink-0 gap-1.5">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() =>
+                                        void act(
+                                            acceptPlan().url,
+                                            [item.id],
+                                            'Added to your drafts.',
+                                        )
+                                    }
+                                >
+                                    Add
+                                    <ArrowRight />
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    aria-label="Discard this plan item"
+                                    disabled={busy}
+                                    onClick={() =>
+                                        void act(
+                                            discardPlan().url,
+                                            [item.id],
+                                            'Removed from your plan.',
+                                        )
+                                    }
+                                >
+                                    <X />
+                                </Button>
+                            </div>
+                        </div>
+                        {item.description && (
+                            <p className="text-muted-foreground text-sm">
+                                {item.description}
+                            </p>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 }
 

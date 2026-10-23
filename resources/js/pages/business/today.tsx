@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -6,12 +6,15 @@ import {
     CalendarPlus,
     CircleDot,
     ImageIcon,
+    Lightbulb,
     Plus,
     Sparkles,
 } from 'lucide-react';
+import { useState } from 'react';
 import { ChapterHero, EmptyState, Page, Panel, Stat } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
+import { persist as persistIdea } from '@/routes/ai-post-ideas';
 import { today as businessToday } from '@/routes/business';
 import { index as accounts } from '@/routes/business/accounts';
 import { edit as brand } from '@/routes/business/brand';
@@ -58,8 +61,18 @@ type Dashboard = {
         scheduledNext7: number;
         hasMetrics: boolean;
     };
-    ideaOfTheDay: { title: string; description: string } | null;
+    ideaOfTheDay: {
+        ai_post_idea_id: number | null;
+        title: string;
+        description: string | null;
+        platforms: string[];
+        suggestedCaption: string | null;
+    } | null;
 };
+
+function titleCase(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 function greeting(): string {
     const hour = new Date().getHours();
@@ -77,7 +90,7 @@ function greeting(): string {
 
 export default function Today() {
     const { dashboard } = usePage<{ dashboard: Dashboard }>().props;
-    const { brand, upNext, gaps, needsYou, thisWeek } = dashboard;
+    const { brand, upNext, gaps, needsYou, thisWeek, ideaOfTheDay } = dashboard;
 
     return (
         <Page>
@@ -108,6 +121,8 @@ export default function Today() {
                     </>
                 }
             />
+
+            <IdeaOfTheDayPanel idea={ideaOfTheDay} />
 
             <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
                 <UpNextPanel upNext={upNext} />
@@ -331,6 +346,92 @@ function GapsPanel({ gaps }: { gaps: Dashboard['gaps'] }) {
                     ))}
                 </div>
             )}
+        </Panel>
+    );
+}
+
+function IdeaOfTheDayPanel({ idea }: { idea: Dashboard['ideaOfTheDay'] }) {
+    const [using, setUsing] = useState(false);
+
+    if (idea === null) {
+        return (
+            <Panel
+                icon={Lightbulb}
+                eyebrow="Fresh thinking"
+                title="Idea of the day"
+            >
+                <EmptyState
+                    compact
+                    icon={Sparkles}
+                    title="No idea yet today."
+                    description="We dream one up for your brand each morning — or get a few right now."
+                    action={
+                        <Button variant="brand" size="sm" asChild>
+                            <Link href={ideas()}>
+                                <Sparkles />
+                                Get ideas
+                            </Link>
+                        </Button>
+                    }
+                />
+            </Panel>
+        );
+    }
+
+    const use = () => {
+        if (idea.ai_post_idea_id === null) {
+            return;
+        }
+
+        setUsing(true);
+        router.post(
+            persistIdea(idea.ai_post_idea_id).url,
+            {},
+            { onFinish: () => setUsing(false) },
+        );
+    };
+
+    return (
+        <Panel
+            icon={Lightbulb}
+            eyebrow="Fresh thinking"
+            title="Idea of the day"
+            actions={
+                idea.ai_post_idea_id !== null && (
+                    <Button
+                        variant="brand"
+                        size="sm"
+                        disabled={using}
+                        onClick={use}
+                    >
+                        Use this idea
+                        <ArrowRight />
+                    </Button>
+                )
+            }
+        >
+            <div className="flex flex-col gap-3">
+                <p className="text-[17px] font-semibold text-balance">
+                    {idea.title}
+                </p>
+                {idea.description && (
+                    <p className="text-muted-foreground text-pretty">
+                        {idea.description}
+                    </p>
+                )}
+                {idea.platforms.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {idea.platforms.map((platform) => (
+                            <span
+                                key={platform}
+                                className="border-border/70 text-muted-foreground inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                            >
+                                {titleCase(platform)}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
         </Panel>
     );
 }
