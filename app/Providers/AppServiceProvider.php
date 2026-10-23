@@ -9,6 +9,7 @@ use App\Contracts\EngagementSource;
 use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
 use App\Contracts\ImageProvider;
+use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
 use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
@@ -188,6 +189,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Step B-6.4: repurpose-across-platforms — same DeepSeek-or-Null rule, its own contract.
         $this->app->bind(CaptionRepurposer::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step B-8.2: plain-language insight takeaways — same DeepSeek-or-Null rule, its own contract.
+        $this->app->bind(InsightsSummarizer::class, function () {
             return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
                 ? $this->app->make(DeepSeekProvider::class)
                 : $this->app->make(NullAiProvider::class);

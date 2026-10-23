@@ -6,6 +6,7 @@ use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
 use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
+use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
 use App\Models\Campaign;
 use App\Models\Client;
@@ -30,7 +31,7 @@ use Illuminate\Support\Facades\Log;
  * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
-class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, LocalIdeaProvider
+class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider
 {
     public function suggestCaptions(Post $post): AiCaptionSuggestions
     {
@@ -63,6 +64,13 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurpose
     public function repurpose(Post $post, array $platforms): array
     {
         $this->logDisabled('repurpose', ['post_id' => $post->id, 'client_id' => $post->client_id, 'org_id' => $post->org_id]);
+
+        return [];
+    }
+
+    public function summarizeInsights(Client $brand, array $facts): array
+    {
+        $this->logDisabled('summarizeInsights', ['client_id' => $brand->id, 'org_id' => $brand->org_id]);
 
         return [];
     }

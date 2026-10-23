@@ -38,11 +38,36 @@ return [
         'min_posts' => 2,
         'min_account_posts' => 6,
         'slots' => 3,
+
+        // Step B-8.3: sensible fallback slots when a brand's own history is still too thin to
+        // learn from. One slot per platform (ISO weekday 1=Mon..7=Sun, and an hour **local to the
+        // account's timezone**), drawn from widely-cited best-posting-time research. `default`
+        // catches any platform without an entry. These only ever apply to a `business` workspace's
+        // BestTimeService fallback — the agency/data-driven path is unchanged.
+        'defaults' => [
+            'instagram' => [3, 11],      // Wed 11:00
+            'facebook' => [3, 13],       // Wed 13:00
+            'tiktok' => [5, 19],         // Fri 19:00
+            'linkedin' => [2, 8],        // Tue 08:00
+            'youtube' => [6, 15],        // Sat 15:00
+            'threads' => [3, 10],        // Wed 10:00
+            'pinterest' => [6, 20],      // Sat 20:00
+            'x' => [3, 9],               // Wed 09:00
+            'google_business' => [2, 10], // Tue 10:00
+            'default' => [3, 10],        // Wed 10:00
+        ],
     ],
 
     'client_reports' => [
         'send_day' => 1,
         'send_hour' => 9,
+    ],
+
+    // Step B-8.2: the weekly business Insights email digest goes out on Monday at this local hour
+    // (the brand's timezone), caught from one hourly schedule so every timezone gets it on Monday
+    // morning. Idempotent per ISO week.
+    'insights_digest' => [
+        'send_hour' => (int) env('ANALYTICS_INSIGHTS_DIGEST_HOUR', 8),
     ],
 
 ];

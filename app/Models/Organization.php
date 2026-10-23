@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property OrganizationType $type
  * @property Carbon|null $onboarding_completed_at
  * @property bool $require_post_review
+ * @property bool $insights_digest_opt_out
  * @property string $default_timezone
  * @property string $default_currency
  * @property string|null $billing_details
@@ -45,7 +46,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'require_post_review', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -67,6 +68,7 @@ class Organization extends Model
     protected $attributes = [
         'type' => 'agency',
         'require_post_review' => false,
+        'insights_digest_opt_out' => false,
     ];
 
     /**
@@ -80,6 +82,7 @@ class Organization extends Model
             'type' => OrganizationType::class,
             'onboarding_completed_at' => 'datetime',
             'require_post_review' => 'boolean',
+            'insights_digest_opt_out' => 'boolean',
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
             'publish_mode' => PublishMode::class,
@@ -212,6 +215,17 @@ class Organization extends Model
     public function needsOnboarding(): bool
     {
         return $this->isBusiness() && $this->onboarding_completed_at === null;
+    }
+
+    /**
+     * Step B-8.2 — whether this workspace should receive the weekly Insights email digest: a
+     * business org that has finished onboarding and hasn't opted out. Agencies never receive it.
+     */
+    public function wantsInsightsDigest(): bool
+    {
+        return $this->isBusiness()
+            && $this->onboarding_completed_at !== null
+            && ! $this->insights_digest_opt_out;
     }
 
     /**

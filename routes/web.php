@@ -17,6 +17,7 @@ use App\Http\Controllers\Business\IdeaController as BusinessIdeaController;
 use App\Http\Controllers\Business\ImageStudioController as BusinessImageStudioController;
 use App\Http\Controllers\Business\InsightController as BusinessInsightController;
 use App\Http\Controllers\Business\MediaController as BusinessMediaController;
+use App\Http\Controllers\Business\MediaKitController as BusinessMediaKitController;
 use App\Http\Controllers\Business\OnboardingController as BusinessOnboardingController;
 use App\Http\Controllers\Business\PostController as BusinessPostController;
 use App\Http\Controllers\Business\QuickPostController as BusinessQuickPostController;
@@ -53,6 +54,7 @@ use App\Http\Controllers\Grids\GridWorkflowController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
+use App\Http\Controllers\MediaKitShareController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Organizations\BusinessRegistrationController;
 use App\Http\Controllers\Organizations\RegistrationController;
@@ -97,6 +99,11 @@ Route::middleware('throttle:public-token')->group(function () {
 
     // Campaigns enhancement C-5.4: a read-only campaign preview for stakeholders without portal access.
     Route::get('share/campaigns/{token}', [CampaignShareLinkController::class, 'show'])->name('campaign-share.show');
+
+    // Step B-8.4: the public creator/business media kit (opt-in, revocable). 404s the moment the
+    // owner switches the link off; only ever renders already-public data.
+    Route::get('kit/{token}', [MediaKitShareController::class, 'show'])->name('media-kit.show');
+    Route::get('kit/{token}/pdf', [MediaKitShareController::class, 'pdf'])->name('media-kit.share.pdf');
 
     // Step 6.2: accepting a client portal invitation is unauthenticated — access is granted purely
     // by possession of a valid, unexpired, unrevoked, unaccepted `ClientInvitation` token, mirroring
@@ -240,8 +247,15 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::delete('accounts/{socialAccount}', [BusinessAccountController::class, 'destroy'])->name('accounts.destroy');
         Route::post('accounts/{socialAccount}/connect', [BusinessAccountController::class, 'connect'])->name('accounts.connect');
 
-        // Insights (single-brand; publishing consistency today, reach/engagement with Phase B-8).
+        // Insights (single-brand): consistency, reach/engagement, top posts, best times, AI takeaways.
         Route::get('insights', [BusinessInsightController::class, 'index'])->name('insights.index');
+
+        // Step B-8.4: the creator/business media kit — edit bio, toggle the public link, download PDF.
+        Route::get('media-kit', [BusinessMediaKitController::class, 'index'])->name('media-kit.index');
+        Route::put('media-kit', [BusinessMediaKitController::class, 'update'])->name('media-kit.update');
+        Route::post('media-kit/share', [BusinessMediaKitController::class, 'share'])->name('media-kit.share');
+        Route::delete('media-kit/share', [BusinessMediaKitController::class, 'revoke'])->name('media-kit.revoke');
+        Route::get('media-kit/pdf', [BusinessMediaKitController::class, 'pdf'])->name('media-kit.pdf');
 
         // Step B-7.2: the phone-first quick post flow (camera → caption → accounts → schedule).
         Route::get('posts/quick', [BusinessQuickPostController::class, 'create'])->name('posts.quick');

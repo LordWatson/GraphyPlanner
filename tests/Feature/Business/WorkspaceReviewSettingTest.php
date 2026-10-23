@@ -49,7 +49,7 @@ class WorkspaceReviewSettingTest extends TestCase
         [$organization, $owner] = $this->businessOwner();
 
         $this->actingAs($owner)
-            ->put(route('workspace-settings.update'), ['require_post_review' => true])
+            ->put(route('workspace-settings.update'), ['require_post_review' => true, 'insights_digest_opt_out' => false])
             ->assertRedirect(route('workspace-settings.edit'));
 
         $this->assertTrue($organization->refresh()->require_post_review);
@@ -71,7 +71,7 @@ class WorkspaceReviewSettingTest extends TestCase
         $this->assertContains(PostStatus::Approved, $workflow->allowedTransitions($post));
         $this->assertNotContains(PostStatus::InternalReview, $workflow->allowedTransitions($post));
 
-        $organization->update(['require_post_review' => true]);
+        $organization->update(['require_post_review' => true, 'insights_digest_opt_out' => false]);
         $post->setRelation('organization', $organization->refresh());
 
         // Review on: a draft goes to review first.
@@ -105,7 +105,7 @@ class WorkspaceReviewSettingTest extends TestCase
         $designer = User::factory()->for($organization, 'organization')->role(Role::Designer)->create();
 
         $this->actingAs($designer)
-            ->put(route('workspace-settings.update'), ['require_post_review' => true])
+            ->put(route('workspace-settings.update'), ['require_post_review' => true, 'insights_digest_opt_out' => false])
             ->assertForbidden();
 
         $this->assertFalse($organization->refresh()->require_post_review);

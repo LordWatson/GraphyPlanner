@@ -81,3 +81,7 @@ $safely(Schedule::command('campaigns:send-due-reminders')->dailyAt('08:15'), 'ca
 // and period (computed in the org timezone), so a daily run only ever creates a period's draft
 // once; the team reviews, finalizes and sends — nothing auto-sends. See GenerateRetainerDraftsAction.
 $safely(Schedule::command('invoices:generate-retainer-drafts')->dailyAt('06:30'), 'invoices:generate-retainer-drafts');
+
+// Step B-8.2: weekly business Insights digest. Hourly so each timezone's Monday morning is caught
+// from one schedule; idempotent per org and ISO week. See SendWeeklyInsightsDigestCommand.
+$safely(Schedule::command('business:send-insights-digest')->hourlyAt(40), 'business:send-insights-digest');

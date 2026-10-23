@@ -22,6 +22,7 @@ class WorkspaceSettingsUpdateRequest extends FormRequest
     {
         return [
             'require_post_review' => ['required', 'boolean'],
+            'insights_digest_opt_out' => ['required', 'boolean'],
         ];
     }
 }

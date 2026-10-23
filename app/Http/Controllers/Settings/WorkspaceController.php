@@ -29,13 +29,18 @@ class WorkspaceController extends Controller
             'settings' => [
                 'name' => $organization->name,
                 'require_post_review' => $organization->require_post_review,
+                'insights_digest_opt_out' => $organization->insights_digest_opt_out,
             ],
         ]);
     }
 
     public function update(WorkspaceSettingsUpdateRequest $request, UpdateWorkspaceSettingsAction $action): RedirectResponse
     {
-        $action($request->user()->organization, $request->boolean('require_post_review'));
+        $action(
+            $request->user()->organization,
+            $request->boolean('require_post_review'),
+            $request->boolean('insights_digest_opt_out'),
+        );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Workspace settings saved.')]);
 

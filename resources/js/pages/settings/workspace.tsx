@@ -11,17 +11,21 @@ type WorkspaceProps = {
     settings: {
         name: string;
         require_post_review: boolean;
+        insights_digest_opt_out: boolean;
     };
 };
 
 /**
- * Step B-3.3 — the business workspace's own settings. Today just the review switch: on, posts go
- * through an internal review step before they can go out; off (the default), the owner schedules
- * in one tap. On brand: a single, clearly-explained choice, not a wall of toggles.
+ * Step B-3.3 / B-8.2 — the business workspace's own settings: the review switch (on, posts go
+ * through an internal review step before they go out; off, the owner schedules in one tap) and the
+ * weekly Insights email digest opt-out. On brand: clearly-explained choices, not a wall of toggles.
  */
 export default function WorkspaceSettings({ settings }: WorkspaceProps) {
     const [requireReview, setRequireReview] = useState(
         settings.require_post_review,
+    );
+    const [digestOff, setDigestOff] = useState(
+        settings.insights_digest_opt_out,
     );
 
     return (
@@ -72,6 +76,36 @@ export default function WorkspaceSettings({ settings }: WorkspaceProps) {
                                         it can be scheduled. Leave this off and
                                         you&apos;ll schedule straight from a
                                         draft in one tap.
+                                    </span>
+                                </div>
+                            </label>
+
+                            <label
+                                htmlFor="insights_digest"
+                                className="border-border bg-card hover:border-foreground/30 flex cursor-pointer items-start gap-4 rounded-2xl border p-5 transition-colors"
+                            >
+                                <Checkbox
+                                    id="insights_digest"
+                                    checked={!digestOff}
+                                    onCheckedChange={(checked) =>
+                                        setDigestOff(checked !== true)
+                                    }
+                                    className="mt-0.5"
+                                />
+                                <input
+                                    type="hidden"
+                                    name="insights_digest_opt_out"
+                                    value={digestOff ? '1' : '0'}
+                                />
+
+                                <div className="space-y-1">
+                                    <span className="text-foreground block text-sm font-semibold">
+                                        Weekly insights email
+                                    </span>
+                                    <span className="text-muted-foreground block text-sm">
+                                        Get a short Monday email with how your
+                                        posts did last week and what to try
+                                        next. Turn it off any time.
                                     </span>
                                 </div>
                             </label>

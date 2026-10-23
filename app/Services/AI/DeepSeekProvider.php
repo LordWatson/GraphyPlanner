@@ -6,6 +6,7 @@ use App\Contracts\AiProvider;
 use App\Contracts\CampaignAiProvider;
 use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
+use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
 use App\Enums\Platform;
 use App\Models\Campaign;
@@ -42,7 +43,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, LocalIdeaProvider
+class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -212,6 +213,35 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         }
 
         return $variants;
+    }
+
+    public function summarizeInsights(Client $brand, array $facts): array
+    {
+        $payload = $this->requestStructured(
+            method: 'summarizeInsights',
+            systemPrompt: $this->buildSummarizeInsightsSystemPrompt($brand),
+            userPrompt: $this->buildSummarizeInsightsUserPrompt($facts),
+            validator: fn (array $data): ?string => isset($data['takeaways']) && is_array($data['takeaways']) ? null : 'missing takeaways',
+            context: ['org_id' => $brand->org_id, 'client_id' => $brand->id],
+        );
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $takeaways = [];
+
+        foreach ((array) ($payload['takeaways'] ?? []) as $line) {
+            if (is_string($line) && trim($line) !== '') {
+                $takeaways[] = trim($line);
+            }
+
+            if (count($takeaways) === 3) {
+                break;
+            }
+        }
+
+        return $takeaways;
     }
 
     public function discoverTrends(Client $client, array $platforms): AiTrends
@@ -766,6 +796,30 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         $lines[] = 'Respond with JSON: {"variants": [{"platform": string (one of the values above), "caption": string, "hashtags": string[], "firstComment": string|null}]}';
 
         return implode("\n", $lines);
+    }
+
+    private function buildSummarizeInsightsSystemPrompt(Client $brand): string
+    {
+        return implode("\n", [
+            'You are a friendly social-media coach for a small business or creator called "'.$brand->name.'".',
+            'You read their own posting stats and explain, in plain English, what is working and what to do next.',
+            'Rules: write for a non-marketer; be concrete and encouraging; use the real numbers given; never invent figures;',
+            'each takeaway is one short sentence (max ~20 words); no jargon, no emojis, no hashtags.',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $facts
+     */
+    private function buildSummarizeInsightsUserPrompt(array $facts): string
+    {
+        return implode("\n", [
+            'Here are this brand\'s stats for the recent period (omit any that are missing or zero):',
+            $this->guardrail->scrub((string) json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)),
+            '',
+            'Write up to three short, specific, encouraging takeaways grounded only in these numbers. If a figure is missing, do not mention it.',
+            'Respond with JSON: {"takeaways": string[]} (one to three sentences).',
+        ]);
     }
 
     /**
