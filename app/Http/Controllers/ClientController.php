@@ -10,6 +10,7 @@ use App\Actions\Clients\PurgeClientAction;
 use App\Actions\Clients\RestoreClientAction;
 use App\Actions\Clients\UpdateClientAction;
 use App\Enums\ApprovalMode;
+use App\Enums\ApprovalPolicy;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Enums\Role;
@@ -76,6 +77,8 @@ class ClientController extends Controller
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
             // Step M-2.9: how this client's new posts get approved.
             'approvalModes' => array_map(fn (ApprovalMode $mode) => ['value' => $mode->value, 'label' => $mode->label()], ApprovalMode::cases()),
+            // Step M-6.3: how approvals combine across the client's approver contacts.
+            'approvalPolicies' => array_map(fn (ApprovalPolicy $policy) => ['value' => $policy->value, 'label' => $policy->label(), 'description' => $policy->description()], ApprovalPolicy::cases()),
             'languages' => LanguageOptions::options(),
             'owners' => $this->ownerOptions($request),
         ]);
@@ -136,6 +139,9 @@ class ClientController extends Controller
             'client' => ClientPresenter::detail($client, $request->user()->can('viewBilling', $client), $request->user()),
             'statuses' => array_map(fn (ClientStatus $status) => ['value' => $status->value, 'label' => $status->label()], ClientStatus::cases()),
             'billingCycles' => array_map(fn (BillingCycle $cycle) => ['value' => $cycle->value, 'label' => $cycle->label()], BillingCycle::cases()),
+            'approvalModes' => array_map(fn (ApprovalMode $mode) => ['value' => $mode->value, 'label' => $mode->label()], ApprovalMode::cases()),
+            // Step M-6.3: how approvals combine across the client's approver contacts.
+            'approvalPolicies' => array_map(fn (ApprovalPolicy $policy) => ['value' => $policy->value, 'label' => $policy->label(), 'description' => $policy->description()], ApprovalPolicy::cases()),
             'languages' => LanguageOptions::options(),
             'owners' => $this->ownerOptions($request),
             'currencies' => CurrencyOptions::options(),

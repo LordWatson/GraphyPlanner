@@ -34,11 +34,12 @@ class NotificationTest extends TestCase
         $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
             'client_id' => $client->id,
         ]);
-        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+        // Step M-6.2 (I-8.1): a reviewer comments from their portal, not the internal route.
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
 
-        $this->actingAs($reviewer)->post(route('posts.comments.store', $post), [
+        $this->actingAs($reviewer)->post(route('portal.posts.comments.store', $post), [
             'body' => 'Please change the caption',
-        ])->assertRedirect(route('posts.edit', $post));
+        ])->assertRedirect(route('portal.posts.show', $post));
 
         Notification::assertSentTo($owner, PostCommentAdded::class);
         Notification::assertNotSentTo($reviewer, PostCommentAdded::class);
@@ -347,9 +348,10 @@ class NotificationTest extends TestCase
         ]);
         $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
 
-        $this->actingAs($reviewer)->post(route('posts.transition', $post), [
-            'to' => PostStatus::Approved->value,
-        ])->assertRedirect(route('posts.edit', $post));
+        // Step M-6.2 (I-8.1): a reviewer approves from their portal, not the internal route.
+        $this->actingAs($reviewer)->post(route('portal.posts.decide', $post), [
+            'decision' => 'approved',
+        ])->assertRedirect(route('portal.posts.show', $post));
 
         Notification::assertSentTo($owner, PostApprovalDecided::class);
     }

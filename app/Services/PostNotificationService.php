@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\User;
+use App\Support\Notifications\NotificationPreferences;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 
@@ -112,8 +113,11 @@ class PostNotificationService
             return;
         }
 
+        // Step M-6.7: skip a recipient who has muted this notification's category in-app.
         foreach ($recipients as $recipient) {
-            $recipient->notify($notification);
+            if (NotificationPreferences::wantsInApp($recipient, $notification::class)) {
+                $recipient->notify($notification);
+            }
         }
     }
 }

@@ -86,24 +86,24 @@ class BrandBrainControllerTest extends TestCase
         $this->assertSame('Updated tone', $client->brandBrain->fresh()->voice['tone']);
     }
 
-    public function test_client_reviewer_can_view_their_own_clients_brand_brain_but_not_update_it(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_brand_brain_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): the internal Brand Brain editor is staff-only — a reviewer is sent to
+        // the portal rather than shown a read-only internal view.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.brand-brain.edit', $client));
-        $response->assertOk();
-
-        $response = $this->actingAs($reviewer)->put(route('clients.brand-brain.update', $client), [
+        $this->actingAs($reviewer)->get(route('clients.brand-brain.edit', $client))->assertRedirect(route('portal.dashboard'));
+        $this->actingAs($reviewer)->put(route('clients.brand-brain.update', $client), [
             'voice' => ['tone' => 'Hijacked'],
-        ]);
-        $response->assertForbidden();
+        ])->assertRedirect(route('portal.dashboard'));
+        $this->assertNull($client->brandBrain?->fresh()->voice['tone'] ?? null);
     }
 
-    public function test_client_reviewer_cannot_view_another_clients_brand_brain(): void
+    public function test_client_reviewer_is_redirected_from_another_clients_brand_brain(): void
     {
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
@@ -112,9 +112,7 @@ class BrandBrainControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.brand-brain.edit', $otherClient));
-
-        $response->assertForbidden();
+        $this->actingAs($reviewer)->get(route('clients.brand-brain.edit', $otherClient))->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_owner_can_upload_a_brand_persona_pdf(): void

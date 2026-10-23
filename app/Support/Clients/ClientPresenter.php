@@ -32,6 +32,7 @@ final class ClientPresenter
             'countries' => $client->countries,
             'status' => $client->status->value,
             'default_approval_mode' => $client->default_approval_mode->value,
+            'approval_policy' => $client->approval_policy->value,
             'owner_user_id' => $client->owner_user_id,
             'start_date' => $client->start_date?->toDateString(),
             'retainer_amount' => $canViewBilling ? $client->retainer_amount : null,

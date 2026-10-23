@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\DB;
  * @property int|null $reviewer_id
  * @property Carbon|null $due_at
  * @property PostStatus $status
+ * @property Carbon|null $last_reminded_at
  * @property string|null $publish_dispatch_id
  * @property ApprovalMode $approval_mode
  * @property string|null $master_caption
@@ -63,7 +64,7 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable([
     'org_id', 'client_id', 'campaign_id', 'created_by', 'assignee_id', 'reviewer_id', 'due_at',
-    'status', 'publish_dispatch_id', 'approval_mode',
+    'status', 'last_reminded_at', 'publish_dispatch_id', 'approval_mode',
     'master_caption', 'review_message', 'hashtags', 'music', 'location', 'media_format', 'checklist_snapshot',
     'link_url', 'first_comment', 'cover_asset_id', 'thumb_offset_ms',
     'is_recyclable', 'recycle_after_days', 'recycled_from_post_id', 'recurrence',
@@ -87,6 +88,7 @@ class Post extends Model
             'media_format' => 'array',
             'checklist_snapshot' => 'array',
             'due_at' => 'datetime',
+            'last_reminded_at' => 'datetime',
             'is_recyclable' => 'boolean',
             'recurrence' => PostRecurrence::class,
         ];
@@ -314,11 +316,42 @@ class Post extends Model
     }
 
     /**
+     * Step M-6.3 — the required approvals for this post, built from the client's approver contacts
+     * and approval policy when it enters `waiting_client`. Ordered for sequential policies.
+     *
+     * @return HasMany<ApprovalStep, $this>
+     */
+    public function approvalSteps(): HasMany
+    {
+        return $this->hasMany(ApprovalStep::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
      * @return HasMany<PostComment, $this>
      */
     public function comments(): HasMany
     {
         return $this->hasMany(PostComment::class);
+    }
+
+    /**
+     * Step M-6.4 — a query for this post's open visual-feedback threads: root comments that are
+     * pinned (image/video/caption) or carry a suggested edit, and haven't been resolved. These
+     * block a post from being approved (an Owner can still override).
+     *
+     * @return HasMany<PostComment, $this>
+     */
+    public function unresolvedFeedback(): HasMany
+    {
+        return $this->comments()
+            ->whereNull('parent_id')
+            ->whereNull('resolved_at')
+            ->where(fn ($query) => $query->whereNotNull('anchor_type')->orWhereNotNull('suggested_edit'));
+    }
+
+    public function hasUnresolvedFeedback(): bool
+    {
+        return $this->unresolvedFeedback()->exists();
     }
 
     /**

@@ -377,9 +377,14 @@ class GridPlanActionsTest extends TestCase
         $this->actingAs($this->designer())->put(route('grids.tiles.update', [$plan, $tile]), ['caption_idea' => 'Hello'])->assertSessionHasNoErrors();
 
         foreach ([$this->viewer(), $this->reviewer] as $user) {
-            $this->actingAs($user)->put(route('grids.tiles.update', [$plan, $tile]), ['caption_idea' => 'Nope'])->assertForbidden();
-            $this->actingAs($user)->post(route('grids.tiles.store', $plan), ['tiles' => [['placeholder_colour' => 'teal']]])->assertForbidden();
-            $this->actingAs($user)->post(route('clients.grids.store', $this->client), ['name' => 'x', 'social_account_id' => $this->instagram->id])->assertForbidden();
+            // Viewer → 403; client reviewer → portal redirect (302, Step M-6.2). Neither edits.
+            foreach ([
+                $this->actingAs($user)->put(route('grids.tiles.update', [$plan, $tile]), ['caption_idea' => 'Nope']),
+                $this->actingAs($user)->post(route('grids.tiles.store', $plan), ['tiles' => [['placeholder_colour' => 'teal']]]),
+                $this->actingAs($user)->post(route('clients.grids.store', $this->client), ['name' => 'x', 'social_account_id' => $this->instagram->id]),
+            ] as $response) {
+                $this->assertContains($response->getStatusCode(), [302, 403]);
+            }
         }
 
         $this->assertSame('Hello', $tile->fresh()?->caption_idea);

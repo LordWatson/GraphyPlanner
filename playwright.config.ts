@@ -23,7 +23,19 @@ export default defineConfig({
         timezoneId: 'Europe/London',
         locale: 'en-GB',
     },
-    projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    projects: [
+        {
+            name: 'chromium',
+            use: { ...devices['Desktop Chrome'] },
+            testMatch: '**/signup-to-scheduled.spec.ts',
+        },
+        // Step M-6.6 (I-8.6): the client portal's approve journey on a phone viewport.
+        {
+            name: 'mobile',
+            use: { ...devices['Pixel 5'] },
+            testMatch: '**/portal-approve-mobile.spec.ts',
+        },
+    ],
     webServer: {
         command: 'node tests/e2e/support/server.mjs',
         url: `${baseURL}/up`,

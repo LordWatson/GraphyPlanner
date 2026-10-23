@@ -2,7 +2,8 @@
 
 namespace App\Actions\Campaigns;
 
-use App\Actions\Posts\TransitionPostStatusAction;
+use App\Actions\Posts\Approvals\SubmitClientDecisionAction;
+use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Exceptions\Posts\InvalidPostTransitionException;
@@ -17,10 +18,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Step C-5.2 — the client's "Review this campaign" flow, submitted in one go. Each decision goes
- * through the existing approval path (`TransitionPostStatusAction`, so approvals/activity rows and
- * the state machine are the same as approving one post — and, once I-8.2 lands, its approval
- * steps). Seam: swap the transition call for I-8.2's step-aware approval here.
+ * Step C-5.2 — the client's "Review this campaign" flow, submitted in one go. Step M-6.3 (I-8.2):
+ * each decision goes through `SubmitClientDecisionAction`, so a campaign review honours the client's
+ * approval policy (any / all / sequential) and records approval steps exactly like reviewing a
+ * single post from the portal — the studio still gets one summary for the batch.
  *
  * - A decision only lands on the revision the client saw: if the post changed since (its
  *   `updated_at` moved on) or isn't waiting on the client any more, it's skipped and reported.
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Log;
  */
 class BatchReviewCampaignPostsAction
 {
-    public function __construct(private readonly TransitionPostStatusAction $transition) {}
+    public function __construct(private readonly SubmitClientDecisionAction $decide) {}
 
     /**
      * @param  list<array{post_id: int, decision: string, comment?: string|null, seen_at: string}>  $decisions
@@ -72,7 +73,13 @@ class BatchReviewCampaignPostsAction
             }
 
             try {
-                ($this->transition)($post, $to, $user, $decision['comment'] ?? $note, notifications: $quiet);
+                ($this->decide)(
+                    $post,
+                    $user,
+                    $to === PostStatus::Approved ? ApprovalDecision::Approved : ApprovalDecision::ChangesRequested,
+                    $decision['comment'] ?? $note,
+                    notifications: $quiet,
+                );
             } catch (InvalidPostTransitionException) {
                 $result['stale'][] = ['id' => $post->id, 'reason' => 'It changed while you were reviewing.'];
 

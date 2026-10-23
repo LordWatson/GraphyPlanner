@@ -30,6 +30,7 @@ import {
 } from '@/components/post-editor/editor/use-autosave';
 import { useEditorNavigation } from '@/components/post-editor/editor/use-editor-navigation';
 import { usePostEditor } from '@/components/post-editor/editor/use-post-editor';
+import { FeedbackBoard } from '@/components/feedback/feedback-board';
 import { PostDiscussion } from '@/components/post-editor/post-discussion';
 import { PostWorkflow } from '@/components/post-editor/post-workflow';
 import { BusinessScheduleBar } from '@/components/post-editor/business-schedule-bar';
@@ -42,6 +43,12 @@ import { useKeyboardShortcut } from '@/hooks/use-keyboard-shortcut';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import type { MediaFormatOptions } from '@/lib/media-format';
 import { update as updatePost } from '@/routes/posts';
+import {
+    acceptSuggestion,
+    dismissSuggestion,
+    resolve as resolveFeedback,
+} from '@/routes/comments';
+import { store as storePostComment } from '@/routes/posts/comments';
 
 /**
  * The post editor. Step I-4.6 / M-1.6 split it into feature components under
@@ -245,6 +252,29 @@ export default function PostEdit({
                             defaultOpen={needsFeedback}
                             defaultTab={needsFeedback ? 'activity' : 'comments'}
                         />
+
+                        {/* Step M-6.4: the visual-feedback board — pins, caption notes and suggested
+                            edits the client left, which staff resolve (or accept) before approval. */}
+                        {(post.feedback.length > 0 || can.comment) && (
+                            <div className="border-border bg-card shadow-paper rounded-2xl border p-4">
+                                <FeedbackBoard
+                                    assets={post.assets}
+                                    caption={post.master_caption ?? ''}
+                                    threads={post.feedback}
+                                    canComment={can.comment}
+                                    mode="staff"
+                                    routes={{
+                                        create: storePostComment.url(post.id),
+                                        resolve: (id) =>
+                                            resolveFeedback.url(id),
+                                        acceptSuggestion: (id) =>
+                                            acceptSuggestion.url(id),
+                                        dismissSuggestion: (id) =>
+                                            dismissSuggestion.url(id),
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <EditorSidebar />

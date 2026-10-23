@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\ApprovalDecision;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
@@ -155,8 +154,11 @@ class PostTransitionControllerTest extends TestCase
         $this->assertSame(PostStatus::Draft, $post->refresh()->status);
     }
 
-    public function test_client_reviewer_can_approve_a_post_waiting_on_them_and_it_creates_an_approval_record(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_transition_route_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): a reviewer never uses the internal transition route — they approve from
+        // their portal (`portal.posts.decide`, covered by PortalPostControllerTest). The internal
+        // route redirects them to the portal and makes no change.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
@@ -164,39 +166,33 @@ class PostTransitionControllerTest extends TestCase
         ]);
         $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
 
-        $response = $this->actingAs($reviewer)->post(route('posts.transition', $post), [
+        $this->actingAs($reviewer)->post(route('posts.transition', $post), [
             'to' => PostStatus::Approved->value,
             'comment' => 'Looks great!',
-        ]);
+        ])->assertRedirect(route('portal.posts.show', $post));
 
-        $response->assertRedirect(route('posts.edit', $post));
-        $post->refresh();
-        $this->assertSame(PostStatus::Approved, $post->status);
-
-        $approval = $post->approvals()->firstOrFail();
-        $this->assertSame(ApprovalDecision::Approved, $approval->decision);
-        $this->assertSame('Looks great!', $approval->comment);
-        $this->assertSame($reviewer->id, $approval->user_id);
+        $this->assertSame(PostStatus::WaitingClient, $post->refresh()->status);
+        $this->assertSame(0, $post->approvals()->count());
     }
 
-    public function test_client_reviewer_cannot_transition_a_post_that_is_not_waiting_on_them(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_transition_route_regardless_of_post_state(): void
     {
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
             'client_id' => $client->id,
         ]);
+        // A draft is not client-visible, so the reviewer lands on the portal posts list, not the post.
         $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
 
-        $response = $this->actingAs($reviewer)->post(route('posts.transition', $post), [
+        $this->actingAs($reviewer)->post(route('posts.transition', $post), [
             'to' => PostStatus::InternalReview->value,
-        ]);
+        ])->assertRedirect(route('portal.posts.index'));
 
-        $response->assertForbidden();
         $this->assertSame(PostStatus::Draft, $post->refresh()->status);
     }
 
-    public function test_client_reviewer_cannot_review_another_clients_post(): void
+    public function test_client_reviewer_is_redirected_from_another_clients_post_transition(): void
     {
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
@@ -209,11 +205,12 @@ class PostTransitionControllerTest extends TestCase
             'status' => PostStatus::WaitingClient,
         ]);
 
-        $response = $this->actingAs($reviewer)->post(route('posts.transition', $post), [
+        // Another client's post isn't theirs, so they're sent to the portal posts list.
+        $this->actingAs($reviewer)->post(route('posts.transition', $post), [
             'to' => PostStatus::Approved->value,
-        ]);
+        ])->assertRedirect(route('portal.posts.index'));
 
-        $response->assertForbidden();
+        $this->assertSame(PostStatus::WaitingClient, $post->refresh()->status);
     }
 
     public function test_a_comment_can_be_added_to_a_post_with_an_internal_only_flag(): void
@@ -239,17 +236,18 @@ class PostTransitionControllerTest extends TestCase
 
     public function test_client_reviewer_comments_are_never_stored_as_internal_only(): void
     {
+        // Step M-6.2 (I-8.1): a reviewer comments from their portal; it can never be internal-only.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         $reviewer = User::factory()->for($org, 'organization')->role(Role::ClientReviewer)->create([
             'client_id' => $client->id,
         ]);
-        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
 
-        $this->actingAs($reviewer)->post(route('posts.comments.store', $post), [
+        $this->actingAs($reviewer)->post(route('portal.posts.comments.store', $post), [
             'body' => 'Please change the caption',
             'internal_only' => true,
-        ])->assertRedirect(route('posts.edit', $post));
+        ])->assertRedirect(route('portal.posts.show', $post));
 
         $comment = $post->comments()->firstOrFail();
         $this->assertFalse($comment->internal_only);

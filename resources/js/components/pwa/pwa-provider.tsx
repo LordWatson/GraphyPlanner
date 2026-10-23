@@ -19,7 +19,7 @@ type InstallPromptEvent = Event & {
     userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
-function ensureHead(): void {
+function ensureHead(manifestHref: string): void {
     if (typeof document === 'undefined') {
         return;
     }
@@ -27,7 +27,7 @@ function ensureHead(): void {
     if (!document.querySelector('link[rel="manifest"]')) {
         const link = document.createElement('link');
         link.rel = 'manifest';
-        link.href = '/manifest.webmanifest';
+        link.href = manifestHref;
         document.head.appendChild(link);
     }
 
@@ -47,14 +47,22 @@ function dismissed(): boolean {
     }
 }
 
-export function PwaProvider() {
+export function PwaProvider({
+    manifestHref = '/manifest.webmanifest',
+    title = 'Install Alima',
+    description = 'Add it to your home screen to post in a tap, straight from your phone.',
+}: {
+    manifestHref?: string;
+    title?: string;
+    description?: string;
+} = {}) {
     const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(
         null,
     );
     const registered = useRef(false);
 
     useEffect(() => {
-        ensureHead();
+        ensureHead(manifestHref);
 
         if ('serviceWorker' in navigator && !registered.current) {
             registered.current = true;
@@ -79,7 +87,7 @@ export function PwaProvider() {
             window.removeEventListener('beforeinstallprompt', onPrompt);
             window.removeEventListener('appinstalled', onInstalled);
         };
-    }, []);
+    }, [manifestHref]);
 
     const dismiss = () => {
         try {
@@ -113,10 +121,9 @@ export function PwaProvider() {
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                     <div className="flex flex-col gap-0.5">
-                        <p className="text-sm font-semibold">Install Alima</p>
+                        <p className="text-sm font-semibold">{title}</p>
                         <p className="text-muted-foreground text-xs">
-                            Add it to your home screen to post in a tap,
-                            straight from your phone.
+                            {description}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">

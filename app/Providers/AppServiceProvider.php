@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
 use App\Contracts\CaptionRepurposer;
+use App\Contracts\ChatNotifier;
 use App\Contracts\EngagementSource;
 use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
@@ -69,6 +70,7 @@ use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
+use App\Services\Notifications\NullChatNotifier;
 use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
@@ -120,6 +122,10 @@ class AppServiceProvider extends ServiceProvider
         // Step B-7.4: web push for business workspaces — delivery behind a contract so the VAPID
         // transport can be swapped and faked. The default logs when no transport is installed.
         $this->app->bind(PushNotifier::class, WebPushNotifier::class);
+
+        // Step M-6.7 (I-12.1): team-chat notifications behind a contract. The MVP is a no-op; a
+        // WhatsApp implementation (not Slack) drops in here later without touching callers.
+        $this->app->bind(ChatNotifier::class, NullChatNotifier::class);
 
         // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
         // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private

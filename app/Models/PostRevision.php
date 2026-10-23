@@ -44,6 +44,15 @@ class PostRevision extends Model
     }
 
     /**
+     * Step M-6.3 — a stable content hash of the exact version the client reviewed, printed on the
+     * approval certificate so the approved content is verifiable and tamper-evident.
+     */
+    public function contentHash(): string
+    {
+        return hash('sha256', (string) json_encode($this->snapshot));
+    }
+
+    /**
      * @return BelongsTo<Post, $this>
      */
     public function post(): BelongsTo

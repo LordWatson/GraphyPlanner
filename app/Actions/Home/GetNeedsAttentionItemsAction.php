@@ -15,6 +15,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\Campaigns\Health\LaunchingWithUnapprovedWorkRule;
 use App\Services\Grids\GridOrderRiskService;
+use App\Services\PostApprovalSlaService;
 use App\Support\Campaigns\CampaignClock;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -57,7 +58,7 @@ class GetNeedsAttentionItemsAction
      * @return array{
      *     failedPublishes: array{items: list<array<string, mixed>>, total: int},
      *     internalReviews: array{items: list<array<string, mixed>>, total: int},
-     *     waitingApprovals: array{items: list<array<string, mixed>>, total: int},
+     *     waitingApprovals: array{items: list<array<string, mixed>>, total: int, overdue: int},
      *     missingMedia: array{items: list<array<string, mixed>>, total: int},
      *     campaigns: array{items: list<array<string, mixed>>, total: int},
      *     gridRisks: array{items: list<array<string, mixed>>, total: int},
@@ -75,6 +76,18 @@ class GetNeedsAttentionItemsAction
             ->pluck('aggregate', 'status');
 
         $count = fn (PostStatus ...$statuses): int => (int) collect($statuses)->sum(fn (PostStatus $status) => $statusCounts[$status->value] ?? 0);
+
+        // Step M-6.5: which waiting-on-client posts are past the org's approval SLA (overdue).
+        $overdueWaiting = app(PostApprovalSlaService::class)
+            ->overdueQuery($user->organization)
+            ->where('status', PostStatus::WaitingClient->value);
+        $overdueIds = (clone $overdueWaiting)->pluck('id')->all();
+        $overdueTotal = (clone $overdueWaiting)->count();
+
+        $waitingApprovals = array_map(
+            fn (array $row) => [...$row, 'overdue' => in_array($row['post_id'], $overdueIds, true)],
+            $this->rows($this->posts($user)->where('status', PostStatus::WaitingClient), $limit, fn () => 'Waiting on client approval'),
+        );
 
         $missingMediaQuery = $this->missingMedia($this->posts($user));
 
@@ -103,8 +116,10 @@ class GetNeedsAttentionItemsAction
                 'total' => $count(PostStatus::InternalReview),
             ],
             'waitingApprovals' => [
-                'items' => $this->rows($this->posts($user)->where('status', PostStatus::WaitingClient), $limit, fn () => 'Waiting on client approval'),
+                'items' => $waitingApprovals,
                 'total' => $count(PostStatus::WaitingClient),
+                // Step M-6.5: how many of those are past the approval SLA.
+                'overdue' => $overdueTotal,
             ],
             'missingMedia' => [
                 'items' => $this->rows(clone $missingMediaQuery, $limit, fn () => 'Missing required media'),

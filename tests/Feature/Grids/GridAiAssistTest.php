@@ -95,7 +95,8 @@ class GridAiAssistTest extends TestCase
         Http::fake();
 
         $this->actingAs($this->designer())->postJson(route('grids.ai.captions', $plan))->assertForbidden();
-        $this->actingAs($this->reviewer)->postJson(route('grids.ai.balance', $plan))->assertForbidden();
+        // Step M-6.2 (I-8.1): a reviewer is redirected to their portal before the internal AI route.
+        $this->actingAs($this->reviewer)->postJson(route('grids.ai.balance', $plan))->assertRedirect();
 
         Config::set('ai.enabled', false);
         $this->actingAs($this->owner())->postJson(route('grids.ai.captions', $plan))->assertForbidden();

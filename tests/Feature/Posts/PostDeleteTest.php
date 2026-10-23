@@ -56,7 +56,9 @@ class PostDeleteTest extends TestCase
         $outsider = User::factory()->for(Organization::factory(), 'organization')->role(Role::Owner)->create();
 
         foreach ([$this->user(Role::Designer), $this->user(Role::Viewer), $portalUser, $outsider] as $user) {
-            $this->actingAs($user)->delete(route('posts.destroy', $post))->assertForbidden();
+            // A client reviewer is redirected to their portal (302, Step M-6.2); the others → 403.
+            $status = $this->actingAs($user)->delete(route('posts.destroy', $post))->getStatusCode();
+            $this->assertContains($status, [302, 403]);
         }
 
         $this->assertNotNull($post->fresh());

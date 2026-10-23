@@ -89,3 +89,11 @@ $safely(Schedule::command('business:send-insights-digest')->hourlyAt(40), 'busin
 // Step M-5.8: drop the next occurrence of each recurring post as a draft once the current one has
 // published. Idempotent (a leaf with a recurrence child is skipped). See GenerateRecurringPostDraftsAction.
 $safely(Schedule::command('posts:generate-recurring-drafts')->dailyAt('06:45'), 'posts:generate-recurring-drafts');
+
+// Step M-6.5 (Phase 9): nudge the studio and client about posts stuck past the approval SLA, at most
+// once per 24h per post. See SendOverdueApprovalRemindersJob.
+$safely(Schedule::command('approvals:send-overdue-reminders')->dailyAt('09:00'), 'approvals:send-overdue-reminders');
+
+// Step M-6.7 (I-12.1): email each user a digest of the day's notifications (those they kept in their
+// digest). See SendNotificationDigestAction.
+$safely(Schedule::command('notifications:send-digest')->dailyAt('07:30'), 'notifications:send-digest');

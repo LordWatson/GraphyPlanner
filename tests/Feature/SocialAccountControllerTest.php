@@ -242,8 +242,10 @@ class SocialAccountControllerTest extends TestCase
         $this->assertSame('real', $account->fresh()->external_profile_id);
     }
 
-    public function test_client_reviewer_sees_social_accounts_scoped_to_their_client(): void
+    public function test_client_reviewer_is_redirected_from_the_internal_client_page_to_the_portal(): void
     {
+        // Step M-6.2 (I-8.1): the internal client (social accounts) page is staff-only — a reviewer
+        // is redirected to their portal rather than shown a scoped internal view.
         $org = Organization::factory()->create();
         $client = Client::factory()->for($org, 'organization')->create();
         SocialAccount::factory()->for($client)->create(['org_id' => $org->id]);
@@ -251,9 +253,6 @@ class SocialAccountControllerTest extends TestCase
             'client_id' => $client->id,
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('clients.show', $client));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->has('socialAccounts', 1));
+        $this->actingAs($reviewer)->get(route('clients.show', $client))->assertRedirect(route('portal.dashboard'));
     }
 }

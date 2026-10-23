@@ -1,4 +1,5 @@
 import type { CampaignChipData } from '@/components/campaigns/types';
+import type { FeedbackThread } from '@/components/feedback/types';
 import type { Crop, MediaFormat } from '@/lib/media-format';
 
 /** Prop shapes sent by `PostController::edit` to the `posts/edit` page. */
@@ -145,6 +146,9 @@ export type PostData = {
     activity_logs: ActivityLogData[];
     approvals: ApprovalData[];
     comments: CommentData[];
+    /** Step M-6.4: visual-feedback threads (pins, caption notes, suggested edits). */
+    feedback: FeedbackThread[];
+    unresolved_feedback: number;
 };
 
 export type TargetAccountData = {

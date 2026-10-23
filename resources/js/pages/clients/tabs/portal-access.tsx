@@ -1,6 +1,11 @@
 import { Form, router } from '@inertiajs/react';
-import { Trash2, UserPlus } from 'lucide-react';
+import { Contact, Trash2, UserPlus } from 'lucide-react';
 import InputError from '@/components/input-error';
+import {
+    ClientContactsPanel,
+    type ContactData,
+    type ContactRole,
+} from '@/components/clients/client-contacts-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,15 +37,36 @@ type InvitationData = {
  */
 export default function ClientPortalAccessTab({
     invitations: invitationPage,
+    contacts,
+    contactRoles,
+    canManageContacts,
     ...page
 }: ClientPageProps & {
     invitations: Paginated<InvitationData>;
+    contacts: ContactData[];
+    contactRoles: ContactRole[];
+    canManageContacts: boolean;
 }) {
     const { client, can } = page;
     const invitations = invitationPage.data;
 
     return (
         <ClientLayout {...page}>
+            <TabPanel>
+                <TabHeading
+                    icon={Contact}
+                    title="Client contacts"
+                    description="The people at this client. Approvers get post review emails; billing contacts get invoices."
+                />
+
+                <ClientContactsPanel
+                    clientId={client.id}
+                    contacts={contacts}
+                    roles={contactRoles}
+                    canManage={canManageContacts}
+                />
+            </TabPanel>
+
             <TabPanel>
                 <TabHeading
                     icon={UserPlus}

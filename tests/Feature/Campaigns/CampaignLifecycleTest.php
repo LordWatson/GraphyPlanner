@@ -150,7 +150,9 @@ class CampaignLifecycleTest extends TestCase
         $campaign = $this->makeCampaign(['status' => CampaignStatus::Planning]);
 
         foreach ([$this->designer(), $this->viewer(), $this->reviewer, $this->foreignOwner()] as $user) {
-            $this->actingAs($user)->post(route('campaigns.transition', $campaign), ['to' => 'active'])->assertForbidden();
+            // Reviewer → portal redirect (302, Step M-6.2); the others → 403. None transitions.
+            $status = $this->actingAs($user)->post(route('campaigns.transition', $campaign), ['to' => 'active'])->getStatusCode();
+            $this->assertContains($status, [302, 403]);
         }
 
         $this->actingAs($this->strategist())->post(route('campaigns.transition', $campaign), ['to' => 'active'])->assertSessionHasNoErrors();
