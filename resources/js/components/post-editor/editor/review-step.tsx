@@ -59,7 +59,10 @@ export function ReviewStep({
     const { editor, nav } = usePostEditorContext();
 
     return (
-        <div className="grid gap-5">
+        // `grid-cols-1` pins the column to `minmax(0,1fr)` so wide children (the workflow's stage
+        // track) get a bounded width and scroll inside it, instead of growing the column and
+        // pushing the whole step off a phone screen.
+        <div className="grid min-w-0 grid-cols-1 gap-5">
             <div className="flex flex-col gap-1">
                 <span className="eyebrow text-muted-foreground">05</span>
                 <h2 className="text-[17px] leading-snug font-semibold tracking-[-0.01em]">

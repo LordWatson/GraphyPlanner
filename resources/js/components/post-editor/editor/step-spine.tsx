@@ -1,4 +1,5 @@
 import { AlertTriangle, Check, TriangleAlert } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
 import {
     editorSteps,
@@ -89,14 +90,38 @@ export function StepSpine({
     const { editor, nav } = usePostEditorContext();
     const items = editor.view.checklistItems;
     const errorTabs = new Set(Object.keys(errors).map(tabForErrorKey));
+    const listRef = useRef<HTMLOListElement>(null);
+    const activeRef = useRef<HTMLButtonElement>(null);
+
+    // On a phone the spine scrolls horizontally, so a later active step can land off-screen.
+    // Keep it centred in view whenever it changes (horizontal only — never nudges the page).
+    useEffect(() => {
+        const list = listRef.current;
+        const btn = activeRef.current;
+
+        if (!list || !btn) {
+            return;
+        }
+
+        const target =
+            btn.offsetLeft - (list.clientWidth - btn.clientWidth) / 2;
+        const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)')
+            .matches;
+
+        list.scrollTo({
+            left: Math.max(0, target),
+            behavior: smooth ? 'smooth' : 'auto',
+        });
+    }, [nav.activeTab]);
 
     return (
         <nav
             ref={nav.tabsRef}
             aria-label="Post editor steps"
-            className="border-border bg-card scroll-mt-20 rounded-2xl border p-2 shadow-sm"
+            className="border-border bg-card min-w-0 scroll-mt-20 rounded-2xl border p-2 shadow-sm"
         >
             <ol
+                ref={listRef}
                 role="tablist"
                 className="flex items-stretch gap-1 overflow-x-auto"
             >
@@ -117,6 +142,7 @@ export function StepSpine({
                             className="flex min-w-fit flex-1 items-center gap-1"
                         >
                             <button
+                                ref={active ? activeRef : undefined}
                                 type="button"
                                 role="tab"
                                 id={`post-step-${step.id}`}
@@ -127,7 +153,7 @@ export function StepSpine({
                                         ? `${index + 1}. ${step.label} — ${spoken}`
                                         : `${index + 1}. ${step.label}`
                                 }
-                                onClick={() => nav.setTab(step.id)}
+                                onClick={() => nav.goToStep(step.id)}
                                 className={cn(
                                     'focus-visible:ring-ring/50 flex min-w-fit flex-1 items-center gap-2.5 rounded-xl border px-3 py-2 text-start transition-[color,background-color,box-shadow] outline-none focus-visible:ring-[3px]',
                                     active

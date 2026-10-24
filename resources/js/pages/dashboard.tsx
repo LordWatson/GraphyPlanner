@@ -293,6 +293,14 @@ export default function Dashboard({
                             label: 'Unapproved',
                             value: summary.unapprovedDrafts,
                             caption: 'Drafts awaiting sign-off',
+                            render: (cell) => (
+                                <Link
+                                    href={needsAttention()}
+                                    className="hover:bg-muted/50 block h-full rounded-lg transition-colors"
+                                >
+                                    {cell}
+                                </Link>
+                            ),
                         },
                         {
                             label: 'Active clients',
@@ -311,6 +319,14 @@ export default function Dashboard({
                             label: 'Scheduled',
                             value: summary.scheduledPosts,
                             caption: 'Posts in the pipeline',
+                            render: (cell) => (
+                                <Link
+                                    href={calendar()}
+                                    className="hover:bg-muted/50 block h-full rounded-lg transition-colors"
+                                >
+                                    {cell}
+                                </Link>
+                            ),
                         },
                     ]}
                 />
