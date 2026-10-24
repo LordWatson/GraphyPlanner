@@ -20,7 +20,7 @@ import {
     TabSelectFilter,
     visitClientTab,
 } from '@/components/clients/tab-filters';
-import { EmptyState, Page, PageHeader, StatStrip } from '@/components/page';
+import { ChapterHero, EmptyState, Page, StatStrip } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
 import { Pagination } from '@/components/pagination';
 import { StatusPill } from '@/components/status-pill';
@@ -103,7 +103,7 @@ export default function CampaignsHub({
 
     return (
         <Page>
-            <PageHeader
+            <ChapterHero
                 eyebrow="Campaigns"
                 title={
                     <>
@@ -114,24 +114,26 @@ export default function CampaignsHub({
                 actions={
                     can.create && (
                         <>
-                            <Button asChild variant="outline">
+                            <NewCampaignDialog
+                                options={formOptions}
+                                clients={filterOptions.clients}
+                                triggerVariant="spark"
+                                triggerSize="lg"
+                            />
+                            <Button asChild variant="on-ink" size="lg">
                                 <Link href={compareRoute()}>
                                     <Columns3 />
                                     Compare
                                 </Link>
                             </Button>
                             {can.templates && (
-                                <Button asChild variant="outline">
+                                <Button asChild variant="on-ink" size="lg">
                                     <Link href={templatesIndex()}>
                                         <LayoutTemplate />
                                         Templates
                                     </Link>
                                 </Button>
                             )}
-                            <NewCampaignDialog
-                                options={formOptions}
-                                clients={filterOptions.clients}
-                            />
                         </>
                     )
                 }

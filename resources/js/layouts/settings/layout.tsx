@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
-import { Page, PageHeader } from '@/components/page';
+import { ChapterHero, Page } from '@/components/page';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAiUsage } from '@/routes/ai-usage';
@@ -74,7 +74,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
     return (
         <Page>
-            <PageHeader
+            <ChapterHero
                 eyebrow="Account & studio"
                 title={
                     <>

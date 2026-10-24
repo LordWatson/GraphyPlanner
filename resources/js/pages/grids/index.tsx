@@ -7,7 +7,7 @@ import type {
 } from '@/components/grids/new-grid-dialog';
 import { NewGridDialog } from '@/components/grids/new-grid-dialog';
 import type { GridSummary } from '@/components/grids/types';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
 import { Pagination } from '@/components/pagination';
 import {
@@ -53,8 +53,8 @@ export default function GridsIndex({
         <>
             <Head title="Grids" />
             <Page>
-                <PageHeader
-                    eyebrow="Instagram grids"
+                <ChapterHero
+                    eyebrow={`${String(grids.total).padStart(2, '0')} grid plans`}
                     title={
                         <>
                             Plan the <em>grid</em>.
@@ -66,8 +66,18 @@ export default function GridsIndex({
                             <NewGridDialog
                                 accounts={accounts}
                                 campaignOptions={campaignOptions}
+                                triggerVariant="spark"
+                                triggerSize="lg"
                             />
                         )
+                    }
+                    aside={
+                        <HeroStat
+                            icon={LayoutGrid}
+                            eyebrow="Grid plans"
+                            value={String(grids.total).padStart(2, '0')}
+                            caption="Across every client"
+                        />
                     }
                 />
 

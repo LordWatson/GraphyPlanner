@@ -39,11 +39,16 @@ export function NewCampaignDialog({
     clientId,
     clients,
     label = 'New campaign',
+    triggerVariant,
+    triggerSize,
 }: {
     options: CampaignFormOptions;
     clientId?: number;
     clients?: Option[];
     label?: string;
+    /** Themed trigger for an Ink `ChapterHero` (`spark`); defaults to the paper primary button. */
+    triggerVariant?: React.ComponentProps<typeof Button>['variant'];
+    triggerSize?: React.ComponentProps<typeof Button>['size'];
 }) {
     const [open, setOpen] = useState(false);
     const [client, setClient] = useState<string>(
@@ -90,7 +95,11 @@ export function NewCampaignDialog({
 
     return (
         <>
-            <Button onClick={() => setOpen(true)}>
+            <Button
+                variant={triggerVariant}
+                size={triggerSize}
+                onClick={() => setOpen(true)}
+            >
                 <Plus />
                 {label}
             </Button>

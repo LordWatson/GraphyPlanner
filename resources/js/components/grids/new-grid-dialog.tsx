@@ -50,10 +50,15 @@ export function NewGridDialog({
     accounts,
     campaignOptions,
     clientId,
+    triggerVariant,
+    triggerSize,
 }: {
     accounts: GridAccountOption[];
     campaignOptions: GridCampaignOption[];
     clientId?: number;
+    /** Themed trigger for an Ink `ChapterHero` (`spark`); defaults to the paper primary button. */
+    triggerVariant?: React.ComponentProps<typeof Button>['variant'];
+    triggerSize?: React.ComponentProps<typeof Button>['size'];
 }) {
     const [open, setOpen] = useState(false);
     const form = useForm({
@@ -96,7 +101,11 @@ export function NewGridDialog({
 
     return (
         <>
-            <Button onClick={() => setOpen(true)}>
+            <Button
+                variant={triggerVariant}
+                size={triggerSize}
+                onClick={() => setOpen(true)}
+            >
                 <Plus />
                 New grid
             </Button>
