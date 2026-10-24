@@ -1,18 +1,13 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowLeft, Check, Columns3, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { formatKpi } from '@/components/campaigns/results/kpi-rows';
 import type { KpiResult } from '@/components/campaigns/results/kpi-rows';
 import InputError from '@/components/input-error';
+import { MultiCombobox } from '@/components/multi-combobox';
 import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { formatDateRange } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import {
@@ -77,17 +72,40 @@ export default function CampaignCompare({
         ([key]) => key === 'ids' || key.startsWith('ids.'),
     )?.[1];
 
-    const visit = (ids: number[]) =>
+    // Optimistic local selection so toggles register instantly and successive picks compute from
+    // the up-to-date set rather than racing the server round-trip. Reconciled to the server's
+    // `selected` whenever it changes (e.g. a foreign id dropped by validation).
+    const [picked, setPicked] = useState<number[]>(selected);
+    const selectedKey = selected.join(',');
+    useEffect(() => {
+        setPicked(selected);
+        // Resync only when the server's selection actually changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedKey]);
+
+    const choose = (ids: number[]) => {
+        setPicked(ids);
         router.get(compareRoute.url(), ids.length > 0 ? { ids } : {}, {
             preserveScroll: true,
+            // Keep the multi-select open and its props in sync across toggles, so several
+            // campaigns can be picked in one pass without the popover closing each time.
+            preserveState: true,
         });
+    };
 
-    const available = options.filter(
-        (option) => !selected.includes(Number(option.value)),
-    );
     const byId = new Map(
         options.map((option) => [Number(option.value), option]),
     );
+
+    // The dropdown shows the client for disambiguation and searches on it; the chips below stay
+    // clean (campaign name only), reading from `byId`.
+    const comboOptions = options.map((option) => ({
+        value: option.value,
+        label: option.client
+            ? `${option.label} · ${option.client}`
+            : option.label,
+        keywords: option.client ? [option.client] : [],
+    }));
 
     return (
         <>
@@ -112,7 +130,7 @@ export default function CampaignCompare({
 
                 <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                        {selected.map((id) => (
+                        {picked.map((id) => (
                             <span
                                 key={id}
                                 className="border-border/70 bg-card inline-flex items-center gap-1.5 rounded-full border py-1 pr-1 pl-3 text-sm"
@@ -121,8 +139,8 @@ export default function CampaignCompare({
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        visit(
-                                            selected.filter(
+                                        choose(
+                                            picked.filter(
                                                 (other) => other !== id,
                                             ),
                                         )
@@ -134,33 +152,19 @@ export default function CampaignCompare({
                                 </button>
                             </span>
                         ))}
-                        {selected.length < max && available.length > 0 && (
-                            <Select
-                                value=""
-                                onValueChange={(value) =>
-                                    visit([...selected, Number(value)])
+                        {options.length > 0 && (
+                            <MultiCombobox
+                                options={comboOptions}
+                                value={picked.map(String)}
+                                onChange={(values) =>
+                                    choose(values.map(Number))
                                 }
-                            >
-                                <SelectTrigger className="w-64">
-                                    <SelectValue placeholder="Add a campaign…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {available.map((option) => (
-                                        <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                            {option.client && (
-                                                <span className="text-muted-foreground">
-                                                    {' '}
-                                                    · {option.client}
-                                                </span>
-                                            )}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                max={max}
+                                placeholder="Select campaigns…"
+                                searchPlaceholder="Search campaigns…"
+                                emptyText="No campaigns match that."
+                                className="w-64"
+                            />
                         )}
                     </div>
                     <InputError message={idError} />

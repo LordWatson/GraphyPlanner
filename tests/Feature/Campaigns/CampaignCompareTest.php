@@ -63,11 +63,23 @@ class CampaignCompareTest extends TestCase
             ->assertSessionHasErrors('ids.1');
     }
 
-    public function test_it_needs_two_to_four_campaigns(): void
+    public function test_a_single_campaign_is_a_valid_intermediate_selection(): void
+    {
+        $campaign = $this->makeCampaign();
+
+        // The chip picker adds campaigns one at a time, so the first pick arrives as a single id.
+        // It must render (not error) with the campaign selected and the comparison still empty.
+        $this->actingAs($this->owner())->get(route('campaigns.compare', ['ids' => [$campaign->id]]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('selected', [$campaign->id])
+                ->where('comparison', null));
+    }
+
+    public function test_it_compares_at_most_four_campaigns(): void
     {
         $campaigns = collect(range(1, 5))->map(fn () => $this->makeCampaign());
 
-        $this->actingAs($this->owner())->get(route('campaigns.compare', ['ids' => [$campaigns[0]->id]]))->assertSessionHasErrors('ids');
         $this->actingAs($this->owner())->get(route('campaigns.compare', ['ids' => $campaigns->pluck('id')->all()]))->assertSessionHasErrors('ids');
 
         $this->actingAs($this->owner())->get(route('campaigns.compare'))

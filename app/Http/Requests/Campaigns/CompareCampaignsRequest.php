@@ -25,7 +25,10 @@ class CompareCampaignsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ids' => ['nullable', 'array', 'min:2', 'max:'.self::MAX],
+            // One id is a valid intermediate selection — the page shows "Add one more" and the
+            // comparison only renders at two. Rejecting a single id here would break the chip-based
+            // picker, which adds campaigns one at a time.
+            'ids' => ['nullable', 'array', 'min:1', 'max:'.self::MAX],
             'ids.*' => [
                 'integer', 'distinct',
                 Rule::exists('campaigns', 'id')->where('org_id', $this->user()?->org_id)->whereNull('deleted_at'),
@@ -39,7 +42,6 @@ class CompareCampaignsRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'ids.min' => 'Pick at least two campaigns to compare.',
             'ids.max' => 'Compare up to '.self::MAX.' campaigns at a time.',
             'ids.*.exists' => 'That campaign isn’t one of yours.',
         ];
