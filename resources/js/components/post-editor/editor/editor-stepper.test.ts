@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
+    editorSteps,
+    reviewStatus,
     tabForErrorKey,
     tabStatus,
-} from '@/components/post-editor/editor/editor-tabs';
+} from '@/components/post-editor/editor/editor-steps';
 import type { ChecklistItem } from '@/components/post-editor/types';
 
 const item = (key: string, passed: boolean, soft = false): ChecklistItem => ({
@@ -39,8 +41,40 @@ describe('tabStatus', () => {
     });
 });
 
+describe('reviewStatus', () => {
+    it('is done when every required check passes', () => {
+        const items = [item('caption', true), item('targets', true)];
+        expect(reviewStatus(items)).toBe('done');
+    });
+
+    it('is todo while a required check is open (soft checks do not count)', () => {
+        const items = [
+            item('caption', false),
+            item('campaign_hashtags', false, true),
+        ];
+        expect(reviewStatus(items)).toBe('todo');
+    });
+
+    it('is todo when there are no required checks yet', () => {
+        expect(reviewStatus([])).toBe('todo');
+    });
+});
+
+describe('editorSteps', () => {
+    it('ends with the Review & send step', () => {
+        const ids = editorSteps.map((step) => step.id);
+        expect(ids).toEqual([
+            'compose',
+            'channels',
+            'media',
+            'settings',
+            'review',
+        ]);
+    });
+});
+
 describe('tabForErrorKey', () => {
-    it('routes each error key to its panel', () => {
+    it('routes each error key to its step', () => {
         expect(tabForErrorKey('master_caption')).toBe('compose');
         expect(tabForErrorKey('hashtags.0')).toBe('compose');
         expect(tabForErrorKey('targets.0.social_account_id')).toBe('channels');

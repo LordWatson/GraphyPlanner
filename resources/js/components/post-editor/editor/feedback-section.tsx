@@ -41,7 +41,7 @@ export function FeedbackSection({
     return (
         <Collapsible
             defaultOpen={unresolved > 0}
-            className="border-border bg-card shadow-paper rounded-2xl border"
+            className="border-border bg-card rounded-2xl border"
         >
             <CollapsibleTrigger className="group focus-visible:ring-ring/50 flex w-full items-center justify-between gap-3 rounded-2xl px-5 py-4 text-start outline-none focus-visible:ring-[3px]">
                 <span className="flex items-center gap-2">

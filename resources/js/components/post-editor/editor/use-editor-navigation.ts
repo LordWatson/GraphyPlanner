@@ -3,8 +3,17 @@ import type { ComposerScope } from '@/components/post-editor/composer';
 import type { EditorSection } from '@/components/post-editor/editor/editor-state';
 import { cn } from '@/lib/utils';
 
-/** The four tabbed areas of the editor (the preview lives in the right rail, not a tab). */
-export type EditorTab = 'compose' | 'channels' | 'media' | 'settings';
+/**
+ * The editor's steps (the preview lives in the right rail, not a step). The first four build the
+ * post; `review` is the final "Review & send" consolidation step. The readiness checklist's
+ * jump targets (`EditorSection`) only ever point at the first four, never `review`.
+ */
+export type EditorTab =
+    | 'compose'
+    | 'channels'
+    | 'media'
+    | 'settings'
+    | 'review';
 
 /**
  * Step I-4.6 / M-1.6 — moving around the editor. The Write / Where & when / Media / Settings
@@ -13,8 +22,11 @@ export type EditorTab = 'compose' | 'channels' | 'media' | 'settings';
  * brings it into view and flashes it; media framing jumps to the preview in the right rail.
  * `scope`/`previewId` keep the composer and preview on the one channel being customized.
  */
-export function useEditorNavigation(selectedIds: number[]) {
-    const [activeTab, setActiveTab] = useState<EditorTab>('compose');
+export function useEditorNavigation(
+    selectedIds: number[],
+    initialTab: EditorTab = 'compose',
+) {
+    const [activeTab, setActiveTab] = useState<EditorTab>(initialTab);
     const [flashed, setFlashed] = useState<EditorSection | null>(null);
     const [scope, setScope] = useState<ComposerScope>('all');
     const [previewId, setPreviewId] = useState<number | null>(null);
