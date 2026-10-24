@@ -66,6 +66,40 @@ class PortalPostControllerTest extends TestCase
         );
     }
 
+    public function test_the_post_page_exposes_the_reviewers_remaining_approval_queue(): void
+    {
+        // UX overhaul (review handoff): the post page leads to the next post awaiting this reviewer.
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = $this->makeReviewer($client);
+
+        $current = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
+        Post::factory()->for($client)->count(2)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
+        // A non-waiting post is not part of the queue.
+        Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::Draft]);
+
+        $this->actingAs($reviewer)->get(route('portal.posts.show', $current))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('portal/posts/show')
+                ->where('queue.remaining', 2)
+                ->whereNot('queue.next_id', null));
+    }
+
+    public function test_the_post_page_queue_is_empty_when_nothing_else_waits(): void
+    {
+        $org = Organization::factory()->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $reviewer = $this->makeReviewer($client);
+        $only = Post::factory()->for($client)->create(['org_id' => $org->id, 'status' => PostStatus::WaitingClient]);
+
+        $this->actingAs($reviewer)->get(route('portal.posts.show', $only))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('queue.remaining', 0)
+                ->where('queue.next_id', null));
+    }
+
     public function test_a_client_reviewer_can_approve_their_own_waiting_client_post(): void
     {
         $org = Organization::factory()->create();

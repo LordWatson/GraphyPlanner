@@ -55,6 +55,10 @@ class GetBusinessDashboardAction
 
         return [
             'brand' => ['id' => $brand->id, 'name' => $brand->name],
+            // UX overhaul (business propagation): the brand's get-set-up checklist signals, so Today
+            // can guide a new creator through connecting, their brand, a goal and a first post. Hidden
+            // once done. Mirrors the agency client setup checklist.
+            'setup' => $this->setup($brand),
             'upNext' => $this->upNext($brand, $timezone, $now),
             'gaps' => $this->gaps($brand, $timezone, $now),
             'needsYou' => $this->needsYou($user, $brand),
@@ -63,6 +67,31 @@ class GetBusinessDashboardAction
             // business:generate-daily-ideas run). Read-only here — the page never triggers a vendor
             // call; the empty state links to "Get ideas" when nothing is cached yet.
             'ideaOfTheDay' => $this->dailyIdea->cached($brand, $timezone),
+        ];
+    }
+
+    /**
+     * UX overhaul (business propagation) — the "get set up" checklist for a new brand: connect an
+     * account, fill the brand, set a posting goal, publish a first post. Each is a cheap existence
+     * check; the frontend hides the card once they are all done.
+     *
+     * @return array{accounts: bool, brand: bool, goal: bool, post: bool, complete: bool}
+     */
+    private function setup(Client $brand): array
+    {
+        $steps = [
+            'accounts' => $brand->socialAccounts()->exists(),
+            'brand' => $brand->brandBrain?->isFilled() ?? false,
+            'goal' => $brand->postingGoal()->isSet(),
+            'post' => Post::query()
+                ->where('org_id', $brand->org_id)
+                ->where('client_id', $brand->id)
+                ->exists(),
+        ];
+
+        return [
+            ...$steps,
+            'complete' => ! in_array(false, $steps, true),
         ];
     }
 

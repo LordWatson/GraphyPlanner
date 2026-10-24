@@ -58,6 +58,48 @@ class BusinessDashboardTest extends TestCase
         return $post;
     }
 
+    public function test_setup_checklist_is_incomplete_for_a_brand_new_brand(): void
+    {
+        // UX overhaul (business propagation): a fresh brand has every setup step outstanding.
+        $organization = Organization::factory()->business()->create();
+        $brand = Client::factory()->for($organization, 'organization')->primary()->create();
+        $owner = User::factory()->for($organization, 'organization')->role(Role::Owner)->create();
+
+        $data = app(GetBusinessDashboardAction::class)($owner, $brand, 'UTC');
+
+        $this->assertSame([
+            'accounts' => false,
+            'brand' => false,
+            'goal' => false,
+            'post' => false,
+            'complete' => false,
+        ], $data['setup']);
+    }
+
+    public function test_setup_checklist_completes_once_the_brand_is_set_up(): void
+    {
+        // The `business()` helper already connects an Instagram account.
+        [$organization, $owner, $brand] = $this->business();
+        $brand->brandBrain()->create([
+            'voice' => ['tone' => 'Warm', 'personality' => null, 'do_nots' => []],
+        ]);
+        $brand->update(['posting_goal' => ['posts_per_week' => 3, 'preferred_days' => [1, 3, 5]]]);
+        Post::factory()->for($brand)->create([
+            'org_id' => $organization->id,
+            'status' => PostStatus::Draft,
+        ]);
+
+        $data = app(GetBusinessDashboardAction::class)($owner, $brand->fresh(), 'UTC');
+
+        $this->assertSame([
+            'accounts' => true,
+            'brand' => true,
+            'goal' => true,
+            'post' => true,
+            'complete' => true,
+        ], $data['setup']);
+    }
+
     public function test_up_next_lists_scheduled_targets_soonest_first(): void
     {
         [$organization, $owner, $brand, $account] = $this->business();

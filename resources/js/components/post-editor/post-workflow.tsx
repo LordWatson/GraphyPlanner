@@ -228,7 +228,7 @@ export function PostWorkflow({
                 </div>
             )}
 
-            {reviewLog && (
+            {post.status === 'waiting_client' && canResendReviewEmail && (
                 <div className="px-5 pb-4">
                     <ReviewLinkRow
                         postId={post.id}

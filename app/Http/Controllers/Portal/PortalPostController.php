@@ -13,6 +13,7 @@ use App\Http\Requests\Portal\PortalPostDecisionRequest;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Models\Post;
 use App\Models\PostComment;
+use App\Models\User;
 use App\Services\PostNotificationService;
 use App\Services\Posts\PostRevisionService;
 use App\Support\Posts\ApprovalProgress;
@@ -117,6 +118,9 @@ class PortalPostController extends Controller
             ],
             // Step M-6.3: the approval-steps progress, and whether it's this reviewer's turn.
             'approval' => ApprovalProgress::present($post),
+            // UX overhaul (review handoff): the reviewer's remaining approval queue, so the page can
+            // offer a one-tap path to the next post that needs them ("approving always leads").
+            'queue' => $this->reviewerQueue($user, $post),
             'certificate_available' => $post->status === PostStatus::Approved,
             // Step M-6.4: visual-feedback threads (pins, caption notes, suggested edits).
             'feedback' => PostFeedbackPresenter::threads($post, $user, forClient: true),
@@ -238,6 +242,33 @@ class PortalPostController extends Controller
         $action($comment, $request->user(), $request->boolean('resolved', true));
 
         return to_route('portal.posts.show', $comment->post_id);
+    }
+
+    /**
+     * UX overhaul (review handoff) — the reviewer's approval queue beyond the current post: how
+     * many other posts still await *this* reviewer's decision, and the next one to open. Mirrors the
+     * `decideAll` eligibility (waiting, this reviewer's turn, and a legal approve transition), so the
+     * portal post page can lead straight to the next thing that needs them (brand §8).
+     *
+     * @return array{remaining: int, next_id: int|null}
+     */
+    private function reviewerQueue(User $user, Post $current): array
+    {
+        $waiting = Post::query()
+            ->where('client_id', $user->client_id)
+            ->where('status', PostStatus::WaitingClient)
+            ->whereKeyNot($current->id)
+            ->with('approvalSteps.contact')
+            ->latest()
+            ->get()
+            ->filter(fn (Post $post) => ApprovalProgress::canDecide($post, $user)
+                && $user->can('transition', [$post, PostStatus::Approved]))
+            ->values();
+
+        return [
+            'remaining' => $waiting->count(),
+            'next_id' => $waiting->first()?->id,
+        ];
     }
 
     /**

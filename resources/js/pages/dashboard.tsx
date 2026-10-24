@@ -35,6 +35,7 @@ import {
 } from '@/components/page';
 import type { LiveCampaign } from '@/components/campaigns/live-campaigns-panel';
 import { LiveCampaignsPanel } from '@/components/campaigns/live-campaigns-panel';
+import { HomeViewTabs } from '@/components/home-view-tabs';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -223,7 +224,7 @@ export default function Dashboard({
 
     return (
         <>
-            <Head title="Overview" />
+            <Head title="Home" />
             <Page>
                 <ChapterHero
                     eyebrow={todayFormatter.format(new Date())}
@@ -272,6 +273,11 @@ export default function Dashboard({
                             </span>
                         </Link>
                     }
+                />
+
+                <HomeViewTabs
+                    attentionCount={summary.needsAttention}
+                    className="animate-rise"
                 />
 
                 <StatStrip
@@ -851,7 +857,7 @@ export default function Dashboard({
 Dashboard.layout = {
     breadcrumbs: [
         {
-            title: 'Overview',
+            title: 'Home',
             href: dashboard(),
         },
     ],

@@ -12,10 +12,11 @@ import {
     WifiOff,
 } from 'lucide-react';
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
+import { HomeViewTabs } from '@/components/home-view-tabs';
 import { Page, PageHeader, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
-import { needsAttention } from '@/routes';
+import { dashboard, needsAttention } from '@/routes';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
 import { edit as editGrid } from '@/routes/grids';
@@ -299,6 +300,8 @@ export default function Home({ items }: HomeProps) {
                     description="Everything stopping a post or account from moving forward. Clear the top lanes first."
                 />
 
+                <HomeViewTabs attentionCount={total} className="animate-rise" />
+
                 <StatStrip
                     className="animate-rise"
                     items={lanes.map((lane) => ({
@@ -571,6 +574,10 @@ export default function Home({ items }: HomeProps) {
 
 Home.layout = {
     breadcrumbs: [
+        {
+            title: 'Home',
+            href: dashboard(),
+        },
         {
             title: 'Needs attention',
             href: needsAttention(),

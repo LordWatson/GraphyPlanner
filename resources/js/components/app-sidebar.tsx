@@ -16,7 +16,7 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useWorkspace } from '@/hooks/use-workspace';
 import type { Chapter } from '@/lib/chapters';
 import { businessChapters, chapters, platformChapters } from '@/lib/chapters';
-import { calendar, dashboard, needsAttention } from '@/routes';
+import { calendar, dashboard } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { today as businessToday } from '@/routes/business';
 import { index as businessAccounts } from '@/routes/business/accounts';
@@ -28,7 +28,6 @@ import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as contentIndex } from '@/routes/content';
-import { index as myWorkIndex } from '@/routes/my-work';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -169,14 +168,13 @@ function studioGroups(
         {
             label: 'Studio',
             items: [
-                navItem(chapters.overview, dashboard()),
-                navItem(chapters.attention, needsAttention()),
-                navItem(chapters.myWork, myWorkIndex()),
+                // MOVE 1 (ux-overhaul): one front door. Needs attention + My work are now views of
+                // Home, switched by `HomeViewTabs` in-page (and reachable from ⌘K).
+                navItem(chapters.home, dashboard()),
                 navItem(chapters.calendar, calendar()),
                 {
-                    ...navItem(chapters.clients, clientsIndex()),
-                    // Campaigns enhancement C-1.1: the hub is a section of 04 Clients (no renumber).
-                    // Phase 18: the grids hub is another section of 04 Clients.
+                    // MOVE 2/3: the production engine, promoted out of Clients to its own chapter.
+                    ...navItem(chapters.content, contentIndex()),
                     subItems: [
                         // Step M-5.1: the content hub — posts across every client.
                         { title: 'Posts', href: contentIndex() },
@@ -184,6 +182,7 @@ function studioGroups(
                         { title: 'Grids', href: gridsIndex() },
                     ],
                 },
+                navItem(chapters.clients, clientsIndex()),
                 ...(canViewLedger
                     ? [navItem(chapters.invoices, invoicesIndex())]
                     : []),

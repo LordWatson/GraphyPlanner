@@ -1,6 +1,7 @@
 import { Form, Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
+    ArrowRight,
     CalendarClock,
     CheckCircle2,
     MessageSquareWarning,
@@ -26,6 +27,7 @@ import { cn } from '@/lib/utils';
 import {
     decide as decideOnPortalPost,
     index as portalPostsIndex,
+    show as portalPostShow,
 } from '@/routes/portal/posts';
 import { resolve as resolveComment } from '@/routes/portal/comments';
 import { store as commentOnPortalPost } from '@/routes/portal/posts/comments';
@@ -135,12 +137,15 @@ export default function PortalPostShow({
     post,
     can,
     approval,
+    queue,
     certificate_available,
     feedback,
 }: {
     post: PostData;
     can: { decide: boolean; comment: boolean };
     approval: ApprovalData | null;
+    /** UX overhaul (review handoff): the reviewer's remaining approval queue. */
+    queue: { remaining: number; next_id: number | null };
     certificate_available: boolean;
     feedback: FeedbackThread[];
 }) {
@@ -243,6 +248,32 @@ export default function PortalPostShow({
                     </section>
 
                     <div className="flex flex-col gap-5">
+                        {queue.remaining > 0 && (
+                            <div className="border-info/25 bg-info/5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="eyebrow text-muted-foreground">
+                                        Your review queue
+                                    </span>
+                                    <p className="text-sm">
+                                        {queue.remaining} more{' '}
+                                        {queue.remaining === 1
+                                            ? 'post needs'
+                                            : 'posts need'}{' '}
+                                        your review.
+                                    </p>
+                                </div>
+                                {queue.next_id !== null && (
+                                    <Button asChild size="sm">
+                                        <Link
+                                            href={portalPostShow(queue.next_id)}
+                                        >
+                                            Review the next
+                                            <ArrowRight className="size-4" />
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                         <ReviewChanges
                             changes={post.changes_since_review ?? null}
                         />

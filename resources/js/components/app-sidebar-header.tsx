@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { useCommandPalette } from '@/components/command-palette';
+import { CreateMenu } from '@/components/create-menu';
 import { NotificationBell } from '@/components/notification-bell';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
@@ -28,6 +29,7 @@ export function AppSidebarHeader({
             <span aria-hidden className="bg-border h-4 w-px" />
             <Breadcrumbs breadcrumbs={breadcrumbs} />
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
+                <CreateMenu />
                 <button
                     type="button"
                     onClick={open}

@@ -368,7 +368,7 @@ export default function ContentIndex({
                                             : 'Posts you create for any client show up here.'
                                     }
                                     action={
-                                        active && (
+                                        active ? (
                                             <Button
                                                 variant="outline"
                                                 onClick={() =>
@@ -381,7 +381,13 @@ export default function ContentIndex({
                                             >
                                                 Clear filters
                                             </Button>
-                                        )
+                                        ) : can.create ? (
+                                            // Momentum (ux-overhaul): the Content home never dead-ends
+                                            // — offer the first post via the hub's own picker.
+                                            <NewPostMenu
+                                                clients={filterOptions.clients}
+                                            />
+                                        ) : undefined
                                     }
                                 />
                             }
