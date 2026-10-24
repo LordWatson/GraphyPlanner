@@ -41,7 +41,7 @@ export function ErrorStepSwitcher({
         const target = [...keys]
             .map(tabForErrorKey)
             .sort((a, b) => order.indexOf(a) - order.indexOf(b))[0];
-        nav.setTab(target);
+        nav.goToStep(target);
     });
 
     return null;

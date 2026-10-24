@@ -13,9 +13,10 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
 /**
- * The sidebar reads like the book's Contents page (§00): a mono chapter number, then the title.
- * Collapsed to icons, the number gives way to the item's icon. The active chapter is an Ink-on-
- * Lime pill (approved pairing, 13:1).
+ * The sidebar reads like the book's Contents page (§00): the chapter icon and title, with the
+ * chapter number set as a right-aligned mono index — exactly as a printed Contents lists a section
+ * against its page number. Collapsed to icons, only the icon remains. The active chapter is an
+ * Ink-on-Lime pill (approved pairing, 13:1).
  */
 export function NavMain({
     items,
@@ -44,23 +45,19 @@ export function NavMain({
                         >
                             <Link href={item.href} prefetch>
                                 {item.icon && (
-                                    <item.icon
-                                        className={
-                                            item.number
-                                                ? 'hidden group-data-[collapsible=icon]:block'
-                                                : undefined
-                                        }
-                                    />
+                                    <item.icon className="shrink-0" />
                                 )}
+                                <span className="min-w-0 flex-1 truncate">
+                                    {item.title}
+                                </span>
                                 {item.number && (
                                     <span
                                         aria-hidden
-                                        className="w-5 shrink-0 font-mono text-[11px] tracking-[0.04em] tabular-nums opacity-60 group-data-[collapsible=icon]:hidden"
+                                        className="shrink-0 font-mono text-[10.5px] tracking-[0.05em] tabular-nums opacity-45 group-data-[collapsible=icon]:hidden"
                                     >
                                         {item.number}
                                     </span>
                                 )}
-                                <span>{item.title}</span>
                             </Link>
                         </SidebarMenuButton>
                         {item.subItems && item.subItems.length > 0 && (

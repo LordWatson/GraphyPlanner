@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { CommandPaletteProvider } from '@/components/command-palette';
+import { MobileNav } from '@/components/mobile-nav';
 import { PreviewBanner } from '@/components/preview-banner';
 import { PwaProvider } from '@/components/pwa/pwa-provider';
 import { usePreviewGuard } from '@/hooks/use-preview-guard';
@@ -22,12 +23,14 @@ export default function AppSidebarLayout({
                 <AppSidebar />
                 <AppContent
                     variant="sidebar"
-                    className="min-w-0 overflow-x-clip"
+                    className="min-w-0 overflow-x-clip pb-20 md:pb-0"
                 >
                     <PreviewBanner />
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
                     {children}
                 </AppContent>
+                {/* Phones get a fixed bottom tab bar instead of the slide-over sidebar. */}
+                <MobileNav />
                 {/* Step B-7.1: the installable PWA shell is business-only. */}
                 {isBusiness && <PwaProvider />}
             </CommandPaletteProvider>

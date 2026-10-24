@@ -171,15 +171,18 @@ export default function PostEdit({
                             preserveScroll: true,
                             preserveState: 'errors',
                         }}
-                        className="grid gap-5"
+                        // `grid-cols-1` pins the single column to `minmax(0,1fr)` so no wide child
+                        // (the step spine, a long caption/URL) can blow the form past the viewport
+                        // on a phone. Extra bottom padding clears the docked action bar + tab bar.
+                        className="grid grid-cols-1 gap-5 pb-16 md:pb-0"
                     >
                         {({ processing, errors }) => (
                             <>
                                 <ErrorStepSwitcher errors={errors} />
                                 <StepSpine errors={errors} />
 
-                                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-                                    <div className="grid min-w-0 gap-5">
+                                <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+                                    <div className="grid min-w-0 grid-cols-1 gap-5">
                                         <StepPanel tab="compose">
                                             <ComposeSection
                                                 errors={errors}

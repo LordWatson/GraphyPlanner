@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import AppLogo from '@/components/app-logo';
 import { Peek } from '@/components/brand-poster';
 import { FeedbackDialog } from '@/components/feedback-dialog';
@@ -13,97 +13,10 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { useCurrentUrl } from '@/hooks/use-current-url';
-import { useWorkspace } from '@/hooks/use-workspace';
-import type { Chapter } from '@/lib/chapters';
-import { businessChapters, chapters, platformChapters } from '@/lib/chapters';
-import { calendar, dashboard } from '@/routes';
-import { index as analyticsIndex } from '@/routes/analytics';
-import { today as businessToday } from '@/routes/business';
-import { index as businessAccounts } from '@/routes/business/accounts';
-import { edit as businessBrand } from '@/routes/business/brand';
-import { index as businessCollections } from '@/routes/business/collections';
-import { index as businessIdeas } from '@/routes/business/ideas';
-import { index as businessInsights } from '@/routes/business/insights';
-import { index as businessMedia } from '@/routes/business/media';
-import { index as businessPosts } from '@/routes/business/posts';
-import { index as campaignsIndex } from '@/routes/campaigns';
-import { index as contentIndex } from '@/routes/content';
-import { index as inboxIndex } from '@/routes/inbox';
-import { index as clientsIndex } from '@/routes/clients';
-import { index as gridsIndex } from '@/routes/grids';
-import { index as invoicesIndex } from '@/routes/invoices';
-import { edit as editProfile } from '@/routes/profile';
-import { index as staffIndex } from '@/routes/staff';
-import { dashboard as superAdminDashboard } from '@/routes/super-admin';
-import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
-import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
-import { index as superAdminPartners } from '@/routes/super-admin/partners';
-import { index as superAdminReports } from '@/routes/super-admin/reports';
-import type { Auth, NavItem } from '@/types';
-
-function navItem(
-    chapter: Chapter,
-    href: NavItem['href'],
-    isActive?: boolean,
-): NavItem {
-    return {
-        title: chapter.title,
-        href,
-        icon: chapter.icon,
-        number: chapter.number,
-        isActive,
-    };
-}
+import { useNavGroups } from '@/hooks/use-nav-groups';
 
 export function AppSidebar() {
-    const { auth } = usePage<{ auth: Auth }>().props;
-    const { isBusiness } = useWorkspace();
-    const { currentUrl } = useCurrentUrl();
-    const isSuperAdmin = auth.user.role === 'super_admin';
-    const onSettings = currentUrl
-        .replace(/^\/preview/, '')
-        .startsWith('/settings');
-
-    // Phase 15: platform super admins have no organization — they get the console's own book
-    // instead of the studio chapters (which `org.member` would redirect them away from anyway).
-    // Phase B-4: a business workspace gets its own, calmer book (no clients/invoices/portal).
-    const groups: { label: string; items: NavItem[] }[] = isSuperAdmin
-        ? [
-              {
-                  label: 'Platform',
-                  items: [
-                      navItem(
-                          platformChapters.platformOverview,
-                          superAdminDashboard(),
-                          currentUrl === '/super-admin',
-                      ),
-                      navItem(
-                          platformChapters.organizations,
-                          superAdminOrganizations(),
-                      ),
-                      navItem(
-                          platformChapters.analytics,
-                          superAdminAnalytics(),
-                      ),
-                      navItem(platformChapters.reports, superAdminReports()),
-                      navItem(platformChapters.partners, superAdminPartners()),
-                  ],
-              },
-              {
-                  label: 'Account',
-                  items: [
-                      navItem(
-                          platformChapters.platformSettings,
-                          editProfile(),
-                          onSettings,
-                      ),
-                  ],
-              },
-          ]
-        : isBusiness
-          ? businessGroups(auth, onSettings)
-          : studioGroups(auth, onSettings);
+    const { groups, homeHref } = useNavGroups();
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -115,16 +28,7 @@ export function AppSidebar() {
                             asChild
                             className="hover:bg-transparent active:bg-transparent"
                         >
-                            <Link
-                                href={
-                                    isSuperAdmin
-                                        ? superAdminDashboard()
-                                        : isBusiness
-                                          ? businessToday()
-                                          : dashboard()
-                                }
-                                prefetch
-                            >
+                            <Link href={homeHref} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -159,96 +63,4 @@ export function AppSidebar() {
             </SidebarFooter>
         </Sidebar>
     );
-}
-
-function studioGroups(
-    auth: Auth,
-    onSettings: boolean,
-): { label: string; items: NavItem[] }[] {
-    // Client portal contacts never render this shell (`AppLayout` swaps to `ClientPortalLayout`).
-    // Billing roles only — see `InvoicePolicy::viewLedger`.
-    const canViewLedger =
-        auth.user.role === 'owner' || auth.user.role === 'strategist';
-
-    return [
-        {
-            label: 'Studio',
-            items: [
-                // MOVE 1 (ux-overhaul): one front door. Needs attention + My work are now views of
-                // Home, switched by `HomeViewTabs` in-page (and reachable from ⌘K).
-                navItem(chapters.home, dashboard()),
-                navItem(chapters.calendar, calendar()),
-                {
-                    // MOVE 2/3: the production engine, promoted out of Clients to its own chapter.
-                    ...navItem(chapters.content, contentIndex()),
-                    subItems: [
-                        // Step M-5.1: the content hub — posts across every client.
-                        { title: 'Posts', href: contentIndex() },
-                        { title: 'Campaigns', href: campaignsIndex() },
-                        { title: 'Grids', href: gridsIndex() },
-                    ],
-                },
-                // Phase M-9: the social inbox — every staff role can at least read it.
-                navItem(chapters.inbox, inboxIndex()),
-                navItem(chapters.clients, clientsIndex()),
-                ...(canViewLedger
-                    ? [navItem(chapters.invoices, invoicesIndex())]
-                    : []),
-                // Phase 17 — `OrganizationPolicy::viewAnalytics`, shared as `auth.can`.
-                ...(auth.can?.viewAnalytics
-                    ? [navItem(chapters.analytics, analyticsIndex())]
-                    : []),
-            ],
-        },
-        {
-            label: 'Team',
-            items: [
-                // Owner-only — see `StaffPolicy::viewAny`.
-                ...(auth.user.role === 'owner'
-                    ? [navItem(chapters.staff, staffIndex())]
-                    : []),
-                navItem(chapters.settings, editProfile(), onSettings),
-            ],
-        },
-    ];
-}
-
-/**
- * Phase B-4: the business workspace shell — a calmer book for a brand owner. No clients, invoices,
- * portal or staff-analytics chapters; "Collections" is a section of Posts.
- */
-function businessGroups(
-    auth: Auth,
-    onSettings: boolean,
-): { label: string; items: NavItem[] }[] {
-    return [
-        {
-            label: 'Your brand',
-            items: [
-                navItem(businessChapters.today, businessToday()),
-                navItem(businessChapters.calendar, calendar()),
-                {
-                    ...navItem(businessChapters.posts, businessPosts()),
-                    subItems: [
-                        { title: 'Collections', href: businessCollections() },
-                    ],
-                },
-                navItem(businessChapters.ideas, businessIdeas()),
-                navItem(businessChapters.media, businessMedia()),
-                navItem(businessChapters.insights, businessInsights()),
-                navItem(businessChapters.brand, businessBrand()),
-                navItem(businessChapters.accounts, businessAccounts()),
-            ],
-        },
-        {
-            label: 'Team',
-            items: [
-                // Owner-only — see `StaffPolicy::viewAny`. "Team" is the business label for Staff.
-                ...(auth.user.role === 'owner'
-                    ? [navItem(businessChapters.team, staffIndex())]
-                    : []),
-                navItem(businessChapters.settings, editProfile(), onSettings),
-            ],
-        },
-    ];
 }

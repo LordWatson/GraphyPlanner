@@ -68,6 +68,22 @@ export function useEditorNavigation(
     const smooth = () =>
         !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    /**
+     * Move to a step and bring the spine (and the step below it) to the top of the viewport. The
+     * action bar is sticky at the bottom, so without this a Back/Next tap at the foot of a long
+     * step leaves you scrolled past the new step's start. Reduced motion jumps instead of glides.
+     */
+    const goToStep = (tab: EditorTab) => {
+        setActiveTab(tab);
+
+        requestAnimationFrame(() => {
+            tabsRef.current?.scrollIntoView({
+                behavior: smooth() ? 'smooth' : 'auto',
+                block: 'start',
+            });
+        });
+    };
+
     const jumpTo = (section: EditorSection) => {
         // Media framing is a right-rail tool, not a tab — scroll to it where it sits.
         if (section === 'preview') {
@@ -107,6 +123,7 @@ export function useEditorNavigation(
     return {
         activeTab,
         setTab: setActiveTab,
+        goToStep,
         tabsRef,
         activeScope,
         changeScope,

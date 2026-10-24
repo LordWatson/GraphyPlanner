@@ -20,7 +20,7 @@ function ReadinessSummary({ items }: { items: ChecklistItem[] }) {
     return (
         <button
             type="button"
-            onClick={() => nav.setTab('review')}
+            onClick={() => nav.goToStep('review')}
             className="group border-border bg-card focus-visible:ring-ring/50 rounded-2xl border p-4 text-start shadow-sm outline-none focus-visible:ring-[3px]"
         >
             <div className="flex items-baseline justify-between gap-2">
@@ -72,7 +72,7 @@ export function EditorSidebar() {
     const editable = can.update;
 
     return (
-        <aside className="grid gap-5 lg:sticky lg:top-20">
+        <aside className="grid min-w-0 gap-5 lg:sticky lg:top-20">
             {editable && nav.activeTab !== 'review' && (
                 <ReadinessSummary items={view.checklistItems} />
             )}

@@ -61,7 +61,7 @@ export function ComposeSection({
                 actions={
                     showAi &&
                     nav.activeScope === 'all' && (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                             <WritingToolsMenu
                                 postId={page.post.id}
                                 caption={editor.state.caption}
@@ -78,9 +78,16 @@ export function ComposeSection({
                                     disabled={repurpose.loading}
                                 >
                                     <Shuffle />
-                                    {repurpose.loading
-                                        ? 'Repurposing…'
-                                        : 'Repurpose per platform'}
+                                    <span className="hidden sm:inline">
+                                        {repurpose.loading
+                                            ? 'Repurposing…'
+                                            : 'Repurpose per platform'}
+                                    </span>
+                                    <span className="sm:hidden">
+                                        {repurpose.loading
+                                            ? 'Repurposing…'
+                                            : 'Repurpose'}
+                                    </span>
                                 </Button>
                             )}
                             <Button
