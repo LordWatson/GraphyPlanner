@@ -39,6 +39,8 @@ class SuperAdminAccessTest extends TestCase
             route('super-admin.organizations.show', $organization),
             route('super-admin.organizations.analytics', $organization),
             route('super-admin.analytics.index'),
+            route('super-admin.partners.index'),
+            route('super-admin.feedback.index'),
             route('super-admin.reports.index'),
             route('super-admin.reports.create'),
             route('super-admin.reports.show', $report),

@@ -77,6 +77,7 @@ use App\Http\Controllers\Portal\PortalReportController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PostFeedbackController;
 use App\Http\Controllers\PostRevisionController;
+use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ReviewController;
@@ -88,6 +89,7 @@ use App\Http\Controllers\StaffInvitationController;
 use App\Http\Controllers\SuperAdmin\AnalyticsController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
+use App\Http\Controllers\SuperAdmin\PartnerController as SuperAdminPartnerController;
 use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -307,6 +309,13 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
 
         Route::get('home', [HomeController::class, 'index'])->middleware('workspace:agency')->name('needs-attention');
     });
+
+    // Step M-8.2: the staff "Send feedback" panel — available to every internal role in any
+    // workspace (client reviewers are redirected to the portal by the group-level `portal.redirect`,
+    // super admins to the console by `org.member`, so neither reaches it).
+    Route::post('feedback', [ProductFeedbackController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('feedback.store');
 
     // Step B-1.4: the clients CRM is agency-only. A business workspace has a single primary brand
     // (no list/create/delete UI), so these routes 404 for it until a business equivalent exists.
@@ -866,6 +875,11 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     Route::get('organizations/{organization}/analytics', [SuperAdminOrganizationController::class, 'analytics'])->name('organizations.analytics');
 
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+
+    // Step M-8.2: the design-partner release console — the partner usage view and the in-app
+    // feedback inbox.
+    Route::get('partners', [SuperAdminPartnerController::class, 'index'])->name('partners.index');
+    Route::get('feedback', [SuperAdminPartnerController::class, 'feedback'])->name('feedback.index');
 
     Route::resource('reports', ReportController::class);
     Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('reports.export');

@@ -15,6 +15,7 @@ use App\Http\Middleware\RedirectClientReviewersToPortal;
 use App\Http\Middleware\RejectPreviewUserOutsidePreview;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\ShareRequestContext;
+use App\Http\Middleware\TrackUserActivity;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -56,6 +57,8 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
             // Step 15.3: after HandleInertiaRequests so the "suspended" page gets the shared props.
             EnsureOrganizationNotSuspended::class,
+            // Step M-8.2: stamp last-active (throttled, after the response) for the partner WAU figure.
+            TrackUserActivity::class,
         ]);
 
         $middleware->alias([

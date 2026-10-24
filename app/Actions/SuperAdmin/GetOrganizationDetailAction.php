@@ -51,6 +51,7 @@ class GetOrganizationDetailAction
                 'default_timezone' => $organization->default_timezone,
                 'default_currency' => $organization->default_currency,
                 'ai_monthly_image_quota' => $organization->ai_monthly_image_quota,
+                'is_design_partner' => $organization->is_design_partner,
                 'created_at' => $organization->created_at?->toIso8601String(),
                 'is_suspended' => $organization->isSuspended(),
                 'suspended_at' => $organization->suspended_at?->toIso8601String(),

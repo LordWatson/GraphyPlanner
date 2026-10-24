@@ -7,6 +7,7 @@ import {
     Image,
     LayoutGrid,
     LineChart,
+    MessageSquareHeart,
     Receipt,
     Send,
     Settings2,
@@ -56,6 +57,7 @@ export type PlatformChapterKey =
     | 'organizations'
     | 'analytics'
     | 'reports'
+    | 'partners'
     | 'platformSettings';
 
 export type Chapter = {
@@ -211,9 +213,18 @@ export const platformChapters: Record<PlatformChapterKey, Chapter> = {
         swatch: 'bg-lilac',
         prefixes: ['/super-admin/reports'],
     },
+    partners: {
+        key: 'partners',
+        number: '05',
+        title: 'Partners',
+        summary: 'Design-partner usage and the in-app feedback inbox.',
+        icon: MessageSquareHeart,
+        swatch: 'bg-signal',
+        prefixes: ['/super-admin/partners', '/super-admin/feedback'],
+    },
     platformSettings: {
         key: 'platformSettings',
-        number: '05',
+        number: '06',
         title: 'Settings',
         summary: 'Your profile, security and appearance.',
         icon: Settings2,
@@ -348,6 +359,7 @@ export function chapterForPath(
             platformChapters.organizations,
             platformChapters.analytics,
             platformChapters.reports,
+            platformChapters.partners,
             platformChapters.platformSettings,
             platformChapters.platformOverview,
         ];

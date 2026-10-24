@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $slug
  * @property OrganizationType $type
+ * @property bool $is_design_partner
  * @property Carbon|null $onboarding_completed_at
  * @property bool $require_post_review
  * @property bool $insights_digest_opt_out
@@ -49,7 +50,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'is_design_partner', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -70,6 +71,7 @@ class Organization extends Model
      */
     protected $attributes = [
         'type' => 'agency',
+        'is_design_partner' => false,
         'require_post_review' => false,
         'insights_digest_opt_out' => false,
         'ai_enabled' => false,
@@ -84,6 +86,7 @@ class Organization extends Model
     {
         return [
             'type' => OrganizationType::class,
+            'is_design_partner' => 'boolean',
             'onboarding_completed_at' => 'datetime',
             'require_post_review' => 'boolean',
             'insights_digest_opt_out' => 'boolean',
@@ -248,6 +251,25 @@ class Organization extends Model
     public function isPreviewFixture(): bool
     {
         return $this->slug === self::PREVIEW_SLUG;
+    }
+
+    /**
+     * Step M-8.1 — on the design-partner offer. Set by a super admin; drives the partner usage view
+     * and (from M-10) the auto-applied design-partner coupon.
+     */
+    public function isDesignPartner(): bool
+    {
+        return $this->is_design_partner;
+    }
+
+    /**
+     * Step M-8.1 — the (up to five) organizations on the design-partner offer.
+     *
+     * @param  Builder<Organization>  $query
+     */
+    public function scopeDesignPartners(Builder $query): void
+    {
+        $query->where('is_design_partner', true);
     }
 
     /**
