@@ -13,7 +13,13 @@ import {
     MessageSquareWarning,
 } from 'lucide-react';
 
-import { ChapterHero, EmptyState, Page, Panel } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Panel,
+} from '@/components/page';
 import { PlatformIcon } from '@/components/platform-icon';
 import { PortalPostRow } from '@/components/portal-post-row';
 import { Button } from '@/components/ui/button';
@@ -140,19 +146,25 @@ export default function PortalDashboard({
                     }
                     aside={
                         waiting.length > 0 && (
-                            <div className="flex flex-col items-start gap-2 lg:items-end">
-                                <span className="eyebrow text-cream/70">
-                                    Needs your approval
-                                </span>
-                                <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
-                                    {String(waiting.length).padStart(2, '0')}
-                                </span>
-                                <span className="text-cream/80 text-sm">
-                                    {waiting.length === 1
+                            <HeroStat
+                                icon={CheckCircle2}
+                                eyebrow="Needs your approval"
+                                value={String(waiting.length).padStart(2, '0')}
+                                caption={
+                                    waiting.length === 1
                                         ? 'Post ready for your review'
-                                        : 'Posts ready for your review'}
-                                </span>
-                            </div>
+                                        : 'Posts ready for your review'
+                                }
+                                href={
+                                    next
+                                        ? portalPostsShow(next.post_id).url
+                                        : portalPostsIndex({
+                                              query: {
+                                                  status: 'waiting_client',
+                                              },
+                                          }).url
+                                }
+                            />
                         )
                     }
                 />

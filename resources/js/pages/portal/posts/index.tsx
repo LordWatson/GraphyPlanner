@@ -1,7 +1,13 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { CheckCheck, Inbox } from 'lucide-react';
 
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Panel,
+} from '@/components/page';
 import type { PortalPostRowData } from '@/components/portal-post-row';
 import { PortalPostRow } from '@/components/portal-post-row';
 import { Button } from '@/components/ui/button';
@@ -47,14 +53,22 @@ export default function PortalPostsIndex({
         <>
             <Head title="Posts — Client portal" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`Posts — ${posts.length} ${filters.status ? 'matching' : 'in view'}`}
                     title={
                         <>
-                            Your <em>posts</em>
+                            Your <em>posts</em>.
                         </>
                     }
                     description="Everything the studio has shared with you — awaiting your review, scheduled, and live."
+                    aside={
+                        <HeroStat
+                            icon={Inbox}
+                            eyebrow={filters.status ? 'Matching' : 'In view'}
+                            value={String(posts.length).padStart(2, '0')}
+                            caption={posts.length === 1 ? 'Post' : 'Posts'}
+                        />
+                    }
                 />
 
                 <nav

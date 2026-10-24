@@ -27,7 +27,9 @@ export function decideFromOffset(
 
 /**
  * Step M-6.6 (I-8.6) — swipe to approve on a phone: drag the thumb right to approve, left to
- * request changes. Additive to the tap buttons below it (keyboard and non-touch users use those).
+ * request changes. Additive to the tap buttons below it (keyboard and non-touch users use those),
+ * so it is a touch convenience only — hidden from the `md` breakpoint up (`md:hidden`), where the
+ * pointer is a mouse and the tap buttons carry the decision.
  */
 export function SwipeToApprove({
     onApprove,
@@ -88,7 +90,7 @@ export function SwipeToApprove({
     return (
         <div
             ref={trackRef}
-            className="bg-muted/70 relative flex h-14 items-center justify-center overflow-hidden rounded-full select-none"
+            className="bg-muted/70 relative flex h-14 items-center justify-center overflow-hidden rounded-full select-none md:hidden"
             aria-hidden={false}
         >
             <span

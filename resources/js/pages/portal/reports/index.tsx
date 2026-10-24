@@ -2,7 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { ArrowUpRight, FileBarChart } from 'lucide-react';
 import { reported, signed } from '@/components/analytics/engagement-section';
 import type { ClientReportRow } from '@/components/client-reports/client-report-document';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import { formatDate } from '@/lib/dates';
 import { show as portalReport } from '@/routes/portal/reports';
 
@@ -19,14 +19,24 @@ export default function PortalReportsIndex({
         <>
             <Head title="Reports — Client portal" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow="Results"
                     title={
                         <>
-                            Your monthly <em>reports</em>
+                            Your monthly <em>reports</em>.
                         </>
                     }
                     description="What went out each month, how people responded and how your audience grew."
+                    aside={
+                        <HeroStat
+                            icon={FileBarChart}
+                            eyebrow="Shared with you"
+                            value={String(reports.length).padStart(2, '0')}
+                            caption={
+                                reports.length === 1 ? 'Report' : 'Reports'
+                            }
+                        />
+                    }
                 />
 
                 {reports.length === 0 ? (
