@@ -57,6 +57,7 @@ use App\Http\Controllers\Grids\GridProductionController;
 use App\Http\Controllers\Grids\GridTileController;
 use App\Http\Controllers\Grids\GridWorkflowController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InboxController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\MediaKitShareController;
@@ -77,10 +78,12 @@ use App\Http\Controllers\Portal\PortalReportController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PostFeedbackController;
 use App\Http\Controllers\PostRevisionController;
+use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SavedPostViewController;
+use App\Http\Controllers\SavedReplyController;
 use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationAcceptController;
@@ -88,6 +91,7 @@ use App\Http\Controllers\StaffInvitationController;
 use App\Http\Controllers\SuperAdmin\AnalyticsController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
+use App\Http\Controllers\SuperAdmin\PartnerController as SuperAdminPartnerController;
 use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -307,6 +311,13 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
 
         Route::get('home', [HomeController::class, 'index'])->middleware('workspace:agency')->name('needs-attention');
     });
+
+    // Step M-8.2: the staff "Send feedback" panel — available to every internal role in any
+    // workspace (client reviewers are redirected to the portal by the group-level `portal.redirect`,
+    // super admins to the console by `org.member`, so neither reaches it).
+    Route::post('feedback', [ProductFeedbackController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('feedback.store');
 
     // Step B-1.4: the clients CRM is agency-only. A business workspace has a single primary brand
     // (no list/create/delete UI), so these routes 404 for it until a business equivalent exists.
@@ -549,6 +560,23 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
         Route::post('content/bulk', [ContentHubController::class, 'bulk'])->name('content.bulk');
         Route::post('content/views', [SavedPostViewController::class, 'store'])->name('content.views.store');
         Route::delete('content/views/{savedView}', [SavedPostViewController::class, 'destroy'])->name('content.views.destroy');
+    });
+
+    // Phase M-9: the social inbox — agency-only (a business org has its own surfaces); a client
+    // reviewer is sent to the portal and the InboxConversationPolicy refuses them as well.
+    Route::middleware(['portal.redirect', 'workspace:agency'])->group(function () {
+        Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
+        Route::post('inbox/refresh', [InboxController::class, 'refresh'])->name('inbox.refresh');
+        Route::get('inbox/{conversation}', [InboxController::class, 'show'])->name('inbox.conversations.show');
+        Route::patch('inbox/{conversation}', [InboxController::class, 'update'])->name('inbox.conversations.update');
+        Route::post('inbox/{conversation}/reply', [InboxController::class, 'reply'])->name('inbox.conversations.reply');
+        // Step M-9.3: AI draft reply — budgeted/metered like every text call, never sends.
+        Route::post('inbox/{conversation}/ai/draft', [InboxController::class, 'draft'])
+            ->middleware('throttle:ai')
+            ->name('inbox.conversations.draft');
+        Route::post('saved-replies', [SavedReplyController::class, 'store'])->name('saved-replies.store');
+        Route::patch('saved-replies/{savedReply}', [SavedReplyController::class, 'update'])->name('saved-replies.update');
+        Route::delete('saved-replies/{savedReply}', [SavedReplyController::class, 'destroy'])->name('saved-replies.destroy');
     });
 
     // Phase 18: the Instagram grid planner - plans per client, the planner page, tiles, the
@@ -866,6 +894,11 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     Route::get('organizations/{organization}/analytics', [SuperAdminOrganizationController::class, 'analytics'])->name('organizations.analytics');
 
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+
+    // Step M-8.2: the design-partner release console — the partner usage view and the in-app
+    // feedback inbox.
+    Route::get('partners', [SuperAdminPartnerController::class, 'index'])->name('partners.index');
+    Route::get('feedback', [SuperAdminPartnerController::class, 'feedback'])->name('feedback.index');
 
     Route::resource('reports', ReportController::class);
     Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('reports.export');

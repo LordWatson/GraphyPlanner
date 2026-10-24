@@ -8,12 +8,16 @@ use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
 use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
+use App\Contracts\ReplyAssistant;
 use App\Contracts\WritingAssistant;
+use App\Enums\MessageDirection;
 use App\Enums\Platform;
 use App\Enums\WritingTool;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
+use App\Models\InboxConversation;
+use App\Models\InboxMessage;
 use App\Models\Post;
 use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestion;
@@ -45,7 +49,7 @@ use Throwable;
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, WritingAssistant
+class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, ReplyAssistant, WritingAssistant
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -265,6 +269,52 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         }
 
         return trim((string) $payload['text']);
+    }
+
+    public function draftReply(Client $client, InboxConversation $conversation, ?string $instruction = null): string
+    {
+        $payload = $this->requestStructured(
+            method: 'inbox_reply',
+            systemPrompt: $this->buildSystemPrompt($client),
+            userPrompt: $this->buildReplyUserPrompt($conversation, $instruction),
+            validator: fn (array $data): ?string => is_string($data['text'] ?? null) ? null : 'text must be a string',
+            context: ['org_id' => $client->org_id, 'client_id' => $client->id, 'inbox_conversation_id' => $conversation->id],
+            maxTokens: max(600, (int) config('ai.deepseek.max_tokens', 1024)),
+        );
+
+        return $payload === null ? '' : trim((string) $payload['text']);
+    }
+
+    private function buildReplyUserPrompt(InboxConversation $conversation, ?string $instruction): string
+    {
+        $comments = $conversation->messages()
+            ->where('direction', MessageDirection::Inbound)
+            ->orderBy('posted_at')
+            ->get();
+
+        $thread = $comments
+            ->map(fn (InboxMessage $message) => '- '.($message->author_name ?? 'Someone').': '.$this->guardrail->scrub($message->body))
+            ->implode("\n");
+
+        $lines = [
+            "Draft one friendly, on-brand reply to a comment on the brand's {$conversation->platform->label()} post.",
+            'The reply is sent publicly as the brand, so stay in the Brand Brain voice and never promise anything the brand has not offered.',
+            'Keep it short (one or two sentences), warm and specific to what they said. Do not add hashtags or links.',
+            'If the comment is a complaint, acknowledge it and offer a next step; if it is a question, answer it plainly or say how to find out.',
+            '',
+            'The conversation so far (public comments):',
+            $thread !== '' ? $thread : '- (the comment text was empty)',
+        ];
+
+        if ($instruction !== null && trim($instruction) !== '') {
+            $lines[] = '';
+            $lines[] = 'Extra steer from the team: '.$this->guardrail->scrub(trim($instruction));
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON: {"text": string}';
+
+        return implode("\n", $lines);
     }
 
     private function buildRewriteUserPrompt(string $text, WritingTool $tool, ?Platform $platform, ?string $tone): string

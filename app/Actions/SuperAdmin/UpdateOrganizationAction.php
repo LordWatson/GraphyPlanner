@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class UpdateOrganizationAction
 {
     /**
-     * @param  array{name: string, slug: string, default_timezone: string, default_currency: string, ai_monthly_image_quota: int|null}  $data
+     * @param  array{name: string, slug: string, default_timezone: string, default_currency: string, ai_monthly_image_quota: int|null, is_design_partner: bool}  $data
      */
     public function __invoke(Organization $organization, array $data, User $actor): Organization
     {
@@ -24,6 +24,8 @@ class UpdateOrganizationAction
             'default_currency' => strtoupper($data['default_currency']),
             // null = fall back to the platform default quota.
             'ai_monthly_image_quota' => $data['ai_monthly_image_quota'],
+            // Step M-8.1 — the design-partner offer flag (drives the partner view and the M-10 coupon).
+            'is_design_partner' => $data['is_design_partner'],
         ]);
 
         $changed = array_keys($organization->getDirty());

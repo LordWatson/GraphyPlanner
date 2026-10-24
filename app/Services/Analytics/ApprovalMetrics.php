@@ -2,9 +2,12 @@
 
 namespace App\Services\Analytics;
 
+use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
+use App\Enums\Role;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Models\PostApproval;
 use App\Support\Analytics\AnalyticsRange;
 use App\Support\Analytics\AnalyticsScope;
 use App\Support\Analytics\SqlDialect;
@@ -163,6 +166,40 @@ class ApprovalMetrics
             'since' => $enteredAt->toIso8601String(),
             'hours_waiting' => round(max(0, $enteredAt->diffInSeconds($now)) / 3600, 1),
         ];
+    }
+
+    /**
+     * Approval decisions in the range, split by who made the call:
+     *
+     * - **client**: a `Role::ClientReviewer` from the portal, or the unauthenticated review-link
+     *   portal (a null actor — the only other way an approval row is written);
+     * - **internal**: any logged-in org teammate (an Owner's `overrideApproval()`, or an internal
+     *   approve where the client never gated).
+     *
+     * Reads `post_approvals` — the dedicated decision record — so unscheduling (scheduled →
+     * approved, which writes no approval row) never counts as an approval. One grouped query.
+     *
+     * @return array{client: int, internal: int, total: int}
+     */
+    public function approvalsBySource(AnalyticsScope $scope, AnalyticsRange $range): array
+    {
+        $rows = PostApproval::query()
+            ->where('post_approvals.decision', ApprovalDecision::Approved)
+            ->whereBetween('post_approvals.created_at', $range->utcBounds())
+            ->whereIn('post_approvals.post_id', $scope->posts()->select('posts.id'))
+            ->leftJoin('users', 'users.id', '=', 'post_approvals.user_id')
+            ->toBase()
+            ->selectRaw(
+                'CASE WHEN post_approvals.user_id IS NULL OR users.role = ? THEN ? ELSE ? END as source, COUNT(*) as aggregate',
+                [Role::ClientReviewer->value, 'client', 'internal'],
+            )
+            ->groupBy('source')
+            ->pluck('aggregate', 'source');
+
+        $client = (int) ($rows['client'] ?? 0);
+        $internal = (int) ($rows['internal'] ?? 0);
+
+        return ['client' => $client, 'internal' => $internal, 'total' => $client + $internal];
     }
 
     /**

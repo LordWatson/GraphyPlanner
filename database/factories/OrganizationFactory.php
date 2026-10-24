@@ -45,6 +45,17 @@ class OrganizationFactory extends Factory
     }
 
     /**
+     * Step M-8.1 — an organization on the design-partner offer (shows in the partner usage view and
+     * gets the design-partner coupon from M-10).
+     */
+    public function designPartner(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_design_partner' => true,
+        ]);
+    }
+
+    /**
      * Step B-1.1 — a one-brand business/creator workspace. Pair with `Client::factory()->primary()`
      * (or `CreatePrimaryBrandAction`) to give it its single brand.
      */

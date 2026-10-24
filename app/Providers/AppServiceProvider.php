@@ -6,6 +6,7 @@ use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
 use App\Contracts\CaptionRepurposer;
 use App\Contracts\ChatNotifier;
+use App\Contracts\CommentSource;
 use App\Contracts\EngagementSource;
 use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
@@ -22,6 +23,7 @@ use App\Contracts\TrendSource;
 use App\Contracts\VirusScanner;
 use App\Contracts\VisionProvider;
 use App\Contracts\WebsiteSummarizer;
+use App\Contracts\ReplyAssistant;
 use App\Contracts\WritingAssistant;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
@@ -33,9 +35,11 @@ use App\Models\ClientReport;
 use App\Models\GridPlan;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\InboxConversation;
 use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
+use App\Models\SavedReply;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
 use App\Models\SuperAdminReport;
@@ -51,9 +55,11 @@ use App\Policies\ClientReportPolicy;
 use App\Policies\GridPlanPolicy;
 use App\Policies\InvoiceItemPolicy;
 use App\Policies\InvoicePolicy;
+use App\Policies\InboxConversationPolicy;
 use App\Policies\OrganizationPolicy;
 use App\Policies\OrganizationReportPolicy;
 use App\Policies\PostPolicy;
+use App\Policies\SavedReplyPolicy;
 use App\Policies\SocialAccountPolicy;
 use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
@@ -69,6 +75,7 @@ use App\Services\AI\NullVisionProvider;
 use App\Services\AI\Trends\TopPostsTrendSource;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\Engagement\UploadPostEngagementSource;
+use App\Services\Inbox\UploadPostCommentSource;
 use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\LocalAssetStorage;
@@ -154,6 +161,11 @@ class AppServiceProvider extends ServiceProvider
         // Step M-3.1: engagement metrics (M-0.2 audit — Upload-Post reports all nine networks).
         $this->app->bind(EngagementSource::class, UploadPostEngagementSource::class);
 
+        // Step M-9.1: social-inbox comments (M-0.2 audit — Upload-Post covers seven networks;
+        // Pinterest and Google Business are `comments => false`). Kept its own contract so a Meta
+        // Graph fallback can slot in without touching publishing or analytics.
+        $this->app->bind(CommentSource::class, UploadPostCommentSource::class);
+
         // MusicProvider contract (Step 1.8.1) bound to MetaGraphMusicProvider (Step 1.9.4), a
         // combinator that calls Meta's Graph API directly for Instagram audio search and
         // delegates every other platform (TikTok) unchanged to UploadPostMusicProvider
@@ -209,6 +221,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Step M-7.3: editor writing tools (shorten/tone/adapt) — same DeepSeek-or-Null rule.
         $this->app->bind(WritingAssistant::class, function () {
+            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
+                ? $this->app->make(DeepSeekProvider::class)
+                : $this->app->make(NullAiProvider::class);
+        });
+
+        // Step M-9.3: on-brand inbox reply drafts — same DeepSeek-or-Null rule. A human always sends.
+        $this->app->bind(ReplyAssistant::class, function () {
             return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
                 ? $this->app->make(DeepSeekProvider::class)
                 : $this->app->make(NullAiProvider::class);
@@ -301,6 +320,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, StaffPolicy::class);
         Gate::policy(SuperAdminReport::class, SuperAdminReportPolicy::class);
         Gate::policy(OrganizationReport::class, OrganizationReportPolicy::class);
+        // Phase M-9: the social inbox.
+        Gate::policy(InboxConversation::class, InboxConversationPolicy::class);
+        Gate::policy(SavedReply::class, SavedReplyPolicy::class);
     }
 
     /**

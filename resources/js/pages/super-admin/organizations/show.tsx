@@ -22,6 +22,7 @@ import {
 } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -63,6 +64,7 @@ type OrganizationDetail = {
     suspension_reason: string | null;
     suspended_by: string | null;
     is_preview: boolean;
+    is_design_partner: boolean;
     has_upload_post_key: boolean;
     owner: { id: number; name: string; email: string } | null;
 };
@@ -120,6 +122,9 @@ export default function ShowOrganization({
 }: Props) {
     const [timezone, setTimezone] = useState(organization.default_timezone);
     const [currency, setCurrency] = useState(organization.default_currency);
+    const [designPartner, setDesignPartner] = useState(
+        organization.is_design_partner,
+    );
 
     const reinstate = async () => {
         if (
@@ -163,6 +168,11 @@ export default function ShowOrganization({
                     meta={
                         <>
                             <StatusPill kind="organization" value={status} />
+                            {organization.is_design_partner && (
+                                <span className="bg-lime/15 text-foreground border-lime/40 eyebrow inline-flex items-center rounded-full border px-2.5 py-0.5">
+                                    Design partner
+                                </span>
+                            )}
                             <span className="text-muted-foreground font-mono text-xs">
                                 /{organization.slug}
                             </span>
@@ -404,6 +414,34 @@ export default function ShowOrganization({
                                             }
                                         />
                                     </div>
+                                    <label className="border-border/80 hover:bg-muted/40 flex items-start gap-3 rounded-xl border p-4 transition-colors">
+                                        <input
+                                            type="hidden"
+                                            name="is_design_partner"
+                                            value={designPartner ? '1' : '0'}
+                                        />
+                                        <Checkbox
+                                            id="is_design_partner"
+                                            checked={designPartner}
+                                            onCheckedChange={(checked) =>
+                                                setDesignPartner(
+                                                    checked === true,
+                                                )
+                                            }
+                                            className="mt-0.5"
+                                        />
+                                        <span className="flex flex-col gap-0.5">
+                                            <span className="text-sm font-medium">
+                                                Design partner
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                On the design-partner offer.
+                                                Shows in the partner usage view,
+                                                and gets the design-partner
+                                                coupon when billing goes live.
+                                            </span>
+                                        </span>
+                                    </label>
                                     <div className="flex items-center justify-between gap-3 pt-1">
                                         <span className="text-muted-foreground text-xs">
                                             API keys and invoicing stay with the

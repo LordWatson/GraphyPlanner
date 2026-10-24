@@ -97,3 +97,12 @@ $safely(Schedule::command('approvals:send-overdue-reminders')->dailyAt('09:00'),
 // Step M-6.7 (I-12.1): email each user a digest of the day's notifications (those they kept in their
 // digest). See SendNotificationDigestAction.
 $safely(Schedule::command('notifications:send-digest')->dailyAt('07:30'), 'notifications:send-digest');
+
+// Step M-9.1: social-inbox comment sweep per organization, queued one job per org on the reports
+// queue — see SyncOrganizationCommentsAction. Hourly (comment reading is pull-based — no webhook);
+// the per-target `min_interval_minutes` guard keeps each sweep from re-reading the same post.
+$safely(Schedule::command('inbox:sync-comments')->hourly(), 'inbox:sync-comments');
+
+// Step M-9.2: nudge the assignee (or the studio) about inbox threads past the reply SLA, at most
+// once per 24h per thread. See SendOverdueInboxRemindersJob.
+$safely(Schedule::command('inbox:send-overdue-reminders')->dailyAt('09:15'), 'inbox:send-overdue-reminders');

@@ -28,6 +28,7 @@ use App\Models\ConnectInvite;
 use App\Models\DesignImportConnection;
 use App\Models\GridPlan;
 use App\Models\GridTile;
+use App\Models\InboxConversation;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Organization;
@@ -38,6 +39,7 @@ use App\Models\PostComment;
 use App\Models\PostRevision;
 use App\Models\PostTarget;
 use App\Models\SavedPostView;
+use App\Models\SavedReply;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
 use App\Models\TaxRate;
@@ -259,6 +261,9 @@ class CrossTenantRouteTest extends TestCase
             SavedPostView::class => SavedPostView::factory()->create(['org_id' => $org->id, 'user_id' => $owner->id]),
             // Step M-5.3: a content revision of the other org's post.
             PostRevision::class => PostRevision::factory()->create(['org_id' => $org->id, 'post_id' => $post->id]),
+            // Phase M-9: the other org's inbox thread and a saved reply (inbox/{conversation}, saved-replies/{savedReply}).
+            InboxConversation::class => InboxConversation::factory()->forAccount($account)->create(['org_id' => $org->id]),
+            SavedReply::class => SavedReply::factory()->create(['org_id' => $org->id]),
         ];
     }
 }

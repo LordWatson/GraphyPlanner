@@ -27,6 +27,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
+ * @property Carbon|null $last_active_at
  * @property string $password
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -62,6 +63,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_active_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'role' => Role::class,
@@ -75,6 +77,16 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class, 'org_id');
+    }
+
+    /**
+     * Step M-9.2 — inbox threads assigned to this staff member.
+     *
+     * @return HasMany<InboxConversation, $this>
+     */
+    public function assignedConversations(): HasMany
+    {
+        return $this->hasMany(InboxConversation::class, 'assigned_to');
     }
 
     /**

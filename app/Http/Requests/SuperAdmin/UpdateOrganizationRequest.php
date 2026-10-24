@@ -46,13 +46,14 @@ class UpdateOrganizationRequest extends FormRequest
             'default_timezone' => ['required', 'timezone:all'],
             'default_currency' => ['required', 'string', Rule::in(CurrencyOptions::codes())],
             'ai_monthly_image_quota' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'is_design_partner' => ['sometimes', 'boolean'],
         ];
     }
 
     /**
      * The validated details, shaped for `UpdateOrganizationAction`.
      *
-     * @return array{name: string, slug: string, default_timezone: string, default_currency: string, ai_monthly_image_quota: int|null}
+     * @return array{name: string, slug: string, default_timezone: string, default_currency: string, ai_monthly_image_quota: int|null, is_design_partner: bool}
      */
     public function details(): array
     {
@@ -62,6 +63,7 @@ class UpdateOrganizationRequest extends FormRequest
             'default_timezone' => $this->string('default_timezone')->toString(),
             'default_currency' => $this->string('default_currency')->toString(),
             'ai_monthly_image_quota' => $this->filled('ai_monthly_image_quota') ? $this->integer('ai_monthly_image_quota') : null,
+            'is_design_partner' => $this->boolean('is_design_partner'),
         ];
     }
 

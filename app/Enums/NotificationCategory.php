@@ -49,7 +49,7 @@ enum NotificationCategory: string
 
         return match (true) {
             str_contains($name, 'Approval'), str_contains($name, 'WaitingForClient'), str_contains($name, 'WaitingForInternal') => self::Approvals,
-            str_contains($name, 'Comment'), str_contains($name, 'Mention') => self::Comments,
+            str_contains($name, 'Comment'), str_contains($name, 'Mention'), str_contains($name, 'Inbox') => self::Comments,
             str_contains($name, 'Publish'), str_contains($name, 'TokenExpiring'), str_contains($name, 'OrderAtRisk') => self::Publishing,
             str_contains($name, 'Invoice'), str_contains($name, 'Payment'), str_contains($name, 'Retainer') => self::Invoices,
             str_contains($name, 'Campaign'), str_contains($name, 'Brief'), str_contains($name, 'Deliverable') => self::Campaigns,

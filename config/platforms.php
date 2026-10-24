@@ -324,6 +324,9 @@ return [
         'vendor_prefix' => 'gbp',
         // M-0.2: Upload-Post reports Google Business at account level only.
         'post_metrics' => false,
+        // M-9.1: comment reading/replying is deferred for Google Business (reviews would be a
+        // direct GBP integration — B-11.5). The inbox never ingests here.
+        'comments' => false,
         'vendor_description' => false,
         'cover_field' => null,
         'thumb_offset_field' => null,
@@ -400,6 +403,8 @@ return [
         'label' => 'Pinterest',
         'vendor' => 'pinterest',
         'vendor_prefix' => 'pinterest',
+        // M-9.1: Upload-Post doesn't expose Pinterest comments, so the inbox never ingests here.
+        'comments' => false,
         'vendor_description' => true,
         'cover_field' => 'pinterest_cover_image_url',
         'thumb_offset_field' => null,

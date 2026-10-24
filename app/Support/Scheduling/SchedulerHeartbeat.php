@@ -50,6 +50,9 @@ final class SchedulerHeartbeat
         'notifications:send-digest' => ['label' => 'Notification digest', 'interval_minutes' => 1440],
         // Step B-8.2: weekly business Insights digest, swept hourly (acts Monday morning per tz).
         'business:send-insights-digest' => ['label' => 'Weekly insights digest', 'interval_minutes' => 60],
+        // Phase M-9: hourly social-inbox comment sync and daily overdue-reply reminders.
+        'inbox:sync-comments' => ['label' => 'Inbox comment sync', 'interval_minutes' => 60],
+        'inbox:send-overdue-reminders' => ['label' => 'Overdue inbox reminders', 'interval_minutes' => 1440],
     ];
 
     public static function record(string $command): void

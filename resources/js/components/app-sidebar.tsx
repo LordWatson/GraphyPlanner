@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import AppLogo from '@/components/app-logo';
 import { Peek } from '@/components/brand-poster';
+import { FeedbackDialog } from '@/components/feedback-dialog';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -28,6 +29,7 @@ import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as contentIndex } from '@/routes/content';
+import { index as inboxIndex } from '@/routes/inbox';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -36,6 +38,7 @@ import { index as staffIndex } from '@/routes/staff';
 import { dashboard as superAdminDashboard } from '@/routes/super-admin';
 import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
 import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
+import { index as superAdminPartners } from '@/routes/super-admin/partners';
 import { index as superAdminReports } from '@/routes/super-admin/reports';
 import type { Auth, NavItem } from '@/types';
 
@@ -84,6 +87,7 @@ export function AppSidebar() {
                           superAdminAnalytics(),
                       ),
                       navItem(platformChapters.reports, superAdminReports()),
+                      navItem(platformChapters.partners, superAdminPartners()),
                   ],
               },
               {
@@ -149,6 +153,8 @@ export function AppSidebar() {
                 <p className="eyebrow text-sidebar-foreground/65 px-2 pb-1 group-data-[collapsible=icon]:hidden">
                     Marketing brighter together.
                 </p>
+                {/* Step M-8.2: staff "Send feedback" (renders only for internal roles). */}
+                <FeedbackDialog />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
@@ -182,6 +188,8 @@ function studioGroups(
                         { title: 'Grids', href: gridsIndex() },
                     ],
                 },
+                // Phase M-9: the social inbox — every staff role can at least read it.
+                navItem(chapters.inbox, inboxIndex()),
                 navItem(chapters.clients, clientsIndex()),
                 ...(canViewLedger
                     ? [navItem(chapters.invoices, invoicesIndex())]

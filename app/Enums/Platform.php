@@ -44,6 +44,14 @@ enum Platform: string
     }
 
     /**
+     * Step M-9.1 — whether the social inbox reads and replies to comments here (M-0.2 vendor audit).
+     */
+    public function supportsComments(): bool
+    {
+        return $this->spec()->comments;
+    }
+
+    /**
      * Step I-2.2: the stored values of every text-only-capable platform, for SQL filters (Home's
      * "missing media" bucket) that must agree with `isTextOnlyCapable()` and the §6 checklist.
      *

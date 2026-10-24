@@ -180,6 +180,16 @@ class SocialAccount extends Model
     }
 
     /**
+     * Step M-9.1 — the inbox threads for comments on this account's published posts.
+     *
+     * @return HasMany<InboxConversation, $this>
+     */
+    public function inboxConversations(): HasMany
+    {
+        return $this->hasMany(InboxConversation::class);
+    }
+
+    /**
      * Step M-3.1: one row per day (followers, reach…), newest last.
      *
      * @return HasMany<SocialAccountMetric, $this>
