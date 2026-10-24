@@ -3,8 +3,17 @@ import type { ComposerScope } from '@/components/post-editor/composer';
 import type { EditorSection } from '@/components/post-editor/editor/editor-state';
 import { cn } from '@/lib/utils';
 
-/** The four tabbed areas of the editor (the preview lives in the right rail, not a tab). */
-export type EditorTab = 'compose' | 'channels' | 'media' | 'settings';
+/**
+ * The editor's steps (the preview lives in the right rail, not a step). The first four build the
+ * post; `review` is the final "Review & send" consolidation step. The readiness checklist's
+ * jump targets (`EditorSection`) only ever point at the first four, never `review`.
+ */
+export type EditorTab =
+    | 'compose'
+    | 'channels'
+    | 'media'
+    | 'settings'
+    | 'review';
 
 /**
  * Step I-4.6 / M-1.6 — moving around the editor. The Write / Where & when / Media / Settings

@@ -14,14 +14,14 @@ import { EditorHeader } from '@/components/post-editor/editor/editor-header';
 import { EditorSidebar } from '@/components/post-editor/editor/editor-sidebar';
 import { ImageStudioSection } from '@/components/post-editor/editor/image-studio-section';
 import {
-    EditorTabs,
-    ErrorTabSwitcher,
-    TabFooter,
-    TabPanel,
-} from '@/components/post-editor/editor/editor-tabs';
+    ErrorStepSwitcher,
+    StepActionBar,
+    StepPanel,
+    StepSpine,
+} from '@/components/post-editor/editor/editor-stepper';
 import { MediaSection } from '@/components/post-editor/editor/media-section';
 import { ReadOnlyContent } from '@/components/post-editor/editor/read-only-content';
-import { SaveBar } from '@/components/post-editor/editor/save-bar';
+import { ReviewStep } from '@/components/post-editor/editor/review-step';
 import { SettingsSection } from '@/components/post-editor/editor/settings-section';
 import { ShortcutsDialog } from '@/components/post-editor/editor/shortcuts-dialog';
 import {
@@ -47,8 +47,14 @@ import { update as updatePost } from '@/routes/posts';
 /**
  * The post editor. Step I-4.6 / M-1.6 split it into feature components under
  * `components/post-editor/editor/`: state and actions live in `usePostEditor` (shared through
- * `PostEditorProvider`), and each panel — write, where & when, media, settings, the right rail —
- * is its own component. This page only composes them.
+ * `PostEditorProvider`), and each panel is its own component. This page only composes them.
+ *
+ * Step 24.10 reshaped it into a guided stepper: a progress spine (`StepSpine`) over five steps —
+ * Write, Where & when, Media, Settings, then Review & send — with one step shown at a time beside a
+ * constant live preview (`EditorSidebar`), and a single action bar (`StepActionBar`) carrying the
+ * save state and Back / Next. The lifecycle moves (quick schedule + the full `PostWorkflow`) now
+ * live only inside the final Review & send step (`ReviewStep`), not stacked above the work. Read-only
+ * viewers skip the stepper and see the saved post with the workflow above it.
  *
  * Shortcuts: ⌘/Ctrl+S saves, ⌘/Ctrl+Enter opens "send for review" (in `PostWorkflow`), ⌘/Ctrl+K
  * opens the command palette, `?` lists them.
@@ -151,54 +157,32 @@ export default function PostEdit({
             <Page>
                 <EditorHeader post={post} client={client} grid={grid} />
 
-                {workflow.is_business && (
-                    <BusinessScheduleBar
-                        postId={post.id}
-                        status={post.status}
-                        requiresReview={workflow.requires_review}
-                        hasTimes={workflow.has_times}
-                        canQuickSchedule={can.quick_schedule}
-                        canSharePreview={can.share_preview}
-                    />
-                )}
+                {can.update ? (
+                    <Form
+                        ref={formRef}
+                        {...updatePost.form(post.id)}
+                        options={{
+                            preserveScroll: true,
+                            preserveState: 'errors',
+                        }}
+                        className="grid gap-5"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <ErrorStepSwitcher errors={errors} />
+                                <StepSpine errors={errors} />
 
-                <PostWorkflow
-                    post={post}
-                    clientName={client.name}
-                    allowedTransitions={allowedTransitions}
-                    isDirty={editor.isDirty}
-                    mentionableUsers={mentionableUsers}
-                    canResendReviewEmail={can.resend_review_email}
-                    canRetryFailedTargets={can.retry_failed_targets}
-                    canDelete={can.delete}
-                    canOverrideApproval={can.override_approval}
-                />
-
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-                    <div className="grid min-w-0 gap-5">
-                        {can.update ? (
-                            <Form
-                                ref={formRef}
-                                {...updatePost.form(post.id)}
-                                options={{
-                                    preserveScroll: true,
-                                    preserveState: 'errors',
-                                }}
-                                className="grid gap-5"
-                            >
-                                {({ processing, errors }) => (
-                                    <>
-                                        <ErrorTabSwitcher errors={errors} />
-                                        <EditorTabs errors={errors} />
-                                        <TabPanel tab="compose">
+                                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+                                    <div className="grid min-w-0 gap-5">
+                                        <StepPanel tab="compose">
                                             <ComposeSection
                                                 errors={errors}
                                                 showAi={Boolean(
                                                     ai?.enabled && ai?.canUse,
                                                 )}
                                             />
-                                        </TabPanel>
-                                        <TabPanel tab="channels">
+                                        </StepPanel>
+                                        <StepPanel tab="channels">
                                             <ChannelsSection
                                                 error={
                                                     errors[
@@ -206,56 +190,100 @@ export default function PostEdit({
                                                     ]
                                                 }
                                             />
-                                        </TabPanel>
-                                        <TabPanel tab="media">
+                                        </StepPanel>
+                                        <StepPanel tab="media">
                                             <MediaSection
                                                 showAi={Boolean(
                                                     ai?.enabled && ai?.canUse,
                                                 )}
                                             />
-                                        </TabPanel>
-                                        <TabPanel tab="settings">
+                                        </StepPanel>
+                                        <StepPanel tab="settings">
                                             <SettingsSection errors={errors} />
-                                        </TabPanel>
-                                        <TabFooter />
+                                        </StepPanel>
+                                        <StepPanel tab="review">
+                                            <ReviewStep
+                                                post={post}
+                                                clientName={client.name}
+                                                allowedTransitions={
+                                                    allowedTransitions
+                                                }
+                                                mentionableUsers={
+                                                    mentionableUsers
+                                                }
+                                                can={can}
+                                                workflow={workflow}
+                                            />
+                                        </StepPanel>
                                         <EditorFormFields />
-                                        <SaveBar
-                                            isDirty={editor.isDirty}
-                                            processing={processing}
-                                            autosaves={postAutosaves(
-                                                can.update,
-                                                post.status,
-                                            )}
-                                            savedAt={post.updated_at}
-                                            onDiscard={editor.discard}
-                                            onShowShortcuts={() =>
-                                                setShowShortcuts(true)
-                                            }
-                                        />
-                                    </>
-                                )}
-                            </Form>
-                        ) : (
-                            <ReadOnlyContent post={post} />
+                                    </div>
+
+                                    <EditorSidebar />
+                                </div>
+
+                                <StepActionBar
+                                    isDirty={editor.isDirty}
+                                    processing={processing}
+                                    autosaves={postAutosaves(
+                                        can.update,
+                                        post.status,
+                                    )}
+                                    savedAt={post.updated_at}
+                                    onDiscard={editor.discard}
+                                    onShowShortcuts={() =>
+                                        setShowShortcuts(true)
+                                    }
+                                />
+                            </>
+                        )}
+                    </Form>
+                ) : (
+                    <>
+                        {workflow.is_business && (
+                            <BusinessScheduleBar
+                                postId={post.id}
+                                status={post.status}
+                                requiresReview={workflow.requires_review}
+                                hasTimes={workflow.has_times}
+                                canQuickSchedule={can.quick_schedule}
+                                canSharePreview={can.share_preview}
+                            />
                         )}
 
-                        <PostDiscussion
-                            postId={post.id}
-                            comments={post.comments}
-                            activityLogs={post.activity_logs}
-                            canComment={can.comment}
-                            canResendReviewEmail={can.resend_review_email}
+                        <PostWorkflow
+                            post={post}
+                            clientName={client.name}
+                            allowedTransitions={allowedTransitions}
+                            isDirty={editor.isDirty}
                             mentionableUsers={mentionableUsers}
-                            collapsible
-                            defaultOpen={needsFeedback}
-                            defaultTab={needsFeedback ? 'activity' : 'comments'}
+                            canResendReviewEmail={can.resend_review_email}
+                            canRetryFailedTargets={can.retry_failed_targets}
+                            canDelete={can.delete}
+                            canOverrideApproval={can.override_approval}
                         />
 
-                        <FeedbackSection post={post} canComment={can.comment} />
-                    </div>
+                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+                            <div className="grid min-w-0 gap-5">
+                                <ReadOnlyContent post={post} />
+                            </div>
+                            <EditorSidebar />
+                        </div>
+                    </>
+                )}
 
-                    <EditorSidebar />
-                </div>
+                <PostDiscussion
+                    postId={post.id}
+                    comments={post.comments}
+                    activityLogs={post.activity_logs}
+                    canComment={can.comment}
+                    canResendReviewEmail={can.resend_review_email}
+                    mentionableUsers={mentionableUsers}
+                    collapsible
+                    defaultOpen={needsFeedback}
+                    defaultTab={needsFeedback ? 'activity' : 'comments'}
+                />
+
+                <FeedbackSection post={post} canComment={can.comment} />
 
                 {imageStudio && <ImageStudioSection data={imageStudio} />}
             </Page>
