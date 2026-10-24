@@ -2,6 +2,8 @@ import type { MentionableUser } from '@/components/mention-textarea';
 import { BusinessScheduleBar } from '@/components/post-editor/business-schedule-bar';
 import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
 import { checkSection } from '@/components/post-editor/editor/editor-state';
+import { FeedbackSection } from '@/components/post-editor/editor/feedback-section';
+import { PostDiscussion } from '@/components/post-editor/post-discussion';
 import { PostWorkflow } from '@/components/post-editor/post-workflow';
 import { ReadinessChecklist } from '@/components/post-editor/readiness-checklist';
 import type {
@@ -10,6 +12,7 @@ import type {
 } from '@/components/post-editor/types';
 
 export type ReviewStepCan = {
+    comment: boolean;
     resend_review_email: boolean;
     retry_failed_targets: boolean;
     delete: boolean;
@@ -25,10 +28,15 @@ export type ReviewStepWorkflow = {
 };
 
 /**
- * 05 Review & send — the final step, and the only place the post's lifecycle is driven. It gathers
- * what used to sit above the editor: the readiness checklist (what's left before it can go out),
- * the business one-tap schedule bar, and the full `PostWorkflow` (stage track, the one recommended
- * move, and every other legal move). Nothing here is new; it is simply where "send it" now lives.
+ * 05 Review & send — the final step, and the only place the post's lifecycle is driven. It reads
+ * top-down as "a last look, then move it along": the readiness checklist (what's left), the send
+ * actions (business one-tap schedule + the full `PostWorkflow`), the client feedback to clear, then
+ * the discussion (comments + activity log).
+ *
+ * Step 24.11 pulled the feedback board and the discussion in here, off the bottom of the page, so
+ * every collaboration surface lives in the one step where you decide to send — not stacked
+ * full-width below the editor. When there's feedback waiting (`needsFeedback`), the editor opens on
+ * this step and the discussion opens straight to the activity log.
  */
 export function ReviewStep({
     post,
@@ -37,6 +45,7 @@ export function ReviewStep({
     mentionableUsers,
     can,
     workflow,
+    needsFeedback,
 }: {
     post: PostData;
     clientName: string;
@@ -44,6 +53,8 @@ export function ReviewStep({
     mentionableUsers: MentionableUser[];
     can: ReviewStepCan;
     workflow: ReviewStepWorkflow;
+    /** Status needs attention (changes requested / failed) — opens the discussion on activity. */
+    needsFeedback: boolean;
 }) {
     const { editor, nav } = usePostEditorContext();
 
@@ -58,6 +69,17 @@ export function ReviewStep({
                     A last look, then move it along.
                 </p>
             </div>
+
+            <ReadinessChecklist
+                items={editor.view.checklistItems}
+                onFix={editor.applyFix}
+                onJump={(key) => nav.jumpTo(checkSection[key] ?? 'compose')}
+                note={
+                    editor.isDirty
+                        ? 'Reflects your unsaved edits — save before scheduling.'
+                        : undefined
+                }
+            />
 
             {workflow.is_business && (
                 <BusinessScheduleBar
@@ -82,15 +104,18 @@ export function ReviewStep({
                 canOverrideApproval={can.override_approval}
             />
 
-            <ReadinessChecklist
-                items={editor.view.checklistItems}
-                onFix={editor.applyFix}
-                onJump={(key) => nav.jumpTo(checkSection[key] ?? 'compose')}
-                note={
-                    editor.isDirty
-                        ? 'Reflects your unsaved edits — save before scheduling.'
-                        : undefined
-                }
+            <FeedbackSection post={post} canComment={can.comment} />
+
+            <PostDiscussion
+                postId={post.id}
+                comments={post.comments}
+                activityLogs={post.activity_logs}
+                canComment={can.comment}
+                canResendReviewEmail={can.resend_review_email}
+                mentionableUsers={mentionableUsers}
+                collapsible
+                defaultOpen={needsFeedback}
+                defaultTab={needsFeedback ? 'activity' : 'comments'}
             />
         </div>
     );

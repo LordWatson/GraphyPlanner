@@ -22,8 +22,11 @@ export type EditorTab =
  * brings it into view and flashes it; media framing jumps to the preview in the right rail.
  * `scope`/`previewId` keep the composer and preview on the one channel being customized.
  */
-export function useEditorNavigation(selectedIds: number[]) {
-    const [activeTab, setActiveTab] = useState<EditorTab>('compose');
+export function useEditorNavigation(
+    selectedIds: number[],
+    initialTab: EditorTab = 'compose',
+) {
+    const [activeTab, setActiveTab] = useState<EditorTab>(initialTab);
     const [flashed, setFlashed] = useState<EditorSection | null>(null);
     const [scope, setScope] = useState<ComposerScope>('all');
     const [previewId, setPreviewId] = useState<number | null>(null);
