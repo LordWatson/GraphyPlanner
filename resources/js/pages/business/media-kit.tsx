@@ -14,7 +14,7 @@ import {
     MediaKitView,
     type MediaKitData,
 } from '@/components/media-kit/media-kit-view';
-import { Page, PageHeader, Panel } from '@/components/page';
+import { ChapterHero, Page, Panel } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,7 +40,7 @@ export default function BusinessMediaKit({
         <Page>
             <Head title="Media kit" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="Show your work"
                 title={
                     <>
@@ -49,16 +49,16 @@ export default function BusinessMediaKit({
                 }
                 description="A one-page summary of your audience and best posts — share it with sponsors and partners, or download it as a PDF."
                 actions={
-                    <a
-                        href={pdf().url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        <Button variant="outline">
+                    <Button variant="on-ink" size="lg" asChild>
+                        <a
+                            href={pdf().url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
                             <Download className="size-4" />
                             Download PDF
-                        </Button>
-                    </a>
+                        </a>
+                    </Button>
                 }
             />
 

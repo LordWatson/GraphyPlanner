@@ -4,7 +4,13 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { DataTable } from '@/components/data-table';
-import { EmptyState, Page, PageHeader, StatStrip } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    StatStrip,
+} from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -210,7 +216,7 @@ export default function OrganizationsIndex({
         <>
             <Head title="Organizations" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`${counts.all} on the platform`}
                     title={
                         <>
@@ -219,12 +225,20 @@ export default function OrganizationsIndex({
                     }
                     description="Find any workspace by its name or anyone on its team, then edit, suspend or remove it."
                     actions={
-                        <Button asChild>
+                        <Button variant="spark" size="lg" asChild>
                             <Link href={createOrganization()}>
                                 <Plus />
                                 Onboard an organization
                             </Link>
                         </Button>
+                    }
+                    aside={
+                        <HeroStat
+                            icon={Building2}
+                            eyebrow="On the platform"
+                            value={String(counts.all).padStart(2, '0')}
+                            caption={`${counts.active} active · ${counts.suspended} suspended`}
+                        />
                     }
                 />
 

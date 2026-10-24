@@ -16,7 +16,7 @@ import {
     sectionKeys,
     stateFromFilters,
 } from '@/components/analytics/types';
-import { ChapterHero, Page } from '@/components/page';
+import { ChapterHero, HeroStat, Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -131,19 +131,17 @@ export default function Analytics({
                     }
                     aside={
                         published !== null && (
-                            <div className="flex flex-col items-start gap-2 lg:items-end">
-                                <span className="eyebrow text-cream/70">
-                                    Published · {describeRange(filters)}
-                                </span>
-                                <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
-                                    {pad(published)}
-                                </span>
-                                <span className="text-cream/80 text-sm">
-                                    {published === 1
+                            <HeroStat
+                                eyebrow={
+                                    <>Published · {describeRange(filters)}</>
+                                }
+                                value={pad(published)}
+                                caption={
+                                    published === 1
                                         ? 'Post out the door'
-                                        : 'Posts out the door'}
-                                </span>
-                            </div>
+                                        : 'Posts out the door'
+                                }
+                            />
                         )
                     }
                 />

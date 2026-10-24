@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import type { KanbanColumn } from '@/components/kanban/kanban-board';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
@@ -280,7 +280,7 @@ export default function ContentIndex({
         <>
             <Head title="Content" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`${String(total).padStart(2, '0')} posts`}
                     title={
                         <>
@@ -289,26 +289,41 @@ export default function ContentIndex({
                     }
                     description="Every post across every client — filter it, move it in bulk, and plan it on the board."
                     actions={
-                        <>
-                            <Button variant="outline" asChild>
-                                <Link href={gridsIndex()}>
-                                    <LayoutGrid />
-                                    Grids
-                                </Link>
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <a href={exportHref}>
-                                    <Download />
-                                    Export CSV
-                                </a>
-                            </Button>
-                            <ViewSwitch view={view} filters={filters} />
-                            {can.create && (
-                                <NewPostMenu clients={filterOptions.clients} />
-                            )}
-                        </>
+                        can.create && (
+                            <NewPostMenu
+                                clients={filterOptions.clients}
+                                variant="spark"
+                                size="lg"
+                            />
+                        )
+                    }
+                    aside={
+                        <HeroStat
+                            icon={FileText}
+                            eyebrow="In the pipeline"
+                            value={String(total).padStart(2, '0')}
+                            caption="Posts across every client"
+                        />
                     }
                 />
+
+                <div className="animate-rise flex flex-wrap items-center gap-2 [animation-delay:80ms]">
+                    <ViewSwitch view={view} filters={filters} />
+                    <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                        <Button variant="outline" asChild>
+                            <Link href={gridsIndex()}>
+                                <LayoutGrid />
+                                Grids
+                            </Link>
+                        </Button>
+                        <Button variant="outline" asChild>
+                            <a href={exportHref}>
+                                <Download />
+                                Export CSV
+                            </a>
+                        </Button>
+                    </span>
+                </div>
 
                 {view === 'board' ? (
                     <>
@@ -585,7 +600,15 @@ function Thumb({ url }: { url: string | null }) {
     );
 }
 
-function NewPostMenu({ clients }: { clients: Option[] }) {
+function NewPostMenu({
+    clients,
+    variant,
+    size,
+}: {
+    clients: Option[];
+    variant?: 'default' | 'spark';
+    size?: 'default' | 'lg';
+}) {
     if (clients.length === 0) {
         return null;
     }
@@ -593,7 +616,7 @@ function NewPostMenu({ clients }: { clients: Option[] }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button>
+                <Button variant={variant} size={size}>
                     <Plus />
                     New post
                 </Button>

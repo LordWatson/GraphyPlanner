@@ -2,7 +2,6 @@ import { Deferred, Head, Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
-    ArrowUpRight,
     CalendarDays,
     CheckCircle2,
     ClipboardCheck,
@@ -29,6 +28,7 @@ import {
 import {
     ChapterHero,
     EmptyState,
+    HeroStat,
     Page,
     Panel,
     StatStrip,
@@ -251,27 +251,20 @@ export default function Dashboard({
                         </>
                     }
                     aside={
-                        <Link
-                            href={needsAttention()}
-                            className="group focus-visible:ring-ring flex flex-col items-start gap-2 rounded-2xl outline-none focus-visible:ring-[3px] lg:items-end"
-                        >
-                            <span className="eyebrow text-cream/70 flex items-center gap-2">
-                                <AlertTriangle className="text-lime size-3.5" />
-                                Needs attention
-                            </span>
-                            <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
-                                {String(summary.needsAttention).padStart(
-                                    2,
-                                    '0',
-                                )}
-                            </span>
-                            <span className="text-cream/80 inline-flex items-center gap-1 text-sm">
-                                {summary.needsAttention === 1
+                        <HeroStat
+                            icon={AlertTriangle}
+                            eyebrow="Needs attention"
+                            value={String(summary.needsAttention).padStart(
+                                2,
+                                '0',
+                            )}
+                            caption={
+                                summary.needsAttention === 1
                                     ? 'Decision waiting on you'
-                                    : 'Decisions waiting on you'}
-                                <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                            </span>
-                        </Link>
+                                    : 'Decisions waiting on you'
+                            }
+                            href={needsAttention().url}
+                        />
                     }
                 />
 

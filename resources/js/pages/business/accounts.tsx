@@ -3,7 +3,7 @@ import { Link2, Loader2, Settings2, Unplug } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { confirmDialog } from '@/components/confirm-dialog';
-import { Page, PageHeader, Panel } from '@/components/page';
+import { ChapterHero, HeroStat, Page, Panel } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -113,7 +113,7 @@ export default function BusinessAccounts({
         <Page>
             <Head title="Accounts" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="Where you post"
                 title={
                     <>
@@ -121,6 +121,16 @@ export default function BusinessAccounts({
                     </>
                 }
                 description="Connect the places you want to post. No API keys — just log in, and we handle the rest."
+                aside={
+                    <HeroStat
+                        icon={Link2}
+                        eyebrow="Connected"
+                        value={String(
+                            platforms.filter((card) => card.account).length,
+                        ).padStart(2, '0')}
+                        caption={`of ${platforms.length} channels`}
+                    />
+                }
             />
 
             <div className="grid gap-4 sm:grid-cols-2">

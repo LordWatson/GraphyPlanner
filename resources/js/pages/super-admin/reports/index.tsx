@@ -2,7 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileBarChart, Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import type { ResolvedFilters } from '@/components/super-admin/types';
 import { describeRange, metricLabels } from '@/components/super-admin/types';
 import { Badge } from '@/components/ui/badge';
@@ -106,7 +106,7 @@ export default function ReportsIndex({ reports }: { reports: Report[] }) {
         <>
             <Head title="Reports" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`${reports.length} saved`}
                     title={
                         <>
@@ -115,12 +115,20 @@ export default function ReportsIndex({ reports }: { reports: Report[] }) {
                     }
                     description="Analytics views you’ve named and kept. Relative ranges re-run against today every time you open one."
                     actions={
-                        <Button asChild>
+                        <Button variant="spark" size="lg" asChild>
                             <Link href={createReport()}>
                                 <Plus />
                                 Build a report
                             </Link>
                         </Button>
+                    }
+                    aside={
+                        <HeroStat
+                            icon={FileBarChart}
+                            eyebrow="Saved"
+                            value={String(reports.length).padStart(2, '0')}
+                            caption="Analytics views kept"
+                        />
                     }
                 />
 

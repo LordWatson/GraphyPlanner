@@ -12,7 +12,13 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { confirmWithPassword } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/data-table';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    PageHeader,
+} from '@/components/page';
 import type { Paginated } from '@/components/pagination';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -229,17 +235,57 @@ export default function ClientsIndex({
         <>
             <Head title="Clients" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`${String(rosterSize).padStart(2, '0')} on the books`}
                     title={
                         <>
-                            The <em>roster</em>
+                            The <em>roster</em>.
                         </>
                     }
                     description="Every brand your studio manages, with retainer health and status at a glance."
-                    meta={
-                        rosterSize > 0 &&
-                        healthCounts.map(({ health, count }) => (
+                    actions={
+                        <>
+                            {can.create && (
+                                <Button variant="spark" size="lg" asChild>
+                                    <Link href={create()}>
+                                        <Plus />
+                                        Add client
+                                    </Link>
+                                </Button>
+                            )}
+                            {archivedCount > 0 && (
+                                <Button variant="on-ink" size="lg" asChild>
+                                    <Link
+                                        href={index({
+                                            query: { archived: 1 },
+                                        })}
+                                    >
+                                        <Archive />
+                                        Archived
+                                        <span className="font-mono tabular-nums">
+                                            {archivedCount}
+                                        </span>
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
+                    }
+                    aside={
+                        <HeroStat
+                            icon={Building2}
+                            eyebrow="On the books"
+                            value={String(rosterSize).padStart(2, '0')}
+                            caption="Brands you're running"
+                        />
+                    }
+                />
+
+                {rosterSize > 0 && (
+                    <div className="animate-rise flex flex-wrap items-center gap-2 [animation-delay:80ms]">
+                        <span className="eyebrow text-muted-foreground mr-1">
+                            Health
+                        </span>
+                        {healthCounts.map(({ health, count }) => (
                             <button
                                 type="button"
                                 key={health}
@@ -274,36 +320,9 @@ export default function ClientsIndex({
                                     {resolveStatus('health', health).label}
                                 </span>
                             </button>
-                        ))
-                    }
-                    actions={
-                        <>
-                            {archivedCount > 0 && (
-                                <Button variant="outline" asChild>
-                                    <Link
-                                        href={index({
-                                            query: { archived: 1 },
-                                        })}
-                                    >
-                                        <Archive />
-                                        Archived
-                                        <span className="font-mono tabular-nums">
-                                            {archivedCount}
-                                        </span>
-                                    </Link>
-                                </Button>
-                            )}
-                            {can.create && (
-                                <Button asChild>
-                                    <Link href={create()}>
-                                        <Plus />
-                                        Add client
-                                    </Link>
-                                </Button>
-                            )}
-                        </>
-                    }
-                />
+                        ))}
+                    </div>
+                )}
 
                 {rosterSize > 0 && (
                     <RosterToolbar filters={filters} options={filterOptions} />

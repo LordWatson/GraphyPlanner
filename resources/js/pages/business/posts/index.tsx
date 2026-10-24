@@ -2,7 +2,13 @@ import { Link, router } from '@inertiajs/react';
 import { Head } from '@inertiajs/react';
 import { FileText, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Panel,
+} from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { Pagination } from '@/components/pagination';
 import type { Paginated } from '@/components/pagination';
@@ -82,7 +88,7 @@ export default function BusinessPostsIndex({
         <Page>
             <Head title="Posts" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="Your posts"
                 title={
                     <>
@@ -92,13 +98,21 @@ export default function BusinessPostsIndex({
                 description="Drafts, scheduled and published — all in one place."
                 actions={
                     can.create && (
-                        <Button variant="brand" asChild>
+                        <Button variant="spark" size="lg" asChild>
                             <Link href={createPost()} method="post" as="button">
                                 <Plus />
                                 New post
                             </Link>
                         </Button>
                     )
+                }
+                aside={
+                    <HeroStat
+                        icon={FileText}
+                        eyebrow="In the pipeline"
+                        value={String(posts.total).padStart(2, '0')}
+                        caption={posts.total === 1 ? 'Post' : 'Posts'}
+                    />
                 }
             />
 

@@ -1,5 +1,5 @@
-import { usePage } from '@inertiajs/react';
-import type { LucideIcon } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { ArrowUpRight, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { createContext, useContext } from 'react';
 import { Peek } from '@/components/brand-poster';
@@ -19,8 +19,10 @@ import { cn } from '@/lib/utils';
  * resolved automatically from the URL via `lib/chapters.ts`. `<em>` inside a title renders as the
  * accent word (Deep Teal; Acid Lime in dark mode), upright — at most one word.
  *
- * `ChapterHero` is the full-bleed chapter opener (Ink block, giant headline, the peek): use it as
- * the one hero on a landing page (Overview, Needs attention) in place of `PageHeader`.
+ * `ChapterHero` is the full-bleed chapter opener (Ink block, giant headline, the peek): it is the
+ * standard opener for every primary chapter/index page (Overview, Calendar, Content, Clients,
+ * Invoices, Analytics, Staff, and the business/platform/portal equivalents), in place of
+ * `PageHeader`, each leading with a `HeroStat` figure. `PageHeader` stays for detail/form/sub-pages.
  */
 
 /**
@@ -279,6 +281,63 @@ export function ChapterHero({
                 </div>
             </div>
         </header>
+    );
+}
+
+/**
+ * The hero figure for a `ChapterHero` `aside` — a giant Acid Lime numeral under a mono eyebrow,
+ * exactly as the Overview counts "needs attention". It is the one recurring move that ties every
+ * chapter opener together: each primary page leads with its single most telling number. Pass
+ * `href` to make the whole figure a link (an arrow then trails the caption and nudges on hover).
+ */
+export function HeroStat({
+    eyebrow,
+    value,
+    caption,
+    icon: Icon,
+    href,
+}: {
+    eyebrow: ReactNode;
+    value: ReactNode;
+    caption?: ReactNode;
+    icon?: LucideIcon;
+    href?: string;
+}) {
+    const body = (
+        <>
+            <span className="eyebrow text-cream/70 flex items-center gap-2">
+                {Icon && <Icon className="text-lime size-3.5" />}
+                {eyebrow}
+            </span>
+            <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
+                {value}
+            </span>
+            {caption && (
+                <span className="text-cream/80 inline-flex items-center gap-1 text-sm">
+                    {caption}
+                    {href && (
+                        <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    )}
+                </span>
+            )}
+        </>
+    );
+
+    if (href) {
+        return (
+            <Link
+                href={href}
+                className="group focus-visible:ring-ring flex flex-col items-start gap-2 rounded-2xl outline-none focus-visible:ring-[3px] lg:items-end"
+            >
+                {body}
+            </Link>
+        );
+    }
+
+    return (
+        <div className="flex flex-col items-start gap-2 lg:items-end">
+            {body}
+        </div>
     );
 }
 

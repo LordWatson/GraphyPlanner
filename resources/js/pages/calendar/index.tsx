@@ -1,4 +1,5 @@
 import { Head, router } from '@inertiajs/react';
+import { CalendarDays } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CalendarNewPostDialog } from '@/components/calendar/calendar-new-post-dialog';
@@ -11,7 +12,7 @@ import type {
     TargetMove,
 } from '@/components/content-calendar';
 import { ContentCalendar } from '@/components/content-calendar';
-import { Page, PageHeader } from '@/components/page';
+import { ChapterHero, HeroStat, Page } from '@/components/page';
 import { useWorkspace } from '@/hooks/use-workspace';
 import type { Paginated } from '@/components/pagination';
 import type { UnscheduledPost } from '@/components/unscheduled-posts-sheet';
@@ -124,21 +125,33 @@ export default function Calendar({
         <>
             <Head title="Calendar" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`Schedule — ${count} post${count === 1 ? '' : 's'} in view`}
                     title={
                         <>
-                            The <em>calendar</em>
+                            The <em>calendar</em>.
                         </>
                     }
                     description="Every scheduled target across every client — by month, week, day, or as a running list."
-                    actions={
-                        <UnscheduledPostsSheet
-                            count={unscheduledCount}
-                            page={unscheduled}
+                    aside={
+                        <HeroStat
+                            icon={CalendarDays}
+                            eyebrow="In view"
+                            value={String(count).padStart(2, '0')}
+                            caption={
+                                count === 1
+                                    ? 'Scheduled target'
+                                    : 'Scheduled targets'
+                            }
                         />
                     }
                 />
+                <div className="animate-rise flex justify-end [animation-delay:80ms]">
+                    <UnscheduledPostsSheet
+                        count={unscheduledCount}
+                        page={unscheduled}
+                    />
+                </div>
                 <ContentCalendar
                     {...props}
                     multiClient={!isBusiness}
