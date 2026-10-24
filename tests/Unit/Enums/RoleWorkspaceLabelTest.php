@@ -32,14 +32,24 @@ class RoleWorkspaceLabelTest extends TestCase
         $this->assertNotContains(Role::SuperAdmin, $assignable);
     }
 
-    public function test_agency_assignable_roles_exclude_only_client_reviewer(): void
+    public function test_agency_assignable_roles_exclude_client_reviewer_and_super_admin(): void
     {
         $assignable = Role::assignableFor(OrganizationType::Agency);
 
+        // `SuperAdmin` is org-less platform staff and must never be assignable in any tenant
+        // workspace; `ClientReviewer` belongs to the client-portal flow.
         $this->assertNotContains(Role::ClientReviewer, $assignable);
+        $this->assertNotContains(Role::SuperAdmin, $assignable);
         $this->assertContains(Role::Owner, $assignable);
         $this->assertContains(Role::Strategist, $assignable);
         $this->assertContains(Role::Designer, $assignable);
         $this->assertContains(Role::Viewer, $assignable);
+    }
+
+    public function test_super_admin_is_assignable_in_no_workspace_type(): void
+    {
+        foreach (OrganizationType::cases() as $type) {
+            $this->assertNotContains(Role::SuperAdmin, Role::assignableFor($type));
+        }
     }
 }

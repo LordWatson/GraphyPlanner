@@ -45,10 +45,14 @@ enum Role: string
     }
 
     /**
-     * Step B-1.5 — roles that can be assigned when inviting a teammate into an org of this type.
-     * `ClientReviewer` is reserved for the client-portal invitation flow in both. A business org
-     * additionally never assigns `SuperAdmin` (platform staff) — its team is Owner/Manager/Creator/
-     * Viewer. Agency behaviour is unchanged (every role except `ClientReviewer`).
+     * Roles that can be assigned when inviting or editing a teammate inside a tenant workspace.
+     *
+     * `ClientReviewer` is reserved for the client-portal invitation flow, and `SuperAdmin` is
+     * org-less platform staff (`Gate::before` grants it every ability and it bypasses the
+     * `OrganizationScope`) — it is provisioned out of band and must NEVER be assignable through
+     * any tenant-facing staff flow, or an org Owner could escalate themselves or a teammate to
+     * platform god-mode. Both are excluded in every workspace type. A business org narrows the
+     * remainder to its own vocabulary (Owner/Manager/Creator/Viewer, no agency-only roles).
      *
      * @return list<Role>
      */
@@ -58,6 +62,9 @@ enum Role: string
             return [self::Owner, self::Strategist, self::Designer, self::Viewer];
         }
 
-        return array_values(array_filter(self::cases(), fn (Role $role) => $role !== self::ClientReviewer));
+        return array_values(array_filter(
+            self::cases(),
+            fn (Role $role) => $role !== self::ClientReviewer && $role !== self::SuperAdmin,
+        ));
     }
 }

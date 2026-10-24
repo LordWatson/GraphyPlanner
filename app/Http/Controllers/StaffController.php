@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Staff\RemoveStaffMemberAction;
 use App\Actions\Staff\UpdateStaffMemberAction;
+use App\Enums\OrganizationType;
 use App\Enums\Role;
 use App\Http\Requests\UpdateStaffMemberRequest;
 use App\Models\StaffActivityLog;
@@ -35,7 +36,7 @@ class StaffController extends Controller
                 ->latest()
                 ->get()
                 ->map(fn (StaffInvitation $invitation) => $this->transformInvitation($invitation, $request->user())),
-            'roles' => $this->roleOptions(),
+            'roles' => $this->roleOptions($organization->type),
             'can' => [
                 'invite' => $request->user()->can('create', [StaffInvitation::class, $organization]),
             ],
@@ -68,7 +69,7 @@ class StaffController extends Controller
 
         return Inertia::render('staff/edit', [
             'member' => $this->transform($staff, $request->user()),
-            'roles' => $this->roleOptions(),
+            'roles' => $this->roleOptions($request->user()->organization->type),
         ]);
     }
 
@@ -95,14 +96,20 @@ class StaffController extends Controller
     }
 
     /**
+     * Role options for the staff roster's assign/edit selects. Driven by the same
+     * `Role::assignableFor()` allow-list as the invite and update validators, so the UI never
+     * offers a role those flows would reject — in particular the platform `SuperAdmin` role, which
+     * is provisioned out of band and must never be selectable inside a tenant workspace. Labels use
+     * the workspace vocabulary (e.g. Manager/Creator in a business org).
+     *
      * @return array<int, array{value: string, label: string}>
      */
-    private function roleOptions(): array
+    private function roleOptions(OrganizationType $type): array
     {
-        return array_values(array_map(
-            fn (Role $role) => ['value' => $role->value, 'label' => $role->label()],
-            array_filter(Role::cases(), fn (Role $role) => $role !== Role::ClientReviewer),
-        ));
+        return array_map(
+            fn (Role $role) => ['value' => $role->value, 'label' => $role->labelFor($type)],
+            Role::assignableFor($type),
+        );
     }
 
     /**

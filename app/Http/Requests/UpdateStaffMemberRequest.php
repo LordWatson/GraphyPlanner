@@ -17,14 +17,16 @@ class UpdateStaffMemberRequest extends FormRequest
     }
 
     /**
-     * Staff roles a member can be changed into — `Role::ClientReviewer` is reserved for the
-     * client-portal invitation flow and is never assignable here.
+     * Staff roles a member can be changed into. Shares the single `Role::assignableFor()` allow-list
+     * with the invite flow, so neither the client-portal `ClientReviewer` role nor the platform
+     * `SuperAdmin` role can ever be granted by editing a member (an Owner must not be able to
+     * promote anyone — including themselves — to platform staff).
      *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
-        $staffRoles = array_filter(Role::cases(), fn (Role $role) => $role !== Role::ClientReviewer);
+        $staffRoles = Role::assignableFor($this->user()->organization->type);
 
         return [
             'name' => ['required', 'string', 'max:255'],

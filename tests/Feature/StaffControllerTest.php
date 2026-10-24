@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Staff\UpdateStaffMemberAction;
 use App\Enums\Role;
 use App\Models\Organization;
 use App\Models\StaffActivityLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class StaffControllerTest extends TestCase
@@ -114,6 +116,39 @@ class StaffControllerTest extends TestCase
 
         $response->assertSessionHasErrors('role');
         $this->assertTrue($member->fresh()->hasRole(Role::Viewer));
+    }
+
+    public function test_the_super_admin_role_cannot_be_assigned_via_update(): void
+    {
+        // Regression: an agency Owner must not be able to promote a member (or themselves) to the
+        // org-less platform `SuperAdmin` role, which carries `Gate::before` god-mode.
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $member = User::factory()->for($org, 'organization')->role(Role::Viewer)->create();
+
+        $response = $this->actingAs($owner)->put(route('staff.update', $member), [
+            'name' => 'Updated Name',
+            'role' => Role::SuperAdmin->value,
+        ]);
+
+        $response->assertSessionHasErrors('role');
+        $this->assertTrue($member->fresh()->hasRole(Role::Viewer));
+    }
+
+    public function test_the_update_action_rejects_a_super_admin_promotion(): void
+    {
+        // Defence in depth behind the form request: the Action itself refuses the platform role.
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $member = User::factory()->for($org, 'organization')->role(Role::Viewer)->create();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        try {
+            (new UpdateStaffMemberAction)($member, ['name' => $member->name, 'role' => Role::SuperAdmin->value], $owner);
+        } finally {
+            $this->assertTrue($member->fresh()->hasRole(Role::Viewer));
+        }
     }
 
     public function test_non_owner_cannot_update_a_staff_member(): void

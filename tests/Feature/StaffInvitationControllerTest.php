@@ -70,6 +70,22 @@ class StaffInvitationControllerTest extends TestCase
         $this->assertDatabaseCount('staff_invitations', 0);
     }
 
+    public function test_the_super_admin_role_cannot_be_invited(): void
+    {
+        // Regression: an agency Owner must not be able to invite anyone as the org-less platform
+        // `SuperAdmin` role — it is provisioned out of band and never assignable in a tenant org.
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+
+        $response = $this->actingAs($owner)->post(route('staff.invitations.store'), [
+            'email' => 'newhire@acme.test',
+            'role' => Role::SuperAdmin->value,
+        ]);
+
+        $response->assertSessionHasErrors('role');
+        $this->assertDatabaseCount('staff_invitations', 0);
+    }
+
     public function test_a_non_owner_cannot_send_a_staff_invitation(): void
     {
         $org = Organization::factory()->create();

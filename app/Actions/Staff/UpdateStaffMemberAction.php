@@ -7,6 +7,7 @@ use App\Models\StaffActivityLog;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class UpdateStaffMemberAction
 {
@@ -21,6 +22,13 @@ class UpdateStaffMemberAction
         return DB::transaction(function () use ($staff, $data, $actor) {
             $fromRole = $staff->role;
             $toRole = isset($data['role']) ? Role::from($data['role']) : $fromRole;
+
+            // Defence in depth behind `UpdateStaffMemberRequest`: never let a tenant flow grant a
+            // role the workspace can't assign — above all `SuperAdmin` (org-less platform staff),
+            // which would hand the member platform god-mode. Changing nothing (same role) is fine.
+            if ($toRole !== $fromRole && ! in_array($toRole, Role::assignableFor($staff->organization->type), true)) {
+                throw new InvalidArgumentException("Role [{$toRole->value}] can't be assigned in a {$staff->organization->type->value} workspace.");
+            }
 
             $staff->update([
                 'name' => $data['name'] ?? $staff->name,
