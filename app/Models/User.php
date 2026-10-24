@@ -80,6 +80,16 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * Step M-9.2 — inbox threads assigned to this staff member.
+     *
+     * @return HasMany<InboxConversation, $this>
+     */
+    public function assignedConversations(): HasMany
+    {
+        return $this->hasMany(InboxConversation::class, 'assigned_to');
+    }
+
+    /**
      * The client this user is scoped to, when acting as a Client reviewer.
      *
      * @return BelongsTo<Client, $this>

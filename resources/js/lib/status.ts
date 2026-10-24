@@ -33,7 +33,9 @@ export type StatusKind =
     | 'brief'
     | 'deliverable'
     | 'timeline'
-    | 'clientReport';
+    | 'clientReport'
+    | 'inbox'
+    | 'sentiment';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -175,6 +177,19 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         active: { tone: 'success', label: 'Active' },
         suspended: { tone: 'danger', label: 'Suspended' },
         preview: { tone: 'muted', label: 'Preview fixture' },
+    },
+    // Phase M-9: a social-inbox conversation's workflow state.
+    inbox: {
+        open: { tone: 'info', label: 'Open' },
+        snoozed: { tone: 'warning', label: 'Snoozed' },
+        resolved: { tone: 'success', label: 'Resolved' },
+    },
+    // Phase M-9: a comment's triage sentiment (set deterministically at ingestion).
+    sentiment: {
+        positive: { tone: 'success', label: 'Positive' },
+        neutral: { tone: 'neutral', label: 'Neutral' },
+        negative: { tone: 'danger', label: 'Negative' },
+        question: { tone: 'info', label: 'Question' },
     },
 };
 

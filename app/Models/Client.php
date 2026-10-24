@@ -296,6 +296,16 @@ class Client extends Model
     }
 
     /**
+     * Step M-9.1 — the client's social-inbox threads (comments on its published posts).
+     *
+     * @return HasMany<InboxConversation, $this>
+     */
+    public function inboxConversations(): HasMany
+    {
+        return $this->hasMany(InboxConversation::class);
+    }
+
+    /**
      * @return HasMany<Asset, $this>
      */
     public function assets(): HasMany

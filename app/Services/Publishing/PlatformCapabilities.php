@@ -52,6 +52,30 @@ class PlatformCapabilities
     }
 
     /**
+     * Step M-9.1 — whether the social inbox can read and reply to comments on this platform
+     * (M-0.2: Upload-Post covers seven networks; Pinterest and Google Business are `comments => false`).
+     * The comment sync skips any target whose platform returns false here.
+     */
+    public function supportsComments(Platform $platform): bool
+    {
+        return $this->for($platform)->comments;
+    }
+
+    /**
+     * The stored platform values the inbox ingests from, for SQL `whereIn` filters that must agree
+     * with {@see supportsComments()}.
+     *
+     * @return list<string>
+     */
+    public function commentablePlatformValues(): array
+    {
+        return array_values(array_map(
+            fn (Platform $platform) => $platform->value,
+            array_filter(Platform::cases(), fn (Platform $platform) => $this->supportsComments($platform)),
+        ));
+    }
+
+    /**
      * The format a target publishes as: its explicit choice when the platform offers it, else the
      * first format (in registry order) whose media kinds and item bounds fit the attached media,
      * else the platform default. Formats with a forced crop (Stories) are only ever explicit.

@@ -29,6 +29,7 @@ import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as contentIndex } from '@/routes/content';
+import { index as inboxIndex } from '@/routes/inbox';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -187,6 +188,8 @@ function studioGroups(
                         { title: 'Grids', href: gridsIndex() },
                     ],
                 },
+                // Phase M-9: the social inbox — every staff role can at least read it.
+                navItem(chapters.inbox, inboxIndex()),
                 navItem(chapters.clients, clientsIndex()),
                 ...(canViewLedger
                     ? [navItem(chapters.invoices, invoicesIndex())]

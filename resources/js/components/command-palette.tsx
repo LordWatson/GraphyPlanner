@@ -45,6 +45,7 @@ import { index as clientsIndex } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as contentIndex } from '@/routes/content';
+import { index as inboxIndex } from '@/routes/inbox';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as myWorkIndex } from '@/routes/my-work';
 import { index as invoicesIndex } from '@/routes/invoices';
@@ -188,6 +189,7 @@ function useCommands(close: () => void): Command[] {
                 chapter: chapters.content,
                 run: visit(gridsIndex()),
             },
+            chapterCommand(chapters.inbox, inboxIndex()),
             chapterCommand(chapters.clients, clientsIndex()),
             ...(isBilling
                 ? [chapterCommand(chapters.invoices, invoicesIndex())]

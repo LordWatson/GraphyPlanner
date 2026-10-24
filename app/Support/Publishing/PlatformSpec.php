@@ -45,6 +45,7 @@ final readonly class PlatformSpec
         public array $formats,
         public bool $accountMetrics = true,
         public bool $postMetrics = true,
+        public bool $comments = true,
     ) {}
 
     /**
@@ -98,6 +99,7 @@ final readonly class PlatformSpec
             formats: $formats,
             accountMetrics: (bool) ($config['account_metrics'] ?? true),
             postMetrics: (bool) ($config['post_metrics'] ?? true),
+            comments: (bool) ($config['comments'] ?? true),
         );
     }
 
@@ -148,6 +150,7 @@ final readonly class PlatformSpec
             'formats' => array_values(array_map(fn (FormatSpec $format) => $format->toArray(), $this->formats)),
             'account_metrics' => $this->accountMetrics,
             'post_metrics' => $this->postMetrics,
+            'comments' => $this->comments,
         ];
     }
 }

@@ -8,12 +8,14 @@ use App\Contracts\CaptionRepurposer;
 use App\Contracts\GridAiProvider;
 use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
+use App\Contracts\ReplyAssistant;
 use App\Contracts\WritingAssistant;
 use App\Enums\Platform;
 use App\Enums\WritingTool;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
+use App\Models\InboxConversation;
 use App\Models\Post;
 use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestions;
@@ -34,13 +36,20 @@ use Illuminate\Support\Facades\Log;
  * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
-class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, WritingAssistant
+class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, ReplyAssistant, WritingAssistant
 {
     public function rewrite(Client $client, string $text, WritingTool $tool, ?Platform $platform = null, ?string $tone = null): string
     {
         $this->logDisabled('rewrite', ['client_id' => $client->id, 'org_id' => $client->org_id, 'tool' => $tool->value]);
 
         return $text;
+    }
+
+    public function draftReply(Client $client, InboxConversation $conversation, ?string $instruction = null): string
+    {
+        $this->logDisabled('draftReply', ['client_id' => $client->id, 'org_id' => $client->org_id, 'inbox_conversation_id' => $conversation->id]);
+
+        return '';
     }
 
     public function suggestCaptions(Post $post): AiCaptionSuggestions

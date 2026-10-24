@@ -57,6 +57,7 @@ use App\Http\Controllers\Grids\GridProductionController;
 use App\Http\Controllers\Grids\GridTileController;
 use App\Http\Controllers\Grids\GridWorkflowController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InboxController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\MediaKitShareController;
@@ -82,6 +83,7 @@ use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SavedPostViewController;
+use App\Http\Controllers\SavedReplyController;
 use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationAcceptController;
@@ -558,6 +560,23 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
         Route::post('content/bulk', [ContentHubController::class, 'bulk'])->name('content.bulk');
         Route::post('content/views', [SavedPostViewController::class, 'store'])->name('content.views.store');
         Route::delete('content/views/{savedView}', [SavedPostViewController::class, 'destroy'])->name('content.views.destroy');
+    });
+
+    // Phase M-9: the social inbox — agency-only (a business org has its own surfaces); a client
+    // reviewer is sent to the portal and the InboxConversationPolicy refuses them as well.
+    Route::middleware(['portal.redirect', 'workspace:agency'])->group(function () {
+        Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
+        Route::post('inbox/refresh', [InboxController::class, 'refresh'])->name('inbox.refresh');
+        Route::get('inbox/{conversation}', [InboxController::class, 'show'])->name('inbox.conversations.show');
+        Route::patch('inbox/{conversation}', [InboxController::class, 'update'])->name('inbox.conversations.update');
+        Route::post('inbox/{conversation}/reply', [InboxController::class, 'reply'])->name('inbox.conversations.reply');
+        // Step M-9.3: AI draft reply — budgeted/metered like every text call, never sends.
+        Route::post('inbox/{conversation}/ai/draft', [InboxController::class, 'draft'])
+            ->middleware('throttle:ai')
+            ->name('inbox.conversations.draft');
+        Route::post('saved-replies', [SavedReplyController::class, 'store'])->name('saved-replies.store');
+        Route::patch('saved-replies/{savedReply}', [SavedReplyController::class, 'update'])->name('saved-replies.update');
+        Route::delete('saved-replies/{savedReply}', [SavedReplyController::class, 'destroy'])->name('saved-replies.destroy');
     });
 
     // Phase 18: the Instagram grid planner - plans per client, the planner page, tiles, the

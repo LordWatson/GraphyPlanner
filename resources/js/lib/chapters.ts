@@ -28,6 +28,7 @@ export type ChapterKey =
     | 'home'
     | 'calendar'
     | 'content'
+    | 'inbox'
     | 'clients'
     | 'invoices'
     | 'analytics'
@@ -119,11 +120,23 @@ export const chapters: Record<ChapterKey, Chapter> = {
             '/ai-post-ideas',
         ],
     },
+    // Phase M-9: the social inbox — comments on the studio's published posts, triaged and replied to.
+    // Its own chapter because community management is a daily surface and a headline selling point.
+    inbox: {
+        key: 'inbox',
+        number: '04',
+        title: 'Inbox',
+        summary:
+            'Comments across every client, triaged, assigned and answered.',
+        icon: MessageSquareHeart,
+        swatch: 'bg-electric',
+        prefixes: ['/inbox'],
+    },
     // MOVE 2/3: Clients is now purely the roster + per-client CRM (Brand Brain, accounts, billing,
     // briefs, portal access, health).
     clients: {
         key: 'clients',
-        number: '04',
+        number: '05',
         title: 'Clients',
         summary: 'The roster — brands, Brand Brain, accounts and billing.',
         icon: Building2,
@@ -132,7 +145,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     invoices: {
         key: 'invoices',
-        number: '05',
+        number: '06',
         title: 'Invoices',
         summary: 'The ledger — raised, sent, paid and overdue.',
         icon: Receipt,
@@ -142,7 +155,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     // Phase 17: the studio's own analytics. Every staff role sees it (sections are gated inside).
     analytics: {
         key: 'analytics',
-        number: '06',
+        number: '07',
         title: 'Analytics',
         summary:
             'How the studio is tracking — output, approvals, billing and AI.',
@@ -152,7 +165,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     staff: {
         key: 'staff',
-        number: '07',
+        number: '08',
         title: 'Staff',
         summary: 'The team, their roles and invitations.',
         icon: UsersRound,
@@ -161,7 +174,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
     },
     settings: {
         key: 'settings',
-        number: '08',
+        number: '09',
         title: 'Settings',
         summary: 'Profile, security, appearance and organization.',
         icon: Settings2,
