@@ -2,6 +2,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
     AlertTriangle,
+    ArrowRight,
+    CalendarDays,
     CheckCircle2,
     ClipboardCheck,
     Clock,
@@ -13,10 +15,11 @@ import {
 } from 'lucide-react';
 import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { HomeViewTabs } from '@/components/home-view-tabs';
-import { Page, PageHeader, StatStrip } from '@/components/page';
+import { ChapterHero, HeroStat, Page, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
-import { dashboard, needsAttention } from '@/routes';
+import { calendar, dashboard, needsAttention } from '@/routes';
+import { index as contentIndex } from '@/routes/content';
 import { show as showCampaign } from '@/routes/campaigns';
 import { show as showClient } from '@/routes/clients';
 import { edit as editGrid } from '@/routes/grids';
@@ -283,13 +286,12 @@ export default function Home({ items }: HomeProps) {
         <>
             <Head title="Needs attention" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow="Triage — sorted by what to fix first"
                     title={
                         total > 0 ? (
                             <>
-                                <em>{total}</em> thing{total === 1 ? '' : 's'}{' '}
-                                need you.
+                                Clear the <em>queue</em>.
                             </>
                         ) : (
                             <>
@@ -298,6 +300,36 @@ export default function Home({ items }: HomeProps) {
                         )
                     }
                     description="Everything stopping a post or account from moving forward. Clear the top lanes first."
+                    actions={
+                        <>
+                            <Button variant="spark" size="lg" asChild>
+                                <Link href={calendar()}>
+                                    <CalendarDays />
+                                    Open calendar
+                                </Link>
+                            </Button>
+                            <Button variant="on-ink" size="lg" asChild>
+                                <Link href={contentIndex()}>
+                                    See everything
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        </>
+                    }
+                    aside={
+                        <HeroStat
+                            icon={AlertTriangle}
+                            eyebrow="Needs attention"
+                            value={String(total).padStart(2, '0')}
+                            caption={
+                                total === 0
+                                    ? 'Every lane is clear'
+                                    : total === 1
+                                      ? 'Thing to fix'
+                                      : 'Things to fix'
+                            }
+                        />
+                    }
                 />
 
                 <HomeViewTabs attentionCount={total} className="animate-rise" />

@@ -1,19 +1,28 @@
 import { Head, Link } from '@inertiajs/react';
 import {
+    ArrowRight,
     AtSign,
     CalendarClock,
+    CalendarDays,
     CheckCircle2,
     ClipboardList,
     Eye,
     type LucideIcon,
 } from 'lucide-react';
 import { HomeViewTabs } from '@/components/home-view-tabs';
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Panel,
+} from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
+import { Button } from '@/components/ui/button';
 import { formatDate, formatSchedule } from '@/lib/dates';
 import { cn } from '@/lib/utils';
-import { dashboard } from '@/routes';
+import { calendar, dashboard } from '@/routes';
 import { index as contentIndex } from '@/routes/content';
 import { index as myWorkIndex } from '@/routes/my-work';
 import { edit as editPost } from '@/routes/posts';
@@ -87,14 +96,44 @@ export default function MyWork({ buckets }: { buckets: Buckets }) {
         <>
             <Head title="My work" />
             <Page>
-                <PageHeader
-                    eyebrow={`${String(total).padStart(2, '0')} on your plate`}
+                <ChapterHero
+                    eyebrow="Across every client"
                     title={
-                        <>
-                            Your <em>work</em>.
-                        </>
+                        total > 0 ? (
+                            <>
+                                Your <em>work</em>.
+                            </>
+                        ) : (
+                            <>
+                                A clear <em>desk</em>.
+                            </>
+                        )
                     }
                     description="Everything assigned to you, waiting on your review, due soon, or where you were mentioned."
+                    actions={
+                        <>
+                            <Button variant="spark" size="lg" asChild>
+                                <Link href={calendar()}>
+                                    <CalendarDays />
+                                    Open calendar
+                                </Link>
+                            </Button>
+                            <Button variant="on-ink" size="lg" asChild>
+                                <Link href={contentIndex()}>
+                                    See everything
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        </>
+                    }
+                    aside={
+                        <HeroStat
+                            icon={ClipboardList}
+                            eyebrow="On your plate"
+                            value={String(total).padStart(2, '0')}
+                            caption={total === 1 ? 'Open item' : 'Open items'}
+                        />
+                    }
                 />
 
                 <HomeViewTabs className="animate-rise" />
@@ -132,17 +171,6 @@ export default function MyWork({ buckets }: { buckets: Buckets }) {
                         </Panel>
                     );
                 })}
-
-                <p className="text-muted-foreground text-sm">
-                    Looking for everything across the studio?{' '}
-                    <Link
-                        href={contentIndex()}
-                        className="text-primary underline"
-                    >
-                        Open the content hub
-                    </Link>
-                    .
-                </p>
             </Page>
         </>
     );

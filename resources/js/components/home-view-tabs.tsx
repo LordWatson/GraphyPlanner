@@ -10,7 +10,9 @@ import { index as myWorkIndex } from '@/routes/my-work';
  * three competing sidebar chapters — they are three views of a single `01 Home` chapter, switched
  * here. Rendered under the header on each of the three pages so Home reads as one place.
  *
- * Segmented pills on a muted track (brand §6 "Tabs"): active = a card lifted on the track.
+ * Segmented pills on a muted track (brand §6 "Tabs"): active = a card lifted on the track. Each view
+ * carries its icon in a tint circle and names its own job inline (so the labels aren't cryptic) —
+ * a deliberately large, obvious switcher rather than a passive filter strip.
  */
 const views = [
     {
@@ -47,12 +49,16 @@ export function HomeViewTabs({
         <nav
             aria-label="Home views"
             className={cn(
-                'border-border/70 bg-muted/40 inline-flex max-w-full gap-1 overflow-x-auto rounded-full border p-1',
+                'border-border/70 bg-muted/40 inline-flex max-w-full gap-1.5 overflow-x-auto rounded-full border p-1.5',
                 className,
             )}
         >
             {views.map((view) => {
                 const active = isCurrentOrParentUrl(view.href);
+                const showCount =
+                    view.label === 'Needs attention' &&
+                    typeof attentionCount === 'number' &&
+                    attentionCount > 0;
 
                 return (
                     <Link
@@ -62,24 +68,46 @@ export function HomeViewTabs({
                         aria-current={active ? 'page' : undefined}
                         title={view.hint}
                         className={cn(
-                            'flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                            'group flex shrink-0 items-center gap-3 rounded-full py-2 pr-4 pl-2.5 text-left whitespace-nowrap transition-colors',
                             active
                                 ? 'bg-card text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground',
+                                : 'text-muted-foreground hover:bg-card/60 hover:text-foreground',
                         )}
                     >
-                        <view.icon className="size-4 shrink-0" />
-                        <span>{view.label}</span>
-                        {view.label === 'Needs attention' &&
-                        attentionCount &&
-                        attentionCount > 0 ? (
-                            <span
-                                aria-hidden
-                                className="bg-foreground/10 text-foreground ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-mono text-[11px] tabular-nums"
-                            >
-                                {attentionCount}
+                        <span
+                            aria-hidden
+                            className={cn(
+                                'grid size-9 shrink-0 place-items-center rounded-full transition-colors',
+                                active
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-foreground/5 text-muted-foreground group-hover:bg-foreground/10',
+                            )}
+                        >
+                            <view.icon className="size-[18px]" />
+                        </span>
+
+                        <span className="flex min-w-0 flex-col">
+                            <span className="flex items-center gap-2">
+                                <span
+                                    className={cn(
+                                        'text-[15px] leading-tight font-semibold',
+                                        active
+                                            ? 'text-foreground'
+                                            : 'text-foreground/80 group-hover:text-foreground',
+                                    )}
+                                >
+                                    {view.label}
+                                </span>
+                                {showCount ? (
+                                    <span className="bg-primary text-primary-foreground inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-px font-mono text-[11px] leading-none font-medium tabular-nums">
+                                        {attentionCount}
+                                    </span>
+                                ) : null}
                             </span>
-                        ) : null}
+                            <span className="text-muted-foreground hidden text-xs leading-tight sm:block">
+                                {view.hint}
+                            </span>
+                        </span>
                     </Link>
                 );
             })}
