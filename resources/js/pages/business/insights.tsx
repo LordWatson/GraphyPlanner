@@ -10,9 +10,9 @@ import {
     Users,
 } from 'lucide-react';
 import {
+    ChapterHero,
     EmptyState,
     Page,
-    PageHeader,
     Panel,
     StatStrip,
 } from '@/components/page';
@@ -137,7 +137,7 @@ export default function BusinessInsights({
         <Page>
             <Head title="Insights" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="How you're tracking"
                 title={
                     <>
@@ -146,12 +146,12 @@ export default function BusinessInsights({
                 }
                 description="Your posting rhythm, reach and best times to post — for your brand, all in one place."
                 actions={
-                    <Link href={mediaKitIndex().url}>
-                        <Button variant="outline">
+                    <Button variant="on-ink" size="lg" asChild>
+                        <Link href={mediaKitIndex().url}>
                             <FileText className="size-4" />
                             Media kit
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
                 }
             />
 

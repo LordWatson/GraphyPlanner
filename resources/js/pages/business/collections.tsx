@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Layers, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -57,7 +57,7 @@ export default function BusinessCollections({
         <Page>
             <Head title="Collections" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="Group your posts"
                 title={
                     <>
@@ -68,13 +68,26 @@ export default function BusinessCollections({
                 actions={
                     can.create && (
                         <Button
-                            variant="brand"
+                            variant="spark"
+                            size="lg"
                             onClick={() => setCreating(true)}
                         >
                             <Plus />
                             New collection
                         </Button>
                     )
+                }
+                aside={
+                    <HeroStat
+                        icon={Layers}
+                        eyebrow="Groups of posts"
+                        value={String(collections.length).padStart(2, '0')}
+                        caption={
+                            collections.length === 1
+                                ? 'Collection'
+                                : 'Collections'
+                        }
+                    />
                 }
             />
 

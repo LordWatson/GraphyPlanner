@@ -3,6 +3,7 @@ import {
     AlertTriangle,
     Clock,
     Download,
+    Plus,
     Receipt,
     Search,
     Wallet,
@@ -14,7 +15,13 @@ import { DatePicker } from '@/components/date-picker';
 import { InvoiceLedgerList } from '@/components/invoices/invoice-ledger-list';
 import { NewInvoiceDialog } from '@/components/invoices/new-invoice-dialog';
 import type { CurrencyOption, InvoiceRow } from '@/components/invoices/types';
-import { EmptyState, Page, PageHeader, Stat } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Stat,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -126,17 +133,30 @@ export default function InvoicesIndex({
         <>
             <Head title="Invoices" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`Billing — ${summary.outstanding_count} awaiting payment`}
                     title={
                         <>
-                            The <em>ledger</em>
+                            The <em>ledger</em>.
                         </>
                     }
                     description="Every invoice across every client — what's owed, what's late, and what's landed."
                     actions={
                         <>
-                            <Button variant="outline" asChild>
+                            {clients.length > 0 && (
+                                <NewInvoiceDialog
+                                    clients={clients}
+                                    currencies={currencies}
+                                    defaultCurrency={currency}
+                                    trigger={
+                                        <Button variant="spark" size="lg">
+                                            <Plus />
+                                            New invoice
+                                        </Button>
+                                    }
+                                />
+                            )}
+                            <Button variant="on-ink" size="lg" asChild>
                                 <a
                                     href={invoicesRoutes.export.url({
                                         query: exportQuery,
@@ -146,14 +166,22 @@ export default function InvoicesIndex({
                                     Export CSV
                                 </a>
                             </Button>
-                            {clients.length > 0 && (
-                                <NewInvoiceDialog
-                                    clients={clients}
-                                    currencies={currencies}
-                                    defaultCurrency={currency}
-                                />
-                            )}
                         </>
+                    }
+                    aside={
+                        <HeroStat
+                            icon={Wallet}
+                            eyebrow="Awaiting payment"
+                            value={String(summary.outstanding_count).padStart(
+                                2,
+                                '0',
+                            )}
+                            caption={
+                                summary.overdue_count > 0
+                                    ? `${summary.overdue_count} past due`
+                                    : 'All on track'
+                            }
+                        />
                     }
                 />
 

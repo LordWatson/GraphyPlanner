@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 import { LayoutGrid } from 'lucide-react';
 import { GridCard } from '@/components/grids/grid-card';
 import type { GridSummary } from '@/components/grids/types';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import { show as portalGridsShow } from '@/routes/portal/grids';
 
 /**
@@ -18,7 +18,7 @@ export default function PortalGridsIndex({ grids }: { grids: GridSummary[] }) {
         <>
             <Head title="Grids — Client portal" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={
                         waiting > 0
                             ? `Grids — ${waiting} waiting on you`
@@ -26,10 +26,28 @@ export default function PortalGridsIndex({ grids }: { grids: GridSummary[] }) {
                     }
                     title={
                         <>
-                            Your Instagram <em>grid</em>
+                            Your Instagram <em>grid</em>.
                         </>
                     }
                     description="How your profile will look over the next run of posts. Approve the look here; each caption comes to you separately."
+                    aside={
+                        <HeroStat
+                            icon={LayoutGrid}
+                            eyebrow={waiting > 0 ? 'Waiting on you' : 'Grids'}
+                            value={String(
+                                waiting > 0 ? waiting : grids.length,
+                            ).padStart(2, '0')}
+                            caption={
+                                waiting > 0
+                                    ? waiting === 1
+                                        ? 'Grid to approve'
+                                        : 'Grids to approve'
+                                    : grids.length === 1
+                                      ? 'Grid'
+                                      : 'Grids'
+                            }
+                        />
+                    }
                 />
                 {grids.length === 0 ? (
                     <EmptyState

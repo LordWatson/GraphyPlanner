@@ -103,6 +103,19 @@ class BrandBrain extends Model
     }
 
     /**
+     * Whether the brand's core identity (voice, audience, offer or content pillars) carries any
+     * content — the signal the setup checklists (ux-overhaul) use to tick off "Brand Brain".
+     */
+    public function isFilled(): bool
+    {
+        return filled(data_get($this->voice, 'tone'))
+            || filled(data_get($this->voice, 'personality'))
+            || filled(data_get($this->audience, 'description'))
+            || filled(data_get($this->offer, 'value_proposition'))
+            || ! empty($this->content_pillars);
+    }
+
+    /**
      * Render the brand brain as a Grok-ready context payload: a human-readable markdown
      * briefing plus the raw structured JSON, so Phase 2 caption assistance can consume either.
      *

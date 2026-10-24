@@ -73,6 +73,50 @@ class ClientTabsTest extends TestCase
                 ->missing('invoices'));
     }
 
+    public function test_a_fresh_client_exposes_an_incomplete_setup_checklist(): void
+    {
+        // MOVE 5 (ux-overhaul): a brand-new client has every setup step outstanding.
+        $this->actingAs($this->owner)
+            ->get(route('clients.show', $this->client))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('setup.brandBrain', false)
+                ->where('setup.accounts', false)
+                ->where('setup.portal', false)
+                ->where('setup.content', false)
+                ->where('setup.complete', false));
+    }
+
+    public function test_setup_checklist_steps_tick_off_and_complete(): void
+    {
+        // Accounts, portal invite and first post done, but the Brand Brain is still empty.
+        SocialAccount::factory()->for($this->client)->create(['org_id' => $this->org->id]);
+        ClientInvitation::factory()->for($this->client)->create();
+        Post::factory()->for($this->client)->create(['org_id' => $this->org->id]);
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.show', $this->client))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('setup.accounts', true)
+                ->where('setup.portal', true)
+                ->where('setup.content', true)
+                ->where('setup.brandBrain', false)
+                ->where('setup.complete', false));
+
+        // Filling any core Brand Brain field completes the last step.
+        $this->client->brandBrain()->create([
+            'voice' => ['tone' => 'Warm', 'personality' => null, 'do_nots' => []],
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('clients.show', $this->client))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('setup.brandBrain', true)
+                ->where('setup.complete', true));
+    }
+
     public function test_each_tab_renders_its_own_paginated_data(): void
     {
         Post::factory()->for($this->client)->count(30)->create(['org_id' => $this->org->id]);

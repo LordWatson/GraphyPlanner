@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import { ChapterHero, EmptyState, Page, Panel } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { http } from '@/lib/http';
@@ -117,7 +117,7 @@ export default function BusinessIdeas({
         <Page>
             <Head title="Ideas" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="For your brand"
                 title={
                     <>
@@ -128,9 +128,23 @@ export default function BusinessIdeas({
                 actions={
                     aiEnabled && (
                         <>
+                            <Button
+                                variant="spark"
+                                size="lg"
+                                disabled={generating}
+                                onClick={() => void generate()}
+                            >
+                                {generating ? (
+                                    <Loader2 className="animate-spin" />
+                                ) : (
+                                    <Sparkles />
+                                )}
+                                More ideas
+                            </Button>
                             {hasGoal && (
                                 <Button
-                                    variant="outline"
+                                    variant="on-ink"
+                                    size="lg"
                                     disabled={planning}
                                     onClick={() => void planWeek()}
                                 >
@@ -142,18 +156,6 @@ export default function BusinessIdeas({
                                     Plan my week
                                 </Button>
                             )}
-                            <Button
-                                variant="brand"
-                                disabled={generating}
-                                onClick={() => void generate()}
-                            >
-                                {generating ? (
-                                    <Loader2 className="animate-spin" />
-                                ) : (
-                                    <Sparkles />
-                                )}
-                                More ideas
-                            </Button>
                         </>
                     )
                 }

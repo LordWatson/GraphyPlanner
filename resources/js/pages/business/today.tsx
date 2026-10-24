@@ -12,6 +12,10 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    BrandSetupChecklist,
+    type BrandSetup,
+} from '@/components/business/brand-setup-checklist';
 import { ChapterHero, EmptyState, Page, Panel, Stat } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
@@ -52,6 +56,8 @@ type NeedsYouItem = {
 
 type Dashboard = {
     brand: { id: number; name: string };
+    /** UX overhaul (business propagation): the brand's get-set-up checklist signals. */
+    setup: BrandSetup;
     upNext: UpNext[];
     gaps: {
         days: GapDay[];
@@ -94,7 +100,8 @@ function greeting(): string {
 
 export default function Today() {
     const { dashboard } = usePage<{ dashboard: Dashboard }>().props;
-    const { brand, upNext, gaps, needsYou, thisWeek, ideaOfTheDay } = dashboard;
+    const { brand, setup, upNext, gaps, needsYou, thisWeek, ideaOfTheDay } =
+        dashboard;
 
     return (
         <Page>
@@ -131,6 +138,10 @@ export default function Today() {
                     </>
                 }
             />
+
+            {!setup.complete && (
+                <BrandSetupChecklist setup={setup} brandName={brand.name} />
+            )}
 
             <IdeaOfTheDayPanel idea={ideaOfTheDay} />
 

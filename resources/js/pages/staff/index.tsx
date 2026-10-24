@@ -6,7 +6,14 @@ import StaffInvitationController from '@/actions/App/Http/Controllers/StaffInvit
 import { confirmDialog } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/data-table';
 import InputError from '@/components/input-error';
-import { EmptyState, PageHeader, Panel, StatStrip } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Panel,
+    StatStrip,
+} from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -189,8 +196,8 @@ export default function StaffIndex({
     return (
         <>
             <Head title="Staff" />
-            <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-8 px-4 pt-6 pb-12 md:px-10 md:pt-10">
-                <PageHeader
+            <Page>
+                <ChapterHero
                     eyebrow={`${members.length} with access`}
                     title={
                         <>
@@ -198,6 +205,24 @@ export default function StaffIndex({
                         </>
                     }
                     description="Everyone with access to your organization, and anyone still waiting on an invite."
+                    actions={
+                        can.invite && (
+                            <Button variant="spark" size="lg" asChild>
+                                <a href="#invite">
+                                    <UserPlus />
+                                    Invite someone
+                                </a>
+                            </Button>
+                        )
+                    }
+                    aside={
+                        <HeroStat
+                            icon={UsersRound}
+                            eyebrow="With access"
+                            value={String(members.length).padStart(2, '0')}
+                            caption="Studio + client reviewers"
+                        />
+                    }
                 />
 
                 <StatStrip
@@ -226,6 +251,7 @@ export default function StaffIndex({
 
                 {can.invite && (
                     <Panel
+                        id="invite"
                         eyebrow="Grow the team"
                         title="Invite someone"
                         icon={UserPlus}
@@ -389,7 +415,7 @@ export default function StaffIndex({
                         />
                     </section>
                 )}
-            </div>
+            </Page>
         </>
     );
 }

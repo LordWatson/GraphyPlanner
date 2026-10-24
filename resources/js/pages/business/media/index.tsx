@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { confirmDialog } from '@/components/confirm-dialog';
-import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
+import { ChapterHero, EmptyState, Page, Panel } from '@/components/page';
 import { Pagination } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
 import {
@@ -202,7 +202,7 @@ export default function BusinessMedia({
         <Page>
             <Head title="Media" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="Your library"
                 title={
                     <>
@@ -212,17 +212,10 @@ export default function BusinessMedia({
                 description="Every photo and video, ready to drop into a post."
                 actions={
                     <>
-                        {aiEnabled && (
-                            <Button variant="outline" asChild>
-                                <Link href={imageStudio()}>
-                                    <Wand2 />
-                                    Create an image
-                                </Link>
-                            </Button>
-                        )}
                         {can.create && (
                             <Button
-                                variant="brand"
+                                variant="spark"
+                                size="lg"
                                 disabled={uploading}
                                 onClick={() => fileInput.current?.click()}
                             >
@@ -232,6 +225,14 @@ export default function BusinessMedia({
                                     <ImagePlus />
                                 )}
                                 Upload
+                            </Button>
+                        )}
+                        {aiEnabled && (
+                            <Button variant="on-ink" size="lg" asChild>
+                                <Link href={imageStudio()}>
+                                    <Wand2 />
+                                    Create an image
+                                </Link>
                             </Button>
                         )}
                     </>

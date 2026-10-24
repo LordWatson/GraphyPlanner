@@ -2,7 +2,6 @@ import { Deferred, Head, Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
-    ArrowUpRight,
     CalendarDays,
     CheckCircle2,
     ClipboardCheck,
@@ -29,12 +28,14 @@ import {
 import {
     ChapterHero,
     EmptyState,
+    HeroStat,
     Page,
     Panel,
     StatStrip,
 } from '@/components/page';
 import type { LiveCampaign } from '@/components/campaigns/live-campaigns-panel';
 import { LiveCampaignsPanel } from '@/components/campaigns/live-campaigns-panel';
+import { HomeViewTabs } from '@/components/home-view-tabs';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -223,7 +224,7 @@ export default function Dashboard({
 
     return (
         <>
-            <Head title="Overview" />
+            <Head title="Home" />
             <Page>
                 <ChapterHero
                     eyebrow={todayFormatter.format(new Date())}
@@ -250,28 +251,26 @@ export default function Dashboard({
                         </>
                     }
                     aside={
-                        <Link
-                            href={needsAttention()}
-                            className="group focus-visible:ring-ring flex flex-col items-start gap-2 rounded-2xl outline-none focus-visible:ring-[3px] lg:items-end"
-                        >
-                            <span className="eyebrow text-cream/70 flex items-center gap-2">
-                                <AlertTriangle className="text-lime size-3.5" />
-                                Needs attention
-                            </span>
-                            <span className="font-display text-lime text-[6.5rem] leading-[0.85] font-bold tracking-[-0.05em] tabular-nums sm:text-[8.5rem]">
-                                {String(summary.needsAttention).padStart(
-                                    2,
-                                    '0',
-                                )}
-                            </span>
-                            <span className="text-cream/80 inline-flex items-center gap-1 text-sm">
-                                {summary.needsAttention === 1
+                        <HeroStat
+                            icon={AlertTriangle}
+                            eyebrow="Needs attention"
+                            value={String(summary.needsAttention).padStart(
+                                2,
+                                '0',
+                            )}
+                            caption={
+                                summary.needsAttention === 1
                                     ? 'Decision waiting on you'
-                                    : 'Decisions waiting on you'}
-                                <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                            </span>
-                        </Link>
+                                    : 'Decisions waiting on you'
+                            }
+                            href={needsAttention().url}
+                        />
                     }
+                />
+
+                <HomeViewTabs
+                    attentionCount={summary.needsAttention}
+                    className="animate-rise"
                 />
 
                 <StatStrip
@@ -851,7 +850,7 @@ export default function Dashboard({
 Dashboard.layout = {
     breadcrumbs: [
         {
-            title: 'Overview',
+            title: 'Home',
             href: dashboard(),
         },
     ],

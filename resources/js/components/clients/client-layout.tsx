@@ -27,6 +27,7 @@ import {
 import type { ReactNode } from 'react';
 import { usePlatforms } from '@/lib/platforms';
 import { useState } from 'react';
+import { ClientSetupChecklist } from '@/components/clients/client-setup-checklist';
 import { HealthReasons } from '@/components/clients/health-reasons';
 import type {
     HealthReason,
@@ -138,6 +139,14 @@ export type ClientPageProps = {
         billing: { invoices: number; outstanding: CurrencyTotal[] } | null;
         portalAccess: { invitations: number; active: number } | null;
         ai: { trends: number; ideas: number; briefs: number } | null;
+    };
+    /** MOVE 5 (ux-overhaul): the new-client setup checklist signals. */
+    setup: {
+        brandBrain: boolean;
+        accounts: boolean;
+        portal: boolean;
+        content: boolean;
+        complete: boolean;
     };
 };
 
@@ -266,6 +275,7 @@ export function ClientLayout({
     tab,
     can,
     stats,
+    setup,
     children,
 }: ClientPageProps & { children: ReactNode }) {
     const { currency, auth } = usePage<{
@@ -578,6 +588,15 @@ export function ClientLayout({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                {/* MOVE 5 (ux-overhaul): the guided first-run, on the client's landing tab only. */}
+                {tab === 'accounts' && !setup.complete && (
+                    <ClientSetupChecklist
+                        client={client}
+                        can={can}
+                        setup={setup}
+                    />
+                )}
 
                 <div className="flex flex-col gap-4">
                     <nav

@@ -1,5 +1,12 @@
 import { Form, router } from '@inertiajs/react';
-import { Mail, RefreshCw, TriangleAlert } from 'lucide-react';
+import {
+    Check,
+    Copy,
+    Link2,
+    Mail,
+    RefreshCw,
+    TriangleAlert,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type {
@@ -7,48 +14,123 @@ import type {
     TargetData,
 } from '@/components/post-editor/types';
 import { Button } from '@/components/ui/button';
-import { retryFailedTargets } from '@/routes/posts';
+import { Input } from '@/components/ui/input';
+import { useClipboard } from '@/hooks/use-clipboard';
+import { postJson } from '@/lib/campaigns';
+import { retryFailedTargets, reviewLink } from '@/routes/posts';
 import postActivityLogs from '@/routes/posts/activity-logs';
 
-/** The review link the client was emailed, with a resend. */
+/**
+ * The client review link for a post waiting on the client: copy a fresh link to share over any
+ * channel (no email contact needed), and — when one was emailed — resend it. Either action mints a
+ * fresh link and turns the previous one off, so only the newest ever works (Step I-1.6).
+ */
 export function ReviewLinkRow({
     postId,
     log,
     canResend,
 }: {
     postId: number;
-    log: ActivityLogData;
+    /** The "review email sent" activity log, when the client was emailed; absent otherwise. */
+    log?: ActivityLogData;
     canResend: boolean;
 }) {
+    const [fresh, setFresh] = useState<string | null>(null);
+    const [minting, setMinting] = useState(false);
+    const [copiedText, copy] = useClipboard();
+
+    const makeLink = async () => {
+        setMinting(true);
+        const result = await postJson<{ url: string }>(reviewLink.url(postId));
+        setMinting(false);
+
+        if (!result.ok) {
+            toast.error(result.message);
+
+            return;
+        }
+
+        setFresh(result.data.url);
+
+        if (await copy(result.data.url)) {
+            toast.success('Review link copied. Paste it to the client.');
+        } else {
+            toast.message('Review link ready — copy it below.');
+        }
+    };
+
     return (
-        <div className="border-border bg-muted/40 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
-            <Mail className="text-muted-foreground size-4 shrink-0" />
-            <span className="text-muted-foreground min-w-0 flex-1 text-xs">
-                Review link emailed to the client. Re-sending issues a fresh
-                link and turns off the old one.
-            </span>
-            {canResend && (
-                <Form
-                    {...postActivityLogs.resendReviewEmail.form([
-                        postId,
-                        log.id,
-                    ])}
-                    options={{ preserveScroll: true, preserveState: true }}
-                    onSuccess={() => toast.success('Fresh review link sent.')}
-                >
-                    {({ processing }) => (
-                        <Button
-                            type="submit"
-                            variant="outline"
-                            size="sm"
-                            disabled={processing}
-                        >
-                            <Mail />
-                            {processing ? 'Sending…' : 'Resend email'}
-                        </Button>
-                    )}
-                </Form>
+        <div className="border-border bg-muted/40 flex flex-col gap-2 rounded-xl border px-3 py-2.5">
+            <div className="flex items-start gap-2">
+                <Link2 className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                <span className="text-muted-foreground min-w-0 flex-1 text-xs">
+                    Share this post’s review link with the client — over email,
+                    or anywhere you like. A fresh link turns the previous one
+                    off.
+                </span>
+            </div>
+
+            {fresh && (
+                <div className="flex gap-2">
+                    <Input
+                        readOnly
+                        value={fresh}
+                        onFocus={(event) => event.currentTarget.select()}
+                        className="h-9 font-mono text-xs"
+                        aria-label="Review link"
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void copy(fresh)}
+                    >
+                        {copiedText === fresh ? <Check /> : <Copy />}
+                        {copiedText === fresh ? 'Copied' : 'Copy'}
+                    </Button>
+                </div>
             )}
+
+            <div className="flex flex-wrap items-center gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void makeLink()}
+                    disabled={minting}
+                >
+                    <Link2 />
+                    {minting
+                        ? 'Making a link…'
+                        : fresh
+                          ? 'New link'
+                          : 'Copy review link'}
+                </Button>
+                {canResend && log && (
+                    <Form
+                        {...postActivityLogs.resendReviewEmail.form([
+                            postId,
+                            log.id,
+                        ])}
+                        options={{ preserveScroll: true, preserveState: true }}
+                        onSuccess={() =>
+                            toast.success('Fresh review link sent.')
+                        }
+                    >
+                        {({ processing }) => (
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                disabled={processing}
+                            >
+                                <Mail />
+                                {processing ? 'Sending…' : 'Resend email'}
+                            </Button>
+                        )}
+                    </Form>
+                )}
+            </div>
         </div>
     );
 }

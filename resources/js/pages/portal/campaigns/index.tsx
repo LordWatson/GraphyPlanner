@@ -2,7 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { ArrowUpRight, Clapperboard, FileSignature } from 'lucide-react';
 import { campaignSwatch } from '@/components/campaigns/campaign-chip';
 import type { CampaignTimeline } from '@/components/campaigns/types';
-import { EmptyState, Page, PageHeader } from '@/components/page';
+import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import { formatDateRange } from '@/lib/dates';
@@ -38,14 +38,26 @@ export default function PortalCampaignsIndex({
         <>
             <Head title="Campaigns — Client portal" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`Campaigns — ${campaigns.length} in total`}
                     title={
                         <>
-                            Your <em>campaigns</em>
+                            Your <em>campaigns</em>.
                         </>
                     }
                     description="What we’re running for your brand, when, and anything we need from you."
+                    aside={
+                        <HeroStat
+                            icon={Clapperboard}
+                            eyebrow="Running"
+                            value={String(campaigns.length).padStart(2, '0')}
+                            caption={
+                                campaigns.length === 1
+                                    ? 'Campaign'
+                                    : 'Campaigns'
+                            }
+                        />
+                    }
                 />
 
                 {campaigns.length === 0 ? (

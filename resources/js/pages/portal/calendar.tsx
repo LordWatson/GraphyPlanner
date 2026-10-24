@@ -1,7 +1,8 @@
 import { Head } from '@inertiajs/react';
 import type { CalendarPayload } from '@/components/content-calendar';
 import { ContentCalendar } from '@/components/content-calendar';
-import { Page, PageHeader } from '@/components/page';
+import { CalendarDays } from 'lucide-react';
+import { ChapterHero, HeroStat, Page } from '@/components/page';
 import { calendar as portalCalendar } from '@/routes/portal';
 import { show as portalPostsShow } from '@/routes/portal/posts';
 
@@ -20,14 +21,22 @@ export default function PortalCalendar({
         <>
             <Head title="Calendar — Client portal" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={`${client.name} — ${count} post${count === 1 ? '' : 's'} on the calendar`}
                     title={
                         <>
-                            Your <em>calendar</em>
+                            Your <em>calendar</em>.
                         </>
                     }
                     description="When and where every post is going out — in each account's own timezone, or the studio's."
+                    aside={
+                        <HeroStat
+                            icon={CalendarDays}
+                            eyebrow="Scheduled"
+                            value={String(count).padStart(2, '0')}
+                            caption={count === 1 ? 'Post' : 'Posts'}
+                        />
+                    }
                 />
                 <ContentCalendar
                     {...payload}

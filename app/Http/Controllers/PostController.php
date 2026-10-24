@@ -6,6 +6,7 @@ use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
 use App\Actions\Posts\Approvals\GenerateApprovalCertificatePdfAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
+use App\Actions\Posts\CreateShareableReviewLinkAction;
 use App\Actions\Posts\CreateSharePreviewAction;
 use App\Actions\Posts\DeletePostAction;
 use App\Actions\Posts\DuplicatePostAction;
@@ -464,6 +465,18 @@ class PostController extends Controller
         $action($activityLog);
 
         return to_route('posts.edit', $post);
+    }
+
+    /**
+     * UX overhaul (post-editor journey) — mint a fresh, copyable review link for a post waiting on
+     * the client, returned as JSON for the editor to reveal and copy. Same gate as re-sending the
+     * review email; the link rotates the post's token like the email does.
+     */
+    public function reviewLink(Post $post, CreateShareableReviewLinkAction $action): JsonResponse
+    {
+        $this->authorize('resendReviewEmail', $post);
+
+        return response()->json(['url' => $action($post)]);
     }
 
     /**

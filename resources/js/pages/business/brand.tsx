@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Sparkles, Target } from 'lucide-react';
-import { Page, PageHeader, Panel } from '@/components/page';
+import { ChapterHero, Page, Panel } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/input-error';
@@ -52,7 +52,7 @@ export default function BusinessBrand({
         <Page width="narrow">
             <Head title="Brand" />
 
-            <PageHeader
+            <ChapterHero
                 eyebrow="Who you are"
                 title={
                     <>

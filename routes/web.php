@@ -658,6 +658,10 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])
         ->name('posts.activity-logs.resend-review-email');
+    // UX overhaul (post-editor journey): mint a fresh, copyable review link (no email contact
+    // needed) for a post waiting on the client, to share over any channel.
+    Route::post('posts/{post}/review-link', [PostController::class, 'reviewLink'])
+        ->name('posts.review-link');
     Route::get('posts/{post}/music-search', [PostController::class, 'musicSearch'])
         ->middleware('throttle:music-search')
         ->name('posts.music-search');

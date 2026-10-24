@@ -84,6 +84,9 @@ class HandleInertiaRequests extends Middleware
                 return $current && $current->role === Role::ClientReviewer && $current->client_id
                     ? [
                         'pendingApprovals' => $cache->pendingApprovals($current->client_id),
+                        // The managing agency (the reviewer's organization). Surfaced on every portal
+                        // page so the client always sees who runs their account — not just "Alima".
+                        'agency' => ['name' => $current->organization?->name],
                         // Phase 18: the "Grids" nav item shows once the client has a grid to see.
                         'grids' => $cache->portalGrids($current->client_id),
                     ]

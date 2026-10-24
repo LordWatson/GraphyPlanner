@@ -1,7 +1,13 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowUpRight, Receipt } from 'lucide-react';
 
-import { EmptyState, Page, PageHeader, Stat } from '@/components/page';
+import {
+    ChapterHero,
+    EmptyState,
+    HeroStat,
+    Page,
+    Stat,
+} from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -57,14 +63,34 @@ export default function PortalInvoicesIndex({
         <>
             <Head title="Invoices — Client portal" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow="Billing"
                     title={
                         <>
-                            Your <em>invoices</em>
+                            Your <em>invoices</em>.
                         </>
                     }
                     description="Your billing history with the studio. Open any invoice to view or download the PDF."
+                    aside={
+                        <HeroStat
+                            icon={Receipt}
+                            eyebrow={
+                                unpaidCount > 0 ? 'Outstanding' : 'Billing'
+                            }
+                            value={String(
+                                unpaidCount > 0 ? unpaidCount : invoices.length,
+                            ).padStart(2, '0')}
+                            caption={
+                                unpaidCount > 0
+                                    ? overdueCount > 0
+                                        ? `${overdueCount} overdue`
+                                        : unpaidCount === 1
+                                          ? 'Unpaid invoice'
+                                          : 'Unpaid invoices'
+                                    : 'Invoices in total'
+                            }
+                        />
+                    }
                 />
 
                 {invoices.length === 0 ? (

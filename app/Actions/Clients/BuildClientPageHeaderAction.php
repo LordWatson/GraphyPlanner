@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Builder;
 class BuildClientPageHeaderAction
 {
     /**
-     * @return array{client: array<string, mixed>, can: array<string, bool>, tab: string, stats: array<string, mixed>}
+     * @return array{client: array<string, mixed>, can: array<string, bool>, tab: string, stats: array<string, mixed>, setup: array<string, bool>}
      */
     public function __invoke(Client $client, User $user, string $tab): array
     {
@@ -77,6 +77,11 @@ class BuildClientPageHeaderAction
             'client' => ClientPresenter::detail($client, $can['viewBilling'], $user),
             'can' => $can,
             'tab' => $tab,
+            // MOVE 5 (ux-overhaul): the guided first-run checklist for a new client. Each step is a
+            // completion signal derived from existing aggregates (no new query but the Brand Brain
+            // read); the frontend shows only the steps the viewer can act on and hides the whole
+            // card once they are done. See `clients/client-setup-checklist.tsx`.
+            'setup' => $this->setup($client, $counts),
             'stats' => [
                 'socialAccounts' => $can['viewSocialAccounts'] ? (int) $counts->social_accounts_count : 0,
                 'campaigns' => $can['viewCampaigns'] ? (int) $counts->campaigns_count : 0,
@@ -97,6 +102,30 @@ class BuildClientPageHeaderAction
                     'briefs' => DailyBrief::query()->where('client_id', $client->id)->count(),
                 ] : null,
             ],
+        ];
+    }
+
+    /**
+     * MOVE 5 (ux-overhaul): the new-client setup checklist signals. A step is "done" once its work
+     * exists; "complete" when every step is. The frontend gates each step by the viewer's abilities
+     * and hides the card when the visible steps are all done.
+     *
+     * @param  Client  $counts  the client row carrying the `withCount` aggregates
+     * @return array{brandBrain: bool, accounts: bool, portal: bool, content: bool, complete: bool}
+     */
+    private function setup(Client $client, Client $counts): array
+    {
+        $steps = [
+            'brandBrain' => $client->brandBrain?->isFilled() ?? false,
+            'accounts' => (int) $counts->getAttribute('social_accounts_count') > 0,
+            'portal' => (int) $counts->getAttribute('invitations_count') > 0,
+            'content' => (int) $counts->getAttribute('posts_count') > 0
+                || (int) $counts->getAttribute('campaigns_count') > 0,
+        ];
+
+        return [
+            ...$steps,
+            'complete' => ! in_array(false, $steps, true),
         ];
     }
 

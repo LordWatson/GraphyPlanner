@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { BookmarkPlus } from 'lucide-react';
-import { Page, PageHeader } from '@/components/page';
+import { ChapterHero, HeroStat, Page } from '@/components/page';
 import type { FilterState } from '@/components/super-admin/analytics-filter-bar';
 import {
     AnalyticsFilterBar,
@@ -44,7 +44,7 @@ export default function PlatformAnalytics({
         <>
             <Head title="Analytics" />
             <Page>
-                <PageHeader
+                <ChapterHero
                     eyebrow={formatDateRange(
                         summary.filters.from,
                         summary.filters.to,
@@ -56,7 +56,7 @@ export default function PlatformAnalytics({
                     }
                     description="Signups, publishing, billing and AI usage across every organization — demo data from the preview studio left out."
                     actions={
-                        <Button variant="outline" asChild>
+                        <Button variant="spark" size="lg" asChild>
                             <Link
                                 href={createReport({
                                     query: filterQuery(state),
@@ -66,6 +66,22 @@ export default function PlatformAnalytics({
                                 Save as report
                             </Link>
                         </Button>
+                    }
+                    aside={
+                        summary.posts && (
+                            <HeroStat
+                                eyebrow="Published"
+                                value={String(summary.posts.published).padStart(
+                                    2,
+                                    '0',
+                                )}
+                                caption={
+                                    summary.posts.published === 1
+                                        ? 'Post out the door'
+                                        : 'Posts out the door'
+                                }
+                            />
+                        )
                     }
                 />
 

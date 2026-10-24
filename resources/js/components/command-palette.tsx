@@ -1,11 +1,12 @@
 import { router, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
+    ClipboardCheck,
     CornerDownLeft,
     LayoutGrid,
+    ListChecks,
     Megaphone,
     Moon,
-    Plus,
     Search,
     Sun,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ import { useAppearance } from '@/hooks/use-appearance';
 import { useWorkspace } from '@/hooks/use-workspace';
 import type { Chapter } from '@/lib/chapters';
 import { businessChapters, chapters, platformChapters } from '@/lib/chapters';
+import { useCreateActions } from '@/lib/create-actions';
 import { cn, toUrl } from '@/lib/utils';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { today as businessToday } from '@/routes/business';
@@ -38,33 +40,20 @@ import { index as businessCollections } from '@/routes/business/collections';
 import { index as businessIdeas } from '@/routes/business/ideas';
 import { index as businessInsights } from '@/routes/business/insights';
 import { index as businessMedia } from '@/routes/business/media';
-import {
-    create as createBusinessPost,
-    index as businessPosts,
-} from '@/routes/business/posts';
-import {
-    create as createClient,
-    index as clientsIndex,
-} from '@/routes/clients';
+import { index as businessPosts } from '@/routes/business/posts';
+import { index as clientsIndex } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as contentIndex } from '@/routes/content';
 import { index as gridsIndex } from '@/routes/grids';
 import { index as myWorkIndex } from '@/routes/my-work';
-import { create as createAnalyticsReport } from '@/routes/analytics/reports';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
 import { dashboard as superAdminDashboard } from '@/routes/super-admin';
 import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
-import {
-    create as createOrganization,
-    index as superAdminOrganizations,
-} from '@/routes/super-admin/organizations';
-import {
-    create as createReport,
-    index as superAdminReports,
-} from '@/routes/super-admin/reports';
+import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
+import { index as superAdminReports } from '@/routes/super-admin/reports';
 import type { Auth } from '@/types';
 
 type Command = {
@@ -125,6 +114,9 @@ function useCommands(close: () => void): Command[] {
     const { auth } = usePage<{ auth: Auth }>().props;
     const { isBusiness } = useWorkspace();
     const { resolvedAppearance, updateAppearance } = useAppearance();
+    // MOVE 4 (ux-overhaul): the Create group is the shared `useCreateActions` set, so the palette
+    // and the header's New menu never drift.
+    const createActions = useCreateActions();
 
     return useMemo(() => {
         const visit = (href: Parameters<typeof toUrl>[0]) => () => {
@@ -153,14 +145,29 @@ function useCommands(close: () => void): Command[] {
         });
 
         const studioCommands: Command[] = [
-            chapterCommand(chapters.overview, dashboard()),
-            chapterCommand(chapters.attention, needsAttention()),
+            chapterCommand(chapters.home, dashboard()),
             {
-                ...chapterCommand(chapters.myWork, myWorkIndex()),
+                id: 'section-needs-attention',
+                group: 'Chapters',
+                label: 'Needs attention',
+                hint: 'Every decision waiting on the studio.',
+                keywords: 'queue blocked triage decisions attention needs',
+                icon: ListChecks,
+                chapter: chapters.home,
+                run: visit(needsAttention()),
+            },
+            {
+                id: 'section-my-work',
+                group: 'Chapters',
+                label: 'My work',
+                hint: 'Your posts: assigned, to review, due soon, mentioned.',
                 keywords: 'my work assigned mine review due mentioned tasks',
+                icon: ClipboardCheck,
+                chapter: chapters.home,
+                run: visit(myWorkIndex()),
             },
             chapterCommand(chapters.calendar, calendar()),
-            chapterCommand(chapters.clients, clientsIndex()),
+            chapterCommand(chapters.content, contentIndex()),
             {
                 id: 'section-campaigns',
                 group: 'Chapters',
@@ -168,7 +175,7 @@ function useCommands(close: () => void): Command[] {
                 hint: 'Every campaign, in one place.',
                 keywords: 'launch brief plan board',
                 icon: Megaphone,
-                chapter: chapters.clients,
+                chapter: chapters.content,
                 run: visit(campaignsIndex()),
             },
             {
@@ -178,9 +185,10 @@ function useCommands(close: () => void): Command[] {
                 hint: 'Plan each client’s Instagram grid.',
                 keywords: 'instagram grid profile plan preview',
                 icon: LayoutGrid,
-                chapter: chapters.clients,
+                chapter: chapters.content,
                 run: visit(gridsIndex()),
             },
+            chapterCommand(chapters.clients, clientsIndex()),
             ...(isBilling
                 ? [chapterCommand(chapters.invoices, invoicesIndex())]
                 : []),
@@ -216,18 +224,6 @@ function useCommands(close: () => void): Command[] {
                 ? [chapterCommand(businessChapters.team, staffIndex())]
                 : []),
             chapterCommand(businessChapters.settings, editProfile()),
-            {
-                id: 'create-post',
-                group: 'Create',
-                label: 'New post',
-                hint: 'Start a fresh post for your brand.',
-                keywords: 'new post create draft schedule',
-                icon: Plus,
-                run: () => {
-                    close();
-                    router.post(toUrl(createBusinessPost()));
-                },
-            },
         ];
 
         // Phase 15: super admins navigate the platform console, not the studio.
@@ -254,68 +250,23 @@ function useCommands(close: () => void): Command[] {
                           platformChapters.platformSettings,
                           editProfile(),
                       ),
-                      {
-                          id: 'create-organization',
-                          group: 'Create',
-                          label: 'Onboard an organization',
-                          hint: 'Set up a workspace and invite its owner.',
-                          keywords: 'new organization org signup onboard',
-                          icon: Plus,
-                          run: visit(createOrganization()),
-                      },
-                      {
-                          id: 'create-report',
-                          group: 'Create',
-                          label: 'Build a report',
-                          hint: 'Save an analytics view to re-run later.',
-                          keywords: 'new report analytics saved',
-                          icon: Plus,
-                          run: visit(createReport()),
-                      },
                   ]
                 : isBusiness
                   ? businessCommands
                   : studioCommands;
 
-        // Saved reports are built by Owners/Strategists (`OrganizationReportPolicy::create`).
-        if (!isBusiness && isBilling && canViewAnalytics) {
+        for (const action of createActions) {
             list.push({
-                id: 'create-analytics-report',
+                id: action.id,
                 group: 'Create',
-                label: 'Build a report',
-                hint: 'Save an analytics view to re-run, export or email.',
-                keywords: 'new report analytics saved export schedule',
-                icon: Plus,
-                run: visit(createAnalyticsReport()),
-            });
-        }
-
-        if (!isBusiness && isBilling) {
-            list.push({
-                id: 'create-client',
-                group: 'Create',
-                label: 'Add a client',
-                hint: 'Start a new retainer on the roster.',
-                keywords: 'new client brand onboard',
-                icon: Plus,
-                run: visit(createClient()),
-            });
-        }
-
-        // Step M-5.2: the producing roles can start a post from anywhere; the content hub's
-        // "New post" picker chooses the client (per-client create is re-checked server-side).
-        if (
-            !isBusiness &&
-            ['owner', 'strategist', 'designer'].includes(auth.user.role ?? '')
-        ) {
-            list.push({
-                id: 'create-post',
-                group: 'Create',
-                label: 'New post',
-                hint: 'Start a post for any client.',
-                keywords: 'new post create draft content',
-                icon: Plus,
-                run: visit(contentIndex()),
+                label: action.label,
+                hint: action.hint,
+                keywords: action.keywords,
+                icon: action.icon,
+                run: () => {
+                    close();
+                    action.perform();
+                },
             });
         }
 
@@ -339,6 +290,7 @@ function useCommands(close: () => void): Command[] {
         auth.user.role,
         auth.can?.viewAnalytics,
         isBusiness,
+        createActions,
         close,
         resolvedAppearance,
         updateAppearance,

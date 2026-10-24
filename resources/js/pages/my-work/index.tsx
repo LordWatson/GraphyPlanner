@@ -7,11 +7,13 @@ import {
     Eye,
     type LucideIcon,
 } from 'lucide-react';
+import { HomeViewTabs } from '@/components/home-view-tabs';
 import { EmptyState, Page, PageHeader, Panel } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
 import { formatDate, formatSchedule } from '@/lib/dates';
 import { cn } from '@/lib/utils';
+import { dashboard } from '@/routes';
 import { index as contentIndex } from '@/routes/content';
 import { index as myWorkIndex } from '@/routes/my-work';
 import { edit as editPost } from '@/routes/posts';
@@ -94,6 +96,8 @@ export default function MyWork({ buckets }: { buckets: Buckets }) {
                     }
                     description="Everything assigned to you, waiting on your review, due soon, or where you were mentioned."
                 />
+
+                <HomeViewTabs className="animate-rise" />
 
                 {SECTIONS.map((section) => {
                     const rows = buckets[section.key];
@@ -201,5 +205,8 @@ function WorkRow({ row, showDue }: { row: Row; showDue: boolean }) {
 }
 
 MyWork.layout = {
-    breadcrumbs: [{ title: 'My work', href: myWorkIndex() }],
+    breadcrumbs: [
+        { title: 'Home', href: dashboard() },
+        { title: 'My work', href: myWorkIndex() },
+    ],
 };
