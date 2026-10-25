@@ -18,7 +18,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { http } from '@/lib/http';
 import { cn } from '@/lib/utils';
 import { store as storePost } from '@/routes/clients/posts';
-import { store as storeSocialAccount } from '@/routes/clients/social-accounts';
 import { connect as connectSocialAccount } from '@/routes/social-accounts';
 
 type Voice = {
@@ -584,8 +583,11 @@ function AccountsStep({
         }
 
         setAdding(true);
+        // Brand-implicit onboarding route (brand resolved from CurrentWorkspace) that redirects back
+        // into the wizard. The agency `clients.social-accounts.store` route is gated by
+        // `workspace:agency` and 404s for a business/creator org.
         router.post(
-            storeSocialAccount.url(brandId),
+            OnboardingController.storeAccount.url(),
             { platform, handle: handle.trim(), timezone: defaultTimezone },
             {
                 preserveScroll: true,

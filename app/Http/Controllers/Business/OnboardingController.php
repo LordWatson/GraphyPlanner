@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Business;
 use App\Actions\AI\DraftBrandProfileAction;
 use App\Actions\BrandBrains\UpdateBrandBrainAction;
 use App\Actions\Clients\UpdateClientAction;
+use App\Actions\SocialAccounts\CreateSocialAccountAction;
 use App\Enums\ConnectionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Business\DraftBrandProfileRequest;
 use App\Http\Requests\Business\SaveBrandVoiceRequest;
 use App\Http\Requests\Business\UpdateBusinessBrandRequest;
+use App\Http\Requests\StoreSocialAccountRequest;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\SocialAccount;
@@ -75,6 +77,18 @@ class OnboardingController extends Controller
     public function saveVoice(SaveBrandVoiceRequest $request, CurrentWorkspace $workspace, UpdateBrandBrainAction $update): RedirectResponse
     {
         $update($workspace->brand(), $request->brandBrainData());
+
+        return back();
+    }
+
+    /**
+     * Step B-2.3 — add a social account from inside the wizard. Brand-implicit (resolved from
+     * `CurrentWorkspace` by {@see StoreSocialAccountRequest}) and returns `back()` so the user stays
+     * in the guided setup, unlike `business.accounts.store`, which redirects to the accounts page.
+     */
+    public function storeAccount(StoreSocialAccountRequest $request, CurrentWorkspace $workspace, CreateSocialAccountAction $action): RedirectResponse
+    {
+        $action($workspace->brand(), $request->validatedAccount());
 
         return back();
     }

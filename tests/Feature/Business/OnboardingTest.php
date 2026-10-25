@@ -224,6 +224,50 @@ class OnboardingTest extends TestCase
         $this->assertNull($brand->brandBrain()->first()->voice);
     }
 
+    public function test_a_business_owner_can_add_an_account_from_inside_the_wizard(): void
+    {
+        [$organization, $brand, $owner] = $this->businessWorkspace();
+
+        // Regression (B-2.3): the wizard "Add" button used to POST to the agency-only
+        // `clients.social-accounts.store` route, which 404s for a business org. It now uses the
+        // brand-implicit `business.onboarding.accounts.store` route, which returns `back()` so the
+        // user stays in the wizard rather than being bounced to the accounts page.
+        $this->actingAs($owner)
+            ->from(route('business.onboarding'))
+            ->post(route('business.onboarding.accounts.store'), [
+                'platform' => Platform::Instagram->value,
+                'handle' => '@sourdough',
+                'timezone' => 'Europe/London',
+            ])
+            ->assertRedirect(route('business.onboarding'));
+
+        $this->assertDatabaseHas('social_accounts', [
+            'org_id' => $organization->id,
+            'client_id' => $brand->id,
+            'platform' => Platform::Instagram->value,
+            'handle' => '@sourdough',
+        ]);
+    }
+
+    public function test_an_agency_cannot_use_the_business_onboarding_account_route(): void
+    {
+        $agencyOwner = User::factory()->create([
+            'org_id' => Organization::factory()->create(['type' => OrganizationType::Agency])->id,
+            'role' => Role::Owner,
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($agencyOwner)
+            ->post(route('business.onboarding.accounts.store'), [
+                'platform' => Platform::Instagram->value,
+                'handle' => '@agency',
+                'timezone' => 'Europe/London',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('social_accounts', 0);
+    }
+
     public function test_skipping_stamps_completion_and_redirects_to_the_dashboard(): void
     {
         [$organization, , $owner] = $this->businessWorkspace();

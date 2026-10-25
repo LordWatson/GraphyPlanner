@@ -192,6 +192,9 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
             ->middleware('throttle:ai')
             ->name('onboarding.draft');
         Route::put('voice', [BusinessOnboardingController::class, 'saveVoice'])->name('onboarding.voice');
+        // Step B-2.3: add a social account inline (brand implicit). Separate from `business.accounts.store`
+        // so it redirects back into the wizard instead of the accounts page.
+        Route::post('accounts', [BusinessOnboardingController::class, 'storeAccount'])->name('onboarding.accounts.store');
         Route::post('skip', [BusinessOnboardingController::class, 'skip'])->name('onboarding.skip');
         Route::post('complete', [BusinessOnboardingController::class, 'complete'])->name('onboarding.complete');
     });
