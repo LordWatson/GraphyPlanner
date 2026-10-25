@@ -15,18 +15,73 @@ export type EditorTab =
     | 'settings'
     | 'review';
 
+const TAB_IDS: EditorTab[] = [
+    'compose',
+    'channels',
+    'media',
+    'settings',
+    'review',
+];
+
+function isEditorTab(value: unknown): value is EditorTab {
+    return typeof value === 'string' && (TAB_IDS as string[]).includes(value);
+}
+
+/**
+ * A successful save remounts the whole page (Inertia drops the component state when there are no
+ * errors), which would otherwise snap the editor back to the first step. Remembering the open step
+ * per post in `sessionStorage` keeps the user on the step they were working on after saving.
+ */
+function readStoredTab(key: string | undefined): EditorTab | null {
+    if (!key) {
+        return null;
+    }
+
+    try {
+        const stored = window.sessionStorage.getItem(key);
+
+        return isEditorTab(stored) ? stored : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeStoredTab(key: string | undefined, tab: EditorTab) {
+    if (!key) {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(key, tab);
+    } catch {
+        // sessionStorage can be unavailable (private mode); the step simply won't persist.
+    }
+}
+
 /**
  * Step I-4.6 / M-1.6 — moving around the editor. The Write / Where & when / Media / Settings
  * panels are tabs: one shows at a time while the others stay mounted (so every field still
  * submits). The checklist's "jump to the field that fixes this" switches to that panel's tab,
  * brings it into view and flashes it; media framing jumps to the preview in the right rail.
  * `scope`/`previewId` keep the composer and preview on the one channel being customized.
+ *
+ * `persistKey` (when given) remembers the open step across a save-triggered remount — see
+ * `readStoredTab`.
  */
 export function useEditorNavigation(
     selectedIds: number[],
     initialTab: EditorTab = 'compose',
+    persistKey?: string,
 ) {
-    const [activeTab, setActiveTab] = useState<EditorTab>(initialTab);
+    const [activeTab, setActiveTabState] = useState<EditorTab>(
+        () => readStoredTab(persistKey) ?? initialTab,
+    );
+
+    // Every step change is mirrored to sessionStorage so it survives the save remount.
+    const setActiveTab = (tab: EditorTab) => {
+        setActiveTabState(tab);
+        writeStoredTab(persistKey, tab);
+    };
     const [flashed, setFlashed] = useState<EditorSection | null>(null);
     const [scope, setScope] = useState<ComposerScope>('all');
     const [previewId, setPreviewId] = useState<number | null>(null);

@@ -129,6 +129,7 @@ export default function PostEdit({
     const nav = useEditorNavigation(
         Object.keys(editor.state.schedule).map(Number),
         can.update && needsFeedback ? 'review' : 'compose',
+        `post-editor-step:${post.id}`,
     );
     const formRef = useRef<FormComponentRef>(null);
     const [showShortcuts, setShowShortcuts] = useState(false);

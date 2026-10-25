@@ -1,4 +1,5 @@
-import { ImagePlus, LibraryBig, Loader2, X } from 'lucide-react';
+import { GripVertical, ImagePlus, LibraryBig, Loader2, X } from 'lucide-react';
+import type { KeyboardEvent } from 'react';
 import { useRef, useState } from 'react';
 import { AssetLibraryDialog } from '@/components/post-editor/asset-library-dialog';
 import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
@@ -95,10 +96,25 @@ export function BrowseLibraryTile({ onClick }: { onClick: () => void }) {
     );
 }
 
+function moveItem(list: AssetData[], from: number, to: number): AssetData[] {
+    const next = [...list];
+    const [moved] = next.splice(from, 1);
+    next.splice(Math.max(0, Math.min(next.length, to)), 0, moved);
+
+    return next;
+}
+
+const orderOf = (assets: AssetData[]) => assets.map((a) => a.id).join(',');
+const nameOf = (asset: AssetData) => asset.original_filename ?? 'this item';
+
 /**
  * The post's attached media, in publish order, plus two tiles: upload a new file (click or drop)
  * straight into the client's library, or browse the existing library in a searchable, paged
  * dialog. Only attached assets render here, so a large library never crowds the editor.
+ *
+ * The attached tiles reorder like the grid board: drag one onto another (mouse), or focus its grip
+ * handle and press space to lift it, the arrow keys to move it, space to drop (escape cancels) —
+ * announced to screen readers. The number badge is the publish order and updates live.
  */
 export function MediaPicker({
     clientId,
@@ -119,14 +135,148 @@ export function MediaPicker({
     onUpload: (file: File) => void;
 }) {
     const [browsing, setBrowsing] = useState(false);
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [overIndex, setOverIndex] = useState<number | null>(null);
+    // A keyboard drag stages its order here until dropped, so Escape can cancel it cleanly.
+    const [lifted, setLifted] = useState<{
+        id: number;
+        order: AssetData[];
+    } | null>(null);
+    const [announcement, setAnnouncement] = useState('');
+    const handleRefs = useRef(new Map<number, HTMLButtonElement>());
+
+    // While a keyboard drag is in flight the staged order is shown; otherwise the saved order.
+    const order = lifted?.order ?? selected;
+
+    const commit = (next: AssetData[]) => {
+        if (orderOf(next) !== orderOf(selected)) {
+            onChange(next);
+        }
+    };
+
+    const onDrop = (to: number) => {
+        if (dragIndex === null) {
+            return;
+        }
+
+        if (dragIndex !== to) {
+            commit(moveItem(selected, dragIndex, to));
+            setAnnouncement(
+                `Moved to position ${to + 1} of ${selected.length}.`,
+            );
+        }
+
+        setDragIndex(null);
+        setOverIndex(null);
+    };
+
+    const handleKeyDown = (
+        event: KeyboardEvent<HTMLButtonElement>,
+        asset: AssetData,
+    ) => {
+        if (event.key === ' ' || event.key === 'Enter') {
+            event.preventDefault();
+
+            if (!lifted) {
+                setLifted({ id: asset.id, order: selected });
+                setAnnouncement(
+                    `${nameOf(asset)} lifted. Use the arrow keys to move it, space to drop, escape to cancel.`,
+                );
+
+                return;
+            }
+
+            const position =
+                lifted.order.findIndex((a) => a.id === lifted.id) + 1;
+            commit(lifted.order);
+            setLifted(null);
+            setAnnouncement(`Dropped at position ${position}.`);
+
+            return;
+        }
+
+        if (lifted && event.key === 'Escape') {
+            event.preventDefault();
+            setLifted(null);
+            setAnnouncement('Move cancelled.');
+
+            return;
+        }
+
+        if (
+            lifted &&
+            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(
+                event.key,
+            )
+        ) {
+            event.preventDefault();
+            const from = lifted.order.findIndex((a) => a.id === lifted.id);
+            const step =
+                event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+            const to = from + step;
+
+            if (to < 0 || to >= lifted.order.length) {
+                return;
+            }
+
+            const nextOrder = moveItem(lifted.order, from, to);
+            setLifted({ id: lifted.id, order: nextOrder });
+            setAnnouncement(
+                `Moved to position ${to + 1} of ${nextOrder.length}.`,
+            );
+            requestAnimationFrame(() =>
+                handleRefs.current.get(asset.id)?.focus(),
+            );
+        }
+    };
+
+    const reorderable = selected.length > 1;
 
     return (
         <div className="grid gap-3">
+            <div aria-live="assertive" className="sr-only">
+                {announcement}
+            </div>
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-                {selected.map((asset, index) => (
+                {order.map((asset, index) => (
                     <li
                         key={asset.id}
-                        className="group bg-muted border-border relative aspect-square overflow-hidden rounded-xl border"
+                        // Only a mouse drag sets `draggable`; during a keyboard lift it's off so the
+                        // two interactions can't fight over the index.
+                        draggable={reorderable && lifted === null}
+                        onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = 'move';
+                            setDragIndex(index);
+                        }}
+                        onDragEnd={() => {
+                            setDragIndex(null);
+                            setOverIndex(null);
+                        }}
+                        onDragOver={(event) => {
+                            if (dragIndex !== null) {
+                                event.preventDefault();
+                                setOverIndex(index);
+                            }
+                        }}
+                        onDragLeave={() =>
+                            setOverIndex((current) =>
+                                current === index ? null : current,
+                            )
+                        }
+                        onDrop={(event) => {
+                            event.preventDefault();
+                            onDrop(index);
+                        }}
+                        className={cn(
+                            'group bg-muted border-border relative aspect-square overflow-hidden rounded-xl border',
+                            reorderable && 'cursor-grab active:cursor-grabbing',
+                            overIndex === index &&
+                                dragIndex !== index &&
+                                'ring-primary z-10 ring-2',
+                            dragIndex === index && 'opacity-50',
+                            lifted?.id === asset.id &&
+                                'ring-electric z-20 ring-2',
+                        )}
                         title={asset.original_filename ?? undefined}
                     >
                         <AssetThumbnail asset={asset} />
@@ -154,6 +304,32 @@ export function MediaPicker({
                         >
                             <X className="size-3.5" />
                         </button>
+                        {reorderable && (
+                            <button
+                                type="button"
+                                ref={(element) => {
+                                    if (element) {
+                                        handleRefs.current.set(
+                                            asset.id,
+                                            element,
+                                        );
+                                    } else {
+                                        handleRefs.current.delete(asset.id);
+                                    }
+                                }}
+                                onKeyDown={(event) =>
+                                    handleKeyDown(event, asset)
+                                }
+                                aria-label={
+                                    lifted?.id === asset.id
+                                        ? `Moving ${nameOf(asset)}, position ${index + 1} of ${order.length}. Arrow keys to move, space to drop, escape to cancel.`
+                                        : `Reorder ${nameOf(asset)}, position ${index + 1} of ${order.length}. Press space to lift, then the arrow keys.`
+                                }
+                                className="bg-card/90 border-border text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-ring/40 absolute right-1.5 bottom-1.5 flex size-6 cursor-grab items-center justify-center rounded-full border opacity-0 transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-[3px] active:cursor-grabbing [@media(hover:none)]:opacity-100"
+                            >
+                                <GripVertical className="size-3.5" />
+                            </button>
+                        )}
                     </li>
                 ))}
 
@@ -168,10 +344,18 @@ export function MediaPicker({
                 </li>
             </ul>
 
-            {selected.length === 0 && (
+            {selected.length === 0 ? (
                 <p className="text-muted-foreground text-xs">
                     No media attached yet.
                 </p>
+            ) : (
+                reorderable && (
+                    <p className="text-muted-foreground text-xs">
+                        Drag a tile to reorder, or focus its grip handle and
+                        press space, then the arrow keys. The number is the
+                        order it publishes in.
+                    </p>
+                )
             )}
 
             {selected.map((asset, i) => (

@@ -29,6 +29,7 @@ export function AssetThumbnail({ asset }: { asset: AssetData }) {
                     src={asset.thumbnail_url}
                     alt={asset.original_filename ?? ''}
                     loading="lazy"
+                    draggable={false}
                     className="size-full object-cover"
                 />
                 {isVideo(asset) && (
@@ -44,6 +45,7 @@ export function AssetThumbnail({ asset }: { asset: AssetData }) {
                 src={asset.url}
                 alt={asset.original_filename ?? ''}
                 loading="lazy"
+                draggable={false}
                 className="size-full object-cover"
             />
         );
@@ -56,6 +58,7 @@ export function AssetThumbnail({ asset }: { asset: AssetData }) {
                     src={asset.url}
                     muted
                     preload="metadata"
+                    draggable={false}
                     className="size-full object-cover"
                 />
                 <Film className="text-ink-foreground absolute bottom-2 left-2 size-4 drop-shadow" />

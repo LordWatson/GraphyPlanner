@@ -1,7 +1,12 @@
-import { Loader2, Sparkles } from 'lucide-react';
+import { ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
 import type { AssetData } from '@/components/post-editor/types';
 import { Button } from '@/components/ui/button';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -55,6 +60,10 @@ export function MediaDetails({
 }) {
     const images = assets.filter(isImage);
     const video = assets.find(isVideo);
+    // Alt text is rarely filled in, so the section starts collapsed unless there's already some.
+    const describedCount = images.filter(
+        (image) => (altTexts[image.id] ?? '').trim() !== '',
+    ).length;
 
     if (images.length === 0 && !video) {
         return null;
@@ -143,62 +152,79 @@ export function MediaDetails({
             )}
 
             {images.length > 0 && !video && (
-                <div className="grid gap-3">
-                    <div>
-                        <p className="text-sm font-medium">Alt text</p>
+                <Collapsible
+                    defaultOpen={describedCount > 0}
+                    className="grid gap-3"
+                >
+                    <CollapsibleTrigger className="group focus-visible:ring-ring/50 -mx-1 flex items-center justify-between gap-3 rounded-lg px-1 py-1 text-start outline-none focus-visible:ring-[3px]">
+                        <span className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                                Alt text
+                            </span>
+                            <span className="text-muted-foreground font-mono text-xs">
+                                {describedCount > 0
+                                    ? `${describedCount} of ${images.length} described`
+                                    : 'optional'}
+                            </span>
+                        </span>
+                        <ChevronDown className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="grid gap-3">
                         <p className="text-muted-foreground text-xs">
                             {altTextPlatforms.length > 0
                                 ? `Describes each image for screen readers on ${altTextPlatforms.join(', ')}.`
                                 : 'None of the selected channels publish alt text.'}
                         </p>
-                    </div>
-                    <ul className="grid gap-2.5">
-                        {images.map((image, index) => (
-                            <li
-                                key={image.id}
-                                className="flex items-center gap-3"
-                            >
-                                <span className="border-border bg-muted relative size-12 shrink-0 overflow-hidden rounded-lg border">
-                                    <AssetThumbnail asset={image} />
-                                </span>
-                                <Input
-                                    aria-label={`Alt text for image ${index + 1}`}
-                                    dir="auto"
-                                    maxLength={1000}
-                                    value={altTexts[image.id] ?? ''}
-                                    onChange={(e) =>
-                                        onAltTextChange(
-                                            image.id,
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g. A flat white on a marble counter, morning light"
-                                />
-                                {onSuggestAltText && (
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        className="size-9 shrink-0"
-                                        aria-label={`Suggest alt text for image ${index + 1} with AI`}
-                                        disabled={
-                                            suggestingAltTextFor === image.id
+                        <ul className="grid gap-2.5">
+                            {images.map((image, index) => (
+                                <li
+                                    key={image.id}
+                                    className="flex items-center gap-3"
+                                >
+                                    <span className="border-border bg-muted relative size-12 shrink-0 overflow-hidden rounded-lg border">
+                                        <AssetThumbnail asset={image} />
+                                    </span>
+                                    <Input
+                                        aria-label={`Alt text for image ${index + 1}`}
+                                        dir="auto"
+                                        maxLength={1000}
+                                        value={altTexts[image.id] ?? ''}
+                                        onChange={(e) =>
+                                            onAltTextChange(
+                                                image.id,
+                                                e.target.value,
+                                            )
                                         }
-                                        onClick={() =>
-                                            onSuggestAltText(image.id)
-                                        }
-                                    >
-                                        {suggestingAltTextFor === image.id ? (
-                                            <Loader2 className="animate-spin" />
-                                        ) : (
-                                            <Sparkles />
-                                        )}
-                                    </Button>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                                        placeholder="e.g. A flat white on a marble counter, morning light"
+                                    />
+                                    {onSuggestAltText && (
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            className="size-9 shrink-0"
+                                            aria-label={`Suggest alt text for image ${index + 1} with AI`}
+                                            disabled={
+                                                suggestingAltTextFor ===
+                                                image.id
+                                            }
+                                            onClick={() =>
+                                                onSuggestAltText(image.id)
+                                            }
+                                        >
+                                            {suggestingAltTextFor ===
+                                            image.id ? (
+                                                <Loader2 className="animate-spin" />
+                                            ) : (
+                                                <Sparkles />
+                                            )}
+                                        </Button>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </CollapsibleContent>
+                </Collapsible>
             )}
         </div>
     );
