@@ -209,7 +209,7 @@ export function DeliverableDialog({
                             <InputError message={form.errors.title} />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="grid gap-1.5">
                                 <Label>Platform</Label>
                                 <Select
@@ -285,7 +285,7 @@ export function DeliverableDialog({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="deliverable-date">
                                     Goes out
@@ -314,7 +314,7 @@ export function DeliverableDialog({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="deliverable-format">
                                     Format

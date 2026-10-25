@@ -105,7 +105,7 @@ export function UseTemplateDialog({
                             <InputError message={form.errors.client_id} />
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="grid gap-1.5">
                             <Label htmlFor="template-name">Campaign name</Label>
                             <Input
