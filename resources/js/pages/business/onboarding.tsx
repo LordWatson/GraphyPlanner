@@ -621,9 +621,7 @@ function AccountsStep({
                         Back
                     </Button>
                     <Button onClick={onNext}>
-                        {accounts.some((account) => account.connected)
-                            ? 'Continue'
-                            : 'I’ll do this later'}
+                        {accounts.length > 0 ? 'Next' : 'I’ll do this later'}
                     </Button>
                 </>
             }

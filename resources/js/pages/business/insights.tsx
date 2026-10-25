@@ -155,7 +155,7 @@ export default function BusinessInsights({
                 }
             />
 
-            <Deferred data="takeaways" fallback={null}>
+            <Deferred data="takeaways" fallback={<></>}>
                 <TakeawaysPanel takeaways={takeaways} />
             </Deferred>
 
