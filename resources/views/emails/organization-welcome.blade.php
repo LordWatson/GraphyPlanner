@@ -36,13 +36,27 @@
                                 <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
                                     Our team created this workspace for you. Choose a password to sign in for the first time.
                                 </p>
+                            @elseif ($verifyUrl)
+                                <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
+                                    One quick step first: confirm this is your email address. The button below verifies
+                                    your email and takes you straight into {{ $organizationName }} — no separate sign-in needed.
+                                </p>
                             @endif
+
+                            @php
+                                $ctaUrl = $setPasswordUrl ?? $verifyUrl ?? $dashboardUrl;
+                                $ctaLabel = $setPasswordUrl
+                                    ? 'Choose your password'
+                                    : ($verifyUrl
+                                        ? 'Verify my email & get started'
+                                        : ($isBusiness ? 'Set up my brand' : "Let's get started"));
+                            @endphp
 
                             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                                 <tr>
                                     <td style="border-radius:999px; background-color:#181723;">
-                                        <a href="{{ $setPasswordUrl ?? $dashboardUrl }}" style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:600; color:#F5F2E8; text-decoration:none; border-radius:999px;">
-                                            {{ $setPasswordUrl ? 'Choose your password' : ($isBusiness ? 'Set up my brand' : "Let's get started") }}
+                                        <a href="{{ $ctaUrl }}" style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:600; color:#F5F2E8; text-decoration:none; border-radius:999px;">
+                                            {{ $ctaLabel }}
                                         </a>
                                     </td>
                                 </tr>
@@ -52,6 +66,11 @@
                                 <p style="margin:0 0 24px; font-size:12px; line-height:1.6; color:#6B6977;">
                                     This link expires after {{ config('auth.passwords.users.expire', 60) }} minutes. If it has, request a fresh one at
                                     <a href="{{ $forgotPasswordUrl }}" style="color:#205557;">{{ $forgotPasswordUrl }}</a> using this email address.
+                                </p>
+                            @elseif ($verifyUrl)
+                                <p style="margin:0 0 24px; font-size:12px; line-height:1.6; color:#6B6977;">
+                                    This link is valid for 48 hours. If it has expired, sign in with your email and password
+                                    and we'll send you a fresh one.
                                 </p>
                             @endif
 

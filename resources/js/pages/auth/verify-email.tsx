@@ -13,10 +13,18 @@ export default function VerifyEmail({ status }: { status?: string }) {
 
             {status === 'verification-link-sent' && (
                 <div className="text-success mb-4 text-center text-sm font-medium">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
+                    A fresh verification link is on its way to the email address
+                    you signed up with.
                 </div>
             )}
+
+            <p className="text-muted-foreground mb-6 text-center text-sm">
+                We've sent you a welcome email. Hit the{' '}
+                <span className="font-medium">Verify my email</span> button
+                inside it and you'll land straight in your workspace — no need
+                to come back here. Can't find it? Check your spam folder, or
+                send yourself a new link below.
+            </p>
 
             <Form {...send.form()} className="space-y-6 text-center">
                 {({ processing }) => (
@@ -40,7 +48,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
 }
 
 VerifyEmail.layout = {
-    title: 'Check your inbox.',
+    title: 'Almost there — check your inbox.',
     description:
-        'Please verify your email address by clicking on the link we just emailed to you.',
+        'Your workspace is ready. Confirm your email from the welcome message we just sent to get started.',
 };

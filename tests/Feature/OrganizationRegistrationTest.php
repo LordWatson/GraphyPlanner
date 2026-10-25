@@ -6,7 +6,6 @@ use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Organization;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -75,11 +74,40 @@ class OrganizationRegistrationTest extends TestCase
         $this->assertAuthenticatedAs($owner);
         $response->assertRedirect(route('dashboard'));
 
-        // Fortify's email verification runs for the new owner, and the welcome email is queued.
-        Notification::assertSentTo($owner, VerifyEmail::class);
+        // A single welcome email carries the one link the owner needs — a signed verification URL.
+        // No separate Fortify verification email is sent (that would be a second email).
+        Notification::assertNothingSent();
         Mail::assertQueued(OrganizationWelcomeMail::class, fn (OrganizationWelcomeMail $mail) => $mail->hasTo('rae@northlight.test')
             && $mail->owner->is($owner)
-            && $mail->setPasswordUrl === null);
+            && $mail->setPasswordUrl === null
+            && $mail->verifyUrl !== null
+            && str_contains((string) $mail->verifyUrl, 'signature='));
+    }
+
+    public function test_the_single_welcome_email_link_verifies_the_owners_email(): void
+    {
+        Mail::fake();
+        Notification::fake();
+
+        $this->post(route('organizations.register.store'), $this->payload());
+
+        $owner = User::query()->sole();
+        $this->assertNull($owner->email_verified_at);
+
+        $verifyUrl = null;
+        Mail::assertQueued(OrganizationWelcomeMail::class, function (OrganizationWelcomeMail $mail) use (&$verifyUrl) {
+            $verifyUrl = $mail->verifyUrl;
+
+            return true;
+        });
+
+        $this->assertNotNull($verifyUrl);
+
+        // The owner is already signed in from signup, so following the one emailed link both
+        // verifies the address and lands them in the app — exactly one click, one email.
+        $this->get($verifyUrl)->assertRedirect(route('dashboard', absolute: false).'?verified=1');
+
+        $this->assertTrue($owner->fresh()->hasVerifiedEmail());
     }
 
     public function test_an_unverified_new_owner_is_asked_to_verify_before_using_the_studio(): void

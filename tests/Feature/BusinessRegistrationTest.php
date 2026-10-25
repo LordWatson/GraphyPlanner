@@ -9,7 +9,6 @@ use App\Mail\OrganizationWelcomeMail;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -81,9 +80,13 @@ class BusinessRegistrationTest extends TestCase
         $this->assertAuthenticatedAs($owner);
         $response->assertRedirect(route('business.onboarding'));
 
-        Notification::assertSentTo($owner, VerifyEmail::class);
+        // One welcome email, one link: the signed verification URL. No separate verification email.
+        Notification::assertNothingSent();
         Mail::assertQueued(OrganizationWelcomeMail::class, fn (OrganizationWelcomeMail $mail) => $mail->hasTo('jess@sourdough.test')
-            && $mail->owner->organization->isBusiness());
+            && $mail->owner->organization->isBusiness()
+            && $mail->setPasswordUrl === null
+            && $mail->verifyUrl !== null
+            && str_contains((string) $mail->verifyUrl, 'signature='));
     }
 
     public function test_a_creator_signup_stores_the_creator_brand_kind(): void

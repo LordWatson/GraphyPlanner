@@ -11,11 +11,11 @@ use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Organization;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
@@ -24,8 +24,11 @@ use Illuminate\Support\Str;
  * can never exist.
  *
  * Two callers share it:
- * - the public signup (`/register-organization`) passes the owner's chosen password; Fortify's
- *   email verification is then triggered through the `Registered` event;
+ * - the public signup (`/register-organization` and `/start`) passes the owner's chosen password.
+ *   A single welcome email carries the one link they need: a signed email-verification URL. We do
+ *   **not** fire Laravel's `Registered` event here, because its `SendEmailVerificationNotification`
+ *   listener would send a *second*, separate verification email — the whole point of this path is
+ *   that the owner receives exactly one email with exactly one button;
  * - a super admin onboarding an org on a customer's behalf (Step 15.3) passes no password and
  *   `$onboardedBy`: the owner gets a random password plus a "set your password" link in the
  *   welcome email — that link is the only way in, so it also counts as email verification.
@@ -94,11 +97,12 @@ class RegisterOrganizationAction
             'email' => $owner->email,
         ]);
 
-        if ($selfServe) {
-            event(new Registered($owner));
-        }
+        // Self-serve owners verify their email by clicking the single button in the welcome email.
+        // The link is generous-lived (48h) so a welcome email opened the next day still works; if it
+        // ever lapses, the signed-in owner is bounced to the verification notice and can resend.
+        $verifyUrl = $selfServe ? $this->verificationUrl($owner) : null;
 
-        Mail::to($owner->email)->queue(new OrganizationWelcomeMail($owner, $setPasswordUrl));
+        Mail::to($owner->email)->queue(new OrganizationWelcomeMail($owner, $setPasswordUrl, $verifyUrl));
 
         Log::info('Organization registered', [
             'org_id' => $owner->org_id,
@@ -110,6 +114,21 @@ class RegisterOrganizationAction
         ]);
 
         return $owner;
+    }
+
+    /**
+     * Build the same signed `verification.verify` URL Laravel's `VerifyEmail` notification would,
+     * so the welcome email's button both proves inbox ownership and marks the address verified —
+     * but with a 48-hour window rather than the default 60 minutes (this is a welcome email, not a
+     * just-requested resend).
+     */
+    private function verificationUrl(User $owner): string
+    {
+        return URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addHours(48),
+            ['id' => $owner->getKey(), 'hash' => sha1($owner->getEmailForVerification())],
+        );
     }
 
     private function resolveType(string|OrganizationType|null $type): OrganizationType
