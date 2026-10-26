@@ -34,6 +34,7 @@ accurate context without re-deriving it from the whole codebase.
 | `grid-planner.md` | Instagram grid planner: grid plans, layout core (PHP/TS), live profile feed, planner + preview, grid approval (review link + portal), tiles → posts, sequence scheduling, drift + order-at-risk, AI assist | Done (Phase 18, Steps 18.1–18.14) |
 | `frontend.md` | Frontend foundation: shared `DataTable`, date/time + search pickers, `http` helper, CI guard rails, Vitest + Playwright harness | Done (Steps M-1.4, M-1.5; editor split M-1.6 in `posts.md`) |
 | `inbox.md` | Social inbox: comment ingestion (`CommentSource`), threaded conversations, triage/assignment/saved replies/SLA, AI draft replies (human sends) | Done (Phase M-9) |
+| `mcp.md` | MCP server ("Graphy for your AI assistant"): tools/resources/prompts exposing Graphy over the Model Context Protocol (`.junie/plans/mcp-server.md`) | In progress (Phase MCP-0 learning spike — no auth/tenancy yet) |
 | `business-workspaces.md` | Business & creator workspaces: `OrganizationType`, primary brand, `CurrentWorkspace`, workspace guards, role mapping, signup/onboarding, solo workflow, the business app shell (routes, nav, Today dashboard, posting goal, copy), managed publishing, tuned AI, and phone-first creation (PWA, quick post, push), and single-brand insights + media kit (`.junie/plans/business-workspaces.md`) | In progress (Phases B-0–B-8 done) |
 
 Add new rows/files here as new modules are introduced. Only list files that exist:
