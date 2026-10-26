@@ -40,7 +40,7 @@ MCP-4 tools are `#[IsDestructive]`.
 | Tool | `get_client` | `Read` | `Client::healthFor()` + `ClientHealthService` | MCP-2.1 |
 | Tool | `get_brand_brain` | `Read` | `BrandBrain::toGrokContext()` | MCP-2.1 |
 | Tool | `list_posts` | `Read` | `ListPostsAction::query()` (pinned to org) | MCP-2.2 |
-| Tool | `get_post` | `Read` | `EvaluatePostChecklistAction` + per-target local/org times | MCP-2.2 |
+| Tool | `get_post` | `Read` | `EvaluatePostChecklistAction` + per-target local/org times + **attached images as vision previews** (`McpImagePreview`, default on, `include_media`) | MCP-2.2 |
 | Tool | `get_calendar` | `Read` | `GetCalendarPostsAction` + `BuildCalendarOccurrencesAction` | MCP-2.3 |
 | Tool | `list_campaigns` | `Read` | org-scoped `Campaign` query | MCP-2.4 |
 | Tool | `get_campaign` | `Read` | `GetCampaignOverviewAction` | MCP-2.4 |
@@ -272,6 +272,15 @@ many posts ("create 3 posts, I'll upload media for each"):
   `App\Support\Mcp\McpImagePreview` (bounded ~768px JPEG, from the asset's thumbnail or original via
   `AssetStorage::contents()` + GD — the `ProbeAssetJob` stack; best-effort, metadata-only on failure).
 
+**Seeing a post's media the robust way (`get_post`).** When media is uploaded for named posts it is
+attached server-side on upload, so `get_post` (keyed by `post_id` — which clients pass reliably, unlike
+a `session_id` a model must carry across turns) returns the post's attached images as vision previews
+(default on; `include_media: false` for text only). This is the dependable path for the media-first
+flow and sidesteps a real client-side failure mode observed in the wild: Claude Desktop sometimes calls
+`get_media_upload` with **no `session_id`** at all (→ "The session id field is required") — the server,
+schema and both int/string values are proven correct by `McpUploadSessionTest` (incl. an HTTP-transport
+test), so the fix is to not depend on that call for post-attached media.
+
 **Media-FIRST ordering (as built):** when content should be shaped *by* media the user provides, the
 instructions tell the model to get the media before finalising captions — either library-first
 (`request_media_upload` with no posts → view → `create_draft_post(asset_ids, caption)`) or placeholder-
@@ -441,6 +450,14 @@ is enforced and the test that proves it.
 
 ## Changelog
 
+- 2026-10-26: Media over MCP — **`get_post` returns the post's images as vision previews** (default on,
+  `include_media` flag; reuses `McpImagePreview`). Robustness fix after a real run where Claude Desktop
+  called `get_media_upload` with no `session_id` ("field is required") — a client-side omission (server/
+  schema/int+string all proven correct, incl. a new HTTP-transport regression test). Since uploaded
+  media is attached to its post server-side, `get_post(post_id)` is the reliable way for the assistant
+  to SEE a post's media (post_id is passed reliably), so the media-first captioning flow no longer hinges
+  on `get_media_upload`. Server instructions updated to prefer `get_post` for post-attached media. Pint +
+  PHPStan L7 clean; 34 affected tests green.
 - 2026-10-26: Media over MCP — **assistant can now see uploaded media (vision) + media-first flow**.
   `get_media_upload` now returns `Response::make([...])` with the text summary **and** the uploaded
   images as `Response::image()` previews (new `App\Support\Mcp\McpImagePreview` — bounded ~768px JPEG via
