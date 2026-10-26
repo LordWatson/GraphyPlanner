@@ -74,4 +74,25 @@ return [
         'per_minute' => (int) env('MCP_RATE_LIMIT_PER_MINUTE', 60),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Out-of-band media upload link (MCP media)
+    |--------------------------------------------------------------------------
+    |
+    | A model can't reliably carry a real image as base64 in a tool argument, so
+    | `request_media_upload` hands a human a short-lived browser link
+    | (`mcp-upload/{token}`) to drop the files instead; Graphy ingests them
+    | through the normal (safe) upload pipeline. One link is a batch session: it
+    | covers one client and a fixed set of its posts and accepts many files until
+    | it expires. `ttl_minutes` is how long the link stays valid; `max_files`
+    | caps how many files one session may take (an abuse guard, since the link is
+    | not single-use).
+    |
+    */
+
+    'upload' => [
+        'ttl_minutes' => (int) env('MCP_UPLOAD_TTL_MINUTES', 60),
+        'max_files' => (int) env('MCP_UPLOAD_MAX_FILES', 50),
+    ],
+
 ];

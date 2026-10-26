@@ -16,12 +16,14 @@ use App\Mcp\Tools\GetBrandBrainTool;
 use App\Mcp\Tools\GetCalendarTool;
 use App\Mcp\Tools\GetCampaignTool;
 use App\Mcp\Tools\GetClientTool;
+use App\Mcp\Tools\GetMediaUploadTool;
 use App\Mcp\Tools\GetPostTool;
 use App\Mcp\Tools\ListAssetsTool;
 use App\Mcp\Tools\ListCampaignsTool;
 use App\Mcp\Tools\ListClientsTool;
 use App\Mcp\Tools\ListPostsTool;
 use App\Mcp\Tools\RecommendPostsTool;
+use App\Mcp\Tools\RequestMediaUploadTool;
 use App\Mcp\Tools\SchedulePostTool;
 use App\Mcp\Tools\SetPostMediaTool;
 use App\Mcp\Tools\StartAccountConnectionTool;
@@ -87,6 +89,8 @@ class McpSecretsGuardTest extends TestCase
             TransitionPostStatusTool::class,
             UploadMediaTool::class,
             SetPostMediaTool::class,
+            RequestMediaUploadTool::class,
+            GetMediaUploadTool::class,
             SchedulePostTool::class,
             StartAccountConnectionTool::class,
             CancelScheduledPostTool::class,
@@ -179,6 +183,9 @@ class McpSecretsGuardTest extends TestCase
             // vendor OAuth token. (It is a write tool, but proving its output carries no secret is
             // exactly the guard's job.)
             GraphyServer::tool(StartAccountConnectionTool::class, ['client_id' => $client->id])->assertOk(),
+            // MCP media: like the connect tool, request_media_upload returns only a browser-completable
+            // URL (the raw token lives in the path, never as a secret-shaped field).
+            GraphyServer::tool(RequestMediaUploadTool::class, ['client_id' => $client->id])->assertOk(),
         ];
 
         foreach (['SENTINEL-SECRET-9f3a2b7c1d', ...self::FORBIDDEN] as $needle) {

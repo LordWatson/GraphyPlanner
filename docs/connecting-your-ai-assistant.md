@@ -134,19 +134,27 @@ To test the remote HTTP transport locally, set `MCP_HTTP_ENABLED=true`, create a
 |---|---|---|
 | Explore the agency | `list_clients`, `get_client`, `get_brand_brain`, `list_posts`, `get_post`, `get_calendar`, `list_campaigns`, `get_campaign`, `list_assets`, `get_analytics_summary` | Read |
 | Create & refine content | `create_draft_post`, `update_post`, `transition_post_status` (up to *approved*) | Write drafts |
-| Add & attach media | `upload_media` (send an image as base64 to a client's library), `set_post_media` (replace / add / remove a post's media) | Write drafts |
+| Add & attach media | `request_media_upload` + `get_media_upload` (the reliable upload-link flow, incl. media for several posts at once), `upload_media` (a small image as base64), `set_post_media` (replace / add / remove a post's media) | Write drafts |
 | Publish, schedule, connect | `schedule_post`, `cancel_scheduled_post`, `start_account_connection` | Publish & schedule |
 | Use Graphy’s AI | `discover_trends`, `recommend_posts`, `suggest_captions` | AI |
 | Packaged workflows | `plan_week`, `fill_calendar_gaps` (prompts) | (use the tools above) |
 
-### Using an image from your chat
+### Uploading your media
 
-Paste or attach an image in your assistant and say e.g. *"create a post for Northwind using this
-image"* or *"replace the media on post 482 with this image"*. The assistant sends the image to
-`upload_media` as base64 (it is validated exactly like a web upload — file type, size, content
-sniffing and a virus scan), then attaches the returned asset to the post via `create_draft_post`
-(`asset_ids`) or `set_post_media`. Both need the **Write drafts** scope. Graphy never hands an
-assistant a media download URL, so sharing media works one way: into Graphy.
+An assistant can't reliably carry a real photo as text, so for images you need to provide, Graphy uses
+a one-click upload link that handles any number of files across any number of posts.
+
+Say e.g. *"create 3 posts for Northwind — I'll upload media for each."* The assistant creates the posts,
+then calls **`request_media_upload`** and gives you **one** link. You open it in any browser (no login),
+and the page shows each post with its own drop area — drop **one or more** files onto each (or into the
+library area if no post was named). The assistant picks up what landed with **`get_media_upload`** and
+finishes the posts. The link is scoped to that one client, expires after ~60 minutes, and every file is
+validated exactly like a web upload (file type, size, content sniffing and a virus scan).
+
+For a small image the assistant already holds, it can instead send it straight to `upload_media` as
+base64. Either way the media attaches via `create_draft_post` (`asset_ids`) or `set_post_media`. All of
+these need the **Write drafts** scope. Graphy never hands an assistant a media download URL, so sharing
+media works one way: into Graphy.
 
 ### Safety
 

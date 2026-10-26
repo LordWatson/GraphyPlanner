@@ -60,6 +60,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
+use App\Http\Controllers\McpUploadController;
 use App\Http\Controllers\MediaKitShareController;
 use App\Http\Controllers\MyWorkController;
 use App\Http\Controllers\NotificationController;
@@ -139,6 +140,12 @@ Route::middleware('throttle:public-token')->group(function () {
     // Step M-6.2: the passwordless "magic link" — a single-use, expiring token that signs a client
     // reviewer into their portal, landing on the emailed post. Unauthenticated by design.
     Route::get('portal-login/{token}', [MagicLinkController::class, 'login'])->name('portal.magic-login');
+
+    // MCP media: a user finishes image uploads for the MCP assistant from a `request_media_upload`
+    // link — access is possession of a live `McpUploadSession` token, scoped to its one client's
+    // library and the posts it was issued for. The model never carries the bytes.
+    Route::get('mcp-upload/{token}', [McpUploadController::class, 'show'])->name('mcp-upload.show');
+    Route::post('mcp-upload/{token}', [McpUploadController::class, 'store'])->name('mcp-upload.store');
 });
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted

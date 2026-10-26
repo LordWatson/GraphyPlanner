@@ -50,6 +50,8 @@ MCP-4 tools are `#[IsDestructive]`.
 | Tool | `update_post` | `WriteDrafts` | `UpdatePostAction` (returns the diff) | MCP-3.2 |
 | Tool | `upload_media` | `WriteDrafts` | `CreateAssetFromBase64Action` → `SafeUpload` → `CreateAssetAction` | Media |
 | Tool | `set_post_media` | `WriteDrafts` | `UpdatePostAction` (`asset_ids` sync; replace/add/remove) | Media |
+| Tool | `request_media_upload` | `WriteDrafts` | `CreateMcpUploadSessionAction` (one browser link for a client + its posts; returns the URL, never the token) | Media (link) |
+| Tool | `get_media_upload` | `WriteDrafts` | `McpUploadSession` status → per-post + library asset ids (`McpPresenters::asset`) | Media (link) |
 | Tool | `transition_post_status` | `WriteDrafts` | `TransitionPostStatusAction` + `PostStatusTransitionMap` (capped ≤ approved) | MCP-3.3 |
 | Tool | `schedule_post` | `WriteSchedule` | re-runs checklist, then `TransitionPostStatusAction` → `PublishPostJob` `#[IsDestructive]` | MCP-4.1 |
 | Tool | `start_account_connection` | `WriteSchedule` | `CreateConnectInviteAction` (returns a connect URL, never a token) | MCP-4.2 |
@@ -80,6 +82,16 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   `AiUsageLog`; on the MCP transport there is no signed-in member so `OrganizationScope` is a no-op
   and the explicit `org_id` on write scopes it. **No column can carry a secret, token or argument
   value** (the MCP-1.6 guard asserts this).
+
+- **`McpUploadSession` (`mcp_upload_sessions`)** — MCP media (link). A short-lived browser link that
+  lets a human finish media uploads for the assistant (`request_media_upload`). One session is scoped
+  to a client and a fixed set of its posts, and is **reusable** until it expires so it can take a whole
+  batch. Columns: `org_id` (FK), `client_id` (FK), `token_hash` (unique SHA-256), `post_ids` (json —
+  the allowed target posts; `[]` = library-only), `uploaded_asset_ids` (json — every asset created via
+  the session, for the poll tool + library reporting), `expires_at`, `created_by` (nullable FK),
+  timestamps. Uses `BelongsToOrganization`; `hashToken()` / `findActive()` (unscoped pre-auth lookup) /
+  `isActive()` (`expires_at->isFuture()`) / `allowsPost()` mirror `ConnectInvite`. `const
+  DEFAULT_TTL_MINUTES = 60`. Not single-use — a `config('mcp.upload.max_files')` cap bounds abuse.
 
 ## Actions / Services / Contracts
 
@@ -160,6 +172,18 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   data and keep the MCP-1.1 405 test valid).
 - **Note (route cache):** `Mcp::web` adds real routes, so after pulling this change run
   `php artisan route:clear` (a stale `bootstrap/cache/routes-v7.php` will otherwise hide `/mcp`).
+- **Public media-upload page (MCP media).** `routes/web.php`, in the `throttle:public-token` group
+  beside `connect/{token}` (unauthenticated — the token is the capability):
+  - `GET mcp-upload/{token}` → `McpUploadController@show` — renders Inertia `mcp-upload/show` with the
+    session's client + target posts; an unknown/expired session → the same page null props at **410**.
+  - `POST mcp-upload/{token}` → `McpUploadController@store` — re-resolves the active session (410 if
+    not), enforces the `max_files` cap, validates `file` with the **same rules as `StoreAssetRequest`**
+    (`mimes:` + per-type size + `SafeUpload`) and `post_id` (must be one the session allows, else 403),
+    creates the asset via `CreateAssetAction`, appends it to the post via `UpdatePostAction`, and
+    records it on the session. JSON `{ asset }` on success; the session stays open for more files.
+  - Named `mcp-upload.show` / `mcp-upload.store`. Frontend `resources/js/pages/mcp-upload/show.tsx`
+    (`PublicShell`/`PublicTitle` + a local multi-file dropzone per post, posting via the `http`
+    helper). After adding the routes run `php artisan route:clear` then `wayfinder:generate --with-form`.
 
 ## Business Rules
 
@@ -217,6 +241,36 @@ bytes** in a tool argument. There is deliberately **no server-side URL fetch** (
   using this image" = `upload_media` → `create_draft_post(asset_ids)`; "replace the media on this post
   with this image" = `upload_media` → `set_post_media(mode=replace)`.
 
+### Out-of-band upload link — a batch session (the reliable path for pasted/large images)
+
+base64 only works for small images: a model can't reliably transcribe a real photo (~90K base64 chars)
+into a tool argument without corrupting it, and it isn't a cap we can raise. **Verified:** MCP
+`tools/call` carries only JSON (no client→server binary channel), Claude Desktop doesn't hand chat
+attachments to tools, and the model only *sees* the image as pixels — so a pasted image can't be pulled
+through MCP. (The MCP spec's own emerging direction, SEP-2631 `files/authorizeUpload`, is this same
+one-time-upload-URL pattern.) The robust path hands the **human** the bytes via a browser link, reusing
+the connect-invite pattern end to end, and is a **batch session** so one link covers many files and
+many posts ("create 3 posts, I'll upload media for each"):
+
+- **`request_media_upload`** (`WriteDrafts`) mints an `McpUploadSession` and returns a short-lived
+  browser URL — **never the raw token** (only `upload_url`, like `start_account_connection`'s
+  `connect_url`; the secrets guard covers it). Args: `client_id` (required), `post_ids` (optional — the
+  posts the user will upload for, each must belong to the client), `expires_in_minutes` (5–240, default
+  60). Authorizes `AssetPolicy::create` + `PostPolicy::update` for every post.
+- The user opens the link (**no login** — the token is the capability, like `connect`/`review`). The
+  page shows one upload area **per post** (plus a general "library" area when no posts were given), each
+  accepting **multiple files**; `McpUploadController` ingests every file through the same `SafeUpload` +
+  `CreateAssetAction` pipeline as the web uploader, **appends** it to the chosen post via
+  `UpdatePostAction` (upload order = carousel order), and records it on the session. The session stays
+  open (not single-use) until it expires; a `max_files` cap bounds abuse.
+- **`get_media_upload`** (`WriteDrafts`, `#[IsReadOnly]`) polls by `session_id` → per-post attached asset
+  ids + any library uploads (safe `McpPresenters::asset()` metadata), so the assistant sees what landed
+  and chains the ids into `create_draft_post` / `set_post_media`.
+
+Headline flow: `create_draft_post` ×N → `request_media_upload(post_ids:[…])` → user uploads per post →
+`get_media_upload` → confirm. The model never carries bytes; no server-side URL fetch (no SSRF);
+outbound responses never include a signed URL or storage path.
+
 ## How to run it (manual round-trip)
 
 - MCP Inspector: `php artisan mcp:inspector graphy` — connect, list tools/resources, call
@@ -262,6 +316,15 @@ bytes** in a tool argument. There is deliberately **no server-side URL fetch** (
   leaking a URL; it rejects a renamed non-image and an oversized file via `SafeUpload`/size (clean
   `isError`, not a 500) and requires `write:drafts`; `create_draft_post` attaches supplied `asset_ids`;
   `set_post_media` replaces/adds/removes, refuses another client's asset, and requires `write:drafts`.
+- `tests/Feature/Mcp/McpUploadSessionTest.php` (Media link): `request_media_upload` mints one link for
+  multiple `post_ids` without returning the token, refuses a post from another client and another org's
+  client, and requires `write:drafts`; `get_media_upload` reports each post's assets + library uploads
+  and is org-scoped.
+- `tests/Feature/Mcp/McpUploadPageTest.php` (Media link): the public page renders the target posts and
+  410s when expired/unknown; a file routes to the named post and **multiple files append in order**; a
+  post outside the session is refused (403); a library upload (no post) lands in the library; a
+  disallowed file is rejected by `SafeUpload`; the `max_files` cap is enforced. Uses `withoutVite()`
+  (the local Vite manifest can be stale).
 - `tests/Feature/Mcp/McpSecretsGuardTest.php` (MCP-1.6): a coverage assertion forces the guard to be
   revisited when a primitive changes; no declared schema / advertised definition names a secret-shaped
   field; and the real output of each read primitive — invoked against seeded data with a connected
@@ -306,6 +369,10 @@ defaults it on for tests, `mcpDisabled()` for the off path) — the per-org mast
 reuse; `mcp_tokens`/`mcp_call_logs` are unchanged from MCP-1).
 
 **New Actions / support.**
+- `App\Actions\Mcp\CreateMcpUploadSessionAction` (MCP media): mints an `McpUploadSession` and returns
+  `['session', 'token', 'url']` where `url = route('mcp-upload.show', $token)`. `Str::random(64)` →
+  stores only the SHA-256 → raw token returned once (in the URL), never logged. Single insert (no
+  transaction, CLAUDE.md #5). Mirrors `CreateConnectInviteAction`.
 - `App\Actions\Mcp\RevokeMcpTokenAction` (MCP-6.1/7.2): soft-revokes a token (`revoked_at`),
   idempotent, immediate effect (`findActive()` ignores it). Mirrors `RevokeConnectInviteAction`.
 - `App\Actions\Mcp\GetMcpUsageAction` (MCP-7.1): read-only aggregation over `mcp_call_logs` for the
@@ -360,6 +427,20 @@ is enforced and the test that proves it.
 
 ## Changelog
 
+- 2026-10-26: Media over MCP — out-of-band upload link as a **batch session**. base64 can't carry real
+  images reliably (verified: MCP tool calls are JSON-only, Claude Desktop doesn't forward attachments,
+  the model can't reproduce bytes — and SEP-2631 shows the spec heading to this same upload-URL model).
+  Added `request_media_upload` (mints an `McpUploadSession` for a client + a set of its posts →
+  short-lived browser URL via `CreateMcpUploadSessionAction`, returns the URL not the token) +
+  `get_media_upload` (poll → per-post + library asset ids), and the unauthenticated token-gated
+  `mcp-upload/{token}` page (`McpUploadController`, in `throttle:public-token`) with a per-post
+  multi-file dropzone that ingests each file through `SafeUpload` + `CreateAssetAction` and appends it to
+  the post. One link handles many files across many posts ("create 3 posts, I'll upload media for each").
+  New `mcp_upload_sessions` table/model/factory + `config('mcp.upload.{ttl_minutes,max_files}')`.
+  Registered both tools on `GraphyServer`; `McpSecretsGuardTest` extended. Added `McpUploadSessionTest` +
+  `McpUploadPageTest`. Model never carries bytes; no SSRF. **Adds a migration** → deploy needs
+  `php artisan migrate` + `npm run build` + `route:clear` + `wayfinder:generate`. Pint + PHPStan L7 +
+  tsc clean; new tests green.
 - 2026-10-26: Media over MCP. Added `upload_media` (base64 ingest → asset, via new
   `App\Actions\Assets\CreateAssetFromBase64Action` reusing `SafeUpload` + `CreateAssetAction`) and
   `set_post_media` (`asset_ids` replace/add/remove via `UpdatePostAction`); `create_draft_post` gained
