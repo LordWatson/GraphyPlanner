@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Models\Client;
-use App\Support\Mcp\McpDevOrg;
+use App\Support\Mcp\McpTenant;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
@@ -16,12 +16,12 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 /**
- * Phase MCP-0.2 (learning spike) — the first read-only tool: list the dev org's clients as a
- * small structured list (id, name, status). No arguments, no authentication — tenancy is a
- * single hardcoded dev org (McpDevOrg). Phase MCP-1/MCP-2 make this genuinely multi-tenant,
- * reuse ListClientsAction's filters, and add scope/policy gating.
+ * Phase MCP-0.2 → MCP-1.2 — a read-only tool: list the org's clients as a small structured list
+ * (id, name, status). No arguments. Tenancy comes from `McpTenant`: the authenticated token's org
+ * on the remote HTTP transport (real multi-tenancy), or the hardcoded dev org on the local/stdio
+ * spike. MCP-2 reuses ListClientsAction's filters and adds scope/policy gating.
  *
- * Security: NOT YET SCOPED — dev only. See .junie/plans/mcp-server.md.
+ * See .junie/plans/mcp-server.md.
  */
 #[Name('list_clients')]
 #[Title('List clients')]
@@ -34,14 +34,14 @@ class ListClientsTool extends Tool
      */
     public function handle(Request $request): Response|ResponseFactory
     {
-        $org = McpDevOrg::resolve();
+        $org = McpTenant::organization();
 
         if ($org === null) {
-            return Response::error('No development organization exists yet. Seed an organization first.');
+            return Response::error('No organization is available for this connection.');
         }
 
-        // Spike: scope explicitly to the dev org. No signed-in member means the global
-        // OrganizationScope is a no-op, so the org_id filter is what keeps this to one tenant.
+        // No signed-in member means the global OrganizationScope is a no-op, so the explicit
+        // org_id filter is what keeps this to exactly the resolved token's (or dev) org.
         $clients = Client::query()
             ->withoutOrgScope()
             ->where('org_id', $org->id)

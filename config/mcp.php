@@ -39,10 +39,12 @@ return [
     | `EnsureMcpHttpEnabled`: while `enabled` is false — the default, including
     | production — every request to it 404s.
     |
-    | It ships OFF because authentication arrives in Step MCP-1.2 (OAuth 2.1 +
-    | per-token org/scope resolution). Until then the endpoint is unauthenticated
-    | and must not be internet-reachable, so only turn it on in local/dev. MCP-1.2
-    | adds the auth layer; this flag stays as the per-env master switch.
+    | Step MCP-1.2 added bearer-token authentication (AuthenticateMcp) on the POST
+    | route, so the endpoint is now authenticated + strictly org-scoped. It still
+    | ships OFF by default: capability-scope gating, rate limiting, audit logging and
+    | the secrets-exposure guard (MCP-1.3–1.6) are not in place yet, so do not enable
+    | it anywhere internet-reachable until the rest of MCP-1 lands. This flag stays as
+    | the per-env master switch (and the MCP-7.2 kill-switch surface).
     |
     */
 

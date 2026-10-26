@@ -3,7 +3,7 @@
 namespace App\Mcp\Resources;
 
 use App\Models\Client;
-use App\Support\Mcp\McpDevOrg;
+use App\Support\Mcp\McpTenant;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -35,10 +35,10 @@ class BrandBrainResource extends Resource
      */
     public function handle(Request $request): Response
     {
-        $org = McpDevOrg::resolve();
+        $org = McpTenant::organization();
 
         if ($org === null) {
-            return Response::error('No development organization exists yet. Seed an organization first.');
+            return Response::error('No organization is available for this connection.');
         }
 
         $client = Client::query()
@@ -50,7 +50,7 @@ class BrandBrainResource extends Resource
             ->first();
 
         if ($client?->brandBrain === null) {
-            return Response::error('No client in the development organization has a brand brain yet.');
+            return Response::error('No client in this organization has a brand brain yet.');
         }
 
         return Response::text($client->brandBrain->toGrokContext()['markdown']);

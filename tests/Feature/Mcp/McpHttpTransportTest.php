@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Mcp;
 
+use App\Actions\Mcp\CreateMcpTokenAction;
 use App\Enums\ClientStatus;
 use App\Models\Client;
 use App\Models\Organization;
@@ -59,7 +60,10 @@ class McpHttpTransportTest extends TestCase
             'status' => ClientStatus::Active,
         ]);
 
-        $response = $this->postJson(self::ENDPOINT, $this->listToolsPayload());
+        // The POST route requires a bearer token (MCP-1.2), so authenticate as this org.
+        ['token' => $token] = app(CreateMcpTokenAction::class)($this->org, 'Test connection');
+
+        $response = $this->withToken($token)->postJson(self::ENDPOINT, $this->listToolsPayload());
 
         $response->assertOk();
 
