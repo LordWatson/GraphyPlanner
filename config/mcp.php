@@ -28,4 +28,27 @@ return [
         'dev_org_id' => env('MCP_DEV_ORG_ID'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Remote HTTP transport (Phase MCP-1.1)
+    |--------------------------------------------------------------------------
+    |
+    | Graphy's MCP server is exposed over a remote Streamable HTTP transport at
+    | `POST /{path}` (default `/mcp`), alongside the local/stdio command kept
+    | for dev and tests. The route is always registered but guarded by
+    | `EnsureMcpHttpEnabled`: while `enabled` is false — the default, including
+    | production — every request to it 404s.
+    |
+    | It ships OFF because authentication arrives in Step MCP-1.2 (OAuth 2.1 +
+    | per-token org/scope resolution). Until then the endpoint is unauthenticated
+    | and must not be internet-reachable, so only turn it on in local/dev. MCP-1.2
+    | adds the auth layer; this flag stays as the per-env master switch.
+    |
+    */
+
+    'http' => [
+        'enabled' => env('MCP_HTTP_ENABLED', false),
+        'path' => env('MCP_HTTP_PATH', 'mcp'),
+    ],
+
 ];

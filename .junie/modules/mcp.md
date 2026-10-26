@@ -1,10 +1,13 @@
 # MCP Server
 
-> ⚠️ **Security: NOT YET SCOPED — dev only.** Phase MCP-0 is a local/stdio learning spike with
-> **no authentication and no real tenancy**. Every tool/resource reads from one hardcoded "dev org"
-> (`McpDevOrg`). Nothing here is reachable over the internet and nothing here is shippable. Phase
-> MCP-1 adds remote HTTP transport, OAuth 2.1, per-token org/scope resolution, rate limiting and
-> audit logging before any customer sees it. See `.junie/plans/mcp-server.md`.
+> ⚠️ **Security: NOT YET SCOPED — dev only.** The server still has **no authentication and no real
+> tenancy**: every tool/resource reads from one hardcoded "dev org" (`McpDevOrg`). As of Step
+> **MCP-1.1** there is now a remote Streamable HTTP transport (`POST /mcp`), but it is **OFF by
+> default** (`mcp.http.enabled` / `MCP_HTTP_ENABLED`) — while off (including production) every verb
+> on the route 404s, so it is not internet-reachable. It stays off until Step **MCP-1.2** adds
+> OAuth 2.1 + per-token org/scope resolution; the remaining MCP-1 steps add rate limiting, audit
+> logging and the secrets-exposure guard before any customer sees it. See
+> `.junie/plans/mcp-server.md`.
 
 ## Purpose
 
@@ -39,14 +42,28 @@ the existing `ListClientsAction`/presenters once auth exists.)
 - `App\Support\Mcp\McpDevOrg`: resolves the single spike "dev org". Order: configured
   `mcp.spike.dev_org_id` → the seeded `graphy-agency` org → the lowest-id org → `null`. A deliberate
   stand-in for real tenancy; deleted/replaced by token→org resolution in MCP-1.
-- `config/mcp.php`: spike config (`spike.dev_org_id`, env `MCP_DEV_ORG_ID`). Rate limits, scopes and
-  auth config land here in MCP-1.
+- `config/mcp.php`: spike config (`spike.dev_org_id`, env `MCP_DEV_ORG_ID`) and the MCP-1.1 HTTP
+  block (`http.enabled` / `MCP_HTTP_ENABLED`, default `false`; `http.path` / `MCP_HTTP_PATH`,
+  default `mcp`). Rate limits, scopes and auth config land here across the rest of MCP-1.
 
 ## Routes / Controllers
 
-- `routes/ai.php` — `Mcp::local('graphy', GraphyServer::class)`. **Local (stdio) transport only**:
-  an Artisan command (`php artisan mcp:start graphy`) the MCP Inspector / Claude Desktop launches.
-  There is deliberately **no** `Mcp::web(...)` route yet (that's MCP-1, behind OAuth).
+- `routes/ai.php` registers **two transports**:
+  - **Local (stdio):** `Mcp::local('graphy', GraphyServer::class)` — an Artisan command
+    (`php artisan mcp:start graphy`) the MCP Inspector / Claude Desktop launches. Kept for local
+    dev and tests.
+  - **Remote (Streamable HTTP, MCP-1.1):** `Mcp::web(config('mcp.http.path', 'mcp'), GraphyServer::class)`
+    wrapped in a `Route::middleware(EnsureMcpHttpEnabled::class)->group(...)` so the gate covers all
+    verbs (`GET`/`DELETE` → 405 Allow: POST per the Streamable HTTP spec; `POST` → the JSON-RPC
+    handler). The package adds its own `ReorderJsonAccept`, `ValidateMcpHeaders` and
+    `AddWwwAuthenticateHeader` middleware to the POST route.
+- `App\Http\Middleware\EnsureMcpHttpEnabled`: `abort_unless(config('mcp.http.enabled'), 404)`. The
+  HTTP route is always registered (so it is testable) but 404s for everyone while the flag is off —
+  the default, including production. This is the MCP-1.1 guard **before** auth exists; MCP-1.2 adds
+  the OAuth middleware that rejects unauthenticated callers, and this flag remains the per-env master
+  switch (and the MCP-7.2 kill-switch surface).
+- **Note (route cache):** `Mcp::web` adds real routes, so after pulling this change run
+  `php artisan route:clear` (a stale `bootstrap/cache/routes-v7.php` will otherwise hide `/mcp`).
 
 ## Business Rules
 
@@ -72,6 +89,12 @@ the existing `ListClientsAction`/presenters once auth exists.)
     (documents single-org reads — not a tenancy proof, which is MCP-1);
   - the brand-brain resource returns the `toGrokContext()` markdown;
   - `list-clients` reports an empty structured list when the dev org has no clients.
+- `tests/Feature/Mcp/McpHttpTransportTest.php` (MCP-1.1):
+  - every verb on `/mcp` 404s while `mcp.http.enabled` is false (the production default);
+  - with the flag on, `GET /mcp` returns 405 + `Allow: POST` (proving the transport is mounted);
+  - with the flag on, a `POST /mcp` `tools/list` JSON-RPC call returns 200 and lists `list_clients`
+    over HTTP (a real round-trip; a legacy request with no `_meta` reaches the dispatcher without an
+    initialize handshake). Still single dev-org — auth/tenancy proof is MCP-1.2.
 
 ## Package facts & API deltas (verify each phase)
 
@@ -94,8 +117,12 @@ the existing `ListClientsAction`/presenters once auth exists.)
 
 ## Known Gaps / Open Questions
 
-- **No auth, no tenancy, no scopes** — all MCP-1. `McpDevOrg` is temporary.
-- No remote (HTTP) transport yet — MCP-1.1.
+- **No auth, no tenancy, no scopes** — all still open across the rest of MCP-1. `McpDevOrg` is
+  temporary. The HTTP endpoint (MCP-1.1) is therefore flagged **off by default** until MCP-1.2 lands
+  OAuth 2.1 + per-token org/scope resolution; do **not** enable `MCP_HTTP_ENABLED` anywhere internet-
+  reachable before then.
+- Remote HTTP transport exists (MCP-1.1) but is unauthenticated — MCP-1.2 adds OAuth 2.1 and the
+  two-org isolation test.
 - No rate limiting (MCP-1.4), audit logging (MCP-1.5), or secrets-exposure guard test (MCP-1.6).
 - **Phase 13 convergence** (`.junie/plans/mcp-server.md` §Prerequisites): Phase 13 (Public API /
   `ApiToken` / Sanctum) is **not built** as of MCP-0. MCP-1 must either reuse its token/org layer if
@@ -108,3 +135,8 @@ the existing `ListClientsAction`/presenters once auth exists.)
 - 2026-10-26: Phase MCP-0 (learning spike). Installed `laravel/mcp` v1.1.0; added `GraphyServer`
   (local/stdio), `ListClientsTool`, `BrandBrainResource`, `McpDevOrg`, `config/mcp.php`, `routes/ai.php`
   and `GraphyMcpSpikeTest`. No auth/tenancy/scopes yet — dev only.
+- 2026-10-26: Step MCP-1.1 (remote Streamable HTTP transport). Added `Mcp::web('mcp', GraphyServer)`
+  in `routes/ai.php` behind `EnsureMcpHttpEnabled` (new middleware), with a `config/mcp.php` `http`
+  block (`enabled`/`path`, env `MCP_HTTP_ENABLED`/`MCP_HTTP_PATH`), defaulting **off**. Added
+  `McpHttpTransportTest`. Still no auth/tenancy — the endpoint 404s unless explicitly enabled; OAuth
+  arrives in MCP-1.2.
