@@ -3,6 +3,7 @@
 namespace App\Support\Mcp;
 
 use App\Models\Organization;
+use App\Models\User;
 
 /**
  * Step MCP-1.2 — resolves the organization a tool/resource should read from, for either transport:
@@ -23,5 +24,18 @@ class McpTenant
         $context = McpContext::current();
 
         return $context !== null ? $context->organization : McpDevOrg::resolve();
+    }
+
+    /**
+     * The member an MCP call acts as (MCP-2): the authenticated context's acting user on HTTP, or
+     * the dev org's Owner on the trusted local/stdio transport. Read tools reusing Actions that
+     * scope via `Auth::user()`/`OrganizationScope` resolve this and bind it as the request's member
+     * (see `McpTool::actAsOrganizationMember()`), so the same web-UI business logic runs org-scoped.
+     */
+    public static function actingUser(): ?User
+    {
+        $context = McpContext::current();
+
+        return $context !== null ? $context->actingUser() : McpDevOrg::resolve()?->owner;
     }
 }

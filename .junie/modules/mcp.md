@@ -1,37 +1,66 @@
 # MCP Server
 
-> ✅ **Security: Phase MCP-1 complete (the backbone).** The remote Streamable HTTP transport
-> (`POST /mcp`) is a **bearer-token-authenticated, strictly org-scoped** resource server:
-> unauthenticated/invalid requests are rejected 401 before any tool runs (MCP-1.2); a valid token
-> resolves to **exactly one organization** (two-org isolation test green); tools are
-> **capability-scope gated** (MCP-1.3), **rate-limited per connection** (MCP-1.4) and **audited**
-> (MCP-1.5), and an automated **secrets-exposure guard** (MCP-1.6) covers every registered primitive.
-> It still ships **OFF by default** (`mcp.http.enabled` / `MCP_HTTP_ENABLED`) — a deployment choice,
-> not a missing guardrail — and while off (including production) every verb on the route 404s. The
-> local/stdio transport and in-process tool tests remain unauthenticated and fall back to a single
-> hardcoded "dev org" (`McpDevOrg`) for local dev only (so they are not rate-limited or audited).
-> See `.junie/plans/mcp-server.md`.
+> ✅ **Complete: Phases MCP-0 → MCP-7.** Graphy is a production-ready MCP (Model Context Protocol)
+> server. Over the remote Streamable HTTP transport (`POST /mcp`) it is a **bearer-token-authenticated,
+> strictly org-scoped** resource server: unauthenticated/invalid requests are rejected 401 before any
+> tool runs; a valid token resolves to **exactly one organization** (two-org isolation test green);
+> tools are **capability-scope gated**, **rate-limited per connection** and **audited**, and an
+> automated **secrets-exposure guard** covers every registered tool/resource/prompt. It exposes
+> **read tools** (MCP-2), **draft/edit tools** (MCP-3), **elevated publish/schedule/connect tools**
+> (MCP-4, destructive-hinted, `WriteSchedule`-gated), **AI tools** (MCP-5) and **packaged prompt
+> workflows** (MCP-5.2), with an Owner-only **"AI connections" settings page** (MCP-6.1) to issue/
+> revoke tokens and see usage/audit (MCP-7.1), a **per-org master switch** (MCP-7.2), and a checked-in
+> **security review** (`.junie/mcp-security-review.md`, MCP-7.3). Two master switches sit in front:
+> `MCP_HTTP_ENABLED` (per-env, off by default → route 404s) and `organizations.mcp_enabled` (per-org,
+> off by default → 403 after auth). The local/stdio transport and in-process tool tests stay
+> unauthenticated and resolve a single hardcoded "dev org" (`McpDevOrg`) for local dev only.
+> See `.junie/plans/mcp-server.md` and `docs/connecting-your-ai-assistant.md`.
 
 ## Purpose
 
-Graphy *is* an MCP (Model Context Protocol) server: it exposes Graphy's data and actions so AI
-assistants (Claude Desktop/web, ChatGPT, Cursor, anything that speaks MCP) can drive the agency on
-the user's behalf. This module covers Phase **MCP-0** — the thinnest possible working server with one
-read-only tool and one resource, driven from a real assistant, to learn MCP hands-on.
+Graphy *is* an MCP server: it exposes Graphy's data and actions so AI assistants (Claude Desktop/web,
+ChatGPT, Cursor, anything that speaks MCP) can drive the agency on the user's behalf — "run your
+entire social-media agency from inside your AI assistant."
 
 The guiding idea (CLAUDE.md principle #3): an MCP tool is *just another thin entry point into the
-same business logic the web UI already uses.* A tool handler validates input, calls the same
-`App\Actions\*`/model query, and maps the result to MCP output — it never reimplements business
-rules. (In MCP-0 the "query reuse" is a simple org-scoped model lookup; MCP-2 wires the tools onto
-the existing `ListClientsAction`/presenters once auth exists.)
+same business logic the web UI already uses.* A tool handler validates input, binds the token's
+acting member onto the auth guard (so `OrganizationScope`, policies and the checklist all apply),
+calls the same `App\Actions\*`, and maps the result to safe MCP output via `McpPresenters` — it never
+reimplements business rules.
 
-## MCP primitives we expose (MCP-0)
+## MCP primitives we expose
 
-| Primitive | Name | Class | What it does | Annotations |
+All tools extend `App\Mcp\Tools\McpTool` (scope gate + rate limit + audit + `actAsOrganizationMember()`),
+declare their required scope(s), and are org-scoped. Read tools are `#[IsReadOnly]`; the irreversible
+MCP-4 tools are `#[IsDestructive]`.
+
+| Primitive | Name | Scope | Backing Action/query | Phase |
 |---|---|---|---|---|
-| Tool | `list_clients` | `App\Mcp\Tools\ListClientsTool` | Lists the resolved org's clients (`id`, `name`, `status`) as structured content; no arguments. Org comes from `McpTenant` (authenticated token's org on HTTP; dev org locally). Requires the `Read` scope. | `#[IsReadOnly]` |
-| Resource | `brand_brain` | `App\Mcp\Resources\BrandBrainResource` | Returns the resolved org's first client's Brand Brain as markdown, reusing `BrandBrain::toGrokContext()`. | `text/markdown`, URI `graphy://brand-brain` |
-| Prompt | — | — | None yet (Phase MCP-5). | — |
+| Tool | `list_clients` | `Read` | org-scoped `Client` query + `McpPresenters::clientRow` | MCP-2.1 |
+| Tool | `get_client` | `Read` | `Client::healthFor()` + `ClientHealthService` | MCP-2.1 |
+| Tool | `get_brand_brain` | `Read` | `BrandBrain::toGrokContext()` | MCP-2.1 |
+| Tool | `list_posts` | `Read` | `ListPostsAction::query()` (pinned to org) | MCP-2.2 |
+| Tool | `get_post` | `Read` | `EvaluatePostChecklistAction` + per-target local/org times | MCP-2.2 |
+| Tool | `get_calendar` | `Read` | `GetCalendarPostsAction` + `BuildCalendarOccurrencesAction` | MCP-2.3 |
+| Tool | `list_campaigns` | `Read` | org-scoped `Campaign` query | MCP-2.4 |
+| Tool | `get_campaign` | `Read` | `GetCampaignOverviewAction` | MCP-2.4 |
+| Tool | `list_assets` | `Read` | `SearchClientAssetsAction` (metadata only — no signed URLs) | MCP-2.4 |
+| Tool | `get_analytics_summary` | `Read` | `GetOrganizationAnalyticsSummaryAction` (viewer role scoping) | MCP-2.4 |
+| Tool | `create_draft_post` | `WriteDrafts` | `CreatePostAction` | MCP-3.1 |
+| Tool | `update_post` | `WriteDrafts` | `UpdatePostAction` (returns the diff) | MCP-3.2 |
+| Tool | `transition_post_status` | `WriteDrafts` | `TransitionPostStatusAction` + `PostStatusTransitionMap` (capped ≤ approved) | MCP-3.3 |
+| Tool | `schedule_post` | `WriteSchedule` | re-runs checklist, then `TransitionPostStatusAction` → `PublishPostJob` `#[IsDestructive]` | MCP-4.1 |
+| Tool | `start_account_connection` | `WriteSchedule` | `CreateConnectInviteAction` (returns a connect URL, never a token) | MCP-4.2 |
+| Tool | `cancel_scheduled_post` | `WriteSchedule` | `TransitionPostStatusAction` (scheduled→approved, recalls vendor) `#[IsDestructive]` | MCP-4.3 |
+| Tool | `discover_trends` | `Ai` | `DiscoverTrendsAction` (budget + guardrails) | MCP-5.1 |
+| Tool | `recommend_posts` | `Ai` | `RecommendPostsAction` | MCP-5.1 |
+| Tool | `suggest_captions` | `Ai` | `SuggestCaptionsForPostAction` | MCP-5.1 |
+| Resource | `brand_brain` | (read) | the org's first client's Brand Brain markdown (`graphy://brand-brain`) | MCP-0.3 |
+| Prompt | `plan_week` | — | orchestrates get_brand_brain → get_calendar → trends/ideas → create_draft_post | MCP-5.2 |
+| Prompt | `fill_calendar_gaps` | — | orchestrates get_calendar → recommend_posts → create_draft_post | MCP-5.2 |
+
+`App\Support\Mcp\McpPresenters` is the single place that maps models to safe read shapes (gates
+billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-only health reasons).
 
 ## Models / Tables
 
@@ -231,6 +260,48 @@ the existing `ListClientsAction`/presenters once auth exists.)
   OAuth authorization-server pieces — dynamic client registration (DCR) and a hosted authorize/token
   flow — which MCP-6 can add in front of the same token/org resolution if a client requires them.
 
+## MCP-2 → MCP-7 additions (as built)
+
+**Acting member (MCP-2).** Read/write tools reuse Actions that scope via `Auth::user()`/
+`OrganizationScope`. `AuthenticateMcp` binds the token's acting member (`McpContext::actingUser()` =
+the token's user, else the org's Owner) onto the auth guard for the request, so every reused query/
+policy runs org-scoped exactly as the web UI. `McpTool::actAsOrganizationMember()` does the same on
+the trusted local transport (binds the dev org's Owner) and fails closed (null) when no member
+resolves. Tools *also* pin queries with an explicit `org_id` filter (belt-and-suspenders).
+
+**Models / columns.** `organizations.mcp_enabled` (MCP-7.2, boolean, default off; `OrganizationFactory`
+defaults it on for tests, `mcpDisabled()` for the off path) — the per-org master switch checked in
+`AuthenticateMcp` (403 when off, *after* the 401 auth check). No other new tables (MCP-2–5 are all
+reuse; `mcp_tokens`/`mcp_call_logs` are unchanged from MCP-1).
+
+**New Actions / support.**
+- `App\Actions\Mcp\RevokeMcpTokenAction` (MCP-6.1/7.2): soft-revokes a token (`revoked_at`),
+  idempotent, immediate effect (`findActive()` ignores it). Mirrors `RevokeConnectInviteAction`.
+- `App\Actions\Mcp\GetMcpUsageAction` (MCP-7.1): read-only aggregation over `mcp_call_logs` for the
+  settings page — totals, per-tool calls/errors and a recent audit trail (last 30 days), org-scoped,
+  never exposing an argument value or token.
+- `App\Support\Mcp\McpPresenters`: the safe read-shape mapper (see above).
+- `App\Mcp\Prompts\PlanWeekPrompt` / `FillCalendarGapsPrompt`: orchestration-only prompts.
+
+**Routes / controllers.**
+- `App\Http\Controllers\Settings\McpConnectionController` (Owner-only via `OrganizationPolicy::update`)
+  renders `settings/ai-connections` and handles `store` (create token via `CreateMcpTokenAction`,
+  flashes the plain token once), `destroy` (revoke, org-guarded binding), `updateSettings` (toggle
+  the per-org switch). Routes in `routes/settings.php` under `org.member`; the `edit` route is behind
+  `RequirePassword` (it issues secrets). Named `mcp-connections.{edit,store,destroy,update}`.
+- Frontend: `resources/js/pages/settings/ai-connections.tsx` (lists/creates/revokes tokens with scope
+  checkboxes, shows the connection URL + one-time token, the master switch, and the usage/audit
+  table). A new Owner-only "AI connections" tab in `resources/js/layouts/settings/layout.tsx`.
+  Wayfinder TS regenerated with `php artisan wayfinder:generate --with-form`.
+
+**Setup/GTM docs (MCP-6.2).** `docs/connecting-your-ai-assistant.md` — copy-paste connection config
+for Claude Desktop, Cursor and hosted clients (via the `mcp-remote` header bridge), plus the local
+stdio/Inspector path and the tool/scope catalogue. (OAuth DCR is deferred, so hosted "custom
+connector" clients use the header bridge for now.)
+
+**Security review (MCP-7.3).** `.junie/mcp-security-review.md` maps each §Security rule to where it
+is enforced and the test that proves it.
+
 ## Known Gaps / Open Questions
 
 - **Resources are not scope-gated yet.** Only tools (via `McpTool`) check scopes, are rate-limited and
@@ -248,6 +319,13 @@ the existing `ListClientsAction`/presenters once auth exists.)
 - **No OAuth authorization server (DCR / hosted authorize-token flow).** Tokens are issued manually
   (the MCP-6.1 settings page will expose that); DCR is deferred — see Package facts.
 - Open: whether to expose the Inbox over MCP in v1; plan-gating/packaging (org vs. token). (Appendix B.)
+- **Inbox over MCP is deferred** (Appendix B), so the `draft_inbox_replies` prompt from the plan is
+  not registered — it would reference inbox tools that don't exist yet. `plan_week` and
+  `fill_calendar_gaps` ship.
+- **Marketing surface (MCP-6.3) is light:** the in-app connection surface is the settings page; a
+  dedicated marketing-site section and a guided onboarding card are a documented follow-up (the
+  settings page carries the connection URL + inline instructions, and `docs/connecting-your-ai-assistant.md`
+  is the self-serve guide).
 
 ## Changelog
 
@@ -284,3 +362,15 @@ the existing `ListClientsAction`/presenters once auth exists.)
   every registered primitive and asserts no secret leaks (schema + real output, with an adversarial
   sentinel token) and forces coverage of new primitives. Pint + PHPStan L7 clean; 27 MCP tests green.
   Endpoint stays off by default as a deployment choice; next is Phase MCP-2 (read tools/resources).
+- 2026-10-26: **Phases MCP-2 → MCP-7 complete.** MCP-2: read tools (`get_client`, `get_brand_brain`,
+  `list_posts`, `get_post`, `get_calendar`, `list_campaigns`, `get_campaign`, `list_assets`,
+  `get_analytics_summary`) + `ListClientsTool` filters + `McpPresenters` + the acting-member binding
+  (`McpContext::actingUser`/`McpTenant::actingUser`/`McpTool::actAsOrganizationMember`, `AuthenticateMcp`
+  sets the auth user). MCP-3: `create_draft_post`/`update_post`/`transition_post_status` (≤approved).
+  MCP-4: `schedule_post`/`start_account_connection`/`cancel_scheduled_post` (`WriteSchedule`,
+  destructive). MCP-5: `discover_trends`/`recommend_posts`/`suggest_captions` + `plan_week`/
+  `fill_calendar_gaps` prompts. MCP-6.1: `McpConnectionController` + `settings/ai-connections` page +
+  `RevokeMcpTokenAction`. MCP-6.2: `docs/connecting-your-ai-assistant.md`. MCP-7.1: `GetMcpUsageAction`
+  + usage/audit panel. MCP-7.2: `organizations.mcp_enabled` per-org master switch (403 after auth) +
+  immediate token revoke. MCP-7.3: `.junie/mcp-security-review.md`. Secrets guard extended to cover
+  every new primitive (incl. prompts); 58 MCP feature tests green; Pint + PHPStan L7 clean; tsc green.

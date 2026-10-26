@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AiUsageController;
+use App\Http\Controllers\Settings\McpConnectionController;
 use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -57,6 +58,16 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::put('settings/ai-usage', [AiUsageController::class, 'update'])->name('ai-usage.update');
     // Step M-7.1: the per-org AI enable toggle + monthly token budget.
     Route::put('settings/ai-settings', [AiUsageController::class, 'updateSettings'])->name('ai-settings.update');
+
+    // Step MCP-6.1: the Owner-only "AI connections" page — MCP bearer tokens, scopes, usage/audit
+    // and the per-org master switch. It issues secrets, so viewing it re-confirms the password
+    // (like the organization page); the token mutations below inherit that confirmed window.
+    Route::get('settings/ai-connections', [McpConnectionController::class, 'edit'])
+        ->middleware(RequirePassword::class)
+        ->name('mcp-connections.edit');
+    Route::post('settings/ai-connections/tokens', [McpConnectionController::class, 'store'])->name('mcp-connections.store');
+    Route::delete('settings/ai-connections/tokens/{mcpToken}', [McpConnectionController::class, 'destroy'])->name('mcp-connections.destroy');
+    Route::put('settings/ai-connections', [McpConnectionController::class, 'updateSettings'])->name('mcp-connections.update');
 
     // Step M-4.1: the organization's tax-rate list (Owner-only, via TaxRatePolicy). The settings
     // page has already confirmed the password, so these mutations aren't re-gated.

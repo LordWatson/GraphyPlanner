@@ -4,9 +4,12 @@ namespace App\Mcp\Tools;
 
 use App\Actions\Mcp\RecordMcpCallAction;
 use App\Enums\McpScope;
+use App\Models\User;
 use App\Support\Mcp\Concerns\AuthorizesScope;
 use App\Support\Mcp\Concerns\RateLimitsCalls;
 use App\Support\Mcp\McpContext;
+use App\Support\Mcp\McpTenant;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -81,4 +84,28 @@ abstract class McpTool extends Tool
      * The tool's actual work, run only once the guardrails pass.
      */
     abstract protected function handleAuthorized(Request $request): Response|ResponseFactory;
+
+    /**
+     * Resolve the acting organization member and bind it onto the auth guard, so a tool can call the
+     * exact same Actions/queries the web UI uses: `OrganizationScope` and policies read
+     * `Auth::user()`, so once the member is bound every reused query scopes to the token's org
+     * without the tool re-implementing tenancy (MCP-2). On HTTP the member is already bound by
+     * `AuthenticateMcp`; locally (and in in-process tests with no member) it binds the dev org's
+     * Owner. Returns null only when no member can be resolved (a misconfigured org with no Owner), so
+     * the caller fails closed rather than running an unscoped query.
+     */
+    protected function actAsOrganizationMember(): ?User
+    {
+        $user = McpTenant::actingUser();
+
+        if ($user === null) {
+            return null;
+        }
+
+        if (! Auth::check()) {
+            Auth::setUser($user);
+        }
+
+        return Auth::user();
+    }
 }

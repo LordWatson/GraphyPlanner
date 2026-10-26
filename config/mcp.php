@@ -4,16 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | MCP server (Phase MCP-0 — learning spike)
+    | MCP server
     |--------------------------------------------------------------------------
     |
     | Graphy exposes its data and actions as an MCP server so AI assistants can
     | drive the agency on the user's behalf (see .junie/plans/mcp-server.md).
     |
-    | Phase MCP-0 is a local/stdio learning spike with NO authentication and NO
-    | tenancy resolution yet: tools resolve to a single hardcoded "dev org".
-    | Auth (OAuth 2.1), token/org/scope resolution, rate limits and audit
-    | logging all arrive in Phase MCP-1 — nothing here is shippable.
+    | The backbone (Phase MCP-1) is complete: over HTTP the server is a
+    | bearer-token-authenticated, strictly org-scoped resource server with
+    | capability-scope gating, per-connection rate limiting, audit logging and
+    | an automated secrets guard. Phases MCP-2–5 add the read tools, draft/edit
+    | tools, elevated publish/schedule/connect tools, the AI tools and the
+    | packaged prompt workflows; MCP-6/7 add the settings surface, the per-org
+    | master switch and usage/audit. The local/stdio transport stays
+    | unauthenticated for dev and resolves the single hardcoded "dev org" below.
     |
     */
 
@@ -39,12 +43,11 @@ return [
     | `EnsureMcpHttpEnabled`: while `enabled` is false — the default, including
     | production — every request to it 404s.
     |
-    | Step MCP-1.2 added bearer-token authentication (AuthenticateMcp) on the POST
-    | route, so the endpoint is now authenticated + strictly org-scoped. It still
-    | ships OFF by default: capability-scope gating, rate limiting, audit logging and
-    | the secrets-exposure guard (MCP-1.3–1.6) are not in place yet, so do not enable
-    | it anywhere internet-reachable until the rest of MCP-1 lands. This flag stays as
-    | the per-env master switch (and the MCP-7.2 kill-switch surface).
+    | This is the per-ENV master switch: the whole backbone (auth, scopes, rate
+    | limiting, audit, secrets guard) is in place, so it is safe to enable, but it
+    | stays off by default so a deployment opts in explicitly. The per-ORG master
+    | switch (`organizations.mcp_enabled`, MCP-7.2) is separate and checked after
+    | authentication, so an org can be turned off individually without this flag.
     |
     */
 

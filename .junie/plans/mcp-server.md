@@ -1,10 +1,16 @@
 # Graphy — MCP Server Plan ("Graphy for your AI assistant")
 
-> **Status:** In progress. Phases **MCP-0** (learning spike) and **MCP-1** (auth, tenancy, scopes,
-> rate limiting, audit logging, remote transport & the secrets guard — the backbone) are complete.
-> The `/mcp` endpoint is authenticated, strictly org-scoped, capability-gated, rate-limited and
-> audited, and still ships **off by default** (`MCP_HTTP_ENABLED`). Next up: **Phase MCP-2** (read
-> tools & resources). Completed steps are marked **✅ DONE** below.
+> **Status:** ✅ **Complete — Phases MCP-0 → MCP-7 all built and green.** The `/mcp` endpoint is
+> authenticated, strictly org-scoped, capability-gated, rate-limited and audited, and now exposes the
+> full tool/resource/prompt catalogue (read, draft/edit, elevated publish/schedule/connect, AI, and
+> the `plan_week`/`fill_calendar_gaps` prompts), an Owner-only "AI connections" settings page with
+> usage/audit, a per-org master switch, and a checked-in security review. It still ships **off by
+> default** per environment (`MCP_HTTP_ENABLED`) and per organization (`organizations.mcp_enabled`).
+> 58 MCP feature tests green; Pint + PHPStan L7 clean; tsc green. See `.junie/modules/mcp.md` for the
+> as-built detail, `.junie/mcp-security-review.md` for the review, and
+> `docs/connecting-your-ai-assistant.md` for the setup guide. Completed steps are marked **✅ DONE**.
+> Deferred (documented): Inbox-over-MCP + the `draft_inbox_replies` prompt, OAuth DCR, and a dedicated
+> marketing-site section / onboarding card (the settings page + docs are the self-serve surface).
 > **Direction:** Graphy *is* an **MCP server** — we expose Graphy's data and actions so that AI
 > assistants (Claude Desktop/web, ChatGPT, Cursor, and anything else that speaks MCP) can drive
 > Graphy on the user's behalf. The headline: **"Run your entire social-media agency from inside your
@@ -508,3 +514,13 @@ complete module docs.
 
 ## Changelog
 - 2026-10-26: Initial plan drafted (Graphy-as-MCP-server direction). Not yet implemented.
+- 2026-10-26: Phases MCP-0 & MCP-1 implemented (backbone: transport, auth, scopes, rate limit, audit,
+  secrets guard).
+- 2026-10-26: Phases **MCP-2 → MCP-7 implemented and green.** Read tools + resources (MCP-2),
+  draft/edit tools (MCP-3), elevated publish/schedule/connect tools (MCP-4), AI tools + prompts
+  (MCP-5), the "AI connections" settings page + connector docs (MCP-6.1/6.2), and usage/audit UI +
+  per-org master switch + token revoke + security review + finalised module docs (MCP-7). Acting-member
+  binding lets the tools reuse the exact web-UI Actions/policies org-scoped. Deferred, with reasons
+  recorded in `.junie/modules/mcp.md`: Inbox-over-MCP (and the `draft_inbox_replies` prompt), OAuth
+  DCR, and a standalone marketing-site section / onboarding card (MCP-6.3 shipped as the settings page
+  + `docs/connecting-your-ai-assistant.md`).

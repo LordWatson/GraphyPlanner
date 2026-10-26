@@ -44,4 +44,16 @@ readonly class McpContext
     {
         return in_array($scope, $this->scopes, true);
     }
+
+    /**
+     * The user an MCP call acts as: the token's attributed user, or (when a token was issued without
+     * one) the organization's owner. Driving the existing Actions/policies/`OrganizationScope` as a
+     * real member is what lets MCP reuse the exact web-UI business logic (MCP-2); it also means a
+     * token attributed to a non-Owner inherits that member's role-level permissions. Null only for a
+     * misconfigured org with no Owner — the caller fails closed in that case.
+     */
+    public function actingUser(): ?User
+    {
+        return $this->user ?? $this->organization->owner;
+    }
 }
