@@ -46,8 +46,10 @@ MCP-4 tools are `#[IsDestructive]`.
 | Tool | `get_campaign` | `Read` | `GetCampaignOverviewAction` | MCP-2.4 |
 | Tool | `list_assets` | `Read` | `SearchClientAssetsAction` (metadata only — no signed URLs) | MCP-2.4 |
 | Tool | `get_analytics_summary` | `Read` | `GetOrganizationAnalyticsSummaryAction` (viewer role scoping) | MCP-2.4 |
-| Tool | `create_draft_post` | `WriteDrafts` | `CreatePostAction` | MCP-3.1 |
+| Tool | `create_draft_post` | `WriteDrafts` | `CreatePostAction` (+ `asset_ids` attached via `UpdatePostAction`) | MCP-3.1 |
 | Tool | `update_post` | `WriteDrafts` | `UpdatePostAction` (returns the diff) | MCP-3.2 |
+| Tool | `upload_media` | `WriteDrafts` | `CreateAssetFromBase64Action` → `SafeUpload` → `CreateAssetAction` | Media |
+| Tool | `set_post_media` | `WriteDrafts` | `UpdatePostAction` (`asset_ids` sync; replace/add/remove) | Media |
 | Tool | `transition_post_status` | `WriteDrafts` | `TransitionPostStatusAction` + `PostStatusTransitionMap` (capped ≤ approved) | MCP-3.3 |
 | Tool | `schedule_post` | `WriteSchedule` | re-runs checklist, then `TransitionPostStatusAction` → `PublishPostJob` `#[IsDestructive]` | MCP-4.1 |
 | Tool | `start_account_connection` | `WriteSchedule` | `CreateConnectInviteAction` (returns a connect URL, never a token) | MCP-4.2 |
@@ -190,6 +192,31 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   `id`/`name`/`status` for clients and the brand-brain markdown are returned — no tokens, keys or
   signed URLs.)
 
+## Media over MCP (upload an image from the assistant, use it on a post)
+
+MCP tool calls carry only JSON arguments (`Laravel\Mcp\Request` exposes `arguments`/`meta`/`uri`, no
+binary channel), so an image the user pastes/attaches in their AI assistant reaches Graphy as **base64
+bytes** in a tool argument. There is deliberately **no server-side URL fetch** (no SSRF surface).
+
+- **`upload_media`** (`WriteDrafts`) ingests the base64 `data` into a client's media library.
+  `App\Actions\Assets\CreateAssetFromBase64Action` decodes it (tolerating a `data:…;base64,` prefix),
+  writes it to a temp file, wraps it in a test-mode `Illuminate\Http\UploadedFile`, and validates it
+  with the **exact same rules as `StoreAssetRequest` for `source=upload`** — the `mimes:` allowlist,
+  the per-type size ceiling, and `App\Rules\SafeUpload` (content sniffing, SVG/HTML/script refusal,
+  `VirusScanner`) — before delegating to the existing `CreateAssetAction` (private disk,
+  `ProbeAssetJob`). So nothing the web uploader would reject can be stored via MCP. It returns only
+  safe metadata via `McpPresenters::asset()` (**never** a signed URL/disk/path) plus `asset_id`, and
+  enforces `AssetPolicy::create`. The raw bytes are never logged.
+- **`set_post_media`** (`WriteDrafts`) sets a post's attached media from `asset_ids` with a `mode`
+  (`replace` default / `add` / `remove`). Every id must belong to **the post's own client** in the org
+  (cross-client/org ids are refused); it then delegates to `UpdatePostAction` so the carousel order
+  (`post_assets.sort_order`), checklist refresh, revision and scheduled-post vendor recall/resubmit all
+  apply. Never changes the post status.
+- **`create_draft_post`** gained an optional `asset_ids` argument; when present it attaches the media
+  through `UpdatePostAction` after `CreatePostAction` (one media/checklist path). So "create a post
+  using this image" = `upload_media` → `create_draft_post(asset_ids)`; "replace the media on this post
+  with this image" = `upload_media` → `set_post_media(mode=replace)`.
+
 ## How to run it (manual round-trip)
 
 - MCP Inspector: `php artisan mcp:inspector graphy` — connect, list tools/resources, call
@@ -231,6 +258,10 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   with the expected fields and the plain token absent from every column; a scope-denied call is
   recorded as `error`; a forced insert failure is swallowed (the call is unaffected) and logged at
   `error`.
+- `tests/Feature/Mcp/McpMediaTest.php` (Media): `upload_media` creates an asset from base64 without
+  leaking a URL; it rejects a renamed non-image and an oversized file via `SafeUpload`/size (clean
+  `isError`, not a 500) and requires `write:drafts`; `create_draft_post` attaches supplied `asset_ids`;
+  `set_post_media` replaces/adds/removes, refuses another client's asset, and requires `write:drafts`.
 - `tests/Feature/Mcp/McpSecretsGuardTest.php` (MCP-1.6): a coverage assertion forces the guard to be
   revisited when a primitive changes; no declared schema / advertised definition names a secret-shaped
   field; and the real output of each read primitive — invoked against seeded data with a connected
@@ -329,6 +360,14 @@ is enforced and the test that proves it.
 
 ## Changelog
 
+- 2026-10-26: Media over MCP. Added `upload_media` (base64 ingest → asset, via new
+  `App\Actions\Assets\CreateAssetFromBase64Action` reusing `SafeUpload` + `CreateAssetAction`) and
+  `set_post_media` (`asset_ids` replace/add/remove via `UpdatePostAction`); `create_draft_post` gained
+  an `asset_ids` argument. Both new tools require `WriteDrafts`, are client/org-scoped, and expose only
+  safe asset metadata (no signed URL/path). Registered on `GraphyServer`; `McpSecretsGuardTest` list
+  extended; added `McpMediaTest`. Base64-only by design (no server-side URL fetch → no SSRF). Pint +
+  PHPStan L7 clean; `McpMediaTest` (8) + the MCP write/secrets-guard suites green. See
+  `.junie/modules/assets.md` (ingest Action) and `docs/connecting-your-ai-assistant.md` (tool catalogue).
 - 2026-10-26: Phase MCP-0 (learning spike). Installed `laravel/mcp` v1.1.0; added `GraphyServer`
   (local/stdio), `ListClientsTool`, `BrandBrainResource`, `McpDevOrg`, `config/mcp.php`, `routes/ai.php`
   and `GraphyMcpSpikeTest`. No auth/tenancy/scopes yet — dev only.

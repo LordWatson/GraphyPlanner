@@ -43,6 +43,13 @@ shared campaigns & assets doc in Step C-0.1).
   (`PER_PAGE = 24`, eager-loads `campaign:id,name`), optionally filtered by a case-insensitive
   `original_filename` substring (`%`/`_` escaped so input matches literally) and an `AssetType`.
   Read-only, so no transaction/logging.
+- `App\Actions\Assets\CreateAssetFromBase64Action`: ingests base64-encoded media (an image a user put
+  into their AI assistant, via the MCP `upload_media` tool) as an uploaded `Asset`. Decodes the bytes
+  (tolerating a `data:…;base64,` prefix), wraps them in a test-mode `UploadedFile`, and validates with
+  the **same rules as `StoreAssetRequest` for `source=upload`** (`mimes:` allowlist, per-type size
+  ceiling, `SafeUpload` content-sniffing/SVG-refusal/virus-scan) before delegating to
+  `CreateAssetAction` — so the MCP path can store nothing the web uploader would reject. Throws
+  `ValidationException` on a bad file; never logs the raw bytes. See `mcp.md`.
 - `App\Actions\Assets\DeleteAssetAction`: soft-deletes the row (Step I-1.5 keeps the stored file so
   the asset can be restored), wrapped in `DB::transaction`, logs the deletion.
 - `App\Policies\AssetPolicy`: `viewAny`/`view` mirror `CampaignPolicy`. `create` additionally allows
@@ -162,6 +169,9 @@ shared campaigns & assets doc in Step C-0.1).
   `campaigns.md`.
 
 ## Changelog
+- 2026-10-26: Media over MCP — `CreateAssetFromBase64Action` ingests base64 media from the AI
+  assistant through the same `SafeUpload`/size validation + `CreateAssetAction` pipeline the web
+  uploader uses (reuse, not a second path). See `mcp.md` for the `upload_media`/`set_post_media` tools.
 - 2026-10-23: Step M-5.9 — Canva & cloud imports. `DesignImportProvider` + `AssetSource` cases,
   `design_import_connections` (encrypted tokens), `DesignImportSource` contract + `OAuth2ImportSource`
   base + Canva/Drive/Dropbox sources + `DesignImportManager` + `FakeDesignImportSource`,

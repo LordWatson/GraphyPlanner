@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Actions\Posts\CreatePostAction;
+use App\Actions\Posts\UpdatePostAction;
 use App\Enums\McpScope;
 use App\Enums\PostStatus;
 use App\Models\Client;
@@ -33,7 +34,10 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Creates a DRAFT post for a client (never published). Accepts caption, hashtags, optional campaign, and per-account targets with their own local date/time. Requires the write:drafts scope. Returns the new post id and an edit link.')]
 class CreateDraftPostTool extends McpTool
 {
-    public function __construct(private readonly CreatePostAction $createPost) {}
+    public function __construct(
+        private readonly CreatePostAction $createPost,
+        private readonly UpdatePostAction $updatePost,
+    ) {}
 
     /**
      * @return list<McpScope>
@@ -80,6 +84,8 @@ class CreateDraftPostTool extends McpTool
             'hashtags' => ['nullable', 'array'],
             'hashtags.*' => ['string', 'max:150'],
             'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $client->id)->whereNull('deleted_at')],
+            'asset_ids' => ['nullable', 'array'],
+            'asset_ids.*' => ['integer', 'distinct', Rule::exists('assets', 'id')->where('client_id', $client->id)->whereNull('deleted_at')],
             'targets' => ['nullable', 'array'],
             'targets.*.social_account_id' => ['required', 'integer', Rule::exists('social_accounts', 'id')->where('client_id', $client->id)->whereNull('deleted_at')],
             'targets.*.scheduled_local_date' => ['nullable', 'date_format:Y-m-d'],
@@ -94,10 +100,18 @@ class CreateDraftPostTool extends McpTool
             'targets' => $validated['targets'] ?? [],
         ]);
 
+        // Attach media through UpdatePostAction so the carousel order + §6 checklist stay in one path.
+        if (! empty($validated['asset_ids'])) {
+            $post = ($this->updatePost)($post, [
+                'asset_ids' => array_values(array_map('intval', $validated['asset_ids'])),
+            ], $user);
+        }
+
         return Response::structured([
             'post_id' => $post->id,
             'status' => $post->status->value,
             'client_id' => $client->id,
+            'media_count' => $post->assets()->count(),
             'edit_url' => route('posts.edit', $post),
             'message' => 'Draft created. Review and refine it in Graphy before scheduling.',
         ]);
@@ -113,6 +127,7 @@ class CreateDraftPostTool extends McpTool
             'master_caption' => $schema->string()->description('The master caption; per-account overrides can be edited later.'),
             'hashtags' => $schema->array()->description('A list of hashtag strings (without the leading #).'),
             'campaign_id' => $schema->integer()->description('Attach the draft to this campaign (must belong to the client).'),
+            'asset_ids' => $schema->array()->description('Media asset ids to attach, in carousel order (use upload_media to add a new image first). Each must belong to the client.'),
             'targets' => $schema->array()->description('Per-account targets: objects with social_account_id and optional scheduled_local_date (YYYY-MM-DD) and scheduled_local_time (HH:MM).'),
         ];
     }

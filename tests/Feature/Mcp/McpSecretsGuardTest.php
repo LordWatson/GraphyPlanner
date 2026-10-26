@@ -23,10 +23,12 @@ use App\Mcp\Tools\ListClientsTool;
 use App\Mcp\Tools\ListPostsTool;
 use App\Mcp\Tools\RecommendPostsTool;
 use App\Mcp\Tools\SchedulePostTool;
+use App\Mcp\Tools\SetPostMediaTool;
 use App\Mcp\Tools\StartAccountConnectionTool;
 use App\Mcp\Tools\SuggestCaptionsTool;
 use App\Mcp\Tools\TransitionPostStatusTool;
 use App\Mcp\Tools\UpdatePostTool;
+use App\Mcp\Tools\UploadMediaTool;
 use App\Models\Asset;
 use App\Models\BrandBrain;
 use App\Models\Campaign;
@@ -83,6 +85,8 @@ class McpSecretsGuardTest extends TestCase
             CreateDraftPostTool::class,
             UpdatePostTool::class,
             TransitionPostStatusTool::class,
+            UploadMediaTool::class,
+            SetPostMediaTool::class,
             SchedulePostTool::class,
             StartAccountConnectionTool::class,
             CancelScheduledPostTool::class,
