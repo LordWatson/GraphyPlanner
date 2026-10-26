@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Mcp;
 
+use App\Actions\Assets\CreateAssetAction;
+use App\Enums\AssetSource;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Mcp\Servers\GraphyServer;
@@ -15,6 +17,8 @@ use App\Models\Post;
 use App\Models\User;
 use App\Support\Mcp\McpContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -31,14 +35,18 @@ class McpUploadSessionTest extends TestCase
 
     private Client $client;
 
+    private User $owner;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        Queue::fake(); // CreateAssetAction dispatches ProbeAssetJob.
+
         $this->org = Organization::factory()->create();
         config()->set('mcp.spike.dev_org_id', $this->org->id);
 
-        User::factory()->create(['org_id' => $this->org->id, 'role' => Role::Owner]);
+        $this->owner = User::factory()->create(['org_id' => $this->org->id, 'role' => Role::Owner]);
         $this->client = Client::factory()->for($this->org, 'organization')->create();
     }
 
@@ -118,7 +126,33 @@ class McpUploadSessionTest extends TestCase
             ->assertOk()
             ->assertSee('open')
             ->assertSee((string) $onPost->id)
-            ->assertSee((string) $inLibrary->id);
+            ->assertSee((string) $inLibrary->id)
+            // These factory assets have no stored file, so there is no vision preview — metadata only.
+            ->assertDontSee('/9j/');
+    }
+
+    public function test_get_media_upload_shows_the_uploaded_images_as_vision(): void
+    {
+        $post = $this->draftPost();
+
+        $asset = app(CreateAssetAction::class)($this->client, $this->owner, [
+            'source' => AssetSource::Upload,
+            'file' => UploadedFile::fake()->image('hero.jpg', 600, 600),
+        ]);
+        $post->assets()->sync([$asset->id => ['sort_order' => 0]]);
+
+        $session = McpUploadSession::factory()->for($this->org, 'organization')->for($this->client)->create([
+            'post_ids' => [$post->id],
+            'uploaded_asset_ids' => [$asset->id],
+        ]);
+
+        GraphyServer::tool(GetMediaUploadTool::class, ['session_id' => $session->id])
+            ->assertOk()
+            ->assertSee((string) $asset->id)   // the summary + the "Asset {id}" label
+            ->assertSee('/9j/')                // a JPEG preview (base64 of FF D8 FF) — the model can see it
+            // Even with the image present, no signed URL or storage path leaves the server.
+            ->assertDontSee((string) $asset->path)
+            ->assertDontSee('/files/');
     }
 
     public function test_get_media_upload_is_org_scoped(): void
