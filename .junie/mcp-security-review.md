@@ -65,6 +65,12 @@ it is enforced and the automated test that proves it.
 - **No secret is ever returned.** Assets expose safe metadata only (never the signed `url`, storage
   `disk`/`path`, or thumbnail). Client/campaign billing fields are gated by `viewBilling`. The
   connect tool returns only a browser‑completable invite URL — never a vendor OAuth token.
+- **Media vision — a deliberate, scoped exception.** `get_media_upload` returns *image bytes* (a
+  downscaled preview via `McpImagePreview`) so the assistant can see the user's own just‑uploaded media
+  and caption from it. This is bytes of the user's own upload, to the user's own AI client — never a
+  signed URL or storage `disk`/`path`, and only for assets uploaded through that session. The
+  "no signed URL / storage path leaves the server" rule is unchanged; `McpUploadSessionTest` asserts an
+  image preview is present while the path and the `/files/` signed‑URL prefix are not.
 - **Evidence:** `McpSecretsGuardTest` enumerates **every** registered tool/resource/prompt, fails if
   a new primitive is added without conscious coverage, asserts no schema/definition names a
   secret‑shaped field, and invokes each read primitive against seeded data containing a **sentinel

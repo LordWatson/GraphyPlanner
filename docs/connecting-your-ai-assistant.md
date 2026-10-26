@@ -144,12 +144,15 @@ To test the remote HTTP transport locally, set `MCP_HTTP_ENABLED=true`, create a
 An assistant can't reliably carry a real photo as text, so for images you need to provide, Graphy uses
 a one-click upload link that handles any number of files across any number of posts.
 
-Say e.g. *"create 3 posts for Northwind — I'll upload media for each."* The assistant creates the posts,
-then calls **`request_media_upload`** and gives you **one** link. You open it in any browser (no login),
-and the page shows each post with its own drop area — drop **one or more** files onto each (or into the
-library area if no post was named). The assistant picks up what landed with **`get_media_upload`** and
-finishes the posts. The link is scoped to that one client, expires after ~60 minutes, and every file is
-validated exactly like a web upload (file type, size, content sniffing and a virus scan).
+Say e.g. *"create 3 posts for Northwind — I'll upload media for each."* The assistant gives you **one**
+link (via **`request_media_upload`**). You open it in any browser (no login), and the page shows a drop
+area per post (or a library area) — drop **one or more** files onto each. When you're done, the
+assistant calls **`get_media_upload`**, which both tells it what landed *and shows it the images* — so
+it can **write the captions from the actual media**, not before it. Because it can see the media, it
+also works best media-first: it gets your images, looks at them, then writes the branded posts. The
+link is scoped to that one client, expires after ~60 minutes, and every file is validated exactly like a
+web upload (file type, size, content sniffing and a virus scan). The images the assistant sees are
+downscaled previews of your own uploads — Graphy still never hands it a download URL.
 
 For a small image the assistant already holds, it can instead send it straight to `upload_media` as
 base64. Either way the media attaches via `create_draft_post` (`asset_ids`) or `set_post_media`. All of

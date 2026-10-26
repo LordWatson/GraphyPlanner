@@ -34,7 +34,7 @@ use Laravel\Mcp\Server\Attributes\Title;
  */
 #[Name('request_media_upload')]
 #[Title('Request media upload link')]
-#[Description('Creates one short-lived browser link the user opens to upload images for a client. Pass post_ids (the posts you created) and they can upload one or many files to each post; omit them to collect media into the library. Use this for pasted or large images that can\'t be sent as base64. Poll get_media_upload for the asset ids. Returns the upload URL — never a token. Requires the write:drafts scope.')]
+#[Description('Creates one short-lived browser link the user opens to upload images for a client. Pass post_ids (posts you created, incl. empty placeholders) and they can upload one or many files to each; omit them to collect media into the library. Use this to get media the user must provide BEFORE finalising captions — then call get_media_upload to SEE the images and write captions from them. Returns the upload URL — never a token. Requires the write:drafts scope.')]
 class RequestMediaUploadTool extends McpTool
 {
     public function __construct(private readonly CreateMcpUploadSessionAction $createSession) {}

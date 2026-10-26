@@ -4,7 +4,9 @@ namespace App\Mcp\Tools;
 
 use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Enums\McpScope;
+use App\Models\Asset;
 use App\Models\Post;
+use App\Support\Mcp\McpImagePreview;
 use App\Support\Mcp\McpPresenters;
 use App\Support\Mcp\McpTenant;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -28,7 +30,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('get_post')]
 #[Title('Get post')]
-#[Description('Returns a full post: caption, hashtags, each target\'s scheduled time in both the account\'s local timezone and the org timezone, attached asset metadata, and the live pre-publish checklist. Read-only.')]
+#[Description('Returns a full post: caption, hashtags, each target\'s scheduled time in both the account\'s local timezone and the org timezone, attached asset metadata, the live pre-publish checklist, AND (unless include_media is false) the attached images themselves so you can SEE the media and caption from it. Read-only.')]
 #[IsReadOnly]
 class GetPostTool extends McpTool
 {
@@ -54,6 +56,7 @@ class GetPostTool extends McpTool
 
         $validated = $request->validate([
             'post_id' => ['required', 'integer'],
+            'include_media' => ['nullable', 'boolean'],
         ]);
 
         $post = Post::query()
@@ -76,10 +79,48 @@ class GetPostTool extends McpTool
 
         $checklist = ($this->evaluateChecklist)($post);
         $orgTimezone = $org->default_timezone ?: 'UTC';
+        $detail = McpPresenters::postDetail($post, $checklist, $orgTimezone);
 
-        return Response::structured(
-            McpPresenters::postDetail($post, $checklist, $orgTimezone),
-        );
+        // By default, also show the post's attached images so the assistant can SEE the media and
+        // caption from it (keyed by post_id, which clients pass reliably). Keep the structured detail
+        // either way; append image previews only when there is viewable media and the caller didn't
+        // opt out. Previews are bounded (~768px JPEG) and never a signed URL / storage path.
+        $wantsMedia = ($validated['include_media'] ?? true) !== false;
+        $images = $wantsMedia ? $this->imageResponses($post) : [];
+
+        if ($images === []) {
+            return Response::structured($detail);
+        }
+
+        return Response::make([
+            Response::text((string) json_encode($detail, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)),
+            ...$images,
+        ])->withStructuredContent($detail);
+    }
+
+    /**
+     * Vision previews of the post's attached media, each preceded by a line naming its asset_id so the
+     * model can tie an image to the id it edits. Capped (a carousel is small) and best-effort.
+     *
+     * @return list<Response>
+     */
+    private function imageResponses(Post $post): array
+    {
+        $responses = [];
+
+        foreach ($post->assets->take(10) as $asset) {
+            /** @var Asset $asset */
+            $preview = McpImagePreview::for($asset);
+
+            if ($preview === null) {
+                continue;
+            }
+
+            $responses[] = Response::text('Asset '.$asset->id.($asset->original_filename !== null ? ' ('.$asset->original_filename.')' : '').' on this post:');
+            $responses[] = Response::image($preview['data'], $preview['mime']);
+        }
+
+        return $responses;
     }
 
     /**
@@ -89,6 +130,7 @@ class GetPostTool extends McpTool
     {
         return [
             'post_id' => $schema->integer()->required()->description('The id of the post to fetch.'),
+            'include_media' => $schema->boolean()->description('Also return the attached images so you can see them (default true). Set false for text only.'),
         ];
     }
 }

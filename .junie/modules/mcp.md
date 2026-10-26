@@ -40,7 +40,7 @@ MCP-4 tools are `#[IsDestructive]`.
 | Tool | `get_client` | `Read` | `Client::healthFor()` + `ClientHealthService` | MCP-2.1 |
 | Tool | `get_brand_brain` | `Read` | `BrandBrain::toGrokContext()` | MCP-2.1 |
 | Tool | `list_posts` | `Read` | `ListPostsAction::query()` (pinned to org) | MCP-2.2 |
-| Tool | `get_post` | `Read` | `EvaluatePostChecklistAction` + per-target local/org times | MCP-2.2 |
+| Tool | `get_post` | `Read` | `EvaluatePostChecklistAction` + per-target local/org times + **attached images as vision previews** (`McpImagePreview`, default on, `include_media`) | MCP-2.2 |
 | Tool | `get_calendar` | `Read` | `GetCalendarPostsAction` + `BuildCalendarOccurrencesAction` | MCP-2.3 |
 | Tool | `list_campaigns` | `Read` | org-scoped `Campaign` query | MCP-2.4 |
 | Tool | `get_campaign` | `Read` | `GetCampaignOverviewAction` | MCP-2.4 |
@@ -51,7 +51,7 @@ MCP-4 tools are `#[IsDestructive]`.
 | Tool | `upload_media` | `WriteDrafts` | `CreateAssetFromBase64Action` → `SafeUpload` → `CreateAssetAction` | Media |
 | Tool | `set_post_media` | `WriteDrafts` | `UpdatePostAction` (`asset_ids` sync; replace/add/remove) | Media |
 | Tool | `request_media_upload` | `WriteDrafts` | `CreateMcpUploadSessionAction` (one browser link for a client + its posts; returns the URL, never the token) | Media (link) |
-| Tool | `get_media_upload` | `WriteDrafts` | `McpUploadSession` status → per-post + library asset ids (`McpPresenters::asset`) | Media (link) |
+| Tool | `get_media_upload` | `WriteDrafts` | `McpUploadSession` status → per-post + library asset ids + **the uploaded images as vision previews** (`McpImagePreview`) | Media (link) |
 | Tool | `transition_post_status` | `WriteDrafts` | `TransitionPostStatusAction` + `PostStatusTransitionMap` (capped ≤ approved) | MCP-3.3 |
 | Tool | `schedule_post` | `WriteSchedule` | re-runs checklist, then `TransitionPostStatusAction` → `PublishPostJob` `#[IsDestructive]` | MCP-4.1 |
 | Tool | `start_account_connection` | `WriteSchedule` | `CreateConnectInviteAction` (returns a connect URL, never a token) | MCP-4.2 |
@@ -263,13 +263,36 @@ many posts ("create 3 posts, I'll upload media for each"):
   `CreateAssetAction` pipeline as the web uploader, **appends** it to the chosen post via
   `UpdatePostAction` (upload order = carousel order), and records it on the session. The session stays
   open (not single-use) until it expires; a `max_files` cap bounds abuse.
-- **`get_media_upload`** (`WriteDrafts`, `#[IsReadOnly]`) polls by `session_id` → per-post attached asset
-  ids + any library uploads (safe `McpPresenters::asset()` metadata), so the assistant sees what landed
-  and chains the ids into `create_draft_post` / `set_post_media`.
+- **`get_media_upload`** (`WriteDrafts`, `#[IsReadOnly]`) polls by `session_id` and returns **both** a
+  text summary (per-post attached asset ids + any library uploads, safe `McpPresenters::asset()`
+  metadata) **and the uploaded images themselves as vision previews**, so the assistant can *see* the
+  media and write captions from it, then chain the ids into `create_draft_post` / `set_post_media`. It
+  returns `Response::make([...])` — a text block (the JSON summary), then, newest-first and capped at
+  24, a `"Asset {id}:"` text block + a `Response::image()` preview per uploaded image, built by
+  `App\Support\Mcp\McpImagePreview` (bounded ~768px JPEG, from the asset's thumbnail or original via
+  `AssetStorage::contents()` + GD — the `ProbeAssetJob` stack; best-effort, metadata-only on failure).
 
-Headline flow: `create_draft_post` ×N → `request_media_upload(post_ids:[…])` → user uploads per post →
-`get_media_upload` → confirm. The model never carries bytes; no server-side URL fetch (no SSRF);
-outbound responses never include a signed URL or storage path.
+**Seeing a post's media the robust way (`get_post`).** When media is uploaded for named posts it is
+attached server-side on upload, so `get_post` (keyed by `post_id` — which clients pass reliably, unlike
+a `session_id` a model must carry across turns) returns the post's attached images as vision previews
+(default on; `include_media: false` for text only). This is the dependable path for the media-first
+flow and sidesteps a real client-side failure mode observed in the wild: Claude Desktop sometimes calls
+`get_media_upload` with **no `session_id`** at all (→ "The session id field is required") — the server,
+schema and both int/string values are proven correct by `McpUploadSessionTest` (incl. an HTTP-transport
+test), so the fix is to not depend on that call for post-attached media.
+
+**Media-FIRST ordering (as built):** when content should be shaped *by* media the user provides, the
+instructions tell the model to get the media before finalising captions — either library-first
+(`request_media_upload` with no posts → view → `create_draft_post(asset_ids, caption)`) or placeholder-
+posts-first (`create_draft_post` ×N empty → `request_media_upload(post_ids)` → view each post's media →
+`update_post` to write each caption from it).
+
+**Vision = a deliberate, scoped exception to "no media reaches the AI".** `get_media_upload` sends image
+*bytes* (a downscaled preview of the user's own just-uploaded media) to the user's own AI client —
+never a signed URL or storage path, never to a third party. "No signed URL / storage path leaves the
+server" still holds (proven by `McpUploadSessionTest`, which asserts the image is present yet the path
+and `/files/` signed-URL prefix are not). The model still never carries bytes *into* Graphy; this is
+the reverse direction, and only for session uploads.
 
 ## How to run it (manual round-trip)
 
@@ -427,6 +450,24 @@ is enforced and the test that proves it.
 
 ## Changelog
 
+- 2026-10-26: Media over MCP — **`get_post` returns the post's images as vision previews** (default on,
+  `include_media` flag; reuses `McpImagePreview`). Robustness fix after a real run where Claude Desktop
+  called `get_media_upload` with no `session_id` ("field is required") — a client-side omission (server/
+  schema/int+string all proven correct, incl. a new HTTP-transport regression test). Since uploaded
+  media is attached to its post server-side, `get_post(post_id)` is the reliable way for the assistant
+  to SEE a post's media (post_id is passed reliably), so the media-first captioning flow no longer hinges
+  on `get_media_upload`. Server instructions updated to prefer `get_post` for post-attached media. Pint +
+  PHPStan L7 clean; 34 affected tests green.
+- 2026-10-26: Media over MCP — **assistant can now see uploaded media (vision) + media-first flow**.
+  `get_media_upload` now returns `Response::make([...])` with the text summary **and** the uploaded
+  images as `Response::image()` previews (new `App\Support\Mcp\McpImagePreview` — bounded ~768px JPEG via
+  `AssetStorage::contents()` + GD, thumbnail-or-original, best-effort). Reworked the `GraphyServer`
+  instructions + `request_media_upload`/`get_media_upload` descriptions so the model gets media FIRST and
+  writes captions *from* it (fixes a run where it created posts but never issued the link and captioned
+  before any media existed). This is a deliberate, scoped reversal of "no media reaches the AI": image
+  *bytes* of the user's own uploads go to the user's own AI client, never a signed URL/path (asserted in
+  `McpUploadSessionTest`). Code + instructions only — **no migration, no `npm build`**; deploy = pull +
+  fpm reload + reconnect Claude. Pint + PHPStan L7 clean; tests green.
 - 2026-10-26: Media over MCP — out-of-band upload link as a **batch session**. base64 can't carry real
   images reliably (verified: MCP tool calls are JSON-only, Claude Desktop doesn't forward attachments,
   the model can't reproduce bytes — and SEP-2631 shows the spec heading to this same upload-URL model).
