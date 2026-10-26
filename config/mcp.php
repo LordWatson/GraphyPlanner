@@ -53,4 +53,22 @@ return [
         'path' => env('MCP_HTTP_PATH', 'mcp'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Rate limiting / abuse guard (Phase MCP-1.4)
+    |--------------------------------------------------------------------------
+    |
+    | Every tool call on the remote HTTP transport is counted per connection
+    | (per token, falling back to the org) against a rolling one-minute window.
+    | Once the budget is spent the call is refused with a clean MCP error — not
+    | a 500 — so a runaway assistant loop can't hammer Graphy or the vendor
+    | APIs. Set `per_minute` to 0 to disable limiting. The trusted local/stdio
+    | transport is never throttled.
+    |
+    */
+
+    'rate_limit' => [
+        'per_minute' => (int) env('MCP_RATE_LIMIT_PER_MINUTE', 60),
+    ],
+
 ];

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Mcp;
 
+use App\Enums\McpScope;
 use App\Models\McpToken;
 use App\Models\Organization;
 use App\Models\User;
@@ -20,11 +21,13 @@ use Illuminate\Support\Str;
 class CreateMcpTokenAction
 {
     /**
-     * @param  list<string>  $scopes
+     * @param  list<string>|null  $scopes  defaults to the read-only scope set (`McpScope::default()`)
      * @return array{token: string, model: McpToken}
      */
-    public function __invoke(Organization $organization, string $name, array $scopes = ['read'], ?User $user = null): array
+    public function __invoke(Organization $organization, string $name, ?array $scopes = null, ?User $user = null): array
     {
+        $scopes ??= McpScope::defaultValues();
+
         $plainToken = Str::random(64);
 
         $token = McpToken::create([

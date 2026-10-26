@@ -1,15 +1,16 @@
 # MCP Server
 
-> ⚠️ **Security: AUTHENTICATED & ORG-SCOPED, still hardening.** As of Step **MCP-1.2** the remote
-> Streamable HTTP transport (`POST /mcp`) is a **bearer-token-authenticated, strictly org-scoped**
-> resource server: an unauthenticated/invalid request is rejected 401 before any tool runs, and a
-> valid token resolves to **exactly one organization** (two-org isolation test green). It is still
-> **OFF by default** (`mcp.http.enabled` / `MCP_HTTP_ENABLED`) — while off (including production)
-> every verb on the route 404s. The local/stdio transport and in-process tool tests remain
-> unauthenticated and fall back to a single hardcoded "dev org" (`McpDevOrg`) for local dev only.
-> Still **missing before customer exposure:** capability-scope gating (MCP-1.3), rate limiting
-> (MCP-1.4), audit logging (MCP-1.5) and the secrets-exposure guard (MCP-1.6). See
-> `.junie/plans/mcp-server.md`.
+> ✅ **Security: Phase MCP-1 complete (the backbone).** The remote Streamable HTTP transport
+> (`POST /mcp`) is a **bearer-token-authenticated, strictly org-scoped** resource server:
+> unauthenticated/invalid requests are rejected 401 before any tool runs (MCP-1.2); a valid token
+> resolves to **exactly one organization** (two-org isolation test green); tools are
+> **capability-scope gated** (MCP-1.3), **rate-limited per connection** (MCP-1.4) and **audited**
+> (MCP-1.5), and an automated **secrets-exposure guard** (MCP-1.6) covers every registered primitive.
+> It still ships **OFF by default** (`mcp.http.enabled` / `MCP_HTTP_ENABLED`) — a deployment choice,
+> not a missing guardrail — and while off (including production) every verb on the route 404s. The
+> local/stdio transport and in-process tool tests remain unauthenticated and fall back to a single
+> hardcoded "dev org" (`McpDevOrg`) for local dev only (so they are not rate-limited or audited).
+> See `.junie/plans/mcp-server.md`.
 
 ## Purpose
 
@@ -28,7 +29,7 @@ the existing `ListClientsAction`/presenters once auth exists.)
 
 | Primitive | Name | Class | What it does | Annotations |
 |---|---|---|---|---|
-| Tool | `list_clients` | `App\Mcp\Tools\ListClientsTool` | Lists the resolved org's clients (`id`, `name`, `status`) as structured content; no arguments. Org comes from `McpTenant` (authenticated token's org on HTTP; dev org locally). | `#[IsReadOnly]` |
+| Tool | `list_clients` | `App\Mcp\Tools\ListClientsTool` | Lists the resolved org's clients (`id`, `name`, `status`) as structured content; no arguments. Org comes from `McpTenant` (authenticated token's org on HTTP; dev org locally). Requires the `Read` scope. | `#[IsReadOnly]` |
 | Resource | `brand_brain` | `App\Mcp\Resources\BrandBrainResource` | Returns the resolved org's first client's Brand Brain as markdown, reusing `BrandBrain::toGrokContext()`. | `text/markdown`, URI `graphy://brand-brain` |
 | Prompt | — | — | None yet (Phase MCP-5). | — |
 
@@ -41,7 +42,13 @@ the existing `ListClientsAction`/presenters once auth exists.)
   `revoked_at` (soft revoke, keeps audit history), timestamps. **Not** org-scoped as a global scope:
   lookup by hash happens pre-auth, so it must query across orgs by hash (mirrors `PortalLoginToken`/
   `ReviewToken`). `token_hash` is `#[Hidden]`.
-- Still pending: `mcp_call_logs` for audit (MCP-1.5).
+- **`McpCallLog` (`mcp_call_logs`)** — MCP-1.5. One audit row per executed MCP tool call. Columns:
+  `org_id` (FK), `mcp_token_id` (nullable FK, `nullOnDelete` so history survives a token delete),
+  `tool` (name), `argument_keys` (json — the argument *names* only, never values), `outcome`
+  (`success`|`error`), `duration_ms`, timestamps. Uses `BelongsToOrganization` for parity with
+  `AiUsageLog`; on the MCP transport there is no signed-in member so `OrganizationScope` is a no-op
+  and the explicit `org_id` on write scopes it. **No column can carry a secret, token or argument
+  value** (the MCP-1.6 guard asserts this).
 
 ## Actions / Services / Contracts
 
@@ -52,9 +59,38 @@ the existing `ListClientsAction`/presenters once auth exists.)
   stand-in for real tenancy; deleted/replaced by token→org resolution in MCP-1.
 - `App\Actions\Mcp\CreateMcpTokenAction` (MCP-1.2): mints a bearer token for an org — generates the
   plain token, stores only its hash, returns `['token' => plain, 'model' => McpToken]` (the plain
-  token is the return value only). Defaults to the `['read']` scope set; logs org/user/token-id +
-  scopes, never the token. Single write (no transaction, CLAUDE.md #5). Reused by the MCP-6.1
-  settings page later.
+  token is the return value only). Defaults (when `$scopes` is `null`) to `McpScope::defaultValues()`
+  — the read-only set (MCP-1.3); logs org/user/token-id + scopes, never the token. Single write (no
+  transaction, CLAUDE.md #5). Reused by the MCP-6.1 settings page later.
+- `App\Enums\McpScope` (MCP-1.3): the capability scopes a token can carry — `Read` (`read`),
+  `WriteDrafts` (`write:drafts`), `WriteSchedule` (`write:schedule`), `Ai` (`ai`), `Inbox` (`inbox`).
+  The backing strings are the stable wire format stored in `mcp_tokens.scopes` and compared in
+  `McpContext::hasScope()`. `McpScope::default()`/`defaultValues()` is the single source of truth for
+  a new token's read-only default. `label()` gives the owner-facing description for the MCP-6.1 page.
+- `App\Support\Mcp\Concerns\AuthorizesScope` (MCP-1.3): the scope gate. `denyUnlessScoped(McpScope
+  ...$required)` returns an MCP error `Response` (naming the missing scope) or `null`. All listed
+  scopes are required (AND). No `McpContext` (local/stdio + in-process tests) = trusted transport =
+  `null` (no-op), mirroring `McpTenant`'s dev-org fallback. Rejections log at `warning` with
+  org/token/tool context, never the secret. A scope is *necessary, not sufficient* — the tool's
+  Action still enforces tenancy/policy/checklist on top.
+- `App\Mcp\Tools\McpTool` (MCP-1.3 → MCP-1.5): the base class every Graphy MCP tool extends (uses
+  `AuthorizesScope` + `RateLimitsCalls`). A tool declares `requiredScopes(): list<McpScope>` and puts
+  its work in `handleAuthorized()`. On the HTTP transport `handle()` runs the guardrails in order —
+  **(1)** rate limit, **(2)** scope gate, **(3)** audit around the handler — so an over-budget call is
+  refused before anything, an under-scoped token never reaches any Action, and every executed call
+  writes one audit row. The populated `Request` is forwarded unchanged; Actions/Services are
+  constructor-injected (tools resolve from the container). With no `McpContext` (trusted local/stdio
+  + tests) it goes straight to `handleAuthorized()` — no limiting/audit.
+- `App\Support\Mcp\Concerns\RateLimitsCalls` (MCP-1.4): `enforceRateLimit(McpContext)` counts the
+  call against a one-minute `RateLimiter` window keyed per token (falling back to org), returning a
+  clean MCP error `Response` ("Rate limit reached…") when the budget is spent, else `null` (and one
+  hit recorded). Budget from `config('mcp.rate_limit.per_minute')` (0 disables). An over-budget call
+  is neither counted again nor audited — it is already being throttled. Rejections log at `warning`.
+- `App\Actions\Mcp\RecordMcpCallAction` (MCP-1.5): the single write path for an `mcp_call_logs` row.
+  Mirrors `RecordAiUsageAction`: wrapped in `DB::transaction()` and **never throws** (log-and-continue
+  on its own failure). Records `org_id`, token id, `tool`, argument *keys*, outcome and duration; logs
+  the call at `info` (success) / `warning` (failed call), and at `error` only if the insert itself
+  fails. Never logs or stores the token or any argument value.
 - `App\Support\Mcp\McpContext` (MCP-1.2): readonly DTO — the resolved identity of an authenticated
   request (`organization`, `scopes`, optional `user`, originating `token`). `AuthenticateMcp` binds
   it into the container for the request; `McpContext::current()` returns it or `null` (local/stdio,
@@ -63,9 +99,10 @@ the existing `ListClientsAction`/presenters once auth exists.)
   or falls back to `McpDevOrg` when there is no context (local/stdio + tool tests). On HTTP a tool
   is never reached without a context (`AuthenticateMcp` 401s first), so the dev-org fallback only
   ever applies on the trusted local transport. The tools/resource call this instead of `McpDevOrg`.
-- `config/mcp.php`: spike config (`spike.dev_org_id`, env `MCP_DEV_ORG_ID`) and the MCP-1.1 HTTP
-  block (`http.enabled` / `MCP_HTTP_ENABLED`, default `false`; `http.path` / `MCP_HTTP_PATH`,
-  default `mcp`). Rate limits and scope config land here across the rest of MCP-1.
+- `config/mcp.php`: spike config (`spike.dev_org_id`, env `MCP_DEV_ORG_ID`), the MCP-1.1 HTTP block
+  (`http.enabled` / `MCP_HTTP_ENABLED`, default `false`; `http.path` / `MCP_HTTP_PATH`, default
+  `mcp`), and the MCP-1.4 `rate_limit` block (`rate_limit.per_minute` / `MCP_RATE_LIMIT_PER_MINUTE`,
+  default `60`, `0` disables).
 
 ## Routes / Controllers
 
@@ -104,11 +141,25 @@ the existing `ListClientsAction`/presenters once auth exists.)
 - **Auth is HTTP-only.** `AuthenticateMcp` runs on `POST /mcp`. The local/stdio transport and the
   in-process `GraphyServer::tool(...)` tests have no bearer token, so `McpTenant` falls back to
   `McpDevOrg` — dev-only, never reached over HTTP (the 401 fires first).
-- **Capability scopes stored, not yet enforced.** A token carries a `scopes` set (default `read`).
-  Per-tool scope *gating* is MCP-1.3; MCP-1.2 only resolves and carries the scopes.
-- **No secrets exposed.** Only `id`/`name`/`status` (clients) and the brand-brain markdown are
-  returned; no tokens, keys or signed URLs. `token_hash` is `#[Hidden]` and the plain token is never
-  persisted or logged. The automated secrets-exposure guard arrives in MCP-1.6.
+- **Capability scopes are enforced per tool (MCP-1.3).** A token carries a `scopes` set (default
+  `read`). Each tool extends `McpTool` and declares `requiredScopes()`; the gate rejects a token
+  missing any required scope with a clear MCP error *before* the tool's Action runs. The scope is
+  necessary but not sufficient — the Action still enforces org tenancy, policies and the checklist.
+  Resources are not yet scope-gated (they are read-only and every issued token holds `Read` by
+  default); a resource base class can follow when a write/elevated resource appears.
+- **Rate-limited per connection (MCP-1.4).** Every HTTP tool call is counted against a one-minute
+  window keyed per token (falling back to org); over budget → a clean MCP error, never a 500. The
+  trusted local/stdio transport is never throttled.
+- **Every executed call is audited (MCP-1.5).** `McpTool` writes exactly one `mcp_call_logs` row per
+  executed HTTP call (success *or* scope-denied error), via `RecordMcpCallAction`, recording only the
+  argument *keys*. Audit failure never breaks the call. Rate-limited calls are not audited (already
+  throttled).
+- **No secret ever leaves the server (MCP-1.6).** Only safe fields are returned; the `mcp_call_logs`
+  row stores no value/secret/token; `token_hash` is `#[Hidden]` and the plain token is never
+  persisted or logged. The automated `McpSecretsGuardTest` enforces this across every registered
+  tool/resource and fails if a new primitive is added without being covered. (Today only
+  `id`/`name`/`status` for clients and the brand-brain markdown are returned — no tokens, keys or
+  signed URLs.)
 
 ## How to run it (manual round-trip)
 
@@ -137,6 +188,24 @@ the existing `ListClientsAction`/presenters once auth exists.)
   - **two-org isolation:** org A's token sees only org A's client (never org B's) and vice versa;
   - an authenticated call stamps `last_used_at`;
   - `CreateMcpTokenAction` stores only the SHA-256, never the plain token.
+- `tests/Feature/Mcp/McpScopeTest.php` (MCP-1.3) — the capability-gating proof (via the test-only
+  `Tests\Fixtures\Mcp\ScopeTestServer` registering `list_clients` + `Tests\Fixtures\Mcp\SampleWriteTool`):
+  - a `read`-only token calling the `write:drafts` tool is rejected with a scope error (and the tool's
+    work never runs);
+  - a token with `write:drafts` runs the write tool;
+  - with no `McpContext` (trusted local/stdio) the gate is a no-op and the tool runs;
+  - `list_clients` is rejected for a token lacking `read`, and runs for one holding it.
+- `tests/Feature/Mcp/McpRateLimitTest.php` (MCP-1.4): over-budget HTTP calls return a clean
+  `isError` "Rate limit reached" result (HTTP 200, not a 500); `per_minute = 0` disables it; the
+  per-token key means one connection can't throttle another.
+- `tests/Feature/Mcp/McpAuditTest.php` (MCP-1.5): one call writes exactly one `mcp_call_logs` row
+  with the expected fields and the plain token absent from every column; a scope-denied call is
+  recorded as `error`; a forced insert failure is swallowed (the call is unaffected) and logged at
+  `error`.
+- `tests/Feature/Mcp/McpSecretsGuardTest.php` (MCP-1.6): a coverage assertion forces the guard to be
+  revisited when a primitive changes; no declared schema / advertised definition names a secret-shaped
+  field; and the real output of each read primitive — invoked against seeded data with a connected
+  account's sentinel access token — leaks neither the token nor any secret-shaped field.
 
 ## Package facts & API deltas (verify each phase)
 
@@ -164,12 +233,14 @@ the existing `ListClientsAction`/presenters once auth exists.)
 
 ## Known Gaps / Open Questions
 
-- **Capability-scope gating is not wired yet (MCP-1.3).** Tokens carry a `scopes` set and
-  `McpContext`/`McpToken` expose `hasScope()`, but no tool checks it and there is no `App\Enums\McpScope`
-  yet. Every current tool is read-only, so this is safe for now; it must land before any write tool.
-- No rate limiting (MCP-1.4), audit logging / `mcp_call_logs` (MCP-1.5), or automated secrets-exposure
-  guard test (MCP-1.6). The HTTP endpoint therefore stays flagged **off by default**; do not enable
-  `MCP_HTTP_ENABLED` anywhere internet-reachable before the rest of MCP-1 lands.
+- **Resources are not scope-gated yet.** Only tools (via `McpTool`) check scopes, are rate-limited and
+  are audited; `BrandBrainResource` does none of these. It is read-only and every issued token holds
+  `Read` by default, so this is safe for now — revisit with a resource base class if a resource ever
+  needs an elevated scope (and extend rate limiting/audit to resources then).
+- **Off by default is a deployment choice, not a missing guardrail.** Phase MCP-1 is complete, so the
+  endpoint is safe to enable; it stays off (`MCP_HTTP_ENABLED`) until there is a settings surface to
+  issue tokens (MCP-6.1) and a per-org master switch (MCP-7.2). No audit *UI* yet — `mcp_call_logs` is
+  written but only surfaced in Settings in MCP-7.1.
 - **Phase 13 convergence** (`.junie/plans/mcp-server.md` §Prerequisites): Phase 13 (Public API /
   `ApiToken` / Sanctum) is **not built** as of MCP-1.2, so this plan stood up its own token/org/scope
   layer (`McpToken`). **Convergence outcome:** MCP shipped first → if/when Phase 13 is built it must
@@ -197,3 +268,19 @@ the existing `ListClientsAction`/presenters once auth exists.)
   token-stored); updated `McpHttpTransportTest` to authenticate. Phase 13 convergence: MCP shipped
   first, so Phase 13 must reuse this token layer. Scope gating, rate limits, audit and the secrets
   guard remain (MCP-1.3–1.6); endpoint stays off by default.
+- 2026-10-26: Step MCP-1.3 (capability-scope gating). Added `App\Enums\McpScope`
+  (`read`/`write:drafts`/`write:schedule`/`ai`/`inbox` + `default()`/`defaultValues()`/`label()`),
+  the `App\Support\Mcp\Concerns\AuthorizesScope` gate and the `App\Mcp\Tools\McpTool` base class
+  (`handle()` gates then delegates to `handleAuthorized()`). `ListClientsTool` now extends `McpTool`
+  and requires `Read`; `CreateMcpTokenAction` defaults its scope set through `McpScope`. Added
+  `McpScopeTest` with `ScopeTestServer`/`SampleWriteTool` fixtures (scope present/absent on a write
+  tool and on `list_clients`; trusted-transport no-op). Pint + PHPStan L7 clean; 18 MCP tests green.
+  Still remaining in MCP-1: rate limiting (1.4), audit logging (1.5), secrets guard (1.6).
+- 2026-10-26: Steps MCP-1.4–1.6 — **Phase MCP-1 complete**. MCP-1.4: `RateLimitsCalls` concern +
+  `config('mcp.rate_limit.per_minute')`; `McpTool` now rate-limits every HTTP call per token/org and
+  refuses cleanly over budget (`McpRateLimitTest`). MCP-1.5: `McpCallLog` + `mcp_call_logs` migration +
+  `RecordMcpCallAction` (DB::transaction, log-and-continue); `McpTool` writes one audit row per
+  executed call with argument *keys* only (`McpAuditTest`). MCP-1.6: `McpSecretsGuardTest` enumerates
+  every registered primitive and asserts no secret leaks (schema + real output, with an adversarial
+  sentinel token) and forces coverage of new primitives. Pint + PHPStan L7 clean; 27 MCP tests green.
+  Endpoint stays off by default as a deployment choice; next is Phase MCP-2 (read tools/resources).

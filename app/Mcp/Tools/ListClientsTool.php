@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\McpScope;
 use App\Models\Client;
 use App\Support\Mcp\McpTenant;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -12,14 +13,14 @@ use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Title;
-use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 /**
- * Phase MCP-0.2 → MCP-1.2 — a read-only tool: list the org's clients as a small structured list
+ * Phase MCP-0.2 → MCP-1.3 — a read-only tool: list the org's clients as a small structured list
  * (id, name, status). No arguments. Tenancy comes from `McpTenant`: the authenticated token's org
  * on the remote HTTP transport (real multi-tenancy), or the hardcoded dev org on the local/stdio
- * spike. MCP-2 reuses ListClientsAction's filters and adds scope/policy gating.
+ * spike. Requires the `Read` capability scope (gated by `McpTool` before this runs). MCP-2 reuses
+ * ListClientsAction's filters.
  *
  * See .junie/plans/mcp-server.md.
  */
@@ -27,12 +28,20 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[Title('List clients')]
 #[Description('Lists the development organization\'s clients (brands) as a structured list of id, name and status. Read-only; takes no arguments.')]
 #[IsReadOnly]
-class ListClientsTool extends Tool
+class ListClientsTool extends McpTool
 {
     /**
-     * Handle the tool request.
+     * @return list<McpScope>
      */
-    public function handle(Request $request): Response|ResponseFactory
+    protected function requiredScopes(): array
+    {
+        return [McpScope::Read];
+    }
+
+    /**
+     * Handle the tool request (scope already checked by McpTool::handle).
+     */
+    protected function handleAuthorized(Request $request): Response|ResponseFactory
     {
         $org = McpTenant::organization();
 

@@ -1,6 +1,10 @@
 # Graphy — MCP Server Plan ("Graphy for your AI assistant")
 
-> **Status:** Planning. Nothing in here is built yet.
+> **Status:** In progress. Phases **MCP-0** (learning spike) and **MCP-1** (auth, tenancy, scopes,
+> rate limiting, audit logging, remote transport & the secrets guard — the backbone) are complete.
+> The `/mcp` endpoint is authenticated, strictly org-scoped, capability-gated, rate-limited and
+> audited, and still ships **off by default** (`MCP_HTTP_ENABLED`). Next up: **Phase MCP-2** (read
+> tools & resources). Completed steps are marked **✅ DONE** below.
 > **Direction:** Graphy *is* an **MCP server** — we expose Graphy's data and actions so that AI
 > assistants (Claude Desktop/web, ChatGPT, Cursor, and anything else that speaks MCP) can drive
 > Graphy on the user's behalf. The headline: **"Run your entire social-media agency from inside your
@@ -139,7 +143,7 @@ queues, PHPUnit (class-based, `Tests\TestCase`), MySQL in prod / SQLite in tests
 read-only tool, driven from a real assistant. Optimise for *learning*, not production. Nothing here is
 customer-facing; it may run only in local/dev.
 
-### Step MCP-0.1 — Add the MCP package and a bare server
+### Step MCP-0.1 — Add the MCP package and a bare server — ✅ DONE
 - Install the chosen MCP package (preferably `laravel/mcp`); verify name/version/API and record it.
 - Register a single server (e.g. `App\Mcp\Servers\GraphyServer`) with name, version, and a short
   human description. Mount it on a **local stdio** transport only for now (an artisan command the MCP
@@ -147,7 +151,7 @@ customer-facing; it may run only in local/dev.
 - **Done when:** the MCP Inspector (or Claude Desktop pointed at the local command) connects to the
   server and lists it with zero tools, no errors.
 
-### Step MCP-0.2 — One read-only tool: `list_clients`
+### Step MCP-0.2 — One read-only tool: `list_clients` — ✅ DONE
 - `App\Mcp\Tools\ListClientsTool`: no arguments (spike), returns a small structured list of clients
   (`id`, `name`, `status`) for a **hardcoded dev org** (auth comes in MCP-1 — do not ship this).
 - Reuse the existing client query/transform; do not write new query logic.
@@ -156,20 +160,20 @@ customer-facing; it may run only in local/dev.
   calls the tool and reports the seeded dev org's clients. Screenshot/note the round-trip in
   `.junie/modules/mcp.md`.
 
-### Step MCP-0.3 — One resource: a client's brand brain
+### Step MCP-0.3 — One resource: a client's brand brain — ✅ DONE
 - `App\Mcp\Resources\BrandBrainResource`: exposes a client's brand brain as a read-only resource
   (reuse `BrandBrain::toGrokContext()`'s markdown — it already exists and is the canonical context
   shape). Still dev-org-hardcoded.
 - **Done when:** the assistant can load a brand brain as context and answer a question about the
   client's voice using it.
 
-### Step MCP-0.4 — Write the explainer doc
+### Step MCP-0.4 — Write the explainer doc — ✅ DONE
 - Create `.junie/modules/mcp.md` following the module template: purpose, the MCP primitives we expose,
   the server class, the tool/resource classes so far, and an **explicitly flagged** "Security: NOT
   YET SCOPED — dev only" note. Add its row to `.junie/modules/README.md`.
 - **Done when:** `tests/Unit/ModuleDocsTest.php` passes with the new row/file.
 
-### Phase MCP-0 exit criteria
+### Phase MCP-0 exit criteria — ✅ DONE
 - A real assistant lists clients and loads a brand brain through Graphy's MCP server, locally.
 - The team understands tools vs resources vs prompts and the request flow first-hand.
 - Everyone agrees this code is **not shippable** (no auth) — MCP-1 fixes that.
@@ -183,13 +187,13 @@ org-scoped, permission-gated, rate-limited, and audited. **No business tools are
 — it only hardens the MCP-0 `list_clients`/brand-brain pair so they become genuinely multi-tenant.
 This is the phase that makes everything after it safe.
 
-### Step MCP-1.1 — Remote Streamable HTTP transport
+### Step MCP-1.1 — Remote Streamable HTTP transport — ✅ DONE
 - Expose the server over HTTP (e.g. `POST /mcp`) using the package's Streamable HTTP transport,
   behind the appropriate middleware group. Keep the stdio command for local dev/tests.
 - **Done when:** the Inspector connects to the deployed HTTP endpoint (unauthenticated calls rejected
   — see MCP-1.2) and lists the server.
 
-### Step MCP-1.2 — Authentication (OAuth 2.1) + token/org/scope resolution
+### Step MCP-1.2 — Authentication (OAuth 2.1) + token/org/scope resolution — ✅ DONE
 - Implement MCP authorization per the spec: the server is an **OAuth 2.1 resource server**. Confirm
   the current spec flow (authorization-server metadata discovery, dynamic client registration if we
   support it, bearer access tokens) at build time and record the exact flow chosen.
@@ -203,41 +207,76 @@ This is the phase that makes everything after it safe.
   one org; `list_clients` now returns **that token's org only**, proven by a two-org isolation test
   (mirrors the review-portal isolation test).
 
-### Step MCP-1.3 — MCP scopes (capability gating)
+### Step MCP-1.3 — MCP scopes (capability gating) — ✅ DONE
 - `App\Enums\McpScope` (e.g. `Read`, `WriteDrafts`, `WriteSchedule`, `Ai`, `Inbox`). Default for a new
-  token: `Read` only.
+  token: `Read` only. ✅ Added `McpScope` (string-backed; values are the stable wire format persisted
+  in `mcp_tokens.scopes`), with `McpScope::default()`/`defaultValues()` as the single source of truth
+  for the read-only default — `CreateMcpTokenAction` now defaults through it.
 - `App\Support\Mcp\Concerns\AuthorizesScope` (or a base `McpTool`): a tool declares its required
   scope(s); the framework rejects the call with a clear MCP error if the token lacks it — before any
-  Action runs.
+  Action runs. ✅ Did both: trait `App\Support\Mcp\Concerns\AuthorizesScope` (the gate) + base class
+  `App\Mcp\Tools\McpTool` whose `handle()` runs the gate then delegates to `handleAuthorized()`, so a
+  tool's work never runs for an under-scoped token. `ListClientsTool` now extends it and declares
+  `Read`. No context (local/stdio + in-process tests) = trusted transport = gate is a no-op (mirrors
+  `McpTenant`'s dev-org fallback; HTTP always has a context because `AuthenticateMcp` 401s first).
 - Scopes compose with existing policies/roles: a scope is necessary but not sufficient; the underlying
   Action/policy still applies (e.g. a `WriteSchedule`-scoped token still can't act on another org).
+  ✅ The gate only short-circuits a *missing* scope; the tool still calls its Action, which keeps
+  tenancy/policy/checklist enforcement.
 - **Done when:** a `Read`-only token calling a (future) write tool is rejected with a scope error, and
-  a unit test covers scope-present / scope-absent for a sample tool.
+  a unit test covers scope-present / scope-absent for a sample tool. ✅ `tests/Feature/Mcp/McpScopeTest.php`
+  proves it against a test-only `SampleWriteTool` (requires `write:drafts`) and `list_clients`
+  (requires `read`): read-only token → write tool rejected with the scope error; correct scope → runs;
+  no context → runs; `list_clients` rejected for a token lacking `read`. 18 MCP tests green.
 
-### Step MCP-1.4 — Per-tool rate limiting & abuse guards
+### Step MCP-1.4 — Per-tool rate limiting & abuse guards — ✅ DONE
 - Apply Laravel rate limiting keyed by token/org (and optionally per-tool cost), so a runaway
   assistant loop can't hammer the app or the vendor APIs. Sensible defaults in `config/mcp.php`.
+  ✅ `App\Support\Mcp\Concerns\RateLimitsCalls` (used by `McpTool`) counts every HTTP call against a
+  one-minute window keyed per token (falling back to org) via the `RateLimiter` facade. Budget is
+  `config('mcp.rate_limit.per_minute')` (env `MCP_RATE_LIMIT_PER_MINUTE`, default 60; 0 disables).
+  The trusted local/stdio transport is never throttled.
 - **Done when:** exceeding the limit returns a clean MCP error (not a 500), covered by a test.
+  ✅ `tests/Feature/Mcp/McpRateLimitTest.php`: over-budget calls return HTTP 200 with an `isError`
+  "Rate limit reached" result (not a 500); `per_minute = 0` disables it; the key is per-token so one
+  connection can't throttle another.
 
-### Step MCP-1.5 — Audit logging
+### Step MCP-1.5 — Audit logging — ✅ DONE
 - `App\Actions\Mcp\RecordMcpCallAction` (wrapped in `DB::transaction()`, never blocks/fails the call —
   log-and-continue on its own error, like `RecordAiUsageAction`): records `org_id`, token id, tool
   name, arg *keys* (never secret values), outcome, duration. New `mcp_call_logs` table.
+  ✅ Done exactly so — `RecordMcpCallAction` + `App\Models\McpCallLog` + the `mcp_call_logs` migration
+  (`org_id`, nullable `mcp_token_id` [nullOnDelete, keeps history], `tool`, `argument_keys` json,
+  `outcome`, `duration_ms`). `McpTool::handle` records one row per executed HTTP call (success *or*
+  scope-denied error), passing only `array_keys($request->toArray())`.
 - Log at `info` on success, `warning`/`error` on failure, with org/token/tool context — never the
-  secret. (CLAUDE.md principle #6.)
+  secret. (CLAUDE.md principle #6.) ✅ `info` on a successful call, `warning` on a failed one, and
+  `error` if the audit insert itself throws (then continues). Context is org/token-id/tool/arg-keys —
+  never the token or an argument value.
 - **Done when:** a tool call writes exactly one audit row; a test asserts no secret/token value is
-  ever persisted or logged.
+  ever persisted or logged. ✅ `tests/Feature/Mcp/McpAuditTest.php`: one call → exactly one row with
+  the expected fields and the plain token absent from every column; a scope-denied call is recorded
+  as `error`; a forced insert failure is swallowed (call unaffected) and logged at `error`.
 
-### Step MCP-1.6 — Secrets-exposure guard (automated)
+### Step MCP-1.6 — Secrets-exposure guard (automated) — ✅ DONE
 - A test that enumerates every registered tool/resource output schema and asserts no field can carry
   an API key, OAuth/access token, review token, or webhook secret (extend as tools are added). This is
-  the MCP analogue of Step 0.15's props-payload test.
-- **Done when:** the guard test passes and is wired into CI (`composer test`).
+  the MCP analogue of Step 0.15's props-payload test. ✅ `tests/Feature/Mcp/McpSecretsGuardTest.php`
+  reflects the primitives registered on `GraphyServer` and (a) a coverage assertion fails when a
+  primitive is added/removed so the guard is consciously extended, (b) asserts no declared schema
+  field nor advertised definition contains a secret-shaped name, and (c) invokes each read primitive
+  against seeded data that deliberately includes a connected account's (sentinel) access token and
+  asserts the real output leaks neither the token nor any secret-shaped field.
+- **Done when:** the guard test passes and is wired into CI (`composer test`). ✅ It lives under
+  `tests/Feature/Mcp`, so `composer test` (PHPUnit over `tests/`) runs it in CI.
 
-### Phase MCP-1 exit criteria
-- `/mcp` is reachable, OAuth-authenticated, and strictly org-scoped (two-org isolation test green).
-- Scopes gate capability; rate limits and audit logging work; the secrets guard is green in CI.
-- `list_clients` + brand-brain resource are now genuinely multi-tenant and safe. Update `mcp.md`.
+### Phase MCP-1 exit criteria — ✅ DONE
+- `/mcp` is reachable, OAuth-authenticated, and strictly org-scoped (two-org isolation test green). ✅
+- Scopes gate capability; rate limits and audit logging work; the secrets guard is green in CI. ✅
+- `list_clients` + brand-brain resource are now genuinely multi-tenant and safe. Update `mcp.md`. ✅
+  (27 MCP tests green; Pint + PHPStan L7 clean. The HTTP endpoint still ships **off by default** —
+  `MCP_HTTP_ENABLED` — as a deployment choice, not a missing guardrail; MCP-7.2 adds the per-org
+  master switch. Phase MCP-2 can now add read tools on this backbone.)
 
 ---
 
