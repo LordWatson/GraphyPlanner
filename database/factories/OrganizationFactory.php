@@ -30,7 +30,21 @@ class OrganizationFactory extends Factory
             // works once the global flag/key are on, so fixtures enable the per-org toggle by
             // default. Use `aiDisabled()` to exercise the toggle-off path.
             'ai_enabled' => true,
+            // Step MCP-7.2: real orgs opt into MCP (DB default is off); the test suite assumes the
+            // backbone is on so fixtures enable it. Use `mcpDisabled()` for the toggle-off path.
+            'mcp_enabled' => true,
         ];
+    }
+
+    /**
+     * Step MCP-7.2 — an org whose Owner has switched the per-org MCP master switch off. Every `/mcp`
+     * call for it is rejected even with a valid token.
+     */
+    public function mcpDisabled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'mcp_enabled' => false,
+        ]);
     }
 
     /**

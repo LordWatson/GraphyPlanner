@@ -70,6 +70,15 @@ Profile/Security/Appearance settings pages.
   `organization.edit`.
 - Both routes sit in the existing `auth`+`verified` group in `routes/settings.php`, alongside
   Profile/Security/Appearance.
+- **Settings → AI connections (MCP-6.1, Owner-only).** `GET /settings/ai-connections`
+  (`mcp-connections.edit`, behind `RequirePassword` — it issues secrets) →
+  `App\Http\Controllers\Settings\McpConnectionController@edit` renders
+  `resources/js/pages/settings/ai-connections.tsx` with the org's MCP tokens (safe shape, never the
+  hash), the scope catalogue, usage/audit (`GetMcpUsageAction`), the per-org master switch
+  (`organizations.mcp_enabled`) and the connection URL. `POST …/tokens` (`store`) mints a token via
+  `CreateMcpTokenAction` (plain token flashed once), `DELETE …/tokens/{mcpToken}` (`destroy`) revokes
+  via `RevokeMcpTokenAction` (org-guarded binding), `PUT …` (`update`) toggles the switch. Owner-only
+  via `OrganizationPolicy::update`. Full detail lives in `.junie/modules/mcp.md`.
 
 ## Business Rules
 - Owner-only, scoped to the acting user's own org: enforced by `App\Policies\OrganizationPolicy::update`

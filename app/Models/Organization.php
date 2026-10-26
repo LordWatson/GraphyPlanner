@@ -43,6 +43,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $ai_monthly_image_quota
  * @property bool $ai_enabled
  * @property int|null $ai_monthly_token_budget
+ * @property bool $mcp_enabled
  * @property array<string, bool>|null $campaign_features
  * @property Carbon|null $suspended_at
  * @property string|null $suspension_reason
@@ -51,7 +52,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'is_design_partner', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'type', 'is_design_partner', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -76,6 +77,7 @@ class Organization extends Model
         'require_post_review' => false,
         'insights_digest_opt_out' => false,
         'ai_enabled' => false,
+        'mcp_enabled' => false,
     ];
 
     /**
@@ -101,6 +103,7 @@ class Organization extends Model
             'ai_monthly_image_quota' => 'integer',
             'ai_enabled' => 'boolean',
             'ai_monthly_token_budget' => 'integer',
+            'mcp_enabled' => 'boolean',
             'suspended_at' => 'datetime',
             'campaign_features' => 'array',
         ];

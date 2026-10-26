@@ -4,6 +4,7 @@ import { ChapterHero, Page } from '@/components/page';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAiUsage } from '@/routes/ai-usage';
+import { edit as editMcpConnections } from '@/routes/mcp-connections';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editOrganization } from '@/routes/organization';
 import { edit as editNotifications } from '@/routes/notifications';
@@ -67,6 +68,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
               {
                   title: 'AI usage',
                   href: editAiUsage(),
+                  icon: null,
+              },
+              {
+                  title: 'AI connections',
+                  href: editMcpConnections(),
                   icon: null,
               },
           ]
