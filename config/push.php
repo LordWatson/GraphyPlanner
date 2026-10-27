@@ -20,6 +20,12 @@ return [
     */
     'enabled' => (bool) env('PUSH_ENABLED', false),
 
+    // Step CG-1.3: which delivery transport backs `App\Contracts\PushNotifier`. `log` (the default)
+    // is the no-op logger — the whole opt-in/reminder pipeline runs but nothing leaves the server, so
+    // dev and the test suite stay dependency-free. `webpush` binds the real VAPID transport
+    // (`minishlink/web-push`); set it in production once the VAPID keys are in the environment.
+    'transport' => env('PUSH_TRANSPORT', 'log'),
+
     'vapid' => [
         'subject' => env('PUSH_VAPID_SUBJECT', env('APP_URL', 'https://alima.app')),
         'public_key' => env('PUSH_VAPID_PUBLIC_KEY'),

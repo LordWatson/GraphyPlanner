@@ -50,12 +50,19 @@ export function NewGridDialog({
     accounts,
     campaignOptions,
     clientId,
+    storeUrl,
     triggerVariant,
     triggerSize,
 }: {
     accounts: GridAccountOption[];
     campaignOptions: GridCampaignOption[];
     clientId?: number;
+    /**
+     * Step CG-1.2 — an explicit store URL. The business shell posts to its brand-implicit
+     * `business.grids.store` (no `{client}`); when omitted the agency `clients.grids.store` is used
+     * with the resolved client id.
+     */
+    storeUrl?: string;
     /** Themed trigger for an Ink `ChapterHero` (`spark`); defaults to the paper primary button. */
     triggerVariant?: React.ComponentProps<typeof Button>['variant'];
     triggerSize?: React.ComponentProps<typeof Button>['size'];
@@ -81,7 +88,9 @@ export function NewGridDialog({
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
 
-        if (!targetClientId) {
+        // On the agency surface the client is derived from the picked account; the business shell
+        // passes an explicit `storeUrl` and resolves the brand server-side.
+        if (!storeUrl && !targetClientId) {
             form.setError('social_account_id', 'Pick an Instagram account.');
 
             return;
@@ -94,7 +103,7 @@ export function NewGridDialog({
                 data.campaign_id === NONE ? null : Number(data.campaign_id),
             pinned_count: Number(data.pinned_count),
         }));
-        form.post(storeGrid.url(targetClientId), {
+        form.post(storeUrl ?? storeGrid.url(targetClientId as number), {
             onSuccess: () => setOpen(false),
         });
     };

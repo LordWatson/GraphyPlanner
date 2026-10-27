@@ -19,11 +19,11 @@ use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Contracts\PublishCredentials;
 use App\Contracts\PushNotifier;
+use App\Contracts\ReplyAssistant;
 use App\Contracts\TrendSource;
 use App\Contracts\VirusScanner;
 use App\Contracts\VisionProvider;
 use App\Contracts\WebsiteSummarizer;
-use App\Contracts\ReplyAssistant;
 use App\Contracts\WritingAssistant;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
@@ -33,9 +33,9 @@ use App\Models\Client;
 use App\Models\ClientInvitation;
 use App\Models\ClientReport;
 use App\Models\GridPlan;
+use App\Models\InboxConversation;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
-use App\Models\InboxConversation;
 use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
@@ -53,9 +53,9 @@ use App\Policies\ClientInvitationPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\ClientReportPolicy;
 use App\Policies\GridPlanPolicy;
+use App\Policies\InboxConversationPolicy;
 use App\Policies\InvoiceItemPolicy;
 use App\Policies\InvoicePolicy;
-use App\Policies\InboxConversationPolicy;
 use App\Policies\OrganizationPolicy;
 use App\Policies\OrganizationReportPolicy;
 use App\Policies\PostPolicy;
@@ -75,9 +75,9 @@ use App\Services\AI\NullVisionProvider;
 use App\Services\AI\Trends\TopPostsTrendSource;
 use App\Services\Analytics\AnalyticsCache;
 use App\Services\Analytics\Engagement\UploadPostEngagementSource;
-use App\Services\Inbox\UploadPostCommentSource;
 use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
+use App\Services\Inbox\UploadPostCommentSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
 use App\Services\Notifications\NullChatNotifier;
@@ -86,6 +86,7 @@ use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Services\Push\MinishlinkWebPushNotifier;
 use App\Services\Push\WebPushNotifier;
 use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
@@ -129,9 +130,16 @@ class AppServiceProvider extends ServiceProvider
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);
 
-        // Step B-7.4: web push for business workspaces — delivery behind a contract so the VAPID
-        // transport can be swapped and faked. The default logs when no transport is installed.
-        $this->app->bind(PushNotifier::class, WebPushNotifier::class);
+        // Step B-7.4 / CG-1.3: web push for business workspaces — delivery behind a contract so the
+        // VAPID transport can be swapped and faked. `push.transport = webpush` binds the real
+        // `minishlink/web-push` transport (production, keys set); otherwise the logger default keeps
+        // dev and tests dependency-free. No caller changes either way.
+        $this->app->bind(
+            PushNotifier::class,
+            fn ($app) => config('push.transport') === 'webpush'
+                ? $app->make(MinishlinkWebPushNotifier::class)
+                : $app->make(WebPushNotifier::class),
+        );
 
         // Step M-6.7 (I-12.1): team-chat notifications behind a contract. The MVP is a no-op; a
         // WhatsApp implementation (not Slack) drops in here later without touching callers.

@@ -29,6 +29,10 @@ $safely(Schedule::command('posts:send-upcoming-reminders')->dailyAt('08:00'), 'p
 // minutes so a target is caught inside its lead window; idempotent via `push_reminder_sent_at`.
 $safely(Schedule::command('push:send-post-reminders')->everyFiveMinutes(), 'push:send-post-reminders');
 
+// Step CG-1.3: the daily "nothing scheduled tomorrow" nudge. Evening send so a creator can plan the
+// next day; idempotent per org per local day.
+$safely(Schedule::command('push:send-empty-tomorrow')->dailyAt('18:00'), 'push:send-empty-tomorrow');
+
 // Step 1.5 fallback: catches any post stuck in `publishing` because the Upload-Post webhook
 // never arrived.
 $safely(Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes(), 'publishing:poll-pending-statuses');

@@ -44,6 +44,7 @@ export type BusinessChapterKey =
     | 'today'
     | 'calendar'
     | 'posts'
+    | 'inbox'
     | 'ideas'
     | 'media'
     | 'insights'
@@ -275,14 +276,27 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
         number: '03',
         title: 'Posts',
         summary:
-            'Every post — drafts, scheduled and published — and your collections.',
+            'Every post — drafts, scheduled and published — your grid and collections.',
         icon: Send,
         swatch: 'bg-teal dark:ring-1 dark:ring-inset dark:ring-cream/50',
-        prefixes: ['/posts', '/collections'],
+        // Step CG-1.2: the Instagram grid planner lives under Posts (a section, like Collections).
+        // `/grid` is the business hub; `/grids` is the shared planner/editor the hub opens into.
+        prefixes: ['/posts', '/collections', '/grid', '/grids'],
+    },
+    // Step CG-1.1: the social inbox, switched on for the business shell — comments on the brand's
+    // own posts, triaged and answered with a reply the owner always sends.
+    inbox: {
+        key: 'inbox',
+        number: '04',
+        title: 'Inbox',
+        summary: 'Comments on your posts, triaged and ready for a reply.',
+        icon: MessageSquareHeart,
+        swatch: 'bg-electric',
+        prefixes: ['/inbox'],
     },
     ideas: {
         key: 'ideas',
-        number: '04',
+        number: '05',
         title: 'Ideas',
         summary: 'Fresh post ideas and trends for your brand.',
         icon: Sparkles,
@@ -291,7 +305,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     media: {
         key: 'media',
-        number: '05',
+        number: '06',
         title: 'Media',
         summary: 'Your photos and videos, ready to drop into a post.',
         icon: Image,
@@ -301,7 +315,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     insights: {
         key: 'insights',
-        number: '06',
+        number: '07',
         title: 'Insights',
         summary:
             'How your posting is tracking — consistency, reach and your best times.',
@@ -311,7 +325,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     brand: {
         key: 'brand',
-        number: '07',
+        number: '08',
         title: 'Brand',
         summary: 'Your voice, audience, look and posting goal.',
         icon: SwatchBook,
@@ -320,7 +334,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     accounts: {
         key: 'accounts',
-        number: '08',
+        number: '09',
         title: 'Accounts',
         summary: 'Connect and reconnect your social accounts.',
         icon: AtSign,
@@ -329,7 +343,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     team: {
         key: 'team',
-        number: '09',
+        number: '10',
         title: 'Team',
         summary: 'The people you work with and their roles.',
         icon: UsersRound,
@@ -338,7 +352,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     settings: {
         key: 'settings',
-        number: '10',
+        number: '11',
         title: 'Settings',
         summary: 'Profile, security, appearance, workspace and plan.',
         icon: Settings2,

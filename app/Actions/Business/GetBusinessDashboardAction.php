@@ -4,13 +4,17 @@ namespace App\Actions\Business;
 
 use App\Actions\AI\GenerateDailyIdeaAction;
 use App\Actions\Home\GetNeedsAttentionItemsAction;
+use App\Enums\InboxStatus;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Client;
+use App\Models\GridPlan;
+use App\Models\InboxConversation;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\User;
 use App\Services\Business\PostingGoalGapService;
+use App\Services\Grids\GridOrderRiskService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -205,6 +209,22 @@ class GetBusinessDashboardAction
             $rows[] = $this->postRow($post, 'review', __('Waiting on your review.'));
         }
 
+        // Step CG-1.1: unanswered public comments on the brand's posts (the inbox, switched on for
+        // the business shell). Open threads flagged as needing a reply, oldest inbound first.
+        $comments = $this->unansweredComments($brand);
+
+        foreach ($comments['items'] as $row) {
+            $rows[] = $row;
+        }
+
+        // Step CG-1.4: grid plans whose publish order has drifted out of line (the grid planner,
+        // switched on in CG-1.2). The stamp is cleared when the risk resolves, so it's a live signal.
+        $gridRisks = $this->gridRisks($brand);
+
+        foreach ($gridRisks['items'] as $row) {
+            $rows[] = $row;
+        }
+
         $staleDrafts = $this->staleDrafts($brand);
 
         foreach ($staleDrafts['items'] as $post) {
@@ -216,8 +236,89 @@ class GetBusinessDashboardAction
             'total' => $buckets['failedPublishes']['total']
                 + $buckets['disconnectedAccounts']['total']
                 + $buckets['internalReviews']['total']
+                + $comments['total']
+                + $gridRisks['total']
                 + $staleDrafts['total'],
         ];
+    }
+
+    /**
+     * Grid plans whose order is at risk (CG-1.4). Reuses the agency signal: `order_risk_notified_at`
+     * is stamped when a grid drifts and cleared when it's fixed, so a non-null value is a live flag;
+     * re-verified through {@see GridOrderRiskService} (bounded to {@see self::LIMIT} plans).
+     *
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    private function gridRisks(Client $brand): array
+    {
+        $risk = app(GridOrderRiskService::class);
+
+        $plans = GridPlan::query()
+            ->where('org_id', $brand->org_id)
+            ->where('client_id', $brand->id)
+            ->whereNotNull('order_risk_notified_at')
+            ->orderBy('order_risk_notified_at')
+            ->limit(self::LIMIT)
+            ->get();
+
+        $rows = [];
+
+        foreach ($plans as $plan) {
+            $atRisk = $risk->atRisk($plan);
+
+            if ($atRisk === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'key' => 'grid-'.$plan->id,
+                'type' => 'grid_risk',
+                'title' => $plan->name,
+                'subtitle' => $atRisk['reason'],
+                'post_id' => null,
+                'account_id' => null,
+                'grid_plan_id' => $plan->id,
+            ];
+        }
+
+        return ['items' => $rows, 'total' => count($rows)];
+    }
+
+    /**
+     * Open inbox threads on the brand's posts that still need a reply — surfaced so a creator sees
+     * waiting comments on Today. Org-scoped (global scope) and keyed to the one brand.
+     *
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    private function unansweredComments(Client $brand): array
+    {
+        $query = InboxConversation::query()
+            ->where('org_id', $brand->org_id)
+            ->where('client_id', $brand->id)
+            ->where('status', InboxStatus::Open)
+            ->where('is_reply_needed', true);
+
+        $items = (clone $query)
+            ->with('latestMessage')
+            ->orderBy('last_inbound_at')
+            ->limit(self::LIMIT)
+            ->get()
+            ->map(fn (InboxConversation $conversation) => [
+                'key' => 'comment-'.$conversation->id,
+                'type' => 'comment',
+                'title' => $conversation->author_name
+                    ? Str::limit($conversation->author_name, 60)
+                    : __('A comment on your post'),
+                'subtitle' => $conversation->latestMessage?->body
+                    ? Str::limit($conversation->latestMessage->body, 60)
+                    : __('Waiting for your reply.'),
+                'post_id' => null,
+                'account_id' => null,
+                'conversation_id' => $conversation->id,
+            ])
+            ->all();
+
+        return ['items' => array_values($items), 'total' => (clone $query)->count()];
     }
 
     /**

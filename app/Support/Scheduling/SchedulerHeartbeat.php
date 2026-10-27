@@ -26,6 +26,7 @@ final class SchedulerHeartbeat
         'publishing:poll-pending-statuses' => ['label' => 'Publish status poll', 'interval_minutes' => 5],
         // Step B-7.4: web-push "goes out soon" reminders, every five minutes.
         'push:send-post-reminders' => ['label' => 'Push post reminders', 'interval_minutes' => 5],
+        'push:send-empty-tomorrow' => ['label' => 'Nothing-scheduled-tomorrow push', 'interval_minutes' => 1440],
         'social-accounts:check-health' => ['label' => 'Social account health check', 'interval_minutes' => 60],
         'ai:generate-daily-briefs' => ['label' => 'Daily AI briefs', 'interval_minutes' => 1440],
         // Step B-6.1: hourly (each timezone's 6am is caught from one schedule).

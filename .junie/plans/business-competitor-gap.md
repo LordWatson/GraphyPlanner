@@ -120,7 +120,10 @@ never builds the same thing twice. How to use it (same rules as the other plans)
 Goal: a solo user gets the grid planner, the comment inbox and real push reminders. These are
 the features Planoly and Buffer lead with, and Alima already has all three.
 
-### Step CG-1.1 — Comment inbox in the business shell [MVP]
+### Step CG-1.1 — Comment inbox in the business shell [MVP] ✅ Done
+_Implemented 2026-10-27: the inbox is a shared `/inbox` surface (the `workspace:agency` guard dropped,
+page adapts via the `workspace` prop, `showAssignment` gated by seat count); comments surface on Today.
+See `inbox.md` / `business-workspaces.md`. Tests: `BusinessInboxTest`._
 - Today every inbox route sits under `['portal.redirect','workspace:agency']`. Add business routes
   (`business.` prefix, brand-implicit): `GET /inbox`, `GET /inbox/{conversation}`, `PATCH`,
   `POST …/reply`, `POST …/ai/draft`, `POST /inbox/refresh`, saved replies. Thin
@@ -135,7 +138,10 @@ the features Planoly and Buffer lead with, and Alima already has all three.
   their brand only; an agency conversation id is 404 from the business routes; agency inbox tests
   stay green; `inbox.md` and `business-workspaces.md` are updated.
 
-### Step CG-1.2 — Grid planner in the business shell [MVP]
+### Step CG-1.2 — Grid planner in the business shell [MVP] ✅ Done
+_Implemented 2026-10-27: `Business\GridController` (`/grid` hub + create) reusing the shared planner;
+`StoreGridPlanRequest` made brand-implicit; agency `/grids` hub now `workspace:agency`-guarded with a
+redirect to the business hub. See `grid-planner.md`. Tests: `BusinessGridTest`._
 - Brand-implicit business routes: `GET /grid` (the brand's grid plans), `GET /grid/{grid}/edit` and
   the existing tile/workflow/production/AI endpoints, resolving `{client}` from `CurrentWorkspace`
   (reuse `ResolvesWorkspaceBrand` in the shared Form Requests, as B-4 did).
@@ -150,7 +156,12 @@ the features Planoly and Buffer lead with, and Alima already has all three.
   scheduling the sequence; another org's grid is 404; the agency hub is unreachable from a business
   org; `grid-planner.md` and `business-workspaces.md` are updated.
 
-### Step CG-1.3 — Deliver push reminders [MVP]
+### Step CG-1.3 — Deliver push reminders [MVP] ✅ Done
+_Implemented 2026-10-27: real `MinishlinkWebPushNotifier` (`minishlink/web-push`) behind a
+`push.transport` config switch (default `log`), plus the publish-failure and "nothing scheduled
+tomorrow" pushes. See `notifications.md`. Tests: `PushNotificationsTest`, `MinishlinkWebPushNotifierTest`.
+**Owner handoff:** generate the VAPID keys, set `PUSH_TRANSPORT=webpush`, and record the
+Android-Chrome / iOS-Safari device check in `business-workspaces.md`._
 - Bind a transport-backed `App\Contracts\PushNotifier` (Web Push with VAPID, e.g.
   `minishlink/web-push`) in place of the logging default when `push.enabled` and the VAPID key pair
   are set. Keys come from env only, never from props or logs.
@@ -162,7 +173,10 @@ the features Planoly and Buffer lead with, and Alima already has all three.
   notifications; a manual check on Android Chrome and iOS Safari (installed PWA) is recorded in the
   module doc.
 
-### Step CG-1.4 — Today dashboard and copy for the new surfaces [V1]
+### Step CG-1.4 — Today dashboard and copy for the new surfaces [V1] ✅ Done
+_Implemented 2026-10-27: Today's `needsYou` surfaces unanswered comments (CG-1.1) and grid-order-at-risk
+rows; `OnboardingProgress` gained the optional "Plan your grid" item for Instagram creators. See
+`business-workspaces.md`. Tests: `BusinessDashboardTest`, `OnboardingTest`._
 - Today's **needsYou** includes unanswered comments (CG-1.1) and grid order-at-risk (CG-1.2).
 - Onboarding checklist (`OnboardingProgress`) adds an optional "Plan your grid" item for Instagram
   creators.

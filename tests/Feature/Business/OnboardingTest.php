@@ -10,6 +10,7 @@ use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
 use App\Models\Client;
+use App\Models\GridPlan;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
@@ -121,10 +122,49 @@ class OnboardingTest extends TestCase
         $this->assertTrue($this->item($organization, OnboardingProgress::TEAM));
     }
 
+    public function test_the_grid_item_only_appears_with_a_connected_instagram_account(): void
+    {
+        // Step CG-1.4: the optional "Plan your grid" nudge for Instagram creators.
+        [$organization, $brand, $owner] = $this->businessWorkspace();
+
+        // No Instagram account → the item isn't offered at all.
+        $this->assertNull($this->find($organization, OnboardingProgress::GRID));
+
+        $account = SocialAccount::factory()->create([
+            'org_id' => $organization->id,
+            'client_id' => $brand->id,
+            'platform' => Platform::Instagram,
+            'connection_status' => ConnectionStatus::Connected,
+        ]);
+
+        $grid = $this->find($organization, OnboardingProgress::GRID);
+        $this->assertNotNull($grid);
+        $this->assertTrue($grid['optional']);
+        $this->assertFalse($grid['done']);
+
+        // A grid plan ticks it.
+        GridPlan::factory()->create([
+            'org_id' => $organization->id,
+            'client_id' => $brand->id,
+            'social_account_id' => $account->id,
+            'created_by' => $owner->id,
+        ]);
+        $this->assertTrue($this->item($organization, OnboardingProgress::GRID));
+    }
+
     private function item(Organization $organization, string $key): bool
     {
         return (bool) collect(app(OnboardingProgress::class)->for($organization)['items'])
             ->firstWhere('key', $key)['done'];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function find(Organization $organization, string $key): ?array
+    {
+        return collect(app(OnboardingProgress::class)->for($organization)['items'])
+            ->firstWhere('key', $key);
     }
 
     // ---- The wizard routes --------------------------------------------------------------------

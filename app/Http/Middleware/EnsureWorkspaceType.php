@@ -66,6 +66,8 @@ class EnsureWorkspaceType
             // The agency hubs / per-client analytics → their business equivalents.
             'campaigns.index' => 'business.collections.index',
             'clients.analytics' => 'business.insights.index',
+            // Step CG-1.2: the agency grids hub → the business grid planner.
+            'grids.index' => 'business.grids.index',
         ];
     }
 }

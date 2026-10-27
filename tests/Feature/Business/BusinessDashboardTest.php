@@ -9,12 +9,15 @@ use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Enums\Role;
 use App\Models\Client;
+use App\Models\GridPlan;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\Grids\GridOrderRiskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Tests\Feature\Inbox\Concerns\BuildsInboxFixtures;
 use Tests\TestCase;
 
 /**
@@ -23,6 +26,7 @@ use Tests\TestCase;
  */
 class BusinessDashboardTest extends TestCase
 {
+    use BuildsInboxFixtures;
     use RefreshDatabase;
 
     /**
@@ -227,5 +231,70 @@ class BusinessDashboardTest extends TestCase
         $data = app(GetBusinessDashboardAction::class)($owner, $brand, 'Europe/London');
 
         $this->assertCount(1, $data['upNext']);
+    }
+
+    public function test_needs_you_surfaces_unanswered_comments_for_the_primary_brand_only(): void
+    {
+        // Step CG-1.1: an open comment awaiting a reply on the brand's post shows on Today.
+        [$org, $owner, $brand] = $this->business();
+        $this->conversation($org, $brand, ['is_reply_needed' => true]);
+
+        // A comment on a *different* org's brand must never leak in.
+        $otherOrg = $this->inboxOrg();
+        $this->conversation($otherOrg, null, ['is_reply_needed' => true]);
+
+        $data = app(GetBusinessDashboardAction::class)($owner, $brand, 'Europe/London');
+
+        $comments = array_values(array_filter(
+            $data['needsYou']['items'],
+            fn (array $item) => $item['type'] === 'comment',
+        ));
+
+        $this->assertCount(1, $comments);
+        $this->assertArrayHasKey('conversation_id', $comments[0]);
+    }
+
+    public function test_needs_you_surfaces_grid_plans_at_risk_for_the_primary_brand_only(): void
+    {
+        // Step CG-1.4: a grid whose order has drifted shows on Today. Risk detection itself is
+        // covered by the grid suite; here we double it so the dashboard surfacing is isolated.
+        [$org, $owner, $brand, $account] = $this->business();
+
+        $risk = \Mockery::mock(GridOrderRiskService::class);
+        $risk->shouldReceive('atRisk')->andReturn(['reason' => 'Posts may go out of order.', 'later_post_ids' => [1, 2]]);
+        $this->app->instance(GridOrderRiskService::class, $risk);
+
+        GridPlan::factory()->create([
+            'org_id' => $org->id,
+            'client_id' => $brand->id,
+            'social_account_id' => $account->id,
+            'created_by' => $owner->id,
+            'order_risk_notified_at' => now(),
+        ]);
+
+        // A flagged grid in another org must never leak in.
+        $otherOrg = Organization::factory()->business()->create();
+        $otherBrand = Client::factory()->for($otherOrg, 'organization')->primary()->create();
+        $otherAccount = SocialAccount::factory()->for($otherBrand)->connected()->create([
+            'org_id' => $otherOrg->id,
+            'platform' => Platform::Instagram,
+        ]);
+        GridPlan::factory()->create([
+            'org_id' => $otherOrg->id,
+            'client_id' => $otherBrand->id,
+            'social_account_id' => $otherAccount->id,
+            'created_by' => User::factory()->for($otherOrg, 'organization')->role(Role::Owner)->create()->id,
+            'order_risk_notified_at' => now(),
+        ]);
+
+        $data = app(GetBusinessDashboardAction::class)($owner, $brand, 'Europe/London');
+
+        $gridRows = array_values(array_filter(
+            $data['needsYou']['items'],
+            fn (array $item) => $item['type'] === 'grid_risk',
+        ));
+
+        $this->assertCount(1, $gridRows);
+        $this->assertArrayHasKey('grid_plan_id', $gridRows[0]);
     }
 }

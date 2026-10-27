@@ -24,6 +24,8 @@ import { today as businessToday } from '@/routes/business';
 import { index as accounts } from '@/routes/business/accounts';
 import { edit as brand } from '@/routes/business/brand';
 import { index as ideas } from '@/routes/business/ideas';
+import { index as inbox } from '@/routes/inbox';
+import { edit as editGrid } from '@/routes/grids';
 import {
     create as createPost,
     quick as quickPost,
@@ -47,11 +49,19 @@ type GapDay = { date: string; weekday: number; label: string };
 
 type NeedsYouItem = {
     key: string;
-    type: 'failed' | 'disconnected' | 'review' | 'stale_draft';
+    type:
+        | 'failed'
+        | 'disconnected'
+        | 'review'
+        | 'stale_draft'
+        | 'comment'
+        | 'grid_risk';
     title: string;
     subtitle: string;
     post_id: number | null;
     account_id: number | null;
+    conversation_id?: number | null;
+    grid_plan_id?: number | null;
 };
 
 type Dashboard = {
@@ -249,7 +259,11 @@ function NeedsYouPanel({ needsYou }: { needsYou: Dashboard['needsYou'] }) {
                                 href={
                                     item.post_id
                                         ? editPost(item.post_id)
-                                        : accounts()
+                                        : item.type === 'comment'
+                                          ? inbox()
+                                          : item.grid_plan_id
+                                            ? editGrid(item.grid_plan_id)
+                                            : accounts()
                                 }
                                 className="hover:bg-muted/50 flex items-start gap-3 px-5 py-3.5 transition-colors sm:px-6"
                             >

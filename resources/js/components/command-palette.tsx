@@ -37,6 +37,7 @@ import { today as businessToday } from '@/routes/business';
 import { index as businessAccounts } from '@/routes/business/accounts';
 import { edit as businessBrand } from '@/routes/business/brand';
 import { index as businessCollections } from '@/routes/business/collections';
+import { index as businessGrids } from '@/routes/business/grids';
 import { index as businessIdeas } from '@/routes/business/ideas';
 import { index as businessInsights } from '@/routes/business/insights';
 import { index as businessMedia } from '@/routes/business/media';
@@ -217,6 +218,17 @@ function useCommands(close: () => void): Command[] {
                 chapter: businessChapters.posts,
                 run: visit(businessCollections()),
             },
+            {
+                id: 'section-business-grid',
+                group: 'Chapters',
+                label: 'Grid',
+                hint: 'Plan your Instagram grid before it goes out.',
+                keywords: 'instagram grid profile plan preview',
+                icon: LayoutGrid,
+                chapter: businessChapters.posts,
+                run: visit(businessGrids()),
+            },
+            chapterCommand(businessChapters.inbox, inboxIndex()),
             chapterCommand(businessChapters.ideas, businessIdeas()),
             chapterCommand(businessChapters.media, businessMedia()),
             chapterCommand(businessChapters.insights, businessInsights()),

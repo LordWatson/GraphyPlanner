@@ -115,8 +115,10 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   `WorkspaceMisconfiguredException` if a business org has no primary brand), `brandId()`.
 - `App\Services\Workspace\OnboardingProgress` — **B-2.2:** the business-onboarding checklist computed
   from real data (not stored flags): `brand` (what-you-do / voice set), `accounts` (≥1 connected),
-  `first_post` (≥1 scheduled/published), `team` (optional). Returns `items`, `requiredComplete`,
-  `completedAt`. A handful of indexed existence checks scoped to the primary brand.
+  `first_post` (≥1 scheduled/published), `team` (optional). **CG-1.4** adds an optional `grid`
+  ("Plan your grid") item, included only when the brand has a connected Instagram account and ticked
+  by any grid plan. Returns `items`, `requiredComplete`, `completedAt`. A handful of indexed existence
+  checks scoped to the primary brand.
 - `App\Actions\AI\DraftBrandProfileAction` — **B-2.4:** the brand-profile AI quick-start. Summarises
   the brand's website (via `WebsiteSummarizer`, SSRF-guarded), asks the `AiProvider` to draft
   voice/audience/offer/pillars, records the call in `ai_usage_logs`, and returns an
@@ -137,7 +139,9 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   - `App\Actions\Business\GetBusinessDashboardAction` — the "Today" dashboard data, counted/bounded
     SQL-side (I-2.2), scoped to the primary brand: **upNext** (next 5 scheduled targets),
     **gaps** (via `PostingGoalGapService`), **needsYou** (reuses `GetNeedsAttentionItemsAction` +
-    stale drafts), **thisWeek** (publishing consistency). `ideaOfTheDay` is null until B-6.1.
+    stale drafts; **CG-1.1** adds unanswered-comment rows and **CG-1.4** grid-order-at-risk rows,
+    the latter re-verified through `GridOrderRiskService`), **thisWeek** (publishing consistency).
+    `ideaOfTheDay` is null until B-6.1.
   - `App\Actions\Business\GetBusinessInsightsAction` — single-brand publishing consistency (weekly
     posted counts, streak, by-platform); reach/engagement land with B-8 (`hasMetrics: false`).
   - `App\Services\Business\PostingGoalGapService` — pure, timezone-aware "which goal days in the
@@ -336,6 +340,17 @@ social-account connect endpoints and `clients.posts.store` → editor, brand id 
 - **B-7.4:** `POST /push/subscribe` (`business.push.subscribe`) / `DELETE /push/subscribe`
   (`business.push.unsubscribe`) → `PushSubscriptionController`. Per-user, per-browser; subscribe
   404s when push isn't configured.
+- **Step CG-1.2 (competitor-gap Phase CG-1):** `GET/POST /grid` → `Business\GridController`
+  (`business.grids.*`) is the grid planner hub + create; the planner, tiles, workflow, production and
+  AI are the shared brand-agnostic `grids.*` routes. Grid is a Posts sub-item + ⌘K. The agency
+  `/grids` hub is now `workspace:agency`-guarded (redirecting a business org to `/grid`). Details in
+  `grid-planner.md`.
+- **Step CG-1.1 (competitor-gap Phase CG-1):** `GET /inbox` is the **shared** `InboxController`
+  (the `workspace:agency` guard was dropped; see `inbox.md`), reached by the business shell like the
+  calendar. The shared `inbox/index` page flips `multiClient` off and shows business copy from the
+  `workspace` prop; a new `showAssignment` prop hides assignment for a solo seat. Business **Inbox**
+  chapter (04) + ⌘K; open reply-needed comments appear in the Today dashboard's `needsYou`
+  (`GetBusinessDashboardAction`, `type: 'comment'`, linking to `/inbox`).
 - `GET /calendar` is the **shared** `CalendarController`; the page passes `multiClient={false}` for a
   business workspace, hiding the client filter. **Team** links to the shared `staff.*` (Owner-only);
   **Settings** to the shared settings pages (plus `/settings/workspace`, B-3.3).
@@ -500,12 +515,13 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   (B-11.2) lands; (2) the business `BestTimeService` is available to the quick-post / weekly-plan slot
   pickers but those still use the posting-goal default hour (`NextSlotService`) — wiring the learned
   slot in is an additive follow-up.
-- **B-7 phone-first creation is done.** Two deliberate follow-ups: (1) the quick post upload shows an
-  indeterminate state, not byte-level progress — true direct-to-storage progress awaits I-7.1; (2)
-  `WebPushNotifier` ships without a bundled VAPID transport, so with push *enabled* but no transport
-  bound, reminders are logged rather than delivered (publish failures still email + bell via B-5.3).
-  Binding a transport-backed `PushNotifier` is the only change needed to deliver; push failure /
-  "nothing scheduled tomorrow" notifications reuse the same contract.
+- **B-7 phone-first creation is done.** One deliberate follow-up remains: (1) the quick post upload
+  shows an indeterminate state, not byte-level progress — true direct-to-storage progress awaits
+  I-7.1. **Step CG-1.3 closed the push follow-up:** real VAPID delivery (`MinishlinkWebPushNotifier`,
+  `minishlink/web-push`) is bound by `config('push.transport') = webpush`, and the two remaining
+  notifications (publish failure, "nothing scheduled tomorrow") are built. To deliver in production:
+  generate a VAPID key pair, set `PUSH_ENABLED`/`PUSH_VAPID_*`/`PUSH_TRANSPORT=webpush`, then record
+  the Android-Chrome / iOS-Safari (installed PWA) device check here. Dev/tests stay on the logger.
 - B-6.1's `EventCalendar` is a hand-curated static dataset for GB/US + global (open question §5.5);
   other countries fall back to the global set (and, when unresolved, the `ai.ideas.default_country`
   home market). A paid holiday API can replace `StaticEventCalendar` behind the same contract.
@@ -518,9 +534,11 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   the org's `upload_post_profile`.
 - `DraftBrandProfileAction` records usage in `ai_usage_logs` but there is no allowance *enforcement*
   yet — that lands with the `Entitlements` metering in B-9.2.
-- The agency campaign *workspace* (`campaigns.show` and its tabs) and the grids planner remain shared,
-  unguarded org-scoped surfaces; the business shell simply never links to them (Collections links to
-  the filtered posts list instead). Fully business-ifying or guarding that surface is out of B-4.
+- The agency campaign *workspace* (`campaigns.show` and its tabs) remains a shared, unguarded
+  org-scoped surface; the business shell simply never links to it (Collections links to the filtered
+  posts list instead). Fully business-ifying or guarding that surface is out of B-4. **Step CG-1.2
+  closed the grids half of this gap:** the agency `/grids` hub is now `workspace:agency`-guarded and
+  the business shell has its own `/grid` hub (`business.grids.*`) reusing the shared planner.
 - **B-6.5 is done**: the business shell now has its own Image Studio at `/studio` (preset-driven),
   so `clients.ai.images.store` stays `workspace:agency` by design; business image generation goes
   through `business.studio.generate`, and the brand-agnostic `ai-image-*` routes remain shared.
@@ -528,6 +546,29 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   is intentionally not exposed in the business studio (presets keep it one-tap).
 
 ## Changelog
+- 2026-10-27: Step CG-1.4 (competitor-gap Phase CG-1) — tied the switched-on surfaces into Today.
+  `GetBusinessDashboardAction::needsYou()` now surfaces grid-order-at-risk rows (`type: grid_risk`,
+  re-verified via `GridOrderRiskService`, linking to the planner) alongside the CG-1.1 comment rows;
+  `OnboardingProgress` gained the optional "Plan your grid" item for Instagram creators. Tests:
+  `BusinessDashboardTest`, `OnboardingTest`. No new columns/config.
+- 2026-10-27: Step CG-1.3 (competitor-gap Phase CG-1) — delivered push reminders. Added the real
+  `MinishlinkWebPushNotifier` transport behind a `push.transport` config switch (default `log`), the
+  publish-failure push (business orgs, from `ResolvePostPublishOutcomeAction`) and the daily
+  "nothing scheduled tomorrow" nudge (`push:send-empty-tomorrow`). Internals in `notifications.md`.
+  New config: `push.transport`. New dependency: `minishlink/web-push ^11.0`. VAPID keys + the device
+  check are owner handoff items (see Known Gaps).
+- 2026-10-27: Step CG-1.2 (competitor-gap Phase CG-1) — the Instagram grid planner switched on for the
+  business shell. New `Business\GridController` + `business/grids/index.tsx` (`/grid` hub + create),
+  reusing the shared planner/production routes; `StoreGridPlanRequest` made brand-implicit via
+  `ResolvesWorkspaceBrand`; the agency `/grids` hub guarded with `workspace:agency` + an
+  `EnsureWorkspaceType` redirect to `business.grids.index`. Grid as a Posts sub-item + ⌘K. Details in
+  `grid-planner.md`. Tests: `BusinessGridTest`. No new columns/config.
+- 2026-10-27: Step CG-1.1 (competitor-gap Phase CG-1 — "switch on what's built") — the social inbox
+  switched on for the business shell. Made `/inbox` a shared surface (one `InboxController`/page, the
+  page adapts via the `workspace` prop like the calendar), added a `showAssignment` prop (hidden for a
+  solo seat), org-scoped the assignee list, added the business Inbox chapter (04) + ⌘K, and surfaced
+  open reply-needed comments on Today's `needsYou`. Details in `inbox.md`. Tests: `BusinessInboxTest`,
+  `BusinessDashboardTest`. No new columns/config.
 - 2026-10-25: Fixed a 404 on the onboarding "Connect accounts" step. The wizard's "Add" button posted
   to the agency-only `clients.social-accounts.store` route (gated by `workspace:agency`), which 404s
   for a business/creator org. Added `OnboardingController::storeAccount` + the brand-implicit

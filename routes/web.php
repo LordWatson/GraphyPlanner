@@ -15,6 +15,7 @@ use App\Http\Controllers\Business\AccountController as BusinessAccountController
 use App\Http\Controllers\Business\BrandController as BusinessBrandController;
 use App\Http\Controllers\Business\CollectionController as BusinessCollectionController;
 use App\Http\Controllers\Business\DashboardController as BusinessDashboardController;
+use App\Http\Controllers\Business\GridController as BusinessGridController;
 use App\Http\Controllers\Business\IdeaController as BusinessIdeaController;
 use App\Http\Controllers\Business\ImageStudioController as BusinessImageStudioController;
 use App\Http\Controllers\Business\InsightController as BusinessInsightController;
@@ -277,6 +278,13 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
 
         // Insights (single-brand): consistency, reach/engagement, top posts, best times, AI takeaways.
         Route::get('insights', [BusinessInsightController::class, 'index'])->name('insights.index');
+
+        // Step CG-1.2: the Instagram grid planner, switched on for the business shell. Brand-implicit
+        // hub + create at `/grid` (the planner, tiles, workflow, production and AI are the shared
+        // brand-agnostic `grids.*` routes below). No `{client}` — the brand is resolved from the
+        // workspace; grid-produced posts inherit the primary brand's `internal_only` approval.
+        Route::get('grid', [BusinessGridController::class, 'index'])->name('grids.index');
+        Route::post('grid', [BusinessGridController::class, 'store'])->name('grids.store');
 
         // Step B-8.4: the creator/business media kit — edit bio, toggle the public link, download PDF.
         Route::get('media-kit', [BusinessMediaKitController::class, 'index'])->name('media-kit.index');
@@ -572,9 +580,12 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
         Route::delete('content/views/{savedView}', [SavedPostViewController::class, 'destroy'])->name('content.views.destroy');
     });
 
-    // Phase M-9: the social inbox — agency-only (a business org has its own surfaces); a client
-    // reviewer is sent to the portal and the InboxConversationPolicy refuses them as well.
-    Route::middleware(['portal.redirect', 'workspace:agency'])->group(function () {
+    // Phase M-9 / Step CG-1.1: the social inbox — a shared surface (like the calendar/dashboard).
+    // Both the agency studio and a business/creator workspace reach `/inbox`; the page flips its
+    // client filter and copy from the shared `workspace` prop, and every query is org-scoped (so a
+    // one-brand business org already sees only its own). A client reviewer is sent to the portal and
+    // the InboxConversationPolicy refuses them as well.
+    Route::middleware('portal.redirect')->group(function () {
         Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
         Route::post('inbox/refresh', [InboxController::class, 'refresh'])->name('inbox.refresh');
         Route::get('inbox/{conversation}', [InboxController::class, 'show'])->name('inbox.conversations.show');
@@ -591,8 +602,10 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
 
     // Phase 18: the Instagram grid planner - plans per client, the planner page, tiles, the
     // workflow (Step 18.7), turning tiles into posts and scheduling the sequence (18.9-18.11).
-    // The org-wide grids hub (a section of 04 Clients, like the campaigns hub).
-    Route::get('grids', GridPlanIndexController::class)->middleware('portal.redirect')->name('grids.index');
+    // The org-wide grids hub (a section of 04 Clients, like the campaigns hub). Step CG-1.2: now
+    // `workspace:agency`-guarded (it was the last unguarded shared grid surface) — a business org
+    // reaches the planner through its own `business.grids.index` (`/grid`).
+    Route::get('grids', GridPlanIndexController::class)->middleware(['portal.redirect', 'workspace:agency'])->name('grids.index');
     // Step B-4.1: the Instagram grid planner is an agency tool — agency-only on the `{client}` URL.
     Route::get('clients/{client}/grids', [GridPlanController::class, 'index'])->middleware('workspace:agency')->name('clients.grids.index');
     Route::post('clients/{client}/grids', [GridPlanController::class, 'store'])->middleware('workspace:agency')->name('clients.grids.store');

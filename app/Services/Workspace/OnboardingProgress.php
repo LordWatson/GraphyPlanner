@@ -3,6 +3,7 @@
 namespace App\Services\Workspace;
 
 use App\Enums\ConnectionStatus;
+use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Organization;
@@ -24,6 +25,8 @@ class OnboardingProgress
     public const ACCOUNTS = 'accounts';
 
     public const FIRST_POST = 'first_post';
+
+    public const GRID = 'grid';
 
     public const TEAM = 'team';
 
@@ -64,6 +67,18 @@ class OnboardingProgress
                 'optional' => true,
             ],
         ];
+
+        // Step CG-1.4: nudge Instagram creators to try the grid planner — only shown once they've
+        // connected an Instagram account (the planner needs one), and always optional.
+        if ($this->hasInstagramAccount($brand)) {
+            $items[] = [
+                'key' => self::GRID,
+                'label' => 'Plan your grid',
+                'description' => 'Optional — lay out your Instagram grid before anything goes out.',
+                'done' => $this->hasGridPlan($brand),
+                'optional' => true,
+            ];
+        }
 
         $requiredComplete = collect($items)
             ->where('optional', false)
@@ -118,5 +133,18 @@ class OnboardingProgress
     {
         return $organization->users()->count() > 1
             || $organization->staffInvitations()->exists();
+    }
+
+    private function hasInstagramAccount(?Client $brand): bool
+    {
+        return $brand !== null && $brand->socialAccounts()
+            ->where('platform', Platform::Instagram->value)
+            ->where('connection_status', ConnectionStatus::Connected->value)
+            ->exists();
+    }
+
+    private function hasGridPlan(?Client $brand): bool
+    {
+        return $brand !== null && $brand->gridPlans()->exists();
     }
 }

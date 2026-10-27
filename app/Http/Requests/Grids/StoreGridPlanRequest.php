@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Grids;
 
+use App\Http\Requests\Concerns\ResolvesWorkspaceBrand;
 use App\Http\Requests\Grids\Concerns\GridRules;
 use App\Models\Client;
 use App\Models\GridPlan;
@@ -9,16 +10,17 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Step 18.4 — a new grid plan. The account must be one of this client's Instagram accounts
- * ("One Instagram account per plan").
+ * Step 18.4 / CG-1.2 — a new grid plan. The account must be one of this brand's Instagram accounts
+ * ("One Instagram account per plan"). The brand is the route `{client}` on the agency surface, else
+ * the business workspace's implicit primary brand ({@see ResolvesWorkspaceBrand}).
  */
 class StoreGridPlanRequest extends FormRequest
 {
-    use GridRules;
+    use GridRules, ResolvesWorkspaceBrand;
 
     public function authorize(): bool
     {
-        return $this->user()->can('create', [GridPlan::class, $this->route('client')]);
+        return $this->user()->can('create', [GridPlan::class, $this->brand()]);
     }
 
     /**
@@ -27,7 +29,7 @@ class StoreGridPlanRequest extends FormRequest
     public function rules(): array
     {
         /** @var Client $client */
-        $client = $this->route('client');
+        $client = $this->brand();
 
         return [
             'name' => ['required', 'string', 'max:120'],

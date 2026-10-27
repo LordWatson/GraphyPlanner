@@ -3,6 +3,7 @@
 namespace App\Actions\Publishing;
 
 use App\Actions\Posts\TransitionPostStatusAction;
+use App\Actions\Push\SendPublishFailurePushAction;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
@@ -72,10 +73,17 @@ class ResolvePostPublishOutcomeAction
             ($this->transition)($locked, $outcome, null, $note !== '' ? $note : null);
 
             if ($outcome !== PostStatus::Published) {
-                DB::afterCommit(fn () => $this->notifications->send(
-                    $this->notifications->orgRecipients($locked),
-                    new PostPublishFailed($locked),
-                ));
+                DB::afterCommit(function () use ($locked): void {
+                    $this->notifications->send(
+                        $this->notifications->orgRecipients($locked),
+                        new PostPublishFailed($locked),
+                    );
+
+                    // Step CG-1.3: a business/creator workspace also gets a phone push (resolved from
+                    // the container so the bound transport/fake is used). A no-op for agency orgs and
+                    // when push is unconfigured.
+                    app(SendPublishFailurePushAction::class)($locked);
+                });
 
                 Log::error('Post publish finished with failed targets', [
                     'post_id' => $locked->id,

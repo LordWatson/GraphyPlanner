@@ -195,6 +195,13 @@ can be viewed/acted on.
   grows.
 
 ## Changelog
+- 2026-10-27: Step CG-1.3 (competitor-gap) — real web-push delivery + two new pushes. Added
+  `MinishlinkWebPushNotifier` (`minishlink/web-push ^11.0`) behind a `push.transport` config switch
+  (default `log` keeps dev/tests on the no-op logger), `SendPublishFailurePushAction` (business orgs,
+  from `ResolvePostPublishOutcomeAction`) and `SendNothingScheduledTomorrowPushAction` +
+  `push:send-empty-tomorrow` (daily). See "Web push" above. Tests: `PushNotificationsTest`,
+  `MinishlinkWebPushNotifierTest`. New config: `push.transport`. New dependency: `minishlink/web-push`.
+  The VAPID key generation and the Android-Chrome / iOS-Safari device check are owner handoff items.
 - 2026-10-24: Step M-8.2 — `App\Notifications\ProductFeedbackReceived` (database only), sent to
   every super admin when a partner's staff member submits in-app product feedback; links to the
   super-admin feedback inbox. See `super-admin.md`.
@@ -233,6 +240,30 @@ can be viewed/acted on.
   `mentionableUsers` Inertia prop on `PostController::edit`/`PortalPostController::show`; and the
   `MentionTextarea`/`renderCommentBody` frontend component used in the editor's and portal's
   comment forms/lists.
+
+## Web push (Step B-7.4 / CG-1.3)
+Browser push for business/creator workspaces is a **separate seam** from the in-app bell above — it
+is not a Laravel `Notification`, but the `App\Contracts\PushNotifier` contract (`send(PushSubscription,
+PushMessage): PushDeliveryResult`). Delivery is bound by `config('push.transport')`:
+- `log` (default) → `App\Services\Push\WebPushNotifier` — logs the intent and returns `Failed`, so the
+  whole opt-in/reminder pipeline runs dependency-free in dev and tests.
+- `webpush` → `App\Services\Push\MinishlinkWebPushNotifier` (**CG-1.3**, `minishlink/web-push`
+  `^11.0`) — real VAPID delivery, mapping the push service's response to `Delivered` / `Gone`
+  (404/410 → the caller prunes the subscription) / `Failed`. Never throws for a dead endpoint and
+  never logs a key or the payload. The `WebPush` client is built in a `protected makeWebPush()` so a
+  test can double it without the crypto extensions (`tests/Unit/Services/Push/MinishlinkWebPushNotifierTest`).
+  Bound in `AppServiceProvider` by the config switch; tests fake the contract via `app->instance`.
+
+Pushes (each an Action that builds a `App\Support\Push\PushMessage`, loops the workspace's
+subscriptions and prunes `Gone`; runs only when `isConfigured()`):
+- `SendPostPushRemindersAction` (B-7.4) — "your post goes out at …" (every 5 min).
+- `SendPublishFailurePushAction` (**CG-1.3**) — "a post failed to publish", dispatched from
+  `ResolvePostPublishOutcomeAction`'s after-commit beside the `PostPublishFailed` bell, **business orgs
+  only** (agency keeps email + bell). Resolved from the container so the bound transport/fake is used.
+- `SendNothingScheduledTomorrowPushAction` + `push:send-empty-tomorrow` (**CG-1.3**, daily 18:00,
+  `SchedulerHeartbeat`) — nudges onboarded business orgs whose brand has a connected account but
+  nothing scheduled tomorrow (brand timezone). Idempotent per org per local day (a cache guard).
+  Tests: `tests/Feature/Business/PushNotificationsTest`.
 
 ## Phase M-9 — overdue inbox reply reminder
 - `App\Notifications\InboxReplyOverdue` (database, `NotificationCategory::Comments`) — tells the assignee

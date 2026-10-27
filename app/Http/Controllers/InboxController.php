@@ -27,6 +27,7 @@ use App\Services\Publishing\PlatformCapabilities;
 use App\Support\Inbox\InboxPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -45,16 +46,21 @@ class InboxController extends Controller
         $user = $request->user();
         $filters = $request->filters();
 
+        $staff = $this->assignableStaff($user);
+
         return Inertia::render('inbox/index', [
             'filters' => $filters,
             'conversations' => $list($user, $filters)->through(fn (InboxConversation $c) => InboxPresenter::row($c)),
             'replyNeededCount' => $list->query($user, ['status' => InboxStatus::Open->value, 'reply_needed' => true])->count(),
-            'filterOptions' => $this->filterOptions($platforms),
+            'filterOptions' => $this->filterOptions($platforms, $staff),
             'savedReplies' => SavedReply::query()
                 ->orderBy('title')
                 ->get(['id', 'title', 'body', 'shortcut', 'client_id'])
                 ->all(),
             'aiEnabled' => $this->access->canUse($user),
+            // Step CG-1.1: hide the assignment UI for a one-seat workspace (a solo creator never
+            // assigns a comment to anyone). Agency studios with a team keep it.
+            'showAssignment' => $staff->count() > 1,
             'can' => ['act' => $user->can('viewAny', InboxConversation::class) && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true)],
         ]);
     }
@@ -142,9 +148,26 @@ class InboxController extends Controller
     }
 
     /**
+     * Staff who can be assigned a conversation, scoped to the viewer's own organization. (`User`
+     * has no global org scope, so the `org_id` filter is what keeps one org's names out of
+     * another's assignee list.)
+     *
+     * @return Collection<int, User>
+     */
+    private function assignableStaff(User $user): Collection
+    {
+        return User::query()
+            ->where('org_id', $user->org_id)
+            ->whereIn('role', [Role::Owner, Role::Strategist, Role::Designer])
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * @param  Collection<int, User>  $staff
      * @return array<string, mixed>
      */
-    private function filterOptions(PlatformCapabilities $platforms): array
+    private function filterOptions(PlatformCapabilities $platforms, Collection $staff): array
     {
         $commentable = $platforms->commentablePlatformValues();
 
@@ -160,10 +183,7 @@ class InboxController extends Controller
                 ->get(['id', 'name'])
                 ->map(fn (Client $client) => ['value' => $client->id, 'label' => $client->name])
                 ->all(),
-            'staff' => User::query()
-                ->whereIn('role', [Role::Owner, Role::Strategist, Role::Designer])
-                ->orderBy('name')
-                ->get(['id', 'name'])
+            'staff' => $staff
                 ->map(fn (User $member) => ['value' => $member->id, 'label' => $member->name])
                 ->all(),
         ];

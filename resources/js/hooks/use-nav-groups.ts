@@ -9,6 +9,7 @@ import { today as businessToday } from '@/routes/business';
 import { index as businessAccounts } from '@/routes/business/accounts';
 import { edit as businessBrand } from '@/routes/business/brand';
 import { index as businessCollections } from '@/routes/business/collections';
+import { index as businessGrids } from '@/routes/business/grids';
 import { index as businessIdeas } from '@/routes/business/ideas';
 import { index as businessInsights } from '@/routes/business/insights';
 import { index as businessMedia } from '@/routes/business/media';
@@ -171,8 +172,10 @@ function businessGroups(auth: Auth, onSettings: boolean): NavGroup[] {
                     ...navItem(businessChapters.posts, businessPosts()),
                     subItems: [
                         { title: 'Collections', href: businessCollections() },
+                        { title: 'Grid', href: businessGrids() },
                     ],
                 },
+                navItem(businessChapters.inbox, inboxIndex()),
                 navItem(businessChapters.ideas, businessIdeas()),
                 navItem(businessChapters.media, businessMedia()),
                 navItem(businessChapters.insights, businessInsights()),

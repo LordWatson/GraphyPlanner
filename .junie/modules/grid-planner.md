@@ -129,7 +129,18 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
 ## Routes / Controllers
 - `GET /grids` → `Grids\GridPlanIndexController` — the org-wide grids hub (sidebar: 05 Clients →
   Grids; command palette "Grids"), filter by client/status, "New grid" for any client with an
-  Instagram account (`GridPlanPolicy::viewHub`; client contacts → portal).
+  Instagram account (`GridPlanPolicy::viewHub`; client contacts → portal). **Step CG-1.2:** now
+  `workspace:agency`-guarded (was the last unguarded shared grid surface); a business org is
+  redirected to `business.grids.index` (`EnsureWorkspaceType` equivalents).
+- **Business shell (Step CG-1.2):** `GET /grid` → `Business\GridController@index` (`business.grids.index`,
+  the brand's plans + an `EmptyState` when the brand has no Instagram account) and `POST /grid` →
+  `@store` (`business.grids.store`). Brand-implicit — the brand comes from `CurrentWorkspace`;
+  `StoreGridPlanRequest` resolves it through `ResolvesWorkspaceBrand` (route `{client}` on the agency
+  surface, else the primary brand). The planner (`grids.edit`), tiles, workflow, production and AI are
+  the **shared** `grids.*` routes, reused unchanged. `NewGridDialog` gained an optional `storeUrl`
+  prop so the business hub posts to the brand-implicit route. Grid-produced posts inherit the primary
+  brand's `default_approval_mode = internal_only`, so they skip client review (the review-token link
+  stays available as a sponsor "Share preview").
 - `GET/POST /clients/{client}/grids` → `Grids\GridPlanController@index|store` (Grid tab — always
   shown to staff; without a live Instagram account it explains why there's no "New grid").
 - `GET /grids/{grid}/edit` (planner; client reviewers → portal), `PUT /grids/{grid}`,
@@ -192,6 +203,15 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
   mode, phone width, the review link and the portal grid pages, and drag-reordering with a mouse.
 
 ## Changelog
+- 2026-10-27: Step CG-1.2 (competitor-gap) — the grid planner switched on for the business shell.
+  New `Business\GridController` (`/grid` hub + create) + `business/grids/index.tsx`, reusing the shared
+  planner/production/AI routes and `GridLibrary`/`GridPlanService`. `StoreGridPlanRequest` now uses
+  `ResolvesWorkspaceBrand`; `NewGridDialog` gained a `storeUrl` prop; the agency `/grids` hub is now
+  `workspace:agency`-guarded with an `EnsureWorkspaceType` redirect to the business hub. Grid as a
+  Posts sub-item + ⌘K. Tests: `BusinessGridTest` (create, hub, produce+schedule, cross-org refused,
+  agency-hub redirect); agency grid suite unchanged (planner/workflow/production/model-policy 45/45).
+  Verified: Pint, PHPStan L7, tsc. (Pre-existing, unrelated: the image-split test crashes the PHP
+  process on this environment — GD/image slicing, untouched here.)
 - 2026-10-24: UI — the grids hub (`pages/grids/index.tsx`) now opens with the Ink `ChapterHero` in place of `PageHeader`, leading with a `HeroStat` of the total grid plans; "New grid" renders as the `spark` CTA (`NewGridDialog` `triggerVariant`/`triggerSize`). See `frontend.md`.
 - 2026-10-23: Step M-5.6 — the grid planner is recognised as the MVP's "Instagram grid planner" (it
   supersedes M-5.6's simpler live-feed spec). Added a **"Grids"** entry point on the new content hub

@@ -61,8 +61,29 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
 - `POST /inbox/{conversation}/ai/draft` → `@draft` — AI draft (`throttle:ai`), returns `{text}`.
 - `POST /inbox/refresh` → `@refresh` — dispatch the sweep now.
 - `POST /saved-replies`, `PATCH|DELETE /saved-replies/{savedReply}` → `SavedReplyController`.
-- All under `['portal.redirect','workspace:agency']`. Policies `InboxConversationPolicy`
-  (view: Owner/Strategist/Designer/Viewer; act/reply: Owner/Strategist/Designer) and `SavedReplyPolicy`.
+- **Step CG-1.1:** the whole group is now a **shared surface** under `['portal.redirect']` only
+  (the `workspace:agency` guard was dropped) — both the agency studio and a business/creator
+  workspace reach `/inbox`, exactly like the shared calendar/dashboard. There is **one**
+  `InboxController` and **one** `inbox/index` page; nothing is forked. Policies `InboxConversationPolicy`
+  (view: Owner/Strategist/Designer/Viewer; act/reply: Owner/Strategist/Designer) and `SavedReplyPolicy`
+  still isolate tenants (a bound conversation from another org is refused 403) and exclude client
+  reviewers, so the dropped middleware changes no authorization.
+
+### Business shell (Step CG-1.1)
+- The inbox page (`resources/js/pages/inbox/index.tsx`) is a thin wrapper over the shared
+  `components/inbox/inbox-workspace.tsx` (`InboxWorkspace`, extracted from the old single-file page so
+  the agency `Composer` export/path and its test are unchanged). It flips **`multiClient`** off from
+  the shared `workspace` Inertia prop for a business org — dropping the client filter and per-row
+  client name — and shows business copy. A one-brand business org is already isolated by the
+  `OrganizationScope`, so no brand filter is forced in the controller.
+- **`showAssignment`** (new `InboxController@index` prop) hides the assignee filter + the thread
+  assign dropdown when the workspace has a single actor seat (a solo creator). The staff/assignee
+  list is now **org-scoped** (`InboxController::assignableStaff()` filters `org_id` — `User` has no
+  global org scope, so this is what keeps one org's names out of another's dropdown).
+- The business sidebar/⌘K expose Inbox as business chapter 04 (`businessChapters.inbox`,
+  `resources/js/lib/chapters.ts`), linking to the shared `inbox.index` route.
+- `GetBusinessDashboardAction::needsYou()` surfaces open, reply-needed conversations for the brand as
+  `type: 'comment'` rows (linking to `/inbox`); see `business-workspaces.md`.
 
 ## Business Rules
 - Tenant isolation: every query is org-scoped (`OrganizationScope`); the policy refuses a bound conversation
@@ -85,6 +106,9 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   phrase, over-budget 422, AI-disabled 404.
 - `tests/Feature/Inbox/InboxSlaTest.php` — overdue detection + the once-a-day reminder (assignee, else studio).
 - Fixtures/doubles: `tests/Feature/Inbox/Concerns/{BuildsInboxFixtures,FakeCommentSource,FakeReplyAssistant}`.
+- `tests/Feature/Business/BusinessInboxTest.php` — **Step CG-1.1:** a business owner reaches `/inbox`
+  (scoped to the one brand, `showAssignment` false solo / true with a second seat), AI-drafts then
+  human-sends a reply, a Viewer can't reply, and another org's conversation is refused 403.
 
 ## Known Gaps / Open Questions
 - **DMs are deferred** (comments only, per M-0.2) — the `CommentSource` contract is ready for them.
@@ -96,5 +120,13 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   the inbox can follow.
 
 ## Changelog
+- 2026-10-27: Step CG-1.1 — the inbox switched on for the business/creator shell. The route group
+  became shared (`workspace:agency` dropped, `portal.redirect` kept), the single-file page was
+  extracted into the shared `InboxWorkspace` component (agency `Composer` export/path + test
+  unchanged), and the page flips `multiClient`/copy from the `workspace` prop. New `showAssignment`
+  prop hides assignment for a solo seat; the assignee list is now org-scoped. Business Inbox chapter
+  (04) + ⌘K entry; open reply-needed comments surface on the business Today "Needs you". Tests:
+  `BusinessInboxTest` (5), `BusinessDashboardTest` (comment row). No agency behaviour change
+  (Inbox suite 37/37 green; `WorkspaceGuardsTest` green). Verified: Pint, PHPStan L7, tsc, 132 vitest.
 - 2026-11-12: Phase M-9 — social inbox shipped (ingestion, triage UI, assignment, saved replies, sentiment,
   SLA + reminders, AI draft replies with human send). New chapter 04 "Inbox"; Clients→05 … Settings→09.
