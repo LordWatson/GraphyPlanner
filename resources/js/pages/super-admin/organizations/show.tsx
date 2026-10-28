@@ -4,6 +4,7 @@ import {
     Building2,
     CirclePause,
     CirclePlay,
+    CreditCard,
     Settings2,
     Trash2,
     UserRound,
@@ -104,6 +105,29 @@ type Props = {
     last_published_at: string | null;
     timezones: Option[];
     currencies: Option[];
+    billing: BillingDetail;
+    planOptions: { key: string; name: string; segment: string }[];
+};
+
+type BillingDetail = {
+    plan: string | null;
+    effective_plan: string;
+    plan_name: string;
+    billing_enabled: boolean | null;
+    global_billing_enabled: boolean;
+    has_stripe_customer: boolean;
+    bonus_ai_text_credits: number;
+    bonus_ai_credits_expires_at: string | null;
+    audit: {
+        id: number;
+        action: string;
+        from_plan: string | null;
+        to_plan: string | null;
+        note: string | null;
+        meta: Record<string, unknown> | null;
+        actor: string | null;
+        created_at: string | null;
+    }[];
 };
 
 /**
@@ -119,6 +143,8 @@ export default function ShowOrganization({
     last_published_at: lastPublishedAt,
     timezones,
     currencies,
+    billing,
+    planOptions,
 }: Props) {
     const [timezone, setTimezone] = useState(organization.default_timezone);
     const [currency, setCurrency] = useState(organization.default_currency);
@@ -543,6 +569,12 @@ export default function ShowOrganization({
                     </div>
                 </div>
 
+                <BillingPanel
+                    organizationId={organization.id}
+                    billing={billing}
+                    planOptions={planOptions}
+                />
+
                 <div className="grid gap-5 lg:grid-cols-2">
                     <Panel
                         eyebrow={`${members.length} with access`}
@@ -635,6 +667,238 @@ export default function ShowOrganization({
                 </div>
             </Page>
         </>
+    );
+}
+
+function BillingPanel({
+    organizationId,
+    billing,
+    planOptions,
+}: {
+    organizationId: number;
+    billing: BillingDetail;
+    planOptions: { key: string; name: string; segment: string }[];
+}) {
+    const [plan, setPlan] = useState(billing.plan ?? '');
+    const [mode, setMode] = useState(
+        billing.billing_enabled === null
+            ? 'inherit'
+            : billing.billing_enabled
+              ? 'on'
+              : 'off',
+    );
+
+    return (
+        <Panel
+            eyebrow="Plans & billing"
+            title="Plan & billing"
+            icon={CreditCard}
+        >
+            <div className="grid gap-6 lg:grid-cols-2">
+                {/* Plan override */}
+                <Form
+                    {...OrganizationController.setPlan.form(organizationId)}
+                    options={{ preserveScroll: true }}
+                    className="grid gap-3"
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="plan">Plan</Label>
+                                <input type="hidden" name="plan" value={plan} />
+                                <Select value={plan} onValueChange={setPlan}>
+                                    <SelectTrigger id="plan" className="w-full">
+                                        <SelectValue placeholder="Default for workspace type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="">
+                                            Default for type (
+                                            {billing.effective_plan})
+                                        </SelectItem>
+                                        {planOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.key}
+                                                value={option.key}
+                                            >
+                                                {option.name} · {option.segment}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">
+                                    Currently on{' '}
+                                    <span className="font-medium">
+                                        {billing.plan_name}
+                                    </span>
+                                    {billing.plan === null && ' (type default)'}
+                                    .
+                                </p>
+                                <InputError message={errors.plan} />
+                            </div>
+                            <Input
+                                name="note"
+                                aria-label="Note"
+                                placeholder="Note (optional)"
+                                maxLength={500}
+                            />
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                disabled={processing}
+                            >
+                                {processing && <Spinner />}
+                                Set plan
+                            </Button>
+                        </>
+                    )}
+                </Form>
+
+                {/* Billing override + credits */}
+                <div className="grid gap-6">
+                    <Form
+                        {...OrganizationController.setBilling.form(
+                            organizationId,
+                        )}
+                        options={{ preserveScroll: true }}
+                        className="grid gap-3"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="mode">Stripe billing</Label>
+                                    <input
+                                        type="hidden"
+                                        name="mode"
+                                        value={mode}
+                                    />
+                                    <Select
+                                        value={mode}
+                                        onValueChange={setMode}
+                                    >
+                                        <SelectTrigger
+                                            id="mode"
+                                            className="w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="inherit">
+                                                Inherit global (
+                                                {billing.global_billing_enabled
+                                                    ? 'on'
+                                                    : 'off'}
+                                                )
+                                            </SelectItem>
+                                            <SelectItem value="on">
+                                                Force on
+                                            </SelectItem>
+                                            <SelectItem value="off">
+                                                Force off
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={errors.mode} />
+                                </div>
+                                <Button
+                                    type="submit"
+                                    variant="outline"
+                                    disabled={processing}
+                                >
+                                    {processing && <Spinner />}
+                                    Save billing access
+                                </Button>
+                            </>
+                        )}
+                    </Form>
+
+                    <Form
+                        {...OrganizationController.grantCredits.form(
+                            organizationId,
+                        )}
+                        options={{ preserveScroll: true }}
+                        className="grid gap-3"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="credits">
+                                            Bonus AI credits
+                                        </Label>
+                                        <Input
+                                            id="credits"
+                                            name="credits"
+                                            type="number"
+                                            min={0}
+                                            defaultValue={
+                                                billing.bonus_ai_text_credits
+                                            }
+                                        />
+                                        <InputError message={errors.credits} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="expires_in_days">
+                                            Expires (days)
+                                        </Label>
+                                        <Input
+                                            id="expires_in_days"
+                                            name="expires_in_days"
+                                            type="number"
+                                            min={1}
+                                            placeholder="Never"
+                                        />
+                                        <InputError
+                                            message={errors.expires_in_days}
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    type="submit"
+                                    variant="outline"
+                                    disabled={processing}
+                                >
+                                    {processing && <Spinner />}
+                                    Grant credits
+                                </Button>
+                            </>
+                        )}
+                    </Form>
+                </div>
+            </div>
+
+            {billing.audit.length > 0 && (
+                <div className="mt-6">
+                    <p className="eyebrow text-muted-foreground mb-2">
+                        Recent changes
+                    </p>
+                    <ul className="divide-border/70 divide-y text-sm">
+                        {billing.audit.map((entry) => (
+                            <li
+                                key={entry.id}
+                                className="flex items-center justify-between gap-3 py-2"
+                            >
+                                <span className="text-foreground">
+                                    {entry.action === 'plan_changed'
+                                        ? `Plan → ${entry.to_plan ?? 'default'}`
+                                        : entry.action === 'credits_granted'
+                                          ? 'AI credits granted'
+                                          : 'Billing access changed'}
+                                    {entry.actor && (
+                                        <span className="text-muted-foreground">
+                                            {' '}
+                                            · {entry.actor}
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="text-muted-foreground font-mono text-xs">
+                                    {formatDate(entry.created_at)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </Panel>
     );
 }
 

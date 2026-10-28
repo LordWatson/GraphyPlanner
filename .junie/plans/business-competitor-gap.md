@@ -184,12 +184,26 @@ rows; `OnboardingProgress` gained the optional "Plan your grid" item for Instagr
 
 ---
 
-## Phase CG-2 — Plans & payments [MVP]
+## Phase CG-2 — Plans & payments [MVP] ✅ Done (2026-10-28)
 
 Goal: a solo user can start a trial, pay by card, upgrade and downgrade, and every limit is
 enforced in Actions. Delivers **B-9.1–B-9.4** and **B-12.2** with the competitor-informed pricing.
 
-### Step CG-2.1 — Plan definitions [MVP]
+_Implemented 2026-10-28 — see `.junie/modules/plans.md` for the full as-built record. Summary:
+`config/plans.php` + `App\Enums\Feature` + `App\Support\Plans\{Plan,PlanCatalog}`;
+`App\Contracts\Entitlements` → `ConfigEntitlements` with `PlanLimitReachedException` (friendly
+upgrade prompt, never a 403), enforced in `CreateSocialAccountAction`, `CreatePostAction`,
+`CreateStaffInvitationAction`, the grid gate, and `AiUsageGuard`/`ImageQuotaGuard`; Laravel Cashier
+on `Organization` (Stripe Checkout + Customer Portal, webhook → `SyncSubscriptionAction`, idempotent
+via `stripe_webhook_events`); a global + per-org Stripe switch (`PlatformSettings` / `BillingGate`,
+super admin → Billing); `/settings/plan`; super-admin plan/credit/billing controls with a
+`plan_audit_logs` trail; and the public `/for-business`, `/for-creators`, `/pricing` pages. Prices:
+Free £0 / Pro £15/$19 / Creator Pro £29/$37, annual = two months free. Decisions taken: USD set a
+little higher than GBP; the Stripe switch is global + per-org override. Open: inbox gating on Free
+(§6) is deferred — the `inbox` gate is defined and tested at the contract level but the shared
+`/inbox` surface is not yet hard-gated._
+
+### Step CG-2.1 — Plan definitions [MVP] ✅ Done
 - `config/plans.php` with `business_free`, `business_pro`, `creator_pro` (and `agency_*`
   unchanged = no limits). Each plan holds: GBP/USD monthly and annual Stripe price ids, limits for
   every `Feature`, and new boolean features this plan needs: `grid_planner`, `inbox`, `bio_page`,
@@ -197,36 +211,36 @@ enforced in Actions. Delivers **B-9.1–B-9.4** and **B-12.2** with the competit
 - **Done when**: a test asserts every plan defines every `Feature` (no silent nulls) and that agency
   plans are unlimited.
 
-### Step CG-2.2 — `Entitlements` contract [MVP]
+### Step CG-2.2 — `Entitlements` contract [MVP] ✅ Done
 - **Delivers B-9.1** as specified there, extended with the boolean features above
   (`allows(Organization, Feature)`), enforced in the Actions for CG-1.1, CG-1.2, CG-3 and CG-4
   surfaces as they land.
 - **Done when**: B-9.1's done-when plus one test per new boolean feature (allowed plan passes, free
   plan gets `PlanLimitReachedException`).
 
-### Step CG-2.3 — AI allowance metering [MVP]
+### Step CG-2.3 — AI allowance metering [MVP] ✅ Done
 - **Delivers B-9.2** unchanged. Allowances are set so `business_pro` beats Later Starter's 5
   credits/month by a wide margin while staying within DeepSeek/Gemini cost per seat.
 - **Done when**: B-9.2's done-when.
 
-### Step CG-2.4 — Subscriptions with Cashier [MVP]
+### Step CG-2.4 — Subscriptions with Cashier [MVP] ✅ Done
 - **Delivers B-9.3** (promoted from V1 to MVP: the review shows every competitor self-serves a
   trial and checkout). 14-day trial on paid plans. Stripe Checkout and Customer Portal, idempotent
   `SyncSubscriptionAction`, behind the `billing.enabled` Pennant flag.
 - **Done when**: B-9.3's done-when.
 
-### Step CG-2.5 — Upgrade prompts and the plan page [MVP]
+### Step CG-2.5 — Upgrade prompts and the plan page [MVP] ✅ Done
 - `/settings/plan`: current plan, usage meters (accounts, posts this month, AI credits), upgrade and
   manage-billing buttons. Limit hits render a friendly upgrade prompt (`PlanLimitReachedException` →
   Inertia flash + `EmptyState`-style panel naming the plan that unlocks it), never a 403.
 - **Done when**: feature tests cover the prompt for each limit and that ClientReviewer-style roles
   never see billing.
 
-### Step CG-2.6 — Super admin plan controls [V1]
+### Step CG-2.6 — Super admin plan controls [V1] ✅ Done
 - **Delivers B-9.4** unchanged.
 - **Done when**: B-9.4's done-when.
 
-### Step CG-2.7 — Pricing and segment pages [V1]
+### Step CG-2.7 — Pricing and segment pages [V1] ✅ Done
 - **Delivers B-12.2**: `/for-creators`, `/for-business` and a pricing table generated from
   `config/plans.php`. Copy leads with what we win on (AI that knows your brand, insights in plain
   words, nine networks). An optional "How we compare" table only states facts checked that day,

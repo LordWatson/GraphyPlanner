@@ -31,7 +31,11 @@ class BusinessGridTest extends TestCase
     {
         parent::setUp();
 
-        $this->org = Organization::factory()->business()->create(['default_timezone' => 'Europe/London']);
+        // The grid planner is a Pro feature (Step CG-2.2), so this business workspace is on Pro.
+        $this->org = Organization::factory()->business()->create([
+            'default_timezone' => 'Europe/London',
+            'plan' => 'business_pro',
+        ]);
         $this->client = Client::factory()->for($this->org, 'organization')->primary()->create([
             'default_approval_mode' => ApprovalMode::InternalOnly,
         ]);
@@ -59,6 +63,31 @@ class BusinessGridTest extends TestCase
             'client_id' => $this->client->id,
             'name' => 'November launch',
         ]);
+    }
+
+    public function test_a_free_business_owner_is_blocked_from_creating_a_grid_plan(): void
+    {
+        // Step CG-2.2 — grid planner is gated to Pro; a free workspace gets a friendly upgrade
+        // prompt (redirect back), never a 403, and no plan is created.
+        $this->org->forceFill(['plan' => 'business_free'])->save();
+
+        $this->actingAs($this->owner())
+            ->post(route('business.grids.store'), [
+                'name' => 'November launch',
+                'social_account_id' => $this->instagram->id,
+                'pinned_count' => 0,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('grid_plans', ['name' => 'November launch']);
+
+        // The hub reflects the lock: the brand can't create.
+        $this->actingAs($this->owner())
+            ->get(route('business.grids.index'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('entitled', false)
+                ->where('can.create', false));
     }
 
     public function test_the_grid_hub_lists_the_brands_plans(): void

@@ -8,6 +8,7 @@ use App\Contracts\CaptionRepurposer;
 use App\Contracts\ChatNotifier;
 use App\Contracts\CommentSource;
 use App\Contracts\EngagementSource;
+use App\Contracts\Entitlements;
 use App\Contracts\EventCalendar;
 use App\Contracts\GridAiProvider;
 use App\Contracts\ImageProvider;
@@ -81,6 +82,7 @@ use App\Services\Inbox\UploadPostCommentSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
 use App\Services\Notifications\NullChatNotifier;
+use App\Services\Plans\ConfigEntitlements;
 use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
@@ -126,6 +128,11 @@ class AppServiceProvider extends ServiceProvider
         // binding for an S3-backed implementation once Phase 1/2 needs signed-URL
         // uploads (spec §10) — no caller of App\Contracts\AssetStorage needs to change.
         $this->app->bind(AssetStorage::class, LocalAssetStorage::class);
+
+        // Step CG-2.2 / B-9.1: plan limits & gate features read from config/plans.php. Bound as an
+        // interface so Actions enforce entitlements against a mockable seam and a future
+        // usage/billing-driven source is a drop-in swap.
+        $this->app->bind(Entitlements::class, ConfigEntitlements::class);
 
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);

@@ -2,10 +2,14 @@
 
 namespace App\Actions\Posts;
 
+use App\Contracts\Entitlements;
 use App\Enums\ApprovalMode;
+use App\Enums\Feature;
+use App\Exceptions\Plans\PlanLimitReachedException;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\SocialAccount;
+use App\Services\Plans\PlanUsage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,9 +25,15 @@ class CreatePostAction
      * their local date/time happen to coincide once converted (spec §4.6).
      *
      * @param  array<string, mixed>  $data
+     *
+     * @throws PlanLimitReachedException when the org's plan caps posts a month.
      */
     public function __invoke(Client $client, array $data): Post
     {
+        // Step CG-2.2 / B-9.1: enforce the plan's monthly post allowance (per calendar month in the
+        // org's own timezone). Agency plans are unlimited, so this never fires for them.
+        $this->ensureWithinMonthlyPostLimit($client);
+
         return DB::transaction(function () use ($client, $data) {
             $post = Post::create([
                 ...array_diff_key($data, ['targets' => null]),
@@ -61,5 +71,18 @@ class CreatePostAction
 
             return $post;
         });
+    }
+
+    private function ensureWithinMonthlyPostLimit(Client $client): void
+    {
+        $organization = $client->organization;
+
+        if ($organization === null) {
+            return;
+        }
+
+        $used = (new PlanUsage)->scheduledPostsThisMonth($organization);
+
+        app(Entitlements::class)->ensure($organization, Feature::ScheduledPostsPerMonth, $used);
     }
 }

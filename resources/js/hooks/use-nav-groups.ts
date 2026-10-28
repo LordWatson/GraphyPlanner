@@ -27,6 +27,7 @@ import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
 import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
 import { index as superAdminPartners } from '@/routes/super-admin/partners';
 import { index as superAdminReports } from '@/routes/super-admin/reports';
+import { edit as superAdminSettings } from '@/routes/super-admin/settings';
 import type { Auth, NavItem } from '@/types';
 
 /**
@@ -93,6 +94,10 @@ export function useNavGroups(): NavModel {
                         navItem(
                             platformChapters.partners,
                             superAdminPartners(),
+                        ),
+                        navItem(
+                            platformChapters.platformBilling,
+                            superAdminSettings(),
                         ),
                     ],
                 },

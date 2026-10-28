@@ -7,10 +7,14 @@ use App\Enums\ConnectionStatus;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Organization;
+use App\Models\PlanAuditLog;
 use App\Models\Post;
 use App\Models\PostActivityLog;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\Platform\PlatformSettings;
+use App\Support\Plans\Plan;
+use App\Support\Plans\PlanCatalog;
 use Carbon\CarbonImmutable;
 
 /**
@@ -95,6 +99,48 @@ class GetOrganizationDetailAction
                     ->count(),
             ],
             'last_published_at' => $lastPublishedAt ? CarbonImmutable::parse($lastPublishedAt)->toIso8601String() : null,
+            'billing' => $this->billing($organization),
+            'planOptions' => array_map(
+                fn (Plan $plan) => ['key' => $plan->key, 'name' => $plan->name(), 'segment' => $plan->segment()],
+                array_values(app(PlanCatalog::class)->all()),
+            ),
+        ];
+    }
+
+    /**
+     * Step CG-2.6 — the plan, billing override, AI credit grant and audit trail for the super-admin
+     * org detail page.
+     *
+     * @return array<string, mixed>
+     */
+    private function billing(Organization $organization): array
+    {
+        $audit = $organization->planAuditLogs()
+            ->with('actor:id,name')
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(fn (PlanAuditLog $log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'from_plan' => $log->from_plan,
+                'to_plan' => $log->to_plan,
+                'note' => $log->note,
+                'meta' => $log->meta,
+                'actor' => $log->actor?->name,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ])->all();
+
+        return [
+            'plan' => $organization->plan,
+            'effective_plan' => $organization->effectivePlanKey(),
+            'plan_name' => $organization->currentPlan()->name(),
+            'billing_enabled' => $organization->billing_enabled,
+            'global_billing_enabled' => app(PlatformSettings::class)->billingEnabled(),
+            'has_stripe_customer' => $organization->hasStripeId(),
+            'bonus_ai_text_credits' => $organization->bonusAiTextCredits(),
+            'bonus_ai_credits_expires_at' => $organization->bonus_ai_credits_expires_at?->toIso8601String(),
+            'audit' => $audit,
         ];
     }
 }

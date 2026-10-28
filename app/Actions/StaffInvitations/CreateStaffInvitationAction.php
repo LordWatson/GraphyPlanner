@@ -2,6 +2,8 @@
 
 namespace App\Actions\StaffInvitations;
 
+use App\Contracts\Entitlements;
+use App\Enums\Feature;
 use App\Enums\Role;
 use App\Mail\StaffInvitationMail;
 use App\Models\Organization;
@@ -30,6 +32,13 @@ class CreateStaffInvitationAction
         if (! in_array($role, Role::assignableFor($organization->type), true)) {
             throw new InvalidArgumentException("Role [{$role->value}] can't be assigned in a {$organization->type->value} workspace.");
         }
+
+        // Step CG-2.2 / B-9.1: a new invitation consumes a seat, so count current members plus
+        // outstanding invitations against the plan's seat limit. Agency plans are unlimited.
+        $seatsUsed = $organization->users()->count()
+            + $organization->staffInvitations()->whereNull('accepted_at')->whereNull('revoked_at')->count();
+
+        app(Entitlements::class)->ensure($organization, Feature::TeamSeats, $seatsUsed);
 
         $invitation = DB::transaction(function () use ($organization, $email, $role, $invitedBy) {
             $plainToken = Str::random(64);

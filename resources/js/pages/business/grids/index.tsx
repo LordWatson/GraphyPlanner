@@ -1,5 +1,5 @@
-import { Head, router } from '@inertiajs/react';
-import { AtSign, LayoutGrid } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { AtSign, LayoutGrid, Sparkles } from 'lucide-react';
 import { GridCard } from '@/components/grids/grid-card';
 import type {
     GridAccountOption,
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { index as accountsIndex } from '@/routes/business/accounts';
 import { store as storeGrid } from '@/routes/business/grids';
 import { edit as editGrid } from '@/routes/grids';
+import { edit as editPlan } from '@/routes/plan';
 
 /**
  * Step CG-1.2 — the grid planner hub in the business/creator shell (`/grid`). The brand's Instagram
@@ -27,6 +28,7 @@ export default function BusinessGridsIndex({
     accounts,
     campaignOptions,
     hasInstagram,
+    entitled,
     can,
 }: {
     grids: Paginated<GridSummary>;
@@ -34,6 +36,7 @@ export default function BusinessGridsIndex({
     accounts: GridAccountOption[];
     campaignOptions: GridCampaignOption[];
     hasInstagram: boolean;
+    entitled: boolean;
     can: { create: boolean };
 }) {
     return (
@@ -70,7 +73,18 @@ export default function BusinessGridsIndex({
                     }
                 />
 
-                {!hasInstagram ? (
+                {!entitled ? (
+                    <EmptyState
+                        icon={Sparkles}
+                        title="The grid planner is on Pro."
+                        description="Upgrade to plan your Instagram grid, preview it on your real profile, and turn tiles into scheduled posts."
+                        action={
+                            <Button variant="brand" asChild>
+                                <Link href={editPlan()}>See plans</Link>
+                            </Button>
+                        }
+                    />
+                ) : !hasInstagram ? (
                     <EmptyState
                         icon={AtSign}
                         title="Connect Instagram first."

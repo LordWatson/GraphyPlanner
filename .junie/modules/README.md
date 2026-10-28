@@ -14,6 +14,8 @@ accurate context without re-deriving it from the whole codebase.
 | `clients.md` | Client (CRM) model + health computation | Done (Steps 0.3–0.4); health v2 (Step M-3.4) |
 | `brand-brain.md` | BrandBrain model & editor | Done (Step 0.5) |
 | `billing.md` | Client billing: invoices (line items, branded PDFs, email/reminders, void, ledger & CSV export) | Done (ad-hoc) |
+| `plans.md` | Plans, entitlements & subscriptions: plan config, limit/gate enforcement, Cashier (Stripe) self-serve billing, super-admin plan controls + global/per-org Stripe switch, pricing pages | In progress (Phase CG-2) |
+| `plans.md` | Plans, entitlements, AI allowance, Stripe subscriptions (Cashier), plan page & super-admin plan/billing controls | Done (Phase CG-2) |
 | `social-accounts.md` | SocialAccount model & connection status | Done (Step 0.6); token lifecycle + client self-connect (Phase M-2) |
 | `campaigns.md` | Campaigns: workspace, brief, plan, board, approvals, results (`.junie/plans/campaigns-enhancement.md`) | Done (Step 0.7); enhancement Done (Steps C-0.1 to C-9.4) |
 | `assets.md` | Assets, asset library, S3 upload flow | Done (Step 0.7); private storage + signed URLs (Step I-1.6); probing + thumbnails (Step M-2.4) — S3 package pending |

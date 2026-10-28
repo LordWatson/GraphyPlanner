@@ -667,3 +667,10 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
 - 2026-10-22: `clients.primary_org_id` made VIRTUAL (was STORED) — MySQL rejects a stored generated
   column whose base column (`org_id`) carries an ON DELETE CASCADE FK (error 1215). Verified the
   virtual column + unique index enforce one-primary-per-org on MySQL 8.
+- 2026-10-28: Phase CG-2 (plans & payments) delivered B-9.1–B-9.4 and B-12.2 for business/creator
+  workspaces. Decisions (CG-0.1/0.2): positioning "the AI marketing partner for one brand"; plans
+  Free £0 / Pro £15/$19 / Creator Pro £29/$37, annual = two months free; the Stripe switch is global
+  + per-org override; grid planner and comment inbox are Pro features (inbox surface-gating deferred,
+  open question §6). A free business workspace is capped at 3 accounts / 30 posts a month / 1 seat;
+  `BusinessGridTest` and `BusinessStaffRoleTest` now put their workspace on a paid plan to exercise
+  those gated features. New module doc: `plans.md`.

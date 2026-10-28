@@ -61,6 +61,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceItemController;
+use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\McpUploadController;
 use App\Http\Controllers\MediaKitShareController;
 use App\Http\Controllers\MyWorkController;
@@ -94,12 +95,18 @@ use App\Http\Controllers\SuperAdmin\AnalyticsController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
 use App\Http\Controllers\SuperAdmin\PartnerController as SuperAdminPartnerController;
+use App\Http\Controllers\SuperAdmin\PlatformSettingController;
 use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
 Route::inertia('about', 'about')->name('about');
+
+// Step CG-2.7 / B-12.2: public segment & pricing pages (pricing table generated from config/plans.php).
+Route::get('for-business', [MarketingController::class, 'forBusiness'])->name('for-business');
+Route::get('for-creators', [MarketingController::class, 'forCreators'])->name('for-creators');
+Route::get('pricing', [MarketingController::class, 'pricing'])->name('pricing');
 
 // Step 0.13: the client review portal is unauthenticated — access is granted purely by
 // possession of a valid `ReviewToken`, never a logged-in session (spec §10/§12).
@@ -915,6 +922,15 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     Route::post('organizations/{organization}/reinstate', [SuperAdminOrganizationController::class, 'reinstate'])->name('organizations.reinstate');
     Route::delete('organizations/{organization}', [SuperAdminOrganizationController::class, 'destroy'])->name('organizations.destroy');
     Route::get('organizations/{organization}/analytics', [SuperAdminOrganizationController::class, 'analytics'])->name('organizations.analytics');
+
+    // Step CG-2.6 / B-9.4: plan override, temporary AI credit grants, and the per-org billing switch.
+    Route::post('organizations/{organization}/plan', [SuperAdminOrganizationController::class, 'setPlan'])->name('organizations.plan');
+    Route::post('organizations/{organization}/credits', [SuperAdminOrganizationController::class, 'grantCredits'])->name('organizations.credits');
+    Route::post('organizations/{organization}/billing', [SuperAdminOrganizationController::class, 'setBilling'])->name('organizations.billing');
+
+    // Step CG-2.6: platform-wide settings — the global Stripe billing switch.
+    Route::get('settings', [PlatformSettingController::class, 'edit'])->name('settings.edit');
+    Route::put('settings/billing', [PlatformSettingController::class, 'updateBilling'])->name('settings.billing');
 
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
 

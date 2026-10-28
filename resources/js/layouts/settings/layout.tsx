@@ -8,6 +8,7 @@ import { edit as editMcpConnections } from '@/routes/mcp-connections';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editOrganization } from '@/routes/organization';
 import { edit as editNotifications } from '@/routes/notifications';
+import { edit as editPlan } from '@/routes/plan';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editWorkspace } from '@/routes/workspace-settings';
@@ -65,6 +66,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                         href: editOrganization(),
                         icon: null,
                     },
+              {
+                  title: 'Plan & billing',
+                  href: editPlan(),
+                  icon: null,
+              },
               {
                   title: 'AI usage',
                   href: editAiUsage(),

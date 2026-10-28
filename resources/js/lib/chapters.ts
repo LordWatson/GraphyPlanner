@@ -3,6 +3,7 @@ import {
     AtSign,
     Building2,
     CalendarDays,
+    CreditCard,
     FileBarChart,
     Image,
     LayoutGrid,
@@ -60,6 +61,7 @@ export type PlatformChapterKey =
     | 'analytics'
     | 'reports'
     | 'partners'
+    | 'platformBilling'
     | 'platformSettings';
 
 export type Chapter = {
@@ -236,9 +238,19 @@ export const platformChapters: Record<PlatformChapterKey, Chapter> = {
         swatch: 'bg-signal',
         prefixes: ['/super-admin/partners', '/super-admin/feedback'],
     },
+    platformBilling: {
+        key: 'platformBilling',
+        number: '06',
+        title: 'Billing',
+        summary:
+            'The global Stripe switch and plan distribution across the platform.',
+        icon: CreditCard,
+        swatch: 'bg-electric',
+        prefixes: ['/super-admin/settings'],
+    },
     platformSettings: {
         key: 'platformSettings',
-        number: '06',
+        number: '07',
         title: 'Settings',
         summary: 'Your profile, security and appearance.',
         icon: Settings2,
@@ -387,6 +399,7 @@ export function chapterForPath(
             platformChapters.analytics,
             platformChapters.reports,
             platformChapters.partners,
+            platformChapters.platformBilling,
             platformChapters.platformSettings,
             platformChapters.platformOverview,
         ];
