@@ -362,3 +362,8 @@ Staff group (`auth`, `verified`, `org.member`):
   report emails, super admin drill-down on the org action. Fixed: note rows counted as transitions;
   SSR hydration mismatch in `formatCurrencyCompact`.
 - 2026-10-20: Phase M-1: CSV exports behind password confirmation; reports list on `DataTable`.
+- 2026-11-06: Step CG-3.3 — the business `/insights` page gained a deferred `bio` section (page
+  views, link taps and top five links over 30 days) from `GetBioInsightsAction`, reading the
+  `bio_events` daily rollups. Null when the brand has no bio page, so the section disappears rather
+  than showing zeroes. Bots/unfurlers and the owner's own visits are excluded at write time. Details
+  in `bio-pages.md`.

@@ -136,6 +136,11 @@ export type PostData = {
     /** Step M-2.3: a video's cover image and frame offset. */
     cover_asset_id: number | null;
     thumb_offset_ms: number | null;
+    /** Step CG-5.1 / CG-5.2: the paid-partnership declaration and the deal it delivers. */
+    is_paid_partnership: boolean;
+    partner_name: string | null;
+    partner_handle: string | null;
+    brand_deal_id: number | null;
     music: Record<string, unknown> | null;
     location: Record<string, unknown> | null;
     /** Image format per channel, defaults filled in. */

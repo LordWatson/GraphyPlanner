@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\OrganizationType;
 use App\Enums\PublishMode;
 use App\Enums\Role;
+use App\Support\Plans\Plan;
+use App\Support\Plans\PlanCatalog;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -16,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Laravel\Cashier\Billable;
 
 /**
  * @property int $id
@@ -43,6 +46,14 @@ use Illuminate\Support\Carbon;
  * @property int|null $ai_monthly_image_quota
  * @property bool $ai_enabled
  * @property int|null $ai_monthly_token_budget
+ * @property string|null $plan
+ * @property bool|null $billing_enabled
+ * @property string|null $stripe_id
+ * @property string|null $pm_type
+ * @property string|null $pm_last_four
+ * @property Carbon|null $trial_ends_at
+ * @property int $bonus_ai_text_credits
+ * @property Carbon|null $bonus_ai_credits_expires_at
  * @property bool $mcp_enabled
  * @property array<string, bool>|null $campaign_features
  * @property Carbon|null $suspended_at
@@ -57,7 +68,7 @@ use Illuminate\Support\Carbon;
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
-    use HasFactory, SoftDeletes;
+    use Billable, HasFactory, SoftDeletes;
 
     /**
      * The frozen "Preview Studio" fixture org that powers `/preview/*` (Step 0.14). Super admins
@@ -106,6 +117,10 @@ class Organization extends Model
             'mcp_enabled' => 'boolean',
             'suspended_at' => 'datetime',
             'campaign_features' => 'array',
+            'billing_enabled' => 'boolean',
+            'trial_ends_at' => 'datetime',
+            'bonus_ai_text_credits' => 'integer',
+            'bonus_ai_credits_expires_at' => 'datetime',
         ];
     }
 
@@ -301,5 +316,64 @@ class Organization extends Model
     public function scopeActive(Builder $query): void
     {
         $query->whereNull('suspended_at');
+    }
+
+    /**
+     * Phase CG-2 (Step CG-2.6) — the super-admin audit trail of plan/credit/billing changes.
+     *
+     * @return HasMany<PlanAuditLog, $this>
+     */
+    public function planAuditLogs(): HasMany
+    {
+        return $this->hasMany(PlanAuditLog::class, 'org_id');
+    }
+
+    /**
+     * Phase CG-2 (Step CG-2.1) — the org's effective plan key: its explicit `plan`, or the default
+     * for its workspace type (agencies → unlimited, businesses → free).
+     */
+    public function effectivePlanKey(): string
+    {
+        $catalog = app(PlanCatalog::class);
+
+        return $catalog->resolve($this->plan, $this->type)->key;
+    }
+
+    /**
+     * Phase CG-2 (Step CG-2.1) — the resolved {@see Plan} value object for this org.
+     */
+    public function currentPlan(): Plan
+    {
+        return app(PlanCatalog::class)->resolve($this->plan, $this->type);
+    }
+
+    /**
+     * Phase CG-2 (Step CG-2.6) — any unexpired super-admin AI credit grant, else 0.
+     */
+    public function bonusAiTextCredits(): int
+    {
+        if ($this->bonus_ai_text_credits <= 0) {
+            return 0;
+        }
+
+        if ($this->bonus_ai_credits_expires_at !== null && $this->bonus_ai_credits_expires_at->isPast()) {
+            return 0;
+        }
+
+        return (int) $this->bonus_ai_text_credits;
+    }
+
+    /**
+     * Cashier stores the Stripe customer id on this model, so the Customer Portal / invoices read a
+     * descriptive email. Prefer the Owner's email.
+     */
+    public function stripeEmail(): ?string
+    {
+        return $this->owner?->email;
+    }
+
+    public function stripeName(): ?string
+    {
+        return $this->name;
     }
 }

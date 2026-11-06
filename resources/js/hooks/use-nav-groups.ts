@@ -7,13 +7,17 @@ import { calendar, dashboard } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { today as businessToday } from '@/routes/business';
 import { index as businessAccounts } from '@/routes/business/accounts';
+import { edit as businessBio } from '@/routes/business/bio';
 import { edit as businessBrand } from '@/routes/business/brand';
+import { index as businessDeals } from '@/routes/business/deals';
 import { index as businessCollections } from '@/routes/business/collections';
 import { index as businessGrids } from '@/routes/business/grids';
 import { index as businessIdeas } from '@/routes/business/ideas';
 import { index as businessInsights } from '@/routes/business/insights';
+import { index as businessMediaKit } from '@/routes/business/media-kit';
 import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
+import { index as businessStore } from '@/routes/business/store';
 import { index as campaignsIndex } from '@/routes/campaigns';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as contentIndex } from '@/routes/content';
@@ -27,6 +31,7 @@ import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
 import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
 import { index as superAdminPartners } from '@/routes/super-admin/partners';
 import { index as superAdminReports } from '@/routes/super-admin/reports';
+import { edit as superAdminSettings } from '@/routes/super-admin/settings';
 import type { Auth, NavItem } from '@/types';
 
 /**
@@ -93,6 +98,10 @@ export function useNavGroups(): NavModel {
                         navItem(
                             platformChapters.partners,
                             superAdminPartners(),
+                        ),
+                        navItem(
+                            platformChapters.platformBilling,
+                            superAdminSettings(),
                         ),
                     ],
                 },
@@ -179,7 +188,15 @@ function businessGroups(auth: Auth, onSettings: boolean): NavGroup[] {
                 navItem(businessChapters.ideas, businessIdeas()),
                 navItem(businessChapters.media, businessMedia()),
                 navItem(businessChapters.insights, businessInsights()),
-                navItem(businessChapters.brand, businessBrand()),
+                navItem(businessChapters.store, businessStore()),
+                {
+                    ...navItem(businessChapters.brand, businessBrand()),
+                    subItems: [
+                        { title: 'Link in bio', href: businessBio() },
+                        { title: 'Media kit', href: businessMediaKit() },
+                        { title: 'Deals', href: businessDeals() },
+                    ],
+                },
                 navItem(businessChapters.accounts, businessAccounts()),
             ],
         },

@@ -3,6 +3,7 @@ import {
     AtSign,
     Building2,
     CalendarDays,
+    CreditCard,
     FileBarChart,
     Image,
     LayoutGrid,
@@ -11,6 +12,7 @@ import {
     Receipt,
     Send,
     Settings2,
+    ShoppingBag,
     Sparkles,
     Sun,
     SwatchBook,
@@ -49,6 +51,7 @@ export type BusinessChapterKey =
     | 'media'
     | 'insights'
     | 'brand'
+    | 'store'
     | 'accounts'
     | 'team'
     | 'settings';
@@ -60,6 +63,7 @@ export type PlatformChapterKey =
     | 'analytics'
     | 'reports'
     | 'partners'
+    | 'platformBilling'
     | 'platformSettings';
 
 export type Chapter = {
@@ -236,9 +240,19 @@ export const platformChapters: Record<PlatformChapterKey, Chapter> = {
         swatch: 'bg-signal',
         prefixes: ['/super-admin/partners', '/super-admin/feedback'],
     },
+    platformBilling: {
+        key: 'platformBilling',
+        number: '06',
+        title: 'Billing',
+        summary:
+            'The global Stripe switch and plan distribution across the platform.',
+        icon: CreditCard,
+        swatch: 'bg-electric',
+        prefixes: ['/super-admin/settings'],
+    },
     platformSettings: {
         key: 'platformSettings',
-        number: '06',
+        number: '07',
         title: 'Settings',
         summary: 'Your profile, security and appearance.',
         icon: Settings2,
@@ -327,14 +341,29 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
         key: 'brand',
         number: '08',
         title: 'Brand',
-        summary: 'Your voice, audience, look and posting goal.',
+        summary:
+            'Your voice, audience, look, link in bio, media kit and brand deals.',
         icon: SwatchBook,
         swatch: 'bg-teal dark:ring-1 dark:ring-inset dark:ring-cream/50',
-        prefixes: ['/brand'],
+        // Step CG-3.2 / CG-5.2: the bio page, the media kit and the deals tracker are all how the
+        // brand shows itself and who it works with, so they sit under this chapter as sub-items
+        // rather than taking numbers of their own.
+        prefixes: ['/brand', '/bio', '/media-kit', '/deals'],
+    },
+    // Phase CG-4: the creator store. Its own chapter rather than a sub-item of Brand — money is
+    // not a brand asset, and a creator opens it as often as they open Posts.
+    store: {
+        key: 'store',
+        number: '09',
+        title: 'Shop',
+        summary: 'Downloads, bookings, tips and the orders they bring in.',
+        icon: ShoppingBag,
+        swatch: 'bg-signal',
+        prefixes: ['/store'],
     },
     accounts: {
         key: 'accounts',
-        number: '09',
+        number: '10',
         title: 'Accounts',
         summary: 'Connect and reconnect your social accounts.',
         icon: AtSign,
@@ -343,7 +372,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     team: {
         key: 'team',
-        number: '10',
+        number: '11',
         title: 'Team',
         summary: 'The people you work with and their roles.',
         icon: UsersRound,
@@ -352,7 +381,7 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
     },
     settings: {
         key: 'settings',
-        number: '11',
+        number: '12',
         title: 'Settings',
         summary: 'Profile, security, appearance, workspace and plan.',
         icon: Settings2,
@@ -387,6 +416,7 @@ export function chapterForPath(
             platformChapters.analytics,
             platformChapters.reports,
             platformChapters.partners,
+            platformChapters.platformBilling,
             platformChapters.platformSettings,
             platformChapters.platformOverview,
         ];

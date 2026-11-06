@@ -48,6 +48,13 @@ class StorePostRequest extends FormRequest
             'music' => ['nullable', 'array'],
             'location' => ['nullable', 'array'],
 
+            // Step CG-5.1 (B-11.1) / CG-5.2: the paid-partnership declaration, who it's with, and
+            // the deal it delivers (this brand's own only — a bare `exists:` would take another's).
+            'is_paid_partnership' => ['boolean'],
+            'partner_name' => ['nullable', 'string', 'max:120'],
+            'partner_handle' => ['nullable', 'string', 'max:64'],
+            'brand_deal_id' => ['nullable', 'integer', Rule::exists('brand_deals', 'id')->where('client_id', $clientId)],
+
             'targets' => ['nullable', 'array'],
             'targets.*.social_account_id' => ['required', 'integer', Rule::exists('social_accounts', 'id')->where('client_id', $clientId)->whereNull('deleted_at')],
             'targets.*.scheduled_local_date' => ['nullable', 'date'],

@@ -229,3 +229,11 @@ New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.t
   scheduled posts the vendor is already holding (`VendorScheduleService::releaseScheduled()`,
   best-effort). See `publishing.md`.
 - 2026-10-20: Phase M-1: org delete needs the password; report export behind password confirmation; lists on `DataTable`; Pulse dashboard.
+- 2026-10-28: Phase CG-2.6 — plan controls. The org detail page (`super-admin/organizations/show`)
+  gained a "Plan & billing" panel: override an org's plan, grant temporary AI credits, and set a
+  per-org Stripe billing override (`setPlan`/`grantCredits`/`setBilling` on `SuperAdmin\OrganizationController`
+  → `Set`/`Grant` Actions, each writing a `plan_audit_logs` row). A new platform-settings page
+  (`SuperAdmin\PlatformSettingController`, route `super-admin.settings.*`, nav chapter "Billing")
+  holds the **global Stripe switch** (`PlatformSettings` key `billing.enabled`, default off) and a
+  plan-distribution table. `GetOrganizationDetailAction` now returns a `billing` block + `planOptions`.
+  Full detail in `plans.md`.

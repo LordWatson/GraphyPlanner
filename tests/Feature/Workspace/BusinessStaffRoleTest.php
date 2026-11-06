@@ -22,7 +22,9 @@ class BusinessStaffRoleTest extends TestCase
 
     private function businessOwner(): User
     {
-        $organization = Organization::factory()->business()->create();
+        // Creator Pro gives the 2 seats a business owner needs to invite a teammate (Step CG-2.2
+        // caps Free/Pro at 1 seat).
+        $organization = Organization::factory()->business()->create(['plan' => 'creator_pro']);
         (new CreatePrimaryBrandAction)($organization);
 
         return User::factory()->for($organization, 'organization')->role(Role::Owner)->create();

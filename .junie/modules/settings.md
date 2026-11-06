@@ -154,3 +154,8 @@ Profile/Security/Appearance settings pages.
   (`AiSettingsUpdateRequest`). `settings/ai-usage.tsx` now shows the AI enable toggle, a token-budget
   field, and a text-usage/acceptance `StatStrip` above the existing image quota. See `ai.md` ›
   "AI control plane". Tests in `tests/Feature/AI/AiControlPlaneTest.php`.
+- 2026-10-28: Phase CG-2.5 — a new Owner-only "Plan & billing" settings page (`Settings\PlanController`,
+  route `plan.edit`, nav entry in `settings/layout.tsx`): current plan, this-month usage meters
+  (accounts, posts, AI credits), monthly/annual upgrade cards (Stripe Checkout via Cashier) and a
+  "Manage billing" link (Customer Portal). All Stripe calls are guarded, so the page renders fine
+  while billing is off / prices are unset. Full detail in `plans.md`.

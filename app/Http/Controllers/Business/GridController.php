@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Business;
 
 use App\Actions\Grids\CreateGridPlanAction;
+use App\Contracts\Entitlements;
 use App\Enums\CampaignStatus;
+use App\Enums\Feature;
 use App\Enums\Platform;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Grids\StoreGridPlanRequest;
@@ -30,6 +32,9 @@ class GridController extends Controller
     {
         $brand = $workspace->brand();
         $user = $request->user();
+        $organization = $brand->organization;
+        $entitled = $organization !== null
+            && app(Entitlements::class)->allows($organization, Feature::GridPlanner);
 
         $this->authorize('viewAny', [GridPlan::class, $brand]);
 
@@ -66,7 +71,15 @@ class GridController extends Controller
                 ->map(fn (Campaign $campaign) => ['value' => (string) $campaign->id, 'label' => $campaign->name, 'client_id' => $campaign->client_id])
                 ->values(),
             'hasInstagram' => $accounts->isNotEmpty(),
-            'can' => ['create' => $accounts->isNotEmpty() && $user->can('create', [GridPlan::class, $brand])],
+            // Step CG-2.2: the grid planner is a plan gate. Free business workspaces can see the hub
+            // but not create plans; the UI shows an upgrade panel keyed off `entitled`. The write
+            // path is enforced in CreateGridPlanAction itself.
+            'entitled' => $entitled,
+            'can' => [
+                'create' => $accounts->isNotEmpty()
+                    && $entitled
+                    && $user->can('create', [GridPlan::class, $brand]),
+            ],
         ]);
     }
 

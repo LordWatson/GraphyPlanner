@@ -110,3 +110,8 @@ $safely(Schedule::command('inbox:sync-comments')->hourly(), 'inbox:sync-comments
 // Step M-9.2: nudge the assignee (or the studio) about inbox threads past the reply SLA, at most
 // once per 24h per thread. See SendOverdueInboxRemindersJob.
 $safely(Schedule::command('inbox:send-overdue-reminders')->dailyAt('09:15'), 'inbox:send-overdue-reminders');
+
+// Step CG-4.5: creator-store housekeeping — cancel abandoned checkouts (freeing the booking slot
+// they were holding) and release the card authorisation on paid questions nobody answered in time.
+// Hourly, well inside the ~7 days a Stripe authorisation survives. See ExpireStaleOrdersAction.
+$safely(Schedule::command('store:expire-orders')->hourlyAt(50), 'store:expire-orders');

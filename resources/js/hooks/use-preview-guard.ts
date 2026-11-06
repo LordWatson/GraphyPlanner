@@ -10,7 +10,9 @@ import { decidePreviewVisit } from '@/lib/preview';
  * login redirect elsewhere); this keeps the visitor from ever leaving the mirror by accident.
  */
 export function usePreviewGuard(): void {
-    const { preview } = usePage().props;
+    // `=== true` on purpose: a page prop of the same name would otherwise shadow the shared
+    // boolean and lock a normal page into the read-only mirror.
+    const preview = usePage().props.preview === true;
 
     useEffect(() => {
         if (!preview) {
@@ -44,5 +46,5 @@ export function usePreviewGuard(): void {
 
 /** True on every `/preview/*` page — use it to hide write controls in reused components. */
 export function useIsPreview(): boolean {
-    return Boolean(usePage().props.preview);
+    return usePage().props.preview === true;
 }

@@ -18,6 +18,9 @@ void createInertiaApp({
                 return null;
             case name === 'about':
                 return null;
+            // Step CG-2.7: public segment & pricing pages stand alone, like the welcome page.
+            case name.startsWith('marketing/'):
+                return null;
             case name.startsWith('review/'):
                 return null;
             // C-5.4: the public campaign preview stands alone, like the review page.

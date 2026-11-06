@@ -58,6 +58,13 @@ class UpdatePostRequest extends FormRequest
             'thumb_offset_ms' => ['nullable', 'integer', 'min:0', 'max:86400000'],
             'music' => ['nullable', 'array'],
             'location' => ['nullable', 'array'],
+
+            // Step CG-5.1 (B-11.1) / CG-5.2: the paid-partnership declaration, who it's with, and
+            // the deal it delivers (this brand's own only — a bare `exists:` would take another's).
+            'is_paid_partnership' => ['boolean'],
+            'partner_name' => ['nullable', 'string', 'max:120'],
+            'partner_handle' => ['nullable', 'string', 'max:64'],
+            'brand_deal_id' => ['nullable', 'integer', Rule::exists('brand_deals', 'id')->where('client_id', $clientId)],
             // Step M-5.8: evergreen reuse and repeat. `recycle_after_days` is how long after
             // publishing to suggest recycling; `recurrence` drops the next occurrence as a draft.
             'is_recyclable' => ['boolean'],

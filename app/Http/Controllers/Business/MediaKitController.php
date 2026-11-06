@@ -35,11 +35,17 @@ class MediaKitController extends Controller
         return Inertia::render('business/media-kit', [
             'kit' => [
                 'bio' => $kit->bio,
+                // Step CG-5.3: the editable rate card and whether the public kit takes enquiries.
+                'rates' => $kit->rates ?? [],
+                'enquiries_enabled' => $kit->enquiries_enabled,
                 'is_public' => $kit->isPublic(),
                 'share_url' => $kit->isPublic() ? route('media-kit.show', $kit->share_token) : null,
                 'shared_at' => $kit->shared_at?->toIso8601String(),
             ],
-            'preview' => Inertia::defer(fn () => $build($kit, $brand)),
+            // Not `preview`: that's the shared preview-mode boolean, and a page prop of the same
+            // name shadows it (which switches the whole shell into read-only preview mode).
+            'publicPreview' => Inertia::defer(fn () => $build($kit, $brand)),
+            'currency' => $brand->organization->default_currency ?? 'GBP',
             'canManage' => $request->user()?->can('update', $brand) ?? false,
         ]);
     }
@@ -49,8 +55,16 @@ class MediaKitController extends Controller
         $brand = $workspace->brand();
         $this->authorize('update', $brand);
 
-        $validated = $request->validate(['bio' => ['nullable', 'string', 'max:1000']]);
-        $action($brand, $validated['bio'] ?? null);
+        // Step CG-5.3: the bio, plus the optional rate card and the enquiry-form switch.
+        $validated = $request->validate([
+            'bio' => ['nullable', 'string', 'max:1000'],
+            'enquiries_enabled' => ['boolean'],
+            'rates' => ['nullable', 'array', 'max:12'],
+            'rates.*.label' => ['required', 'string', 'max:60'],
+            'rates.*.amount_minor' => ['required', 'integer', 'min:1', 'max:100000000'],
+        ]);
+
+        $action($brand, $validated);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Media kit saved.')]);
 

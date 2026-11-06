@@ -8,9 +8,8 @@ import { Eye } from 'lucide-react';
  * client's account.
  */
 export function PreviewBanner() {
-    const { preview } = usePage().props;
-
-    if (!preview) {
+    // `=== true`: a page prop named `preview` shadows the shared boolean (see `usePreviewGuard`).
+    if (usePage().props.preview !== true) {
         return null;
     }
 

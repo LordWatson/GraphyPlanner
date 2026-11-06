@@ -12,6 +12,10 @@
     $audience = $kit['audience'] ?? [];
     $engagement = $kit['engagement'] ?? [];
     $topPosts = $kit['top_posts'] ?? [];
+    // Step CG-5.2 / CG-5.3: opted-in past partners and the optional rate card.
+    $partners = $kit['partners'] ?? [];
+    $rates = $kit['rates'] ?? [];
+    $currency = $kit['currency'] ?? 'GBP';
     $count = fn ($value) => $value === null ? '—' : number_format((int) $value);
     $percent = fn ($value) => $value === null ? '—' : rtrim(rtrim(number_format((float) $value, 1), '0'), '.').'%';
 @endphp
@@ -117,6 +121,31 @@
                         </table>
                     </div>
                 @endforeach
+            </div>
+        @endif
+
+        @if (! empty($rates))
+            <div class="section">
+                <span class="eyebrow">Rates</span>
+                @foreach ($rates as $rate)
+                    <div class="row">
+                        <table>
+                            <tr>
+                                <td>{{ $rate['label'] }}</td>
+                                <td class="right"><strong>{{ \App\Support\MoneyFormatter::format(((int) $rate['amount_minor']) / 100, $currency) }}</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        @if (! empty($partners))
+            <div class="section">
+                <span class="eyebrow">Past partners</span>
+                <div class="row">
+                    {{ collect($partners)->map(fn ($partner) => trim($partner['name'].' '.($partner['year'] ?? '')))->implode(' · ') }}
+                </div>
             </div>
         @endif
     </div>

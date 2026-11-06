@@ -6,15 +6,21 @@ use App\Actions\Analytics\GetOrganizationAnalyticsSummaryAction;
 use App\Actions\Organizations\RegisterOrganizationAction;
 use App\Actions\SuperAdmin\DeleteOrganizationAction;
 use App\Actions\SuperAdmin\GetOrganizationDetailAction;
+use App\Actions\SuperAdmin\GrantOrganizationCreditsAction;
 use App\Actions\SuperAdmin\ListOrganizationsAction;
 use App\Actions\SuperAdmin\ReinstateOrganizationAction;
+use App\Actions\SuperAdmin\SetOrganizationBillingOverrideAction;
+use App\Actions\SuperAdmin\SetOrganizationPlanAction;
 use App\Actions\SuperAdmin\SuspendOrganizationAction;
 use App\Actions\SuperAdmin\UpdateOrganizationAction;
 use App\Enums\OrganizationType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SuperAdmin\AnalyticsFilterRequest;
 use App\Http\Requests\SuperAdmin\DeleteOrganizationRequest;
+use App\Http\Requests\SuperAdmin\GrantOrganizationCreditsRequest;
 use App\Http\Requests\SuperAdmin\OrganizationIndexRequest;
+use App\Http\Requests\SuperAdmin\SetOrganizationBillingRequest;
+use App\Http\Requests\SuperAdmin\SetOrganizationPlanRequest;
 use App\Http\Requests\SuperAdmin\StoreOrganizationRequest;
 use App\Http\Requests\SuperAdmin\SuspendOrganizationRequest;
 use App\Http\Requests\SuperAdmin\UpdateOrganizationRequest;
@@ -144,6 +150,48 @@ class OrganizationController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __(':name and all of its data were deleted.', ['name' => $name])]);
 
         return to_route('super-admin.organizations.index');
+    }
+
+    /**
+     * Step CG-2.6 / B-9.4 — override an org's plan (blank resets to the type default). Audited.
+     */
+    public function setPlan(SetOrganizationPlanRequest $request, Organization $organization, SetOrganizationPlanAction $action): RedirectResponse
+    {
+        $this->authorize('update', $organization);
+
+        $action($organization, $request->planKey(), $request->user(), $request->validated('note'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Plan updated.')]);
+
+        return to_route('super-admin.organizations.show', $organization);
+    }
+
+    /**
+     * Step CG-2.6 — grant a temporary pool of AI text credits on top of the plan allowance.
+     */
+    public function grantCredits(GrantOrganizationCreditsRequest $request, Organization $organization, GrantOrganizationCreditsAction $action): RedirectResponse
+    {
+        $this->authorize('update', $organization);
+
+        $action($organization, (int) $request->validated('credits'), $request->expiresInDays(), $request->user(), $request->validated('note'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('AI credits granted.')]);
+
+        return to_route('super-admin.organizations.show', $organization);
+    }
+
+    /**
+     * Step CG-2.6 — set the per-org override of the global Stripe switch (inherit / on / off).
+     */
+    public function setBilling(SetOrganizationBillingRequest $request, Organization $organization, SetOrganizationBillingOverrideAction $action): RedirectResponse
+    {
+        $this->authorize('update', $organization);
+
+        $action($organization, $request->enabled(), $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Billing access updated.')]);
+
+        return to_route('super-admin.organizations.show', $organization);
     }
 
     /**

@@ -54,6 +54,8 @@ final class SchedulerHeartbeat
         // Phase M-9: hourly social-inbox comment sync and daily overdue-reply reminders.
         'inbox:sync-comments' => ['label' => 'Inbox comment sync', 'interval_minutes' => 60],
         'inbox:send-overdue-reminders' => ['label' => 'Overdue inbox reminders', 'interval_minutes' => 1440],
+        // Step CG-4.5: releases abandoned checkouts and uncaptured question authorisations, hourly.
+        'store:expire-orders' => ['label' => 'Store order expiry', 'interval_minutes' => 60],
     ];
 
     public static function record(string $command): void

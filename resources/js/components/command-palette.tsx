@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
     ClipboardCheck,
     CornerDownLeft,
+    Handshake,
     LayoutGrid,
     ListChecks,
     Megaphone,
@@ -42,6 +43,8 @@ import { index as businessIdeas } from '@/routes/business/ideas';
 import { index as businessInsights } from '@/routes/business/insights';
 import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
+import { index as businessDeals } from '@/routes/business/deals';
+import { index as businessStore } from '@/routes/business/store';
 import { index as clientsIndex } from '@/routes/clients';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as campaignsIndex } from '@/routes/campaigns';
@@ -232,7 +235,18 @@ function useCommands(close: () => void): Command[] {
             chapterCommand(businessChapters.ideas, businessIdeas()),
             chapterCommand(businessChapters.media, businessMedia()),
             chapterCommand(businessChapters.insights, businessInsights()),
+            chapterCommand(businessChapters.store, businessStore()),
             chapterCommand(businessChapters.brand, businessBrand()),
+            {
+                id: 'section-business-deals',
+                group: 'Chapters',
+                label: 'Deals',
+                hint: 'Brand partnerships, deliverables and fees.',
+                keywords: 'deal brand partnership sponsor collab paid',
+                icon: Handshake,
+                chapter: businessChapters.brand,
+                run: visit(businessDeals()),
+            },
             chapterCommand(businessChapters.accounts, businessAccounts()),
             ...(isOwner
                 ? [chapterCommand(businessChapters.team, staffIndex())]

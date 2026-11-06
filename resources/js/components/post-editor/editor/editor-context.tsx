@@ -17,6 +17,8 @@ export type PostEditorPageData = {
     mediaFormatOptions: MediaFormatOptions;
     /** Step M-5.4: internal staff for the assignee/reviewer pickers. */
     staff: { id: number; name: string }[];
+    /** Step CG-5.2: the brand's open deals, for linking a paid-partnership post to one. */
+    dealOptions: { id: number; partner_name: string }[];
     can: { update: boolean; create_asset: boolean; duplicate: boolean };
 };
 

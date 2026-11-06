@@ -74,6 +74,7 @@ export default function PostEdit({
     imageStudio,
     mediaFormatOptions,
     staff,
+    dealOptions,
     workflow,
     grid = null,
 }: {
@@ -106,6 +107,8 @@ export default function PostEdit({
     mediaFormatOptions: MediaFormatOptions;
     /** Step M-5.4: internal staff for the assignee/reviewer pickers. */
     staff: { id: number; name: string }[];
+    /** Step CG-5.2: the brand's open deals, for linking a paid-partnership post to one. */
+    dealOptions: { id: number; partner_name: string }[];
     /** Step 18.9: the grid tile this post was made from. */
     grid?: EditorGridLink | null;
 }) {
@@ -155,6 +158,7 @@ export default function PostEdit({
         hashtagSuggestions,
         mediaFormatOptions,
         staff,
+        dealOptions,
         can,
     };
 

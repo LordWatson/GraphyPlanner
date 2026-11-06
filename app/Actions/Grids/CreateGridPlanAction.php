@@ -2,6 +2,8 @@
 
 namespace App\Actions\Grids;
 
+use App\Contracts\Entitlements;
+use App\Enums\Feature;
 use App\Enums\GridPlanStatus;
 use App\Models\Client;
 use App\Models\GridPlan;
@@ -17,10 +19,17 @@ class CreateGridPlanAction
      * Step 18.4 — start a grid plan for one of the client's Instagram accounts (validated by
      * `StoreGridPlanRequest`), in `draft` at version 1 with its first checklist snapshot.
      *
+     * Step CG-2.2: the grid planner is a plan gate. Agency plans always grant it; a business
+     * workspace on Free gets a `PlanLimitReachedException` (friendly upgrade prompt).
+     *
      * @param  array<string, mixed>  $data  `name`, `social_account_id`, and optionally `campaign_id`, `pinned_count`, `include_live_feed`, `review_message`
      */
     public function __invoke(Client $client, User $user, array $data): GridPlan
     {
+        if ($client->organization !== null) {
+            app(Entitlements::class)->ensure($client->organization, Feature::GridPlanner);
+        }
+
         return DB::transaction(function () use ($client, $user, $data) {
             $plan = GridPlan::create([
                 'org_id' => $client->org_id,

@@ -4,6 +4,7 @@ use App\Http\Controllers\Settings\AiUsageController;
 use App\Http\Controllers\Settings\McpConnectionController;
 use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\OrganizationController;
+use App\Http\Controllers\Settings\PlanController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\TaxRateController;
@@ -52,6 +53,16 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::post('settings/organization/test-upload-post', [OrganizationController::class, 'testUploadPost'])
         ->middleware('throttle:6,1')
         ->name('organization.test-upload-post');
+
+    // Step CG-2.5 / B-9.3: the Owner-only plan page — current plan, usage meters, Stripe Checkout
+    // (upgrade) and the Customer Portal (manage billing). Billing ships dark behind the super-admin
+    // switch; the page renders either way and the controller guards every Stripe call.
+    Route::get('settings/plan', [PlanController::class, 'edit'])->name('plan.edit');
+    Route::post('settings/plan/checkout', [PlanController::class, 'checkout'])
+        ->middleware('throttle:12,1')
+        ->name('plan.checkout');
+    Route::get('settings/plan/portal', [PlanController::class, 'portal'])->name('plan.portal');
+    Route::get('settings/plan/success', [PlanController::class, 'success'])->name('plan.success');
 
     // Step 16.11: Owner-only AI usage (images this month vs quota, estimated cost).
     Route::get('settings/ai-usage', [AiUsageController::class, 'edit'])->name('ai-usage.edit');

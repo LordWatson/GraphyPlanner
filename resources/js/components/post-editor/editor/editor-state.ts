@@ -41,6 +41,11 @@ export type EditorState = {
     isRecyclable: boolean;
     recycleAfterDays: string;
     recurrence: string;
+    /** Step CG-5.1 / CG-5.2: paid partnership, who it's with, and the deal it delivers. */
+    isPaidPartnership: boolean;
+    partnerName: string;
+    partnerHandle: string;
+    brandDealId: string;
 };
 
 export type EditorSection =
@@ -65,6 +70,7 @@ export const checkSection: Record<string, EditorSection> = {
     media_fit: 'media',
     media_framing: 'preview',
     campaign_hashtags: 'settings',
+    partnership_disclosure: 'settings',
 };
 
 export const approvalLabels: Record<string, string> = {
@@ -136,6 +142,10 @@ export function initialEditorState(
             ? String(post.recycle_after_days)
             : '',
         recurrence: post.recurrence ?? '',
+        isPaidPartnership: post.is_paid_partnership ?? false,
+        partnerName: post.partner_name ?? '',
+        partnerHandle: post.partner_handle ?? '',
+        brandDealId: post.brand_deal_id ? String(post.brand_deal_id) : '',
     };
 }
 
