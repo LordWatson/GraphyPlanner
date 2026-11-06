@@ -39,7 +39,9 @@ class MediaKitController extends Controller
                 'share_url' => $kit->isPublic() ? route('media-kit.show', $kit->share_token) : null,
                 'shared_at' => $kit->shared_at?->toIso8601String(),
             ],
-            'preview' => Inertia::defer(fn () => $build($kit, $brand)),
+            // Not `preview`: that's the shared preview-mode boolean, and a page prop of the same
+            // name shadows it (which switches the whole shell into read-only preview mode).
+            'publicPreview' => Inertia::defer(fn () => $build($kit, $brand)),
             'canManage' => $request->user()?->can('update', $brand) ?? false,
         ]);
     }

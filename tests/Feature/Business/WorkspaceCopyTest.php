@@ -67,10 +67,15 @@ class WorkspaceCopyTest extends TestCase
         Client::factory()->for($organization, 'organization')->primary()->create();
         $owner = User::factory()->for($organization, 'organization')->role(Role::Owner)->create();
 
-        $body = $this->actingAs($owner)->get(route($routeName))->getContent();
+        $body = (string) $this->actingAs($owner)->get(route($routeName))->getContent();
 
-        $this->assertStringNotContainsStringIgnoringCase('retainer', $body);
-        $this->assertStringNotContainsStringIgnoringCase('invoice', $body);
+        // Vite's asset URLs are hashed chunk filenames, not copy: a shared chunk that happens to be
+        // named after the (agency-only) invoices page is preloaded on every page and would fail this
+        // on a build whose chunking shifted. Strip the build URLs; assert on everything a human reads.
+        $copy = (string) preg_replace("#https?://[^\"']*/build/[^\"']*#", '', $body);
+
+        $this->assertStringNotContainsStringIgnoringCase('retainer', $copy);
+        $this->assertStringNotContainsStringIgnoringCase('invoice', $copy);
     }
 
     public function test_the_shared_workspace_prop_uses_business_role_labels(): void

@@ -6,8 +6,11 @@ use App\Enums\AiTextJobKind;
 use App\Enums\AiTextJobStatus;
 use App\Enums\DesignImportProvider;
 use App\Enums\GridPlanStatus;
+use App\Enums\OrderStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\ProductStatus;
+use App\Enums\ProductType;
 use App\Enums\Role;
 use App\Models\AiImageGeneration;
 use App\Models\AiImageVariant;
@@ -25,12 +28,15 @@ use App\Models\ClientContact;
 use App\Models\ClientInvitation;
 use App\Models\ClientReport;
 use App\Models\ConnectInvite;
+use App\Models\Coupon;
 use App\Models\DesignImportConnection;
 use App\Models\GridPlan;
 use App\Models\GridTile;
 use App\Models\InboxConversation;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\McpToken;
+use App\Models\Order;
 use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
@@ -38,6 +44,7 @@ use App\Models\PostActivityLog;
 use App\Models\PostComment;
 use App\Models\PostRevision;
 use App\Models\PostTarget;
+use App\Models\Product;
 use App\Models\SavedPostView;
 use App\Models\SavedReply;
 use App\Models\SocialAccount;
@@ -206,6 +213,16 @@ class CrossTenantRouteTest extends TestCase
         $account = SocialAccount::factory()->for($client)->create(['org_id' => $org->id, 'platform' => Platform::Instagram]);
         // Step M-5.7: a single channel of the other org's post (post-targets/{target}/reschedule).
         $target = $post->targets()->create(['social_account_id' => $account->id]);
+        // Phase CG-4: the other org's shop — a product, a code and an order against it.
+        $product = Product::create([
+            'org_id' => $org->id,
+            'client_id' => $client->id,
+            'type' => ProductType::Download,
+            'title' => 'Their download',
+            'price_minor' => 1000,
+            'currency' => 'GBP',
+            'status' => ProductStatus::Live,
+        ]);
 
         return [
             Organization::class => $org,
@@ -223,6 +240,19 @@ class CrossTenantRouteTest extends TestCase
             Asset::class => Asset::factory()->for($client)->create(['org_id' => $org->id]),
             SocialAccount::class => $account,
             PostTarget::class => $target,
+            // The other org's MCP connection token (settings/ai-connections/tokens/{mcpToken}).
+            McpToken::class => McpToken::factory()->for($org, 'organization')->create(['user_id' => $owner->id]),
+            Product::class => $product,
+            Coupon::class => Coupon::create(['org_id' => $org->id, 'code' => 'THEIRS', 'percent_off' => 10]),
+            Order::class => Order::create([
+                'org_id' => $org->id,
+                'product_id' => $product->id,
+                'buyer_email' => 'their-buyer@example.test',
+                'amount_minor' => 1000,
+                'currency' => 'GBP',
+                'status' => OrderStatus::Paid,
+                'paid_at' => now(),
+            ]),
             // Step M-5.9: the other org's design/cloud connection (design-imports/{connection}).
             DesignImportConnection::class => DesignImportConnection::create([
                 'org_id' => $org->id,

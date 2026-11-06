@@ -16,6 +16,7 @@ use App\Contracts\InsightsSummarizer;
 use App\Contracts\LocalIdeaProvider;
 use App\Contracts\MediaProber;
 use App\Contracts\MusicProvider;
+use App\Contracts\PaymentProvider;
 use App\Contracts\ProfileFeedSource;
 use App\Contracts\PublishAdapter;
 use App\Contracts\PublishCredentials;
@@ -82,6 +83,8 @@ use App\Services\Inbox\UploadPostCommentSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
 use App\Services\Notifications\NullChatNotifier;
+use App\Services\Payments\NullPaymentProvider;
+use App\Services\Payments\StripeConnectProvider;
 use App\Services\Plans\ConfigEntitlements;
 use App\Services\Posts\PostWorkflowResolver;
 use App\Services\Publishing\MetaGraphMusicProvider;
@@ -133,6 +136,15 @@ class AppServiceProvider extends ServiceProvider
         // interface so Actions enforce entitlements against a mockable seam and a future
         // usage/billing-driven source is a drop-in swap.
         $this->app->bind(Entitlements::class, ConfigEntitlements::class);
+
+        // Step CG-4.1: creators' own sales (Stripe Connect), kept strictly apart from Cashier — our
+        // subscriptions. The real provider is only bound when BOTH `payments.provider = stripe` and
+        // a Connect secret exist; otherwise the store runs on the null provider, which fakes the
+        // shape of the flow and refuses every webhook (there is nothing to verify without a secret).
+        $this->app->bind(PaymentProvider::class, fn () => config('payments.provider') === 'stripe'
+            && (string) config('payments.stripe.secret') !== ''
+                ? new StripeConnectProvider
+                : new NullPaymentProvider);
 
         // Step I-3.5 / M-2.4: video probing + frame grabs for thumbnails (ffprobe/ffmpeg).
         $this->app->bind(MediaProber::class, FfprobeMediaProber::class);

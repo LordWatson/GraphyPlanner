@@ -41,6 +41,10 @@ class GenerateDailyBriefsActionTest extends TestCase
     {
         Mail::fake();
 
+        // The brief email is held back during quiet hours (21:00–07:00), so this has to run at a
+        // fixed hour — otherwise it passes by day and fails for anyone running the suite at night.
+        $this->travelTo('2026-10-19 09:00:00');
+
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $activeClient = Client::factory()->for($org, 'organization')->create(['status' => ClientStatus::Active]);

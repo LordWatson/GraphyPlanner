@@ -852,11 +852,13 @@ businesses share one subscription system.
   publish. Feeds the media kit's "past partners" (opt-in per deal).
 - **Done when**: tests cover deliverable progress from published posts and org scoping.
 
-### Step B-11.3 — Link-in-bio page [Stretch]
+### Step B-11.3 — Link-in-bio page [Stretch → V1] ✅ Done (2026-11-06, as Phase CG-3)
 - A public, brand-styled page (`/@{handle}`) with links and the latest published posts, with click
   tracking via I-10.4 link tracking.
 - **Done when**: page renders only published content, handles are unique, and clicks are counted
   (tests).
+- _Built as Phase CG-3 of `business-competitor-gap.md` — see `.junie/modules/bio-pages.md`.
+  I-10.4 link tracking doesn't exist, so CG-3.3 built the minimum `bio_events` daily rollup instead._
 
 ### Step B-11.4 — Multiple brands for one business [Stretch]
 - Lift the `brands` entitlement above 1 for higher plans: a brand switcher in the business shell,

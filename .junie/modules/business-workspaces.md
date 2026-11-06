@@ -674,3 +674,21 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   open question §6). A free business workspace is capped at 3 accounts / 30 posts a month / 1 seat;
   `BusinessGridTest` and `BusinessStaffRoleTest` now put their workspace on a paid plan to exercise
   those gated features. New module doc: `plans.md`.
+- 2026-11-06: Phase CG-3 (link in bio) delivered B-11.3, promoted to V1. New shell routes
+  `GET/PUT /bio` (`Business\BioPageController`) and the public `GET /@{handle}` +
+  `GET /@{handle}/go/{block}`. The bio page and the media kit are now sub-items of the **Brand**
+  chapter (prefixes `/bio`, `/media-kit`) rather than new chapter numbers. Publishing a page is the
+  `Feature::BioPage` gate (Creator Pro); drafting one is free, so a Free workspace can see exactly
+  what upgrading would put online. Full details in the new `bio-pages.md`.
+- 2026-11-06: Phase CG-4 (creator store) built. New shell routes under `/store`
+  (`Business\StoreController`, `Business\ProductController`) and public selling on the bio handle
+  (`/@{handle}/p/{product}`, `/@{handle}/thanks/{order}`), plus buyer signed links
+  (`/store/download/{order}`, `/store/booking/{order}`) and the Connect webhook
+  (`/webhooks/stripe-connect`). **Shop** is its own business chapter (`09`, prefix `/store`), so
+  `accounts`/`team`/`settings` renumbered to 10–12. Selling is the `Feature::Store` gate (Creator
+  Pro); the page renders without it and explains the upgrade, like `/bio`. Store mutations need the
+  brand-update ability (Owner/Manager). Full details in the new `creator-store.md`.
+- 2026-11-06: Fixed `/media-kit` (B-8.4) shadowing the shared `preview` Inertia prop with its own
+  preview payload, which put the page into read-only preview mode and cancelled every link on it.
+  The payload is now `publicPreview`, and `usePreviewGuard`/`PreviewBanner` only treat `preview`
+  as preview mode when it is boolean `true`. See `bio-pages.md` → Gotchas.

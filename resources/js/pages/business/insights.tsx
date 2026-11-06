@@ -2,6 +2,7 @@ import { Deferred, Head, Link } from '@inertiajs/react';
 import {
     Clock,
     FileText,
+    Link2,
     Heart,
     LineChart as LineChartIcon,
     Sparkles,
@@ -129,9 +130,11 @@ const fmt = (value: number | null | undefined): string =>
 export default function BusinessInsights({
     insights,
     takeaways,
+    bio,
 }: {
     insights?: Insights;
     takeaways?: Takeaways;
+    bio?: BioInsights | null;
 }) {
     return (
         <Page>
@@ -162,7 +165,67 @@ export default function BusinessInsights({
             <Deferred data="insights" fallback={<InsightsSkeleton />}>
                 <InsightsBody insights={insights} />
             </Deferred>
+
+            <Deferred data="bio" fallback={<></>}>
+                <BioPanel bio={bio} />
+            </Deferred>
         </Page>
+    );
+}
+
+/** Step CG-3.3 — the bio page's own numbers, from the daily click/view rollups. */
+type BioInsights = {
+    handle: string;
+    url: string;
+    is_published: boolean;
+    period_days: number;
+    views: number;
+    clicks: number;
+    top_links: { label: string; clicks: number }[];
+};
+
+function BioPanel({ bio }: { bio?: BioInsights | null }) {
+    if (!bio) {
+        return null;
+    }
+
+    return (
+        <Panel
+            icon={Link2}
+            eyebrow={`Last ${bio.period_days} days`}
+            title="Your link in bio"
+            description={
+                bio.is_published
+                    ? `Live at /@${bio.handle}.`
+                    : 'Not published yet — these are the numbers so far.'
+            }
+        >
+            <div className="flex flex-col gap-5">
+                <StatStrip
+                    items={[
+                        { label: 'Page views', value: bio.views },
+                        { label: 'Link taps', value: bio.clicks },
+                    ]}
+                />
+                {bio.top_links.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                        No taps yet. Put your link in every profile bio.
+                    </p>
+                ) : (
+                    <ul className="divide-border/70 divide-y">
+                        {bio.top_links.map((link) => (
+                            <li
+                                key={link.label}
+                                className="flex items-center justify-between gap-4 py-2.5 text-sm"
+                            >
+                                <span className="truncate">{link.label}</span>
+                                <span className="font-mono">{link.clicks}</span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </Panel>
     );
 }
 

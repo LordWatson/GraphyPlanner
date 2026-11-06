@@ -29,11 +29,11 @@ type Kit = {
 
 export default function BusinessMediaKit({
     kit,
-    preview,
+    publicPreview,
     canManage,
 }: {
     kit: Kit;
-    preview?: MediaKitData;
+    publicPreview?: MediaKitData;
     canManage: boolean;
 }) {
     return (
@@ -71,11 +71,11 @@ export default function BusinessMediaKit({
 
             <Panel eyebrow="Preview" title="What people see">
                 <Deferred
-                    data="preview"
+                    data="publicPreview"
                     fallback={<Skeleton className="h-72 rounded-2xl" />}
                 >
-                    {preview ? (
-                        <MediaKitView kit={preview} />
+                    {publicPreview ? (
+                        <MediaKitView kit={publicPreview} />
                     ) : (
                         <Skeleton className="h-72 rounded-2xl" />
                     )}

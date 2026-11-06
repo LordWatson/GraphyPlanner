@@ -35,7 +35,9 @@ export type StatusKind =
     | 'timeline'
     | 'clientReport'
     | 'inbox'
-    | 'sentiment';
+    | 'sentiment'
+    | 'order'
+    | 'product';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -190,6 +192,20 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         neutral: { tone: 'neutral', label: 'Neutral' },
         negative: { tone: 'danger', label: 'Negative' },
         question: { tone: 'info', label: 'Question' },
+    },
+    // Phase CG-4: a creator-store order. `paid` is brand (money in, nothing owed yet), `fulfilled`
+    // success (delivered), and both end states are muted — nothing to do about them.
+    order: {
+        pending: { tone: 'warning', label: 'Awaiting payment' },
+        paid: { tone: 'brand', label: 'Paid' },
+        fulfilled: { tone: 'success', label: 'Delivered' },
+        refunded: { tone: 'muted', label: 'Refunded' },
+        cancelled: { tone: 'muted', label: 'Cancelled' },
+    },
+    product: {
+        draft: { tone: 'neutral', label: 'Draft' },
+        live: { tone: 'success', label: 'On sale' },
+        archived: { tone: 'muted', label: 'Archived' },
     },
 };
 

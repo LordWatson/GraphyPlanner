@@ -250,24 +250,40 @@ little higher than GBP; the Stripe switch is global + per-org override. Open: in
 
 ---
 
-## Phase CG-3 — Link in bio [V1]
+## Phase CG-3 — Link in bio [V1] ✅ Done (2026-11-06)
 
 Goal: Alima owns the creator's bio link, as Planoly, Later, Buffer and Linktree do. It becomes
 the surface the store, email capture and media kit plug into.
 
-### Step CG-3.1 — Bio page model and public page [V1]
+_Implemented 2026-11-06 — **delivers B-11.3** (promoted Stretch → V1). As-built record in
+`.junie/modules/bio-pages.md`. Summary: `bio_pages` / `bio_blocks` / `bio_events` + `BioBlockType`
+(`link`, `latest_posts`, `media_kit` live; the CG-4/CG-6 types rejected by validation until built)
+and `BioTheme` (brand token presets, no raw hex); `SaveBioPageAction` saves the page and its whole
+ordered block list in one transaction, so add/edit/hide/reorder/remove is one write;
+`BuildBioPageAction` builds the visitor payload for both the public page and the owner's live
+preview; `RecordBioEventAction` rolls views/clicks up per day with no visitor data stored, excluding
+bots/unfurlers and the owner's own visits; `GetBioInsightsAction` feeds a deferred `bio` section on
+`/insights`. Public `GET /@{handle}` + `GET /@{handle}/go/{block}` (counted, destination resolved
+server-side); shell `GET/PUT /bio`. Publishing is the `Feature::BioPage` gate (Creator Pro); drafting
+is free. Deviations: reorder is up/down buttons, not drag (`@dnd-kit/sortable` isn't installed and
+the shell is phone-first); the phone preview is a simple frame rather than the grid planner's
+Instagram chrome; CG-3.2's AI "Draft my page" (Stretch) and I-10.4 link tracking are not built — see
+the module doc's Known Gaps._
+
+### Step CG-3.1 — Bio page model and public page [V1] ✅ Done
 - **Delivers B-11.3**, promoted from Stretch to V1.
 - `BioPage` (`bio_pages`: `org_id`, `client_id` unique, `handle` unique, `title`, `bio`,
   `theme` (brand tokens only, no raw hex), `published_at`) and `BioBlock` (`bio_blocks`:
   `bio_page_id`, `type` enum `link|latest_posts|media_kit|product|email_capture|booking`,
   `position`, `settings` json, `is_visible`). Only `link`, `latest_posts` and `media_kit` are live
-  in this step; the others arrive with CG-4/CG-6.
+  in this step; `product` arrived with CG-4.2 and `email_capture` waits for CG-6 (there is no
+  `booking` block — a booking is a product type, sold through a `product` block).
 - Public `GET /@{handle}` (guest, `throttle:public-token`), rendering only published content. Reserved
   handles list (`admin`, `api`, `kit`, `review`, route prefixes).
 - **Done when**: tests cover handle uniqueness and reserved words, that drafts/unpublished posts never
   render, and that a deleted brand's page 404s.
 
-### Step CG-3.2 — Bio page editor [V1]
+### Step CG-3.2 — Bio page editor [V1] ✅ Done (AI draft still Stretch, not built)
 - `GET/PUT /bio` in the business shell: add, reorder (drag), hide and edit blocks, with a live phone
   preview (reuse the grid planner's phone frame). Themes are presets derived from the Brand Brain
   palette.
@@ -277,7 +293,7 @@ the surface the store, email capture and media kit plug into.
 - **Done when**: tests cover block CRUD + reorder in a transaction, scoping to the primary brand,
   and the AI draft never saving on its own.
 
-### Step CG-3.3 — Clicks and insights [V1]
+### Step CG-3.3 — Clicks and insights [V1] ✅ Done
 - Count views and per-block clicks (I-10.4 link tracking, or a minimal `bio_events` table with
   daily rollups; no IPs stored raw). Show top links and views on `/insights`.
 - **Done when**: tests cover click counting, bot/self-click exclusion rules, and the insights section
@@ -285,13 +301,34 @@ the surface the store, email capture and media kit plug into.
 
 ---
 
-## Phase CG-4 — Creator store [V1]
+## Phase CG-4 — Creator store [V1] ✅ Done (2026-11-06)
 
 Goal: creators sell from their bio page at a 0% platform fee, matching Planoly's Creator Store on
 digital products and bookings. New module doc: `.junie/modules/creator-store.md` (add the README row
 in the same change; `ModuleDocsTest` enforces it).
 
-### Step CG-4.1 — `PaymentProvider` contract and Stripe Connect onboarding [V1]
+_Implemented 2026-11-06 — all seven steps. As-built record in `.junie/modules/creator-store.md`.
+Summary: `App\Contracts\PaymentProvider` bound to `StripeConnectProvider` (stripe-php, direct
+charges on the connected account, **no** application fee) or `NullPaymentProvider` (which refuses
+every webhook rather than faking trust); `payment_accounts`, `products`, `orders`, `order_events`,
+`coupons`, `bookings` and a **separate** `connect_webhook_events` ledger behind
+`POST /webhooks/stripe-connect` with its own signing secret (Principle 4, with a test that a
+Cashier-signed delivery is rejected here); `OrderStatus` is the state machine and
+`TransitionOrderStatusAction` the only writer; `MarkOrderPaidAction` is idempotent and refuses an
+amount/currency mismatch; downloads stream through a signed, expiring, use-limited route that a
+refund kills; coupons claim their redemption under a row lock; bookings generate DST-correct slots
+in the brand's timezone with `unique(product_id, starts_at)` as the real double-booking guard, plus
+buyer self-service move/cancel and an `.ics`; paid questions are authorised at checkout and captured
+only when answered, with `store:expire-orders` (hourly) releasing the rest; `/store` carries
+products, orders, earnings, codes, refunds and answers (Owner/Manager only); and
+`DraftLaunchCampaignAction` turns a product into a collection of four **draft** posts whose captions
+go through the shared `RewriteCaptionAction` (so already metered and guardrailed). Deviations and
+gaps: a download's file is chosen by media id (no asset picker exists), S3 is still pending so
+"not from local disk" isn't truly met yet, earnings are summed from our own orders rather than
+Stripe's balance, no Stripe Tax/VAT (plan §5.2 still open), and an abandoned checkout keeps its
+coupon redemption — see the module doc's Known Gaps._
+
+### Step CG-4.1 — `PaymentProvider` contract and Stripe Connect onboarding [V1] ✅ Done
 - `App\Contracts\PaymentProvider` (`createConnectedAccount`, `onboardingLink`, `accountStatus`,
   `createCheckout`, `capture`, `cancelAuthorisation`, `refund`), bound to
   `App\Services\Payments\StripeConnectProvider` (stripe-php, **not** Cashier) and `NullPaymentProvider`.
@@ -303,7 +340,7 @@ in the same change; `ModuleDocsTest` enforces it).
 - **Done when**: signed-fixture webhook tests cover onboarding complete, requirements due and
   disabled; replays are idempotent; no Connect secrets appear in props or logs.
 
-### Step CG-4.2 — Products, checkout and orders [V1]
+### Step CG-4.2 — Products, checkout and orders [V1] ✅ Done
 - `products` (`org_id`, `client_id`, `type` enum `download|booking|tip|qa`, `title`, `description`,
   `price_minor`, `currency`, `status`, `cover_asset_id`), `orders` (`product_id`, buyer email/name,
   `amount_minor`, `currency`, `status` state machine `pending → paid → fulfilled | refunded |
@@ -315,20 +352,20 @@ in the same change; `ModuleDocsTest` enforces it).
 - **Done when**: tests cover the state machine (illegal transitions rejected), webhook-driven paid
   status, double-delivery of the same webhook, currency mismatches, and org scoping.
 
-### Step CG-4.3 — Digital downloads [V1]
+### Step CG-4.3 — Digital downloads [V1] ✅ Done (S3 still pending — see the module doc)
 - Files via `AssetStorage` (S3, private). After payment, `FulfilDownloadAction` emails a receipt with
   a signed, expiring link (and a re-send page keyed by order + email). Download count and expiry are
   configurable per product.
 - **Done when**: tests cover link expiry, the download limit, that an unpaid or refunded order gets
   no link, and that the file URL is never public.
 
-### Step CG-4.4 — Coupons and checkout policies [V1]
+### Step CG-4.4 — Coupons and checkout policies [V1] ✅ Done
 - `coupons` (code, percent/amount, expiry, usage limit, product scope) applied in
   `CreateCheckoutAction`. Store-level terms, privacy and refund text shown on checkout.
 - **Done when**: tests cover expiry, usage limits under concurrent redemption (row lock), and
   product scoping.
 
-### Step CG-4.5 — Bookings, tips and paid Q&A [V1]
+### Step CG-4.5 — Bookings, tips and paid Q&A [V1] ✅ Done
 - **Bookings:** availability windows + buffers on the product, slots generated in the brand's
   timezone (reuse `PostingGoalGapService`-style timezone maths), conflict check against existing
   bookings, buyer reschedule/cancel link, `.ics` attachment.
@@ -340,14 +377,14 @@ in the same change; `ModuleDocsTest` enforces it).
 - **Done when**: tests cover slot generation across a DST change, double-booking prevention,
   capture-on-answer, and expiry cancelling the authorisation.
 
-### Step CG-4.6 — Earnings, orders and refunds [V1]
+### Step CG-4.6 — Earnings, orders and refunds [V1] ✅ Done
 - `/store` in the business shell: products, orders (DataTable), payout status from the connected
   account, and refunds (`RefundOrderAction` → provider → webhook confirms). Business copy only;
   status via `StatusPill`.
 - **Done when**: tests cover refund flow and permissions (Owner/Manager only), and that refund
   revokes download links.
 
-### Step CG-4.7 — AI launch campaign from a product [V1]
+### Step CG-4.7 — AI launch campaign from a product [V1] ✅ Done
 - The differentiator: `DraftLaunchCampaignAction` takes a product and the Brand Brain and drafts a
   collection (campaign) of launch posts (teaser, launch, reminder, social proof) with captions per
   platform, suggested dates from best times, and optional grid tiles. Everything is a **draft**;

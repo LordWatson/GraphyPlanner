@@ -9,9 +9,11 @@ use App\Http\Controllers\Analytics\ClientReportController;
 use App\Http\Controllers\Analytics\ReportController as OrganizationReportController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
+use App\Http\Controllers\BioPageController;
 use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\BulkPostImportController;
 use App\Http\Controllers\Business\AccountController as BusinessAccountController;
+use App\Http\Controllers\Business\BioPageController as BusinessBioPageController;
 use App\Http\Controllers\Business\BrandController as BusinessBrandController;
 use App\Http\Controllers\Business\CollectionController as BusinessCollectionController;
 use App\Http\Controllers\Business\DashboardController as BusinessDashboardController;
@@ -23,7 +25,9 @@ use App\Http\Controllers\Business\MediaController as BusinessMediaController;
 use App\Http\Controllers\Business\MediaKitController as BusinessMediaKitController;
 use App\Http\Controllers\Business\OnboardingController as BusinessOnboardingController;
 use App\Http\Controllers\Business\PostController as BusinessPostController;
+use App\Http\Controllers\Business\ProductController as BusinessProductController;
 use App\Http\Controllers\Business\QuickPostController as BusinessQuickPostController;
+use App\Http\Controllers\Business\StoreController as BusinessStoreController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\Campaigns\CampaignAiController;
@@ -91,6 +95,10 @@ use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationAcceptController;
 use App\Http\Controllers\StaffInvitationController;
+use App\Http\Controllers\Store\BookingController as StoreBookingController;
+use App\Http\Controllers\Store\CheckoutController as StoreCheckoutController;
+use App\Http\Controllers\Store\ConnectWebhookController;
+use App\Http\Controllers\Store\DownloadController as StoreDownloadController;
 use App\Http\Controllers\SuperAdmin\AnalyticsController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
@@ -128,6 +136,37 @@ Route::middleware('throttle:public-token')->group(function () {
     Route::get('kit/{token}', [MediaKitShareController::class, 'show'])->name('media-kit.show');
     Route::get('kit/{token}/pdf', [MediaKitShareController::class, 'pdf'])->name('media-kit.share.pdf');
 
+    // Step CG-3.1 (B-11.3): the public link in bio. The handle is the whole address; an unpublished
+    // page 404s. `/go/{block}` counts the click (CG-3.3) and then redirects to the owner's own URL,
+    // so the page itself never carries the destination.
+    Route::get('@{handle}', [BioPageController::class, 'show'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->name('bio.show');
+    Route::get('@{handle}/go/{block}', [BioPageController::class, 'click'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->whereNumber('block')
+        ->name('bio.click');
+
+    // Phase CG-4: the creator store, on the same handle as the bio page it sells from. Guests by
+    // design -- a buyer is an email address, not an account -- and only ever a `live` product on a
+    // published page. The card itself is entered on the provider's hosted page, never on ours.
+    Route::get('@{handle}/p/{product}', [StoreCheckoutController::class, 'show'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->whereNumber('product')
+        ->name('store.product');
+    Route::post('@{handle}/p/{product}/checkout', [StoreCheckoutController::class, 'checkout'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->whereNumber('product')
+        ->name('store.checkout');
+    Route::get('@{handle}/thanks/{order}', [StoreCheckoutController::class, 'thanks'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->name('store.thanks');
+    // Step CG-4.3: "email me that link again", keyed on the order *and* the buyer's own address.
+    Route::post('@{handle}/thanks/{order}/resend', [StoreCheckoutController::class, 'resend'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->middleware('throttle:6,1')
+        ->name('store.resend');
+
     // Step 6.2: accepting a client portal invitation is unauthenticated — access is granted purely
     // by possession of a valid, unexpired, unrevoked, unaccepted `ClientInvitation` token, mirroring
     // the review portal above.
@@ -156,6 +195,16 @@ Route::middleware('throttle:public-token')->group(function () {
     Route::post('mcp-upload/{token}', [McpUploadController::class, 'store'])->name('mcp-upload.store');
 });
 
+// Step CG-4.3 / CG-4.5: the buyer's own links from their receipt email. `signed` is the whole
+// authorisation — there is no session — so the expiry, the use limit and the refund check inside
+// each controller are what make a link that is still sitting in an inbox stop working.
+Route::middleware(['signed', 'throttle:public-token'])->group(function () {
+    Route::get('store/download/{order}', StoreDownloadController::class)->name('store.download');
+    Route::get('store/booking/{order}', [StoreBookingController::class, 'show'])->name('store.booking.show');
+    Route::post('store/booking/{order}/move', [StoreBookingController::class, 'move'])->name('store.booking.move');
+    Route::post('store/booking/{order}/cancel', [StoreBookingController::class, 'cancel'])->name('store.booking.cancel');
+});
+
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
 // connect flow, so this must be reachable without a session, just like the review portal above.
 Route::get('social-accounts/callback', [SocialAccountController::class, 'callback'])->name('social-accounts.callback');
@@ -167,6 +216,14 @@ Route::get('social-accounts/callback', [SocialAccountController::class, 'callbac
 Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle'])
     ->middleware('throttle:webhooks')
     ->name('webhooks.upload-post');
+
+// Step CG-4.1: Stripe Connect posts the creator-store events here. Its own endpoint and its own
+// signing secret, separate from Cashier's subscription webhook (Principle 4) -- a delivery signed
+// for one is rejected by the other. Public (no session exists for a server-to-server call) and
+// CSRF-exempt via the `webhooks/*` pattern in bootstrap/app.php.
+Route::post('webhooks/stripe-connect', [ConnectWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.stripe-connect');
 
 // Step 15.2: the public organization signup — the first real "create an organization" path.
 // Fortify's own `/register` (which created org-less users) is replaced by it; the old URL
@@ -299,6 +356,26 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::post('media-kit/share', [BusinessMediaKitController::class, 'share'])->name('media-kit.share');
         Route::delete('media-kit/share', [BusinessMediaKitController::class, 'revoke'])->name('media-kit.revoke');
         Route::get('media-kit/pdf', [BusinessMediaKitController::class, 'pdf'])->name('media-kit.pdf');
+
+        // Step CG-3.2: the link-in-bio editor. One PUT saves the page and its whole ordered block
+        // list, so add/edit/hide/reorder/remove are a single transactional write.
+        Route::get('bio', [BusinessBioPageController::class, 'edit'])->name('bio.edit');
+        Route::put('bio', [BusinessBioPageController::class, 'update'])->name('bio.update');
+
+        // Phase CG-4: the creator store. One page for products, orders, codes and earnings; every
+        // mutation needs the brand-update ability (Owner/Manager), because this is money.
+        Route::get('store', [BusinessStoreController::class, 'index'])->name('store.index');
+        Route::post('store/setup', [BusinessStoreController::class, 'setup'])->name('store.setup');
+        Route::get('store/return', [BusinessStoreController::class, 'returned'])->name('store.return');
+        Route::post('store/products', [BusinessProductController::class, 'store'])->name('store.products.store');
+        Route::put('store/products/{product}', [BusinessProductController::class, 'update'])->name('store.products.update');
+        Route::delete('store/products/{product}', [BusinessProductController::class, 'destroy'])->name('store.products.destroy');
+        Route::post('store/coupons', [BusinessProductController::class, 'storeCoupon'])->name('store.coupons.store');
+        Route::delete('store/coupons/{coupon}', [BusinessProductController::class, 'destroyCoupon'])->name('store.coupons.destroy');
+        Route::post('store/orders/{order}/refund', [BusinessStoreController::class, 'refund'])->name('store.orders.refund');
+        Route::post('store/orders/{order}/answer', [BusinessStoreController::class, 'answer'])->name('store.orders.answer');
+        // Step CG-4.7: a product becomes a drafted launch collection -- never scheduled posts.
+        Route::post('store/products/{product}/launch', [BusinessStoreController::class, 'launch'])->name('store.launch');
 
         // Step B-7.2: the phone-first quick post flow (camera → caption → accounts → schedule).
         Route::get('posts/quick', [BusinessQuickPostController::class, 'create'])->name('posts.quick');
