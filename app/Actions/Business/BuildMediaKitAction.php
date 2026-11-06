@@ -2,6 +2,7 @@
 
 namespace App\Actions\Business;
 
+use App\Actions\Deals\GetBrandDealsAction;
 use App\Models\Client;
 use App\Models\MediaKit;
 use App\Services\Analytics\EngagementMetrics;
@@ -17,8 +18,9 @@ use Illuminate\Support\Str;
  *
  * Privacy is the whole point of this Action: it reads only published channels and public follower
  * counts through the shared {@see EngagementMetrics} read layer, and never touches emails, internal
- * notes, draft/unpublished posts or any user data. "Past partners" (B-11.2) aren't built yet, so
- * that section is always empty here.
+ * notes, draft/unpublished posts or any user data. Step CG-5.2 filled the "past partners" section
+ * from the brand-deals tracker — only deals the owner **opted in** and that actually happened — and
+ * Step CG-5.3 added the optional rate card. An enquirer's email or message is never rendered here.
  */
 class BuildMediaKitAction
 {
@@ -26,7 +28,10 @@ class BuildMediaKitAction
 
     private const TOP_POSTS = 6;
 
-    public function __construct(private readonly EngagementMetrics $engagement) {}
+    public function __construct(
+        private readonly EngagementMetrics $engagement,
+        private readonly GetBrandDealsAction $deals = new GetBrandDealsAction,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -76,8 +81,15 @@ class BuildMediaKitAction
                 'engagement' => $post['engagement'],
                 'reach' => $post['reach'],
             ], $summary['top_posts'] ?? []),
-            // B-11.2 (brand deals tracker) isn't built; past partners stay empty until it lands.
-            'partners' => [],
+            // Step CG-5.2: opted-in, actually-delivered deals only (`GetBrandDealsAction`).
+            'partners' => $this->deals->partnersFor($brand),
+            // Step CG-5.3: the rate card, when the owner filled one in.
+            'rates' => array_map(fn (array $rate) => [
+                'label' => (string) $rate['label'],
+                'amount_minor' => (int) $rate['amount_minor'],
+            ], $kit->rates ?? []),
+            'currency' => $brand->organization->default_currency ?? 'GBP',
+            'accepts_enquiries' => $kit->acceptsEnquiries(),
             'generated_at' => $end->toIso8601String(),
         ];
     }

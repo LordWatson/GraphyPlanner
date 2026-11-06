@@ -394,22 +394,38 @@ coupon redemption — see the module doc's Known Gaps._
 
 ---
 
-## Phase CG-5 — Creator deals & compliance [V1]
+## Phase CG-5 — Creator deals & compliance [V1] ✅ Done (2026-11-06)
 
 Goal: complete the sponsor workflow that only Beacons partly offers, on top of the media kit.
 
-### Step CG-5.1 — Paid partnership disclosure [V1]
+_Implemented 2026-11-06 — all three steps, including the Stretch one. As-built record in
+`.junie/modules/brand-deals.md`. Summary: `posts.is_paid_partnership` / `partner_name` /
+`partner_handle` plus `App\Support\Posts\PartnershipDisclosure` and a **hard**
+`partnership_disclosure` checklist item, so a declared partnership cannot be scheduled until every
+channel's *published* caption discloses — caption-based, which makes it per-platform for free (a
+platform that strips hashtags needs the words in the caption). `brand_deals` + `posts.brand_deal_id`
+behind `/deals`, with deliverable progress **derived** from the deal's published posts rather than
+stored, an opt-in feed to the media kit's previously-empty "past partners" (delivered/paid only), and
+a rate card plus a throttled, honeypot-protected `POST /kit/{token}/enquire` that turns a sponsor's
+message into a `DealStatus::Enquiry` draft. Deals sits as a sub-item of the Brand chapter, so no
+chapter numbers moved. Deviations and gaps: no platform branded-content flags (Upload-Post doesn't
+expose Instagram's "Paid partnership" label or TikTok's toggle, so disclosure is caption-only); a
+deal cannot raise a Stripe invoice (CG-5.2's optional extra — the fee is a record, not a charge);
+deliverables are counts per platform, not named formats; nothing reminds the owner about `due_on`;
+and a new enquiry raises no notification — it waits on the page. See the module doc's Known Gaps._
+
+### Step CG-5.1 — Paid partnership disclosure [V1] ✅ Done
 - **Delivers B-11.1** unchanged.
 - **Done when**: B-11.1's done-when.
 
-### Step CG-5.2 — Brand deals tracker [V1]
+### Step CG-5.2 — Brand deals tracker [V1] ✅ Done (no Stripe invoice — see the module doc)
 - **Delivers B-11.2**, promoted from Stretch to V1. Deals link to posts; deliverable progress fills
   as linked posts publish; opt-in feed to the media kit's "past partners".
 - Optional link to CG-4: a deal can raise a Stripe invoice through the connected account (Beacons
   charges 0% on invoices).
 - **Done when**: B-11.2's done-when.
 
-### Step CG-5.3 — Media kit rates and enquiries [Stretch]
+### Step CG-5.3 — Media kit rates and enquiries [Stretch] ✅ Done
 - Optional rates section on the media kit and an enquiry form that creates a draft deal (CG-5.2).
   Spam-protected (honeypot + throttle).
 - **Done when**: tests cover the enquiry creating a draft deal on the right brand and the throttle.
@@ -493,7 +509,7 @@ CG-0 ──► CG-1 (switch on) ──► CG-2 (charge) ──► public solo la
                                    │
                                    ├──► CG-3 (link in bio) ──► CG-4 (store) ──► CG-6 (audience)
                                    └──► CG-5 (deals)
-Stretch: CG-3.2 AI draft, CG-5.3, CG-6.4, CG-7, CG-8
+Stretch: CG-3.2 AI draft, CG-6.4, CG-7, CG-8 (CG-5.3 was built with CG-5)
 ```
 
 **MVP** (we can charge solo users without trailing Planoly/Buffer on what we already built): CG-0,

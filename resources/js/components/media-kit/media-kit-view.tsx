@@ -1,4 +1,12 @@
-import { Globe, Heart, MapPin, Trophy, Users } from 'lucide-react';
+import {
+    Globe,
+    Handshake,
+    Heart,
+    MapPin,
+    Tag,
+    Trophy,
+    Users,
+} from 'lucide-react';
 import { EmptyState, Panel, StatStrip } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 
@@ -34,6 +42,12 @@ export type MediaKitData = {
         engagement: number | null;
         reach: number | null;
     }[];
+    /** Step CG-5.2: opted-in, delivered deals from the brand-deals tracker. */
+    partners: { name: string; handle: string | null; year: number | null }[];
+    /** Step CG-5.3: the optional rate card, in `currency`. */
+    rates: { label: string; amount_minor: number }[];
+    currency: string;
+    accepts_enquiries: boolean;
 };
 
 const nf = new Intl.NumberFormat();
@@ -46,6 +60,13 @@ const fmt = (value: number | null | undefined): string =>
  */
 export function MediaKitView({ kit }: { kit: MediaKitData }) {
     const { brand, audience, engagement, top_posts } = kit;
+    const partners = kit.partners ?? [];
+    const rates = kit.rates ?? [];
+    const money = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: kit.currency || 'GBP',
+        minimumFractionDigits: 0,
+    });
 
     return (
         <div className="flex flex-col gap-5">
@@ -225,6 +246,52 @@ export function MediaKitView({ kit }: { kit: MediaKitData }) {
                     </ol>
                 )}
             </Panel>
+
+            {rates.length > 0 && (
+                <Panel icon={Tag} eyebrow="Working together" title="Rates">
+                    <ul className="divide-border/70 flex flex-col divide-y">
+                        {rates.map((rate, index) => (
+                            <li
+                                key={index}
+                                className="flex items-baseline justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                            >
+                                <span className="text-sm">{rate.label}</span>
+                                <span className="font-display font-bold tabular-nums">
+                                    {money.format(rate.amount_minor / 100)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="text-muted-foreground mt-3 text-[13px]">
+                        A starting point — happy to shape something around your
+                        brief.
+                    </p>
+                </Panel>
+            )}
+
+            {partners.length > 0 && (
+                <Panel
+                    icon={Handshake}
+                    eyebrow="Trusted by"
+                    title="Past partners"
+                >
+                    <ul className="flex flex-wrap gap-2">
+                        {partners.map((partner, index) => (
+                            <li
+                                key={index}
+                                className="border-border/70 rounded-full border px-3 py-1.5 text-sm"
+                            >
+                                {partner.name}
+                                {partner.year && (
+                                    <span className="text-muted-foreground ml-1.5 text-[13px] tabular-nums">
+                                        {partner.year}
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </Panel>
+            )}
         </div>
     );
 }

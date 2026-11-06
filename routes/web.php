@@ -15,6 +15,7 @@ use App\Http\Controllers\BulkPostImportController;
 use App\Http\Controllers\Business\AccountController as BusinessAccountController;
 use App\Http\Controllers\Business\BioPageController as BusinessBioPageController;
 use App\Http\Controllers\Business\BrandController as BusinessBrandController;
+use App\Http\Controllers\Business\BrandDealController as BusinessBrandDealController;
 use App\Http\Controllers\Business\CollectionController as BusinessCollectionController;
 use App\Http\Controllers\Business\DashboardController as BusinessDashboardController;
 use App\Http\Controllers\Business\GridController as BusinessGridController;
@@ -135,6 +136,12 @@ Route::middleware('throttle:public-token')->group(function () {
     // owner switches the link off; only ever renders already-public data.
     Route::get('kit/{token}', [MediaKitShareController::class, 'show'])->name('media-kit.show');
     Route::get('kit/{token}/pdf', [MediaKitShareController::class, 'pdf'])->name('media-kit.share.pdf');
+    // Step CG-5.3: "work with me" — a sponsor's enquiry becomes a draft deal on the creator's
+    // tracker. Only answered while the owner has the form switched on; honeypot + its own throttle
+    // on top of the group's, because it is a public write surface.
+    Route::post('kit/{token}/enquire', [MediaKitShareController::class, 'enquire'])
+        ->middleware('throttle:6,1')
+        ->name('media-kit.enquire');
 
     // Step CG-3.1 (B-11.3): the public link in bio. The handle is the whole address; an unpublished
     // page 404s. `/go/{block}` counts the click (CG-3.3) and then redirects to the owner's own URL,
@@ -356,6 +363,13 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::post('media-kit/share', [BusinessMediaKitController::class, 'share'])->name('media-kit.share');
         Route::delete('media-kit/share', [BusinessMediaKitController::class, 'revoke'])->name('media-kit.revoke');
         Route::get('media-kit/pdf', [BusinessMediaKitController::class, 'pdf'])->name('media-kit.pdf');
+
+        // Step CG-5.2: the brand-deals tracker. Progress is derived from the deal's published
+        // posts, so there is nothing here to mark "done" by hand.
+        Route::get('deals', [BusinessBrandDealController::class, 'index'])->name('deals.index');
+        Route::post('deals', [BusinessBrandDealController::class, 'store'])->name('deals.store');
+        Route::put('deals/{deal}', [BusinessBrandDealController::class, 'update'])->name('deals.update');
+        Route::delete('deals/{deal}', [BusinessBrandDealController::class, 'destroy'])->name('deals.destroy');
 
         // Step CG-3.2: the link-in-bio editor. One PUT saves the page and its whole ordered block
         // list, so add/edit/hide/reorder/remove are a single transactional write.

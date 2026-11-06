@@ -67,6 +67,7 @@ use Illuminate\Support\Facades\DB;
     'status', 'last_reminded_at', 'publish_dispatch_id', 'approval_mode',
     'master_caption', 'review_message', 'hashtags', 'music', 'location', 'media_format', 'checklist_snapshot',
     'link_url', 'first_comment', 'cover_asset_id', 'thumb_offset_ms',
+    'is_paid_partnership', 'partner_name', 'partner_handle', 'brand_deal_id',
     'is_recyclable', 'recycle_after_days', 'recycled_from_post_id', 'recurrence',
 ])]
 class Post extends Model
@@ -90,6 +91,7 @@ class Post extends Model
             'due_at' => 'datetime',
             'last_reminded_at' => 'datetime',
             'is_recyclable' => 'boolean',
+            'is_paid_partnership' => 'boolean',
             'recurrence' => PostRecurrence::class,
         ];
     }

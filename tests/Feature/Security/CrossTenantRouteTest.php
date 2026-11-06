@@ -4,6 +4,7 @@ namespace Tests\Feature\Security;
 
 use App\Enums\AiTextJobKind;
 use App\Enums\AiTextJobStatus;
+use App\Enums\DealStatus;
 use App\Enums\DesignImportProvider;
 use App\Enums\GridPlanStatus;
 use App\Enums\OrderStatus;
@@ -18,6 +19,7 @@ use App\Models\AiPostIdea;
 use App\Models\AiTextJob;
 use App\Models\AiTrend;
 use App\Models\Asset;
+use App\Models\BrandDeal;
 use App\Models\Campaign;
 use App\Models\CampaignDeliverable;
 use App\Models\CampaignPhase;
@@ -242,6 +244,14 @@ class CrossTenantRouteTest extends TestCase
             PostTarget::class => $target,
             // The other org's MCP connection token (settings/ai-connections/tokens/{mcpToken}).
             McpToken::class => McpToken::factory()->for($org, 'organization')->create(['user_id' => $owner->id]),
+            // Phase CG-5: the other org's brand deal (deals/{deal}).
+            BrandDeal::class => BrandDeal::create([
+                'org_id' => $org->id,
+                'client_id' => $client->id,
+                'partner_name' => 'Their sponsor',
+                'status' => DealStatus::Agreed,
+                'currency' => 'GBP',
+            ]),
             Product::class => $product,
             Coupon::class => Coupon::create(['org_id' => $org->id, 'code' => 'THEIRS', 'percent_off' => 10]),
             Order::class => Order::create([

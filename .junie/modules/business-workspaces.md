@@ -680,6 +680,13 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   chapter (prefixes `/bio`, `/media-kit`) rather than new chapter numbers. Publishing a page is the
   `Feature::BioPage` gate (Creator Pro); drafting one is free, so a Free workspace can see exactly
   what upgrading would put online. Full details in the new `bio-pages.md`.
+- 2026-11-06: Phase CG-5 (creator deals & compliance) built. New shell routes under `/deals`
+  (`Business\BrandDealController`), a Paid-partnership panel in the shared post editor whose
+  disclosure check **blocks** scheduling, a rate card and enquiry switch on `/media-kit`, and a
+  public `POST /kit/{token}/enquire` that turns a sponsor's message into a draft deal. **Deals** is a
+  sub-item of the **Brand** chapter (prefix `/deals`), so no chapter numbers moved. The tracker is
+  the `Feature::BrandDeals` gate (Creator Pro); disclosure is not gated, because compliance is not a
+  paid feature. Full details in the new `brand-deals.md`.
 - 2026-11-06: Phase CG-4 (creator store) built. New shell routes under `/store`
   (`Business\StoreController`, `Business\ProductController`) and public selling on the bio handle
   (`/@{handle}/p/{product}`, `/@{handle}/thanks/{order}`), plus buyer signed links

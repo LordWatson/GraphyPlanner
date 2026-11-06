@@ -9,6 +9,7 @@ import { today as businessToday } from '@/routes/business';
 import { index as businessAccounts } from '@/routes/business/accounts';
 import { edit as businessBio } from '@/routes/business/bio';
 import { edit as businessBrand } from '@/routes/business/brand';
+import { index as businessDeals } from '@/routes/business/deals';
 import { index as businessCollections } from '@/routes/business/collections';
 import { index as businessGrids } from '@/routes/business/grids';
 import { index as businessIdeas } from '@/routes/business/ideas';
@@ -193,6 +194,7 @@ function businessGroups(auth: Auth, onSettings: boolean): NavGroup[] {
                     subItems: [
                         { title: 'Link in bio', href: businessBio() },
                         { title: 'Media kit', href: businessMediaKit() },
+                        { title: 'Deals', href: businessDeals() },
                     ],
                 },
                 navItem(businessChapters.accounts, businessAccounts()),

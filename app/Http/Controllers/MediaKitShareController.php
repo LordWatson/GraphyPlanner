@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Actions\Business\BuildMediaKitAction;
 use App\Actions\Business\GenerateMediaKitPdfAction;
+use App\Actions\Deals\RecordDealEnquiryAction;
 use App\Models\MediaKit;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response as ResponseFactory;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,6 +29,42 @@ class MediaKitShareController extends Controller
         return Inertia::render('share/media-kit', [
             'kit' => $build($kit, $kit->client),
             'pdfUrl' => route('media-kit.share.pdf', $token),
+            'enquiryUrl' => $kit->acceptsEnquiries() ? route('media-kit.enquire', $token) : null,
+        ]);
+    }
+
+    /**
+     * Step CG-5.3 — "work with me": a sponsor's enquiry becomes a draft deal on the creator's
+     * tracker ({@see RecordDealEnquiryAction}). Three defences, because this is a public write:
+     * the owner has to have switched the form on, the route is throttled, and a filled `website`
+     * field is a honeypot (a real visitor never sees it, a bot fills everything).
+     *
+     * The answer is the same either way, so the form can't be used to probe which kits are live.
+     */
+    public function enquire(Request $request, string $token, RecordDealEnquiryAction $record): RedirectResponse
+    {
+        $kit = $this->resolve($token);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email:filter', 'max:255'],
+            'company' => ['nullable', 'string', 'max:120'],
+            'message' => ['nullable', 'string', 'max:2000'],
+            'website' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if ($kit->acceptsEnquiries() && blank($validated['website'] ?? null)) {
+            $record($kit, $validated);
+        } else {
+            Log::info('Media kit enquiry ignored', [
+                'client_id' => $kit->client_id,
+                'reason' => $kit->acceptsEnquiries() ? 'honeypot' : 'form off',
+            ]);
+        }
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'message' => __('Thanks — your message is with them.'),
         ]);
     }
 

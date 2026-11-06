@@ -15,6 +15,7 @@ accurate context without re-deriving it from the whole codebase.
 | `brand-brain.md` | BrandBrain model & editor | Done (Step 0.5) |
 | `bio-pages.md` | Link in bio: public `/@{handle}` page, block model, counted clicks & views (`.junie/plans/business-competitor-gap.md`) | Done (Phase CG-3) |
 | `creator-store.md` | Creator store: Stripe Connect (0% fee), products, checkout, orders, downloads, coupons, bookings/tips/paid Q&A, AI launch campaign (`.junie/plans/business-competitor-gap.md`) | Done (Phase CG-4) |
+| `brand-deals.md` | Paid-partnership disclosure (blocks scheduling) + brand-deals tracker, media kit rates & enquiries (`.junie/plans/business-competitor-gap.md`) | Done (Phase CG-5) |
 | `billing.md` | Client billing: invoices (line items, branded PDFs, email/reminders, void, ledger & CSV export) | Done (ad-hoc) |
 | `plans.md` | Plans, entitlements & subscriptions: plan config, limit/gate enforcement, Cashier (Stripe) self-serve billing, super-admin plan controls + global/per-org Stripe switch, pricing pages | In progress (Phase CG-2) |
 | `plans.md` | Plans, entitlements, AI allowance, Stripe subscriptions (Cashier), plan page & super-admin plan/billing controls | Done (Phase CG-2) |

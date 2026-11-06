@@ -905,6 +905,13 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   — worth revisiting since it's unauthenticated and token-guessing-resistant only via token entropy.
 
 ## Changelog
+- 2026-11-06: Step CG-5.1 (B-11.1) added paid-partnership disclosure to posts:
+  `posts.is_paid_partnership`, `partner_name`, `partner_handle` (and `brand_deal_id` from CG-5.2),
+  plus a **hard** `partnership_disclosure` item in `EvaluatePostChecklistAction` that blocks
+  scheduling until every channel's *published* caption discloses
+  (`App\Support\Posts\PartnershipDisclosure`). Caption-based by design, so it is per-platform for
+  free: a platform that strips hashtags needs the words in the caption. Details in `brand-deals.md`.
+
 - 2026-10-24: UX overhaul (post-editor journey, `.junie/plans/ux-overhaul.md`) — a copyable client
   review link. New `POST /posts/{post}/review-link` (`CreateShareableReviewLinkAction`) mints a fresh
   review token (rotating the post's previous ones, Step I-1.6) and returns the plaintext URL for the

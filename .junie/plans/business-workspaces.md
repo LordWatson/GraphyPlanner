@@ -840,17 +840,24 @@ businesses share one subscription system.
 
 ## Phase B-11 — Creator & business extras [V1/Stretch]
 
-### Step B-11.1 — Paid partnership compliance [V1]
+### Step B-11.1 — Paid partnership compliance [V1] ✅ Done (2026-11-06, as Step CG-5.1)
 - Post fields: `is_paid_partnership`, `partner_name`, `partner_handle`. The publish checklist
   requires a disclosure (`#ad`/`#sponsored` or the platform's branded-content flag where the
   adapter supports it) when set, per platform. Optional sponsor approval via B-3.4.
 - **Done when**: checklist tests block scheduling without disclosure and pass with it, per platform.
+- _Built as Step CG-5.1 of `business-competitor-gap.md` — see `.junie/modules/brand-deals.md`.
+  Disclosure is caption-based (checked against each channel's **published** caption, which is what
+  makes it per-platform): no adapter exposes a branded-content flag, so there is none to set._
 
-### Step B-11.2 — Brand deals tracker [Stretch]
+### Step B-11.2 — Brand deals tracker [Stretch → V1] ✅ Done (2026-11-06, as Step CG-5.2)
 - `brand_deals` (org-scoped, primary brand): partner, deliverables (n posts per platform), due
   dates, fee, status; posts link to a deal; deliverable progress fills automatically as linked posts
   publish. Feeds the media kit's "past partners" (opt-in per deal).
 - **Done when**: tests cover deliverable progress from published posts and org scoping.
+- _Built as Step CG-5.2 of `business-competitor-gap.md` — see `.junie/modules/brand-deals.md`.
+  Deliverables are a json list per deal (no second table) and progress is derived from the deal's
+  published posts, never stored. "Past partners" is doubly opt-in: delivered/paid **and**
+  `show_on_media_kit`._
 
 ### Step B-11.3 — Link-in-bio page [Stretch → V1] ✅ Done (2026-11-06, as Phase CG-3)
 - A public, brand-styled page (`/@{handle}`) with links and the latest published posts, with click

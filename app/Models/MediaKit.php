@@ -20,12 +20,14 @@ use Illuminate\Support\Carbon;
  * @property int $org_id
  * @property int $client_id
  * @property string|null $bio
+ * @property list<array{label: string, amount_minor: int}>|null $rates
+ * @property bool $enquiries_enabled
  * @property string|null $share_token
  * @property Carbon|null $shared_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['org_id', 'client_id', 'bio', 'share_token', 'shared_at'])]
+#[Fillable(['org_id', 'client_id', 'bio', 'rates', 'enquiries_enabled', 'share_token', 'shared_at'])]
 class MediaKit extends Model
 {
     /**
@@ -35,6 +37,8 @@ class MediaKit extends Model
     {
         return [
             'shared_at' => 'datetime',
+            'rates' => 'array',
+            'enquiries_enabled' => 'boolean',
         ];
     }
 
@@ -57,5 +61,14 @@ class MediaKit extends Model
     public function isPublic(): bool
     {
         return $this->share_token !== null;
+    }
+
+    /**
+     * Step CG-5.3: the public kit only takes an enquiry while the owner has the form switched on
+     * *and* the link is live.
+     */
+    public function acceptsEnquiries(): bool
+    {
+        return $this->isPublic() && $this->enquiries_enabled;
     }
 }

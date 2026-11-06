@@ -49,6 +49,27 @@ export function EditorFormFields() {
                 value={state.isRecyclable ? state.recycleAfterDays : ''}
             />
             <input type="hidden" name="recurrence" value={state.recurrence} />
+            {/* Step CG-5.1 / CG-5.2: paid partnership and the deal it delivers. */}
+            <input
+                type="hidden"
+                name="is_paid_partnership"
+                value={state.isPaidPartnership ? '1' : '0'}
+            />
+            <input
+                type="hidden"
+                name="partner_name"
+                value={state.isPaidPartnership ? state.partnerName : ''}
+            />
+            <input
+                type="hidden"
+                name="partner_handle"
+                value={state.isPaidPartnership ? state.partnerHandle : ''}
+            />
+            <input
+                type="hidden"
+                name="brand_deal_id"
+                value={state.isPaidPartnership ? state.brandDealId : ''}
+            />
             {/* Image format + framing are set from the preview rail. */}
             {Object.entries(state.mediaFormat).map(([platform, ratio]) => (
                 <input

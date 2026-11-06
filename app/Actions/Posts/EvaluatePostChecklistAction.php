@@ -9,6 +9,7 @@ use App\Models\Post;
 use App\Models\PostTarget;
 use App\Services\Grids\GridDriftService;
 use App\Services\Grids\GridSequenceValidator;
+use App\Support\Posts\PartnershipDisclosure;
 use App\Support\Publishing\FormatSpec;
 use App\Support\Publishing\PlatformSpec;
 
@@ -65,6 +66,9 @@ class EvaluatePostChecklistAction
             $this->item('format', 'Each channel’s format fits the media', $checks['format'], fixes: $checks['format_fixes']),
             $this->item('media_fit', 'Media meets each channel’s limits', $checks['media_fit']),
             $this->item('account_settings', 'Channel settings are complete', $checks['account_settings']),
+            // Step CG-5.1 (B-11.1): a paid partnership must say so, on every channel. A blocker,
+            // not a warning — an undisclosed ad is the creator's legal problem, not a style note.
+            $this->item('partnership_disclosure', 'Paid partnerships are disclosed', $checks['partnership_disclosure']),
             $this->item('hashtags', 'Hashtags suit each channel', $checks['hashtags'], soft: true),
             $this->item('links', 'Links will work where they’re posted', $checks['links'], soft: true),
             $this->item('first_comment', 'First comments are supported', $checks['first_comment'], soft: true),
@@ -104,6 +108,7 @@ class EvaluatePostChecklistAction
         $checks = array_fill_keys([
             'caption_length', 'format', 'format_fixes', 'media_fit', 'account_settings',
             'hashtags', 'links', 'first_comment', 'media_framing', 'framing_fixes',
+            'partnership_disclosure',
         ], []);
 
         $media = $post->publishableMedia();
@@ -129,6 +134,14 @@ class EvaluatePostChecklistAction
                 if (blank($account->platform_settings[$setting] ?? null)) {
                     $checks['account_settings'][] = "{$name}: ".self::settingPrompt($setting);
                 }
+            }
+
+            // The *published* caption is what carries the disclosure, which is what makes this
+            // per-platform for free: a platform that doesn't take hashtags (Google Business) has
+            // them composed out, so `#ad` in the hashtag field doesn't count there.
+            if (PartnershipDisclosure::isRequired($post) && ! PartnershipDisclosure::isDisclosed($published)) {
+                $checks['partnership_disclosure'][] = "{$name}: add ".implode(' or ', PartnershipDisclosure::SUGGESTED)
+                    .($spec->hashtags ? ' to the caption or hashtags.' : ' to the caption — '.$spec->label.' strips hashtags.');
             }
 
             $tags = $target->effectiveHashtags();

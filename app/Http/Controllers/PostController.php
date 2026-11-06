@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Campaigns\ApplyCampaignDefaultsAction;
+use App\Actions\Deals\GetBrandDealsAction;
 use App\Actions\Posts\Approvals\GenerateApprovalCertificatePdfAction;
 use App\Actions\Posts\CreatePostAction;
 use App\Actions\Posts\CreatePostCommentAction;
@@ -240,6 +241,8 @@ class PostController extends Controller
                 ->get(['id', 'name'])
                 ->map(fn (User $member) => ['id' => $member->id, 'name' => $member->name])
                 ->all(),
+            // Step CG-5.2: the brand's open deals, so a paid-partnership post can be linked to one.
+            'dealOptions' => (new GetBrandDealsAction)->linkOptionsFor($post),
             'ai' => [
                 'enabled' => $aiAccess->enabledForUser($user),
                 'canUse' => $aiAccess->canUse($user),
@@ -607,6 +610,12 @@ class PostController extends Controller
             'first_comment' => $post->first_comment,
             'cover_asset_id' => $post->cover_asset_id,
             'thumb_offset_ms' => $post->thumb_offset_ms,
+            // Step CG-5.1 (B-11.1) / CG-5.2: the paid-partnership declaration and the deal it
+            // delivers. The checklist blocks scheduling until the caption actually discloses.
+            'is_paid_partnership' => $post->is_paid_partnership,
+            'partner_name' => $post->partner_name,
+            'partner_handle' => $post->partner_handle,
+            'brand_deal_id' => $post->brand_deal_id,
             'music' => $post->music,
             'location' => $post->location,
             'media_format' => PostMediaPresenter::mediaFormat($post),
