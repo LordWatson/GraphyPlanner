@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\AiUsageController;
 use App\Http\Controllers\Settings\AuditLogController;
+use App\Http\Controllers\Settings\DataExportController;
 use App\Http\Controllers\Settings\McpConnectionController;
 use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\OrganizationController;
@@ -65,6 +66,17 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::get('settings/audit-log/export', [AuditLogController::class, 'export'])
         ->middleware(['throttle:exports', RequirePassword::class])
         ->name('audit-log.export');
+
+    // Data export (Owner only): "download everything you hold for us". Requesting one is cheap;
+    // the download re-checks the password because the file is the whole organisation's record, and
+    // shares the export throttle so a leaked session cannot pull it repeatedly.
+    Route::get('settings/data-export', [DataExportController::class, 'index'])->name('data-export.index');
+    Route::post('settings/data-export', [DataExportController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('data-export.store');
+    Route::get('settings/data-export/{dataExport}/download', [DataExportController::class, 'download'])
+        ->middleware(['throttle:exports', RequirePassword::class])
+        ->name('data-export.download');
 
     // Step I-1.6: "Test connection" for the stored Upload-Post key.
     Route::post('settings/organization/test-upload-post', [OrganizationController::class, 'testUploadPost'])

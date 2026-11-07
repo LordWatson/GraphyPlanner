@@ -5,6 +5,7 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAiUsage } from '@/routes/ai-usage';
 import { index as auditLog } from '@/routes/audit-log';
+import { index as dataExport } from '@/routes/data-export';
 import { edit as editMcpConnections } from '@/routes/mcp-connections';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editOrganization } from '@/routes/organization';
@@ -70,6 +71,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
               {
                   title: 'Audit log',
                   href: auditLog(),
+                  icon: null,
+              },
+              {
+                  title: 'Data export',
+                  href: dataExport(),
                   icon: null,
               },
               {

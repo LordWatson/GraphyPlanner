@@ -8,12 +8,16 @@
 > steps 2 and 3 (organisation-wide two-factor enforcement; the audit log and its CSV export) and
 > item 24 step 3 (mention alerts). Three features, each with tests and module docs.
 >
+> **Phase eight — item 21 step 5.** Per-organisation data export, with an enforced retention
+> policy. The GDPR delete side already existed (`PurgeOrganizationJob`); this is the portability
+> side, and it is the last buildable step of item 21.
+>
 > **Still open in that bucket, and why.** Item 20 (DMs) needs vendor DM access we do not have.
 > Item 21 step 1 (SAML) needs an identity provider to test against and a package decision; step 4
-> (the security page) is marketing copy, not code; **step 5 (per-organisation data export) is
-> buildable code and is the obvious next piece**; step 6 (SOC 2) is a commercial decision. Item 24
+> (the security page) is marketing copy, not code; step 6 (SOC 2) is a commercial decision. Item 24
 > step 1 (Bluesky) needs credentials, and step 4 is comparison-page copy. Item 26 (localisation) is
-> a translation sweep across every page rather than a feature.
+> a translation sweep across every page rather than a feature. **Item 21 is now code-complete apart
+> from SSO.**
 >
 > **Phase one — done.** Findings 1, 2, 3, 4 fixed with tests, plus 15. GTM-0.3 (tax and entity)
 > is not code and still needs an accountant. Finding 1's fix is now **confirmed against real
@@ -1098,7 +1102,7 @@ the deal against anyone who has DMs even partially.
 
 ---
 
-### 21. Enterprise trust: SSO, audit export, and a security page — ◐ steps 2 and 3 done 2026-11-07
+### 21. Enterprise trust: SSO, audit export, and a security page — ◐ steps 2, 3 and 5 done 2026-11-07
 
 **Why:** SSO and audit logs are repeatedly described as the contents of the enterprise tier, and
 SOC 2 comes up in every procurement conversation above a certain deal size. You will not win a
@@ -1126,8 +1130,16 @@ SOC 2 comes up in every procurement conversation above a certain deal size. You 
 4. Write the security page: subprocessors, where data lives, retention, encryption, how to report
    a vulnerability, DPA on request. `.junie/mcp-security-review.md` shows you already think this
    way — publish it.
-5. Ship GDPR mechanics as product features, not support tickets: per-organisation data export (you
-   have `PurgeOrganizationJob` for the delete side) and a documented retention policy.
+5. ✅ **Done.** Settings -> Data export (owner only): one archive of the organisation's records,
+   one CSV per set, built on the reports queue and downloadable for seven days behind a password
+   re-check. What is exported is declarative (`OrganizationDataExport::SETS`) and what is not is
+   listed with a reason (`::EXCLUDED`), so a new table forces the decision instead of quietly
+   falling out of everyone's export. Credentials are blanked, and a drift test fails if a
+   credential-looking column in an exported set is not redacted or reviewed — it caught a real leak
+   (`social_accounts.meta_access_token`) while this was being written. Retention is enforced, not
+   just stated: `exports:purge-expired` deletes the archive on day seven and leaves the row as a
+   receipt. **Not included:** media bytes (the archive lists every asset instead), and there is
+   still no per-*person* subject-access export — this is per organisation.
 6. Start the SOC 2 Type 1 clock when revenue justifies it, and say "in progress, Type 1 expected
    <date>" rather than nothing.
 

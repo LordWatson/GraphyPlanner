@@ -61,6 +61,42 @@ Profile/Security/Appearance settings pages.
   in that timezone on the page and in the CSV header.
 - The page shows the most recent 200 entries and says so; the CSV carries the whole window.
 
+## Data export (Owner only)
+
+The portability half of GDPR, next to the delete half `PurgeOrganizationJob` already covers — a
+product feature rather than a support ticket.
+
+- `settings/data-export` (`data-export.index`), `POST` the same path (`data-export.store`,
+  `throttle:6,1`) and `settings/data-export/{dataExport}/download` (`data-export.download`, behind
+  `throttle:exports` + `RequirePassword`) -> `Settings\DataExportController`, page
+  `settings/data-export.tsx`, nav entry for owners.
+- `data_exports` (`DataExport`, `DataExportStatus`): one row per request — pending / ready / failed /
+  expired, with `row_count`, `size_bytes`, `failure_reason` and `expires_at`. The row **outlives the
+  file** on purpose: once purged it is the receipt that the export happened and is gone.
+- `App\Services\Security\OrganizationDataExport` writes the archive: one CSV per set, plus a
+  `README.txt` that says what is *not* in it. `BuildOrganizationDataExportJob` (reports queue,
+  `ShouldBeUnique`, 900s) streams it to the private assets disk and notifies the requester
+  (`DataExportReady`, database channel only — a link to an organisation's whole record does not go
+  in an email).
+- **What is exported** is declarative: `OrganizationDataExport::SETS` maps each table to how it
+  finds the organisation — `org_id` directly, or through a `parent` set that already does. A child
+  table is therefore one line, and the path is one a reader can check. An automatic foreign-key walk
+  was tried first and rejected: following `created_by`-style back-references pulled in rows (even
+  platform-wide ones like `super_admin_reports`) merely because they named one of the org's users.
+- **What is not**, with a reason each, in `::EXCLUDED`: credentials and one-time tokens, derived
+  metrics, AI suggestions, our own processing logs, the platform's own tables, and framework
+  plumbing. Media **bytes** are not in the archive either (it would run to gigabytes) — `assets.csv`
+  lists every file instead, and the README says so.
+- **Credentials never travel**: `::REDACTED` blanks the named columns, and `::NOT_CREDENTIALS`
+  records the columns whose names only look like one (`ai_monthly_token_budget`, a token *budget*).
+- Three drift guards in `tests/Feature/Security/DataExportTest.php`: every table must be in `SETS`
+  or `EXCLUDED`; every credential-looking column in an exported set must be redacted or reviewed;
+  every set and redaction must name a table and column that exist. The second guard found a real
+  leak while this was being written — `social_accounts.meta_access_token` was being exported,
+  because the redaction list named `access_token`, a column that does not exist.
+- Retention and the purge sweep: see `ops.md` -> "Data retention".
+- `ext-zip` is now a declared requirement in `composer.json` (the archive is a ZIP).
+
 ## Organisation-wide two-factor
 - `organizations.require_two_factor` (boolean, default false; migration `2027_03_19_100100`), the
   Owner switch on this page. Enforcement, the exemptions and the lockout guard are documented in
@@ -166,6 +202,9 @@ existing org already has.
   placeholder.
 
 ## Changelog
+- 2026-11-07: Added the Owner-only **Data export** (`data_exports`, `OrganizationDataExport`,
+  `BuildOrganizationDataExportJob`, `exports:purge-expired`, `settings/data-export.tsx`) — see the
+  section above and `ops.md` for retention.
 - 2026-11-07: Added the Owner-only **Audit log** page and CSV export (`AuditTrail`,
   `AuditLogController`, `AuditLogRequest`, `settings/audit-log.tsx`) and the organisation-wide
   **two-factor** switch (`organizations.require_two_factor`; enforcement in `auth.md`). Also fixed

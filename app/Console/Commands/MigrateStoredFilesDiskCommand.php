@@ -71,6 +71,9 @@ class MigrateStoredFilesDiskCommand extends Command
         ['table' => 'ai_image_variants', 'disk' => 'preview_disk', 'paths' => ['preview_path'], 'urls' => []],
         ['table' => 'brand_brain_reference_assets', 'disk' => 'normalized_disk', 'paths' => ['normalized_path'], 'urls' => []],
         ['table' => 'organizations', 'disk' => 'brand_logo_disk', 'paths' => ['brand_logo_path'], 'urls' => []],
+        // Data-export archives are short-lived, but a switch of disks mid-week would otherwise
+        // break a download link an owner is still holding.
+        ['table' => 'data_exports', 'disk' => 'disk', 'paths' => ['path'], 'urls' => []],
     ];
 
     public function handle(): int

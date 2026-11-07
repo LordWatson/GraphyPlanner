@@ -66,6 +66,8 @@ final class SchedulerHeartbeat
         'ads:sync' => ['label' => 'Paid ads sync', 'interval_minutes' => 1440],
         // Step GTM-7.2: daily check, quarterly alert, on the competitor figures.
         'competitors:review-due' => ['label' => 'Competitor review check', 'interval_minutes' => 1440],
+        // The data-export retention policy: delete archives past their window, daily.
+        'exports:purge-expired' => ['label' => 'Data export retention sweep', 'interval_minutes' => 1440],
     ];
 
     public static function record(string $command): void

@@ -137,3 +137,8 @@ $safely(Schedule::command('ads:sync')->dailyAt('04:30'), 'ads:sync');
 // Checked daily and silent until the quarter is up, which is what makes "one stale quarter, one
 // alert" possible without a second schedule.
 $safely(Schedule::command('competitors:review-due')->dailyAt('09:00'), 'competitors:review-due');
+
+// The data-export retention policy, enforced: an archive of an organisation's whole record should
+// not sit on a disk because somebody pressed a button once. Daily, early, and the row stays behind
+// as a receipt that the export happened and was removed.
+$safely(Schedule::command('exports:purge-expired')->dailyAt('02:30'), 'exports:purge-expired');

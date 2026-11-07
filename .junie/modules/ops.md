@@ -193,6 +193,23 @@ This is the one step with real infrastructure surface, and **the app does not ow
   **never throw**: a failed lookup is "not verified yet", which is also what it means to a creator
   who hasn't finished their DNS.
 
+## Data retention
+
+The only retention window the application enforces by itself is the one on **data exports**:
+
+- `config('exports.retention_days')` (default **7**, `EXPORTS_RETENTION_DAYS`) — how long a finished
+  organisation data export stays downloadable. `exports:purge-expired` (daily, 02:30, in
+  `SchedulerHeartbeat::COMMANDS`) deletes the archive, clears `data_exports.disk`/`path` and marks
+  the row `expired`. **The row stays** as a receipt: an owner asking "was a copy of everything taken,
+  and is it gone?" can read the answer. A file that will not delete is logged and the row is still
+  marked expired — the link must stop working even when the storage call fails.
+- `DataExport::isDownloadable()` re-checks the expiry on every download, so a link in somebody's
+  downloads list stops working at the window's end whether or not the sweep has run yet.
+
+Everything else is kept until the customer deletes it, and an organisation delete removes it all
+(`DeleteOrganizationAction` soft-deletes, `PurgeOrganizationJob` then removes every stored file and
+hard-deletes the rows). That is the policy; if these numbers change, the policy changes.
+
 ## Business Rules
 - Publishing must never share workers with AI or report work (asserted in
   `tests/Feature/QueueInfrastructureTest.php`, which also checks every supervisor timeout is below
@@ -243,6 +260,8 @@ committed):
   engines, and the `mysql` CI job is blocking so the class cannot come back. See the changelog.
 
 ## Changelog
+- 2026-11-07: Added the data-export retention sweep (`exports:purge-expired`, daily 02:30) and the
+  "Data retention" section above. See `settings.md` for the export feature itself.
 - 2026-11-07: **The dependency audit gate passes again, and email deliverability can be checked.**
   Symfony updated 8.1.9 → 8.1.11 across the board, clearing 11 advisories on 6 packages that had
   been failing `composer audit` in CI independently of any code change (audit finding 28). New

@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "ext-zip": "*",
         "barryvdh/laravel-dompdf": "^3.1",
         "inertiajs/inertia-laravel": "^3.0",
         "intervention/image": "^3.11",

@@ -6,6 +6,7 @@ use App\Enums\AiTextJobKind;
 use App\Enums\AiTextJobStatus;
 use App\Enums\AudienceSource;
 use App\Enums\ConnectionStatus;
+use App\Enums\DataExportStatus;
 use App\Enums\DealStatus;
 use App\Enums\DesignImportProvider;
 use App\Enums\GridPlanStatus;
@@ -38,6 +39,7 @@ use App\Models\ClientReport;
 use App\Models\ClientTemplate;
 use App\Models\ConnectInvite;
 use App\Models\Coupon;
+use App\Models\DataExport;
 use App\Models\DesignImportConnection;
 use App\Models\GridPlan;
 use App\Models\GridTile;
@@ -353,6 +355,15 @@ class CrossTenantRouteTest extends TestCase
             SavedReply::class => SavedReply::factory()->create(['org_id' => $org->id]),
             // A word the other org watches (inbox/alerts/{mentionKeyword}).
             MentionKeyword::class => MentionKeyword::create(['org_id' => $org->id, 'term' => 'theirs']),
+            // The other org's data export (settings/data-export/{dataExport}/download) — the one
+            // bound route where getting this wrong hands over their entire record.
+            DataExport::class => DataExport::create([
+                'org_id' => $org->id,
+                'status' => DataExportStatus::Ready,
+                'disk' => 'local',
+                'path' => 'exports/'.$org->id.'/theirs.zip',
+                'expires_at' => now()->addDay(),
+            ]),
         ];
     }
 }
