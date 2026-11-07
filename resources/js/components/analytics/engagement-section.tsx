@@ -309,10 +309,15 @@ export function BestTimesPanel({ accounts }: { accounts: AccountBestTime[] }) {
                                         </Badge>
                                     ))}
                                 </span>
-                            ) : (
+                            ) : account.status === 'learning' ? (
                                 <span className="text-muted-foreground text-xs">
                                     Learning — {account.sample} of{' '}
                                     {account.needed} measured posts
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground text-xs">
+                                    {account.sample} measured posts, none at the
+                                    same time of day
                                 </span>
                             )}
                         </li>

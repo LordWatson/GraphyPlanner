@@ -51,11 +51,20 @@ function BestTimes({
         return null;
     }
 
-    if (best.status === 'learning' || best.slots.length === 0) {
+    if (best.status === 'learning') {
         return (
             <span className="text-muted-foreground text-[11px]">
                 Best times appear after {best.needed} measured posts (
                 {best.sample} so far).
+            </span>
+        );
+    }
+
+    if (best.slots.length === 0) {
+        return (
+            <span className="text-muted-foreground text-[11px]">
+                {best.sample} measured posts, but none at the same time of day —
+                no slot to compare yet.
             </span>
         );
     }

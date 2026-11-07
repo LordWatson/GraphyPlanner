@@ -176,7 +176,7 @@ export type TargetAccountData = {
 };
 
 export type BestTime = {
-    status: 'ready' | 'learning';
+    status: 'ready' | 'learning' | 'spread';
     sample: number;
     needed: number;
     ranked_by: 'rate' | 'interactions' | null;

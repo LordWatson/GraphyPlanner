@@ -187,6 +187,14 @@ Staff group (`auth`, `verified`, `org.member`):
   `block_hours` window **on the account's clock**, ranked by average engagement rate (or average
   interactions when too few readings carry an audience figure — `ranked_by`). Slots need
   `min_posts`; an account needs `min_account_posts` or it's `learning` with no slots.
+- **Three states, not two.** `learning` (fewer than `min_account_posts` measured posts),
+  `spread` (enough measured posts, but no slot reaching `min_posts`, so nothing can be ranked) and
+  `ready` (slots). `spread` exists because `ready` with an empty `slots` array used to be possible,
+  and both consumers rendered that as `learning` — which told a 7-post account "best times appear
+  after 6 measured posts (7 so far)". A low-volume account spread over 84 possible slots hits this
+  routinely; it is the normal case for one-brand workspaces, not an edge case. `App\Services\
+  Business\BestTimeService` was always correct here (it checks `status === 'ready' && slots !== []`
+  and falls back to `best_time.defaults`), so only the agency path misreported it.
 - Shown on the client drill-down (`engagement.best_times`, null on org-wide views) and in the post
   editor's channel rows (`targetAccounts.*.best_time`; a chip picks the next such slot via
   `nextWeeklySlot()` in `lib/timezones.ts`). Top posts ship in the engagement section; pillar,
@@ -264,8 +272,8 @@ Staff group (`auth`, `verified`, `org.member`):
   (faked vendor shapes, Google Business never requested, safe errors, page id), `EngagementSummaryTest`
   (latest-reading totals and rate, nulls not zeros, "not available" platforms, follower growth +
   series, ranking, tenant isolation and filters, every role, CSV, campaign KPIs, top posts,
-  frozen wrap snapshot), `BestTimeTest` (account clock, rate vs interactions, learning, editor +
-  drill-down props), `ClientReportsTest` (client-safe snapshot, permissions, month validation,
+  frozen wrap snapshot), `BestTimeTest` (account clock, rate vs interactions, learning, spread —
+  enough posts but no shared slot, editor + drill-down props), `ClientReportsTest` (client-safe snapshot, permissions, month validation,
   commentary/refresh, freeze + one email per contact, PDF attachment, portal isolation, wrap
   reports, schedule, monthly run per org timezone, idempotency, skips). Shared fixtures
   `Concerns/BuildsEngagementFixtures`, `Concerns/FakeEngagementSource`.

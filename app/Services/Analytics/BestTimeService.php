@@ -17,8 +17,11 @@ use Illuminate\Support\Facades\DB;
  *
  * Replaces the heuristic planned in AI Step 2.10. An account with fewer than `min_account_posts`
  * measured posts is "learning" and gets no slots — a guess dressed up as data would be worse
- * than none. Consumed by the post editor's schedule rows (one click picks the next such slot) and
- * the analytics engagement section; the queue (I-3.7) will read the same output when it lands.
+ * than none. An account that clears that bar but has no single slot reaching `min_posts` is
+ * "spread": it has the history, just not concentrated enough to rank one time over another, which
+ * is a different thing to say. Consumed by the post editor's schedule rows (one click picks the
+ * next such slot) and the analytics engagement section; the queue (I-3.7) will read the same
+ * output when it lands.
  */
 class BestTimeService
 {
@@ -26,7 +29,7 @@ class BestTimeService
 
     /**
      * @param  list<int>  $accountIds
-     * @return array<int, array{status: 'ready'|'learning', sample: int, needed: int, ranked_by: 'rate'|'interactions'|null, slots: list<array{weekday: int, hour: int, block_hours: int, label: string, posts: int, score: float}>}>
+     * @return array<int, array{status: 'ready'|'learning'|'spread', sample: int, needed: int, ranked_by: 'rate'|'interactions'|null, slots: list<array{weekday: int, hour: int, block_hours: int, label: string, posts: int, score: float}>}>
      */
     public function forAccounts(array $accountIds): array
     {
@@ -62,7 +65,7 @@ class BestTimeService
 
     /**
      * @param  Collection<int, \stdClass>  $rows
-     * @return array{status: 'ready'|'learning', sample: int, needed: int, ranked_by: 'rate'|'interactions'|null, slots: list<array{weekday: int, hour: int, block_hours: int, label: string, posts: int, score: float}>}
+     * @return array{status: 'ready'|'learning'|'spread', sample: int, needed: int, ranked_by: 'rate'|'interactions'|null, slots: list<array{weekday: int, hour: int, block_hours: int, label: string, posts: int, score: float}>}
      */
     private function forRows(Collection $rows): array
     {
@@ -109,6 +112,13 @@ class BestTimeService
             ->take($limit)
             ->values()
             ->all();
+
+        // Enough measured posts overall, but no slot reached `min_posts`, so there is nothing to
+        // rank. Distinct from "learning": reporting that state as learning produces the one answer
+        // that cannot be true — "best times appear after 6 posts (7 so far)".
+        if ($ranked === []) {
+            return ['status' => 'spread', 'sample' => $sample->count(), 'needed' => $needed, 'ranked_by' => null, 'slots' => []];
+        }
 
         return [
             'status' => 'ready',

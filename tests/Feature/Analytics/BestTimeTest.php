@@ -99,6 +99,31 @@ class BestTimeTest extends TestCase
         $this->assertSame(['status' => 'learning', 'sample' => 2, 'needed' => 4, 'ranked_by' => null, 'slots' => []], $best);
     }
 
+    public function test_enough_measured_posts_but_none_sharing_a_slot_is_spread_not_learning(): void
+    {
+        $org = $this->engagementOrg();
+        $account = $this->engagementAccount($this->engagementClient($org), Platform::Instagram, 'UTC');
+
+        // Over the minimum (4 here, 6 in production), but every post sits in its own weekday+hour
+        // slot, so none reaches `min_posts` and there is nothing to rank. Reporting this as
+        // "learning" told the editor to say "appear after 6 measured posts (7 so far)".
+        foreach ([
+            '2026-10-13 09:00', '2026-10-14 11:00', '2026-10-15 13:00',
+            '2026-10-16 15:00', '2026-10-17 17:00', '2026-10-18 19:00',
+            '2026-10-19 21:00',
+        ] as $at) {
+            $this->measured($account, $at, 40);
+        }
+
+        $best = app(BestTimeService::class)->forAccounts([$account->id])[$account->id];
+
+        $this->assertSame('spread', $best['status']);
+        $this->assertSame(7, $best['sample']);
+        $this->assertSame([], $best['slots']);
+        // The contradiction the bug produced: sample above needed, yet presented as still learning.
+        $this->assertGreaterThan($best['needed'], $best['sample']);
+    }
+
     public function test_the_editor_and_the_client_drill_down_carry_best_times(): void
     {
         $org = $this->engagementOrg();
