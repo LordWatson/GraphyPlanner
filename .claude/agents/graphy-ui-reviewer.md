@@ -10,6 +10,7 @@ Read `.junie/brand-guidelines.md` in full first, then the changed files under `r
 (`git diff HEAD --name-only -- resources/js` plus untracked files, or the paths given).
 
 Report concrete issues with `path:line — problem — fix`:
+
 - **Brand (Alima)**: Signal Orange (`signal`) used as a button, surface or status, or more than one
   orange dash per layout; Teal (`text-primary`/`bg-primary` in light) on Ink blocks (use lime/cream);
   more than one default (Ink) primary button per view; serif/italic type or a third font family;

@@ -36,7 +36,7 @@ class CampaignProfitabilityTest extends TestCase
         InvoiceItem::factory()->create(['invoice_id' => $sent->id, 'org_id' => $this->org->id, 'campaign_id' => $this->campaign->id, 'price' => 500, 'quantity' => 2]);
 
         foreach ([0.002, 0.003] as $cost) {
-            AiUsageLog::query()->create(['org_id' => $this->org->id, 'client_id' => $this->client->id, 'campaign_id' => $this->campaign->id, 'provider' => 'deepseek', 'model' => 'deepseek-flash', 'method' => 'planCampaign', 'succeeded' => true, 'cost_estimate' => $cost, 'duration_ms' => 100]);
+            AiUsageLog::query()->create(['org_id' => $this->org->id, 'client_id' => $this->client->id, 'campaign_id' => $this->campaign->id, 'provider' => 'anthropic', 'model' => 'claude-sonnet-5-5', 'method' => 'planCampaign', 'succeeded' => true, 'cost_estimate' => $cost, 'duration_ms' => 100]);
         }
     }
 
@@ -78,9 +78,9 @@ class CampaignProfitabilityTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('summary.revenue', null));
     }
 
-    public function test_campaign_ai_calls_record_an_estimated_cost_only_when_deepseek_succeeds(): void
+    public function test_campaign_ai_calls_record_an_estimated_cost_only_when_anthropic_succeeds(): void
     {
-        config(['ai.enabled' => true, 'ai.deepseek.api_key' => '']);
+        config(['ai.enabled' => true, 'ai.anthropic.api_key' => '']);
         $campaign = $this->makeCampaign();
 
         $this->actingAs($this->strategist())->postJson(route('campaigns.ai.brief', $campaign))->assertOk();

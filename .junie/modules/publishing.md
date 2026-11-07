@@ -1,6 +1,7 @@
 # Publishing
 
 ## Purpose
+
 Pluggable publish-vendor integration per spec §7. Step 1.1 defined the `PublishAdapter` contract;
 Step 1.2 implements `publish()`'s per-platform field mapping against Upload-Post's API; Step 1.3
 wires up the account connect flow (`SocialAccountController::connect`/`callback`); Step 1.4 wires
@@ -11,6 +12,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
 `publish()` consults before ever calling the vendor.
 
 ## Models / Tables
+
 - None new. `SocialAccount` (see `social-accounts.md`) has the `provider`, `externalProfileId`,
   `externalAccountId`, `connectedAt` columns; `externalProfileId`/`connectedAt` are now populated by
   the Step 1.3 connect callback (`provider`/`externalAccountId` remain unused until later steps).
@@ -18,6 +20,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   every adapter request.
 
 ## Actions / Services / Contracts
+
 - `App\Contracts\PublishAdapter`: the adapter contract (spec §7) — `connectAccount(SocialAccount): string`,
   `handleCallback(array $query): void`, `publish(Post, Collection<SocialAccount>): Collection<TargetResult>`,
   `cancel(string $externalPostId): void`, `health(SocialAccount): bool`, and (Step 1.5)
@@ -38,73 +41,73 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   `POST {base_url}/upload_photos` (image asset(s), no video), or `POST {base_url}/upload_text` (no
   assets) — resolved by `resolveUploadEndpoint()`, via `Illuminate\Support\Facades\Http`, authenticated
   with the target's `SocialAccount->organization->upload_post_key` (sent as `Authorization: Apikey
-  <key>` — Upload-Post's API uses a custom `Apikey` auth scheme, not OAuth `Bearer`), and maps:
-  - Common fields (all platforms): `user` (`external_account_id`/`external_profile_id`/account id
-    fallback), `title` (`Post::master_caption`), `platform` (single-element array), `scheduled_date`
-    (the matching `PostTarget::scheduled_at_utc`, ISO-8601), `video` (first attached video `Asset::url`,
-    only sent to the `/upload` endpoint) or `photos` (all attached image `Asset::url`s, only sent to
-    the `/upload_photos` endpoint), `hashtags` (`Post::hashtags`) — each skipped (and recorded in
-    `TargetResult::skippedFields`) when the source data is empty.
-  - Image format (2026-10-19): before attaching local images, `attachLocalMediaFiles()` asks
-    `App\Services\Media\PublishImageCropper` for the channel's target ratio
-    (`targetRatio()` — the post's fixed `MediaRatio`, or for an Instagram `original` the first
-    image's shape clamped to 4:5–1.91:1) and crops each image around its `post_assets` focus point
-    + zoom (`crop()`, GD via Intervention, same format re-encoded at quality 92). Never fails a
-    publish: an unreadable image, an animated GIF, or an image already in shape goes out as the
-    original. Skipped for videos, remote (URL-only) images (logged), and AI-generated images sent to
-    LinkedIn (re-encoding would strip the C2PA credentials LinkedIn reads).
-  - Instagram: `location_id` (`Post::location['id']`), `media_type` (`REELS` for a first attached video
-    asset, `IMAGE` for image — `STORIES` isn't derivable from any existing field, always skipped), and
-    `audio_id`/`audio_name` (`Post::music['id']`, falling back to `Post::music['name']` only when no
-    real id is set, per spec §7.1).
-  - TikTok: `tiktok_music_id` (`Post::music['id']`), `location` (`Post::location['name']`).
-  - Every platform (Step 16.13 AI disclosure): `is_ai_generated=true` whenever
-    `Post::hasAiGeneratedMedia()` (any attached asset has `assets.is_ai_generated`, i.e. came out
-    of the AI Image Studio); otherwise recorded as skipped. Upload-Post maps this alias to each
-    platform's native label (https://docs.upload-post.com/guides/ai-content-labeling):
-    | Platform | Native label | Support |
-    |---|---|---|
-    | TikTok | `is_aigc` | Yes (Direct Post) |
-    | Instagram | `is_ai_generated` | Yes (Reels, photos, carousels) |
-    | Facebook | `facebook_is_ai_generated` | Reels only; other Page posts have no API label |
-    | LinkedIn | none | Reads C2PA Content Credentials embedded in the media (we keep the Gemini original unre-encoded for this) |
-  - LinkedIn/Facebook: only the common fields (caption + media + schedule), per spec §7.1.
-  - Returns one `TargetResult` per target: `ok: true` with `externalPostId` from the vendor's
-    `request_id`/`id` on a successful response; `ok: false` with the vendor's `error` (or raw body) on
-    a non-2xx response or thrown exception. Every publish attempt and rejection is logged
-    (`Log::info`/`warning`/`error`) with `post_id`/`social_account_id`/`platform` context.
-  - Step 1.7: before any of the above, `publishToTarget()` resolves the target's
-    `PlatformRolloutStage` via `PlatformRolloutGate::stageFor()` and checks `stageEnabled()`. A
-    disabled stage short-circuits — no HTTP request is made at all — and returns a failed
-    `TargetResult` (`"Publishing to {stage label} is not yet enabled (Step 1.7 rollout)."`),
-    logged via `Log::info`.
-  - `connectAccount()` (Step 1.3, bugfix): first calls `POST {base_url}/uploadposts/users` with the
-    same `username` to create the Upload-Post profile if it doesn't exist yet — Upload-Post's
-    `generate-jwt` endpoint only issues a linking token for a profile that already exists, it does
-    NOT create one implicitly, so skipping this step causes `generate-jwt`/`schedule` to fail with a
-    `PROFILE_NOT_FOUND` error. A response indicating the profile already exists (`error_code`/`error`
-    containing "exist") is treated as success (idempotent); any other non-2xx response throws
-    `RuntimeException`. Then calls `POST {base_url}/uploadposts/users/generate-jwt` with `username`
-    (`external_account_id`/`external_profile_id`/account id fallback) and `redirect_url` (the app's
-    `social-accounts.callback` route, carrying `social_account_id` in the query string so the
-    callback can identify the account). Returns the vendor's `access_url`/`url`; throws
-    `RuntimeException` on a non-2xx response or request failure (logged via `Log::error`/`warning`).
-  - `handleCallback()` (Step 1.3): reads `social_account_id` from the callback query, looks up the
-    `SocialAccount`, and persists `external_profile_id` (from the query's `profile`/`username`,
-    falling back to the existing value) plus `connection_status = connected` and `connected_at =
-    now()`. Logs a warning and no-ops if `social_account_id` is missing or doesn't match an account.
-  - `cancel()` remains interim/partial — real cancellation isn't wired up to any caller yet.
-  - `checkStatus()` (Step 1.5, confirmed against https://docs.upload-post.com/api/upload-status):
-    `GET {base_url}/uploadposts/status?request_id={externalPostId}&job_id={externalPostId}` (both
-    query params are sent since `$externalPostId` may be either kind of id — `request_id` from an
-    `async_upload` publish, `job_id` from a scheduled one — and the caller doesn't track which).
-    Top-level `status` of `completed`/`failed` is resolved; anything else (`pending`/`queued`/
-    `processing`/`in_progress`/`not_found`, an unrecognized shape, non-2xx, or a thrown exception)
-    returns `null` so `PollPendingPublishStatusesAction` retries later instead of wrongly marking
-    the target failed. Because a single job can fan out to multiple platforms, the response's
-    per-platform `results[]` is checked first for an entry matching the account's `platform` (its
-    own `success`/`message` wins); only when no such entry exists does the top-level `status`/
-    `message` decide the outcome.
+<key>` — Upload-Post's API uses a custom `Apikey` auth scheme, not OAuth `Bearer`), and maps:
+    - Common fields (all platforms): `user` (`external_account_id`/`external_profile_id`/account id
+      fallback), `title` (`Post::master_caption`), `platform` (single-element array), `scheduled_date`
+      (the matching `PostTarget::scheduled_at_utc`, ISO-8601), `video` (first attached video `Asset::url`,
+      only sent to the `/upload` endpoint) or `photos` (all attached image `Asset::url`s, only sent to
+      the `/upload_photos` endpoint), `hashtags` (`Post::hashtags`) — each skipped (and recorded in
+      `TargetResult::skippedFields`) when the source data is empty.
+    - Image format (2026-10-19): before attaching local images, `attachLocalMediaFiles()` asks
+      `App\Services\Media\PublishImageCropper` for the channel's target ratio
+      (`targetRatio()` — the post's fixed `MediaRatio`, or for an Instagram `original` the first
+      image's shape clamped to 4:5–1.91:1) and crops each image around its `post_assets` focus point
+        - zoom (`crop()`, GD via Intervention, same format re-encoded at quality 92). Never fails a
+          publish: an unreadable image, an animated GIF, or an image already in shape goes out as the
+          original. Skipped for videos, remote (URL-only) images (logged), and AI-generated images sent to
+          LinkedIn (re-encoding would strip the C2PA credentials LinkedIn reads).
+    - Instagram: `location_id` (`Post::location['id']`), `media_type` (`REELS` for a first attached video
+      asset, `IMAGE` for image — `STORIES` isn't derivable from any existing field, always skipped), and
+      `audio_id`/`audio_name` (`Post::music['id']`, falling back to `Post::music['name']` only when no
+      real id is set, per spec §7.1).
+    - TikTok: `tiktok_music_id` (`Post::music['id']`), `location` (`Post::location['name']`).
+    - Every platform (Step 16.13 AI disclosure): `is_ai_generated=true` whenever
+      `Post::hasAiGeneratedMedia()` (any attached asset has `assets.is_ai_generated`, i.e. came out
+      of the AI Image Studio); otherwise recorded as skipped. Upload-Post maps this alias to each
+      platform's native label (https://docs.upload-post.com/guides/ai-content-labeling):
+        | Platform  | Native label               | Support                                                                                                  |
+        | --------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
+        | TikTok    | `is_aigc`                  | Yes (Direct Post)                                                                                        |
+        | Instagram | `is_ai_generated`          | Yes (Reels, photos, carousels)                                                                           |
+        | Facebook  | `facebook_is_ai_generated` | Reels only; other Page posts have no API label                                                           |
+        | LinkedIn  | none                       | Reads C2PA Content Credentials embedded in the media (we keep the Gemini original unre-encoded for this) |
+    - LinkedIn/Facebook: only the common fields (caption + media + schedule), per spec §7.1.
+    - Returns one `TargetResult` per target: `ok: true` with `externalPostId` from the vendor's
+      `request_id`/`id` on a successful response; `ok: false` with the vendor's `error` (or raw body) on
+      a non-2xx response or thrown exception. Every publish attempt and rejection is logged
+      (`Log::info`/`warning`/`error`) with `post_id`/`social_account_id`/`platform` context.
+    - Step 1.7: before any of the above, `publishToTarget()` resolves the target's
+      `PlatformRolloutStage` via `PlatformRolloutGate::stageFor()` and checks `stageEnabled()`. A
+      disabled stage short-circuits — no HTTP request is made at all — and returns a failed
+      `TargetResult` (`"Publishing to {stage label} is not yet enabled (Step 1.7 rollout)."`),
+      logged via `Log::info`.
+    - `connectAccount()` (Step 1.3, bugfix): first calls `POST {base_url}/uploadposts/users` with the
+      same `username` to create the Upload-Post profile if it doesn't exist yet — Upload-Post's
+      `generate-jwt` endpoint only issues a linking token for a profile that already exists, it does
+      NOT create one implicitly, so skipping this step causes `generate-jwt`/`schedule` to fail with a
+      `PROFILE_NOT_FOUND` error. A response indicating the profile already exists (`error_code`/`error`
+      containing "exist") is treated as success (idempotent); any other non-2xx response throws
+      `RuntimeException`. Then calls `POST {base_url}/uploadposts/users/generate-jwt` with `username`
+      (`external_account_id`/`external_profile_id`/account id fallback) and `redirect_url` (the app's
+      `social-accounts.callback` route, carrying `social_account_id` in the query string so the
+      callback can identify the account). Returns the vendor's `access_url`/`url`; throws
+      `RuntimeException` on a non-2xx response or request failure (logged via `Log::error`/`warning`).
+    - `handleCallback()` (Step 1.3): reads `social_account_id` from the callback query, looks up the
+      `SocialAccount`, and persists `external_profile_id` (from the query's `profile`/`username`,
+      falling back to the existing value) plus `connection_status = connected` and `connected_at =
+now()`. Logs a warning and no-ops if `social_account_id` is missing or doesn't match an account.
+    - `cancel()` remains interim/partial — real cancellation isn't wired up to any caller yet.
+    - `checkStatus()` (Step 1.5, confirmed against https://docs.upload-post.com/api/upload-status):
+      `GET {base_url}/uploadposts/status?request_id={externalPostId}&job_id={externalPostId}` (both
+      query params are sent since `$externalPostId` may be either kind of id — `request_id` from an
+      `async_upload` publish, `job_id` from a scheduled one — and the caller doesn't track which).
+      Top-level `status` of `completed`/`failed` is resolved; anything else (`pending`/`queued`/
+      `processing`/`in_progress`/`not_found`, an unrecognized shape, non-2xx, or a thrown exception)
+      returns `null` so `PollPendingPublishStatusesAction` retries later instead of wrongly marking
+      the target failed. Because a single job can fan out to multiple platforms, the response's
+      per-platform `results[]` is checked first for an entry matching the account's `platform` (its
+      own `success`/`message` wins); only when no such entry exists does the top-level `status`/
+      `message` decide the outcome.
 - `App\Actions\Publishing\SyncPublishStatusAction` (Step 1.5): the single seam both the webhook and
   the poll fallback use to record a vendor's final outcome for a `PostTarget` still `pending`.
   Marks the target `published`/`failed`, then — only if the post is still `publishing` and every
@@ -127,7 +130,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   single app-wide one) live per-organization, encrypted at rest alongside each other.
 - `App\Enums\PlatformRolloutStage` (Step 1.7): the plan's five rollout milestones — Instagram
   feed, Instagram Reels, TikTok, Facebook, LinkedIn (`order()` returns them in that literal
-  order). Instagram feed/Reels are deliberately *not* separate `Platform` enum values (both are
+  order). Instagram feed/Reels are deliberately _not_ separate `Platform` enum values (both are
   the `instagram` platform, distinguished only by the post's derived media type), so this enum
   exists specifically to give each of the five milestones its own togglable stage.
 - `config('publishing.rollout')` (Step 1.7): one boolean flag per `PlatformRolloutStage`, each
@@ -140,12 +143,12 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   resolves which of the five stages a target belongs to (Instagram feed vs. Reels inferred from
   the post's first attached asset type — the same inference `UploadPostAdapter::applyInstagramFields()`
   already uses for `media_type`); `stageEnabled(PlatformRolloutStage)`/`isEnabled(Post,
-  SocialAccount)` read `config('publishing.rollout.*')` (missing key defaults to disabled).
+SocialAccount)` read `config('publishing.rollout.*')` (missing key defaults to disabled).
   `UploadPostAdapter` depends on this via constructor injection (default-constructed when not
   explicitly passed, so every existing `new UploadPostAdapter` call site — tests included — keeps
   working unchanged).
 - `App\Contracts\MusicProvider` (Step 1.8.1): `search(string $query, Platform $platform):
-  Collection<MusicTrack>` and `find(string $id, Platform $platform): ?MusicTrack`, mirroring the
+Collection<MusicTrack>` and `find(string $id, Platform $platform): ?MusicTrack`, mirroring the
   `PublishAdapter` pattern (interface first, no default binding registered yet — that lands with
   Step 1.8.2's `UploadPostMusicProvider`) so the vendor is swappable/mockable. Exists to let
   editors search/browse a real sound catalog and land a track's vendor id in `Post::music`
@@ -165,7 +168,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   `MusicProvider::search()`/`find()` (Step 1.8.1) carry no `SocialAccount`/organization
   parameter, the org is resolved from the authenticated user the same way every controller in
   this app does (`$request->user()->organization`, see `.junie/modules/settings.md`), and the
-  vendor's required `profile` param from that org's first *connected* TikTok `SocialAccount`; no
+  vendor's required `profile` param from that org's first _connected_ TikTok `SocialAccount`; no
   authenticated org or no connected TikTok account both short-circuit to an
   empty-collection/`null` result (logged) rather than an exception. `find()` has no matching
   "get track by id" vendor endpoint, so it re-uses the same search endpoint (unfiltered query,
@@ -185,7 +188,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   configured `graph_base_url`'s host ends with `facebook.com` before issuing any Graph API call —
   production had `FACEBOOK_GRAPH_BASE_URL` typo'd as `https://graph.facebook.co` (missing the
   trailing `m`), which previously surfaced only as an opaque `cURL error 60: SSL: no alternative
-  certificate subject name matches target host name` deep inside Guzzle. A mismatched host now
+certificate subject name matches target host name` deep inside Guzzle. A mismatched host now
   throws a `RuntimeException` with the bad URL in the message, caught by the existing
   `handleCallback()` try/catch and surfaced as a normal flash error instead of a 500. Covered by
   `FacebookInstagramConnectControllerTest::test_callback_fails_gracefully_when_graph_base_url_is_misconfigured`.
@@ -207,6 +210,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   `download_url`/`on_platform_audio_preview_link` → `previewUrl`. The access token is never logged.
 
 ### Publish pipeline (Steps I-1.2 / I-1.3 / I-1.4)
+
 - **Dispatch id (I-1.2).** `posts.publish_dispatch_id` (uuid). `TransitionPostStatusAction` writes
   a fresh one on every move into `scheduled` and clears it on the way out; `PublishPostJob`
   carries the id it was dispatched with and no-ops (logged `info`) when it no longer matches, so
@@ -263,6 +267,7 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
 ## Phase M-2 — Publishing parity (Steps M-2.1 to M-2.9, `mvp.md`)
 
 ### Capability registry (M-2.1 / I-3.3)
+
 - `config/platforms.php` is the single source of truth for every platform rule: caption/title
   limits, hashtag policy (`hashtags`, `max_hashtags`, `hashtag_spacer`), link policy
   (`links_in_caption`, `link_field`), first comment / alt text support, text-only, per-account
@@ -284,18 +289,19 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
   fails on a distinctive caption limit or a `Platform::X => <number>` rule anywhere in `app/`.
 
 ### Capabilities (M-0.2 audit, against docs.upload-post.com on 19 Oct 2026)
-| Platform | Publish | Formats (vendor media type) | First comment | Alt text | Link | Notes |
-|---|---|---|---|---|---|---|
-| Instagram | Upload-Post | feed (IMAGE), carousel ≤10, reel (REELS), story (STORIES) | yes | yes (`instagram_alt_text`) | no (bio) | cover `cover_url`, `thumb_offset` |
-| TikTok | Upload-Post | video, photo mode ≤35 | yes | no | no | cover `tiktok_cover_image_url`, `cover_timestamp` |
-| Facebook | Upload-Post | post (POSTS/VIDEO), reel (REELS), story (STORIES) | yes | yes | in caption | `facebook_page_id` setting |
-| LinkedIn | Upload-Post | post (text, ≤20 images, video) | yes | yes | in caption | `target_linkedin_page_id`; AI images never re-encoded |
-| YouTube Shorts | Upload-Post (`/upload`) | short (≤180s, vertical) | yes | no | in description | `youtube_title` = caption's first line (≤100), `privacyStatus=public` |
-| Google Business | Upload-Post | update (1 image/≤30s video) | no | no | `gbp_cta_url` + LEARN_MORE | hashtags dropped; `gbp_location_id` setting |
-| Threads | Upload-Post | post (text, ≤20 media) | yes | yes | in caption | 500 chars, 1 topic tag |
-| Pinterest | Upload-Post | pin, carousel 2–5 | no | yes | `pinterest_link` | **requires** `pinterest_board_id`; not on the hosted connect page's `platforms` list |
-| X | Upload-Post | post (text, ≤4 images, video) | yes | yes | in caption | 280 chars; no fold spacer |
-| Bluesky | — | — | — | — | — | **Deferred** (MVP note: only if cheap; not in this phase) |
+
+| Platform        | Publish                 | Formats (vendor media type)                               | First comment | Alt text                   | Link                       | Notes                                                                                |
+| --------------- | ----------------------- | --------------------------------------------------------- | ------------- | -------------------------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| Instagram       | Upload-Post             | feed (IMAGE), carousel ≤10, reel (REELS), story (STORIES) | yes           | yes (`instagram_alt_text`) | no (bio)                   | cover `cover_url`, `thumb_offset`                                                    |
+| TikTok          | Upload-Post             | video, photo mode ≤35                                     | yes           | no                         | no                         | cover `tiktok_cover_image_url`, `cover_timestamp`                                    |
+| Facebook        | Upload-Post             | post (POSTS/VIDEO), reel (REELS), story (STORIES)         | yes           | yes                        | in caption                 | `facebook_page_id` setting                                                           |
+| LinkedIn        | Upload-Post             | post (text, ≤20 images, video)                            | yes           | yes                        | in caption                 | `target_linkedin_page_id`; AI images never re-encoded                                |
+| YouTube Shorts  | Upload-Post (`/upload`) | short (≤180s, vertical)                                   | yes           | no                         | in description             | `youtube_title` = caption's first line (≤100), `privacyStatus=public`                |
+| Google Business | Upload-Post             | update (1 image/≤30s video)                               | no            | no                         | `gbp_cta_url` + LEARN_MORE | hashtags dropped; `gbp_location_id` setting                                          |
+| Threads         | Upload-Post             | post (text, ≤20 media)                                    | yes           | yes                        | in caption                 | 500 chars, 1 topic tag                                                               |
+| Pinterest       | Upload-Post             | pin, carousel 2–5                                         | no            | yes                        | `pinterest_link`           | **requires** `pinterest_board_id`; not on the hosted connect page's `platforms` list |
+| X               | Upload-Post             | post (text, ≤4 images, video)                             | yes           | yes                        | in caption                 | 280 chars; no fold spacer                                                            |
+| Bluesky         | —                       | —                                                         | —             | —                          | —                          | **Deferred** (MVP note: only if cheap; not in this phase)                            |
 
 Cancel/edit: `DELETE` / `PATCH /uploadposts/schedule/{job_id}` (media, profile and platforms can't be
 edited, so we cancel and re-submit). Connect links: `generate-jwt` `access_url`, valid 48h, meant to
@@ -303,6 +309,7 @@ be handed to end users (used by M-2.8). Webhooks: `POST /uploadposts/users/notif
 `app.upload-post.com` returns `webhook_secret`.
 
 #### Analytics & comments (M-0.2 audit, docs.upload-post.com `get-analytics` / `comments`, 19 Oct 2026)
+
 Endpoints: profile metrics `GET /analytics/{profile}` (followers, reach, views, impressions,
 profileViews, likes, comments, shares, saves), totals `GET /uploadposts/total-impressions/{profile}`,
 per post `GET /uploadposts/post-analytics/{request_id}` / `?platform_post_id=` (live) / `/cached`
@@ -313,17 +320,17 @@ per post `GET /uploadposts/post-analytics/{request_id}` / `?platform_post_id=` (
 called by `App\Services\Inbox\UploadPostCommentSource`** (the social inbox) for the seven supported
 networks; hide/like/pin and delete remain unused. See `inbox.md`.
 
-| Platform | Account metrics (M-3) | Post metrics (M-3) | Read comments (M-9) | Reply (M-9) | Source |
-|---|---|---|---|---|---|
-| Instagram | yes | yes | yes | yes (needs `comment_id`) | Upload-Post; Meta Graph fallback |
-| Facebook | yes | yes | yes | yes | Upload-Post; Meta Graph fallback |
-| TikTok | yes (+ audience insights) | yes | yes (reconnect first) | yes | Upload-Post |
-| LinkedIn | yes | yes | yes | yes | Upload-Post |
-| YouTube Shorts | yes (+ watch time) | yes | yes | yes | Upload-Post |
-| Threads | yes | yes | yes | yes (can't delete) | Upload-Post |
-| X | yes | live only (not cached) | yes | yes | Upload-Post |
-| Pinterest | yes (+ pin / outbound clicks) | yes | no | no | Upload-Post; comments **deferred** |
-| Google Business | yes | **no** | no | no | Upload-Post account level only; per post and reviews **deferred** (B-11.5 if needed) |
+| Platform        | Account metrics (M-3)         | Post metrics (M-3)     | Read comments (M-9)   | Reply (M-9)              | Source                                                                               |
+| --------------- | ----------------------------- | ---------------------- | --------------------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| Instagram       | yes                           | yes                    | yes                   | yes (needs `comment_id`) | Upload-Post; Meta Graph fallback                                                     |
+| Facebook        | yes                           | yes                    | yes                   | yes                      | Upload-Post; Meta Graph fallback                                                     |
+| TikTok          | yes (+ audience insights)     | yes                    | yes (reconnect first) | yes                      | Upload-Post                                                                          |
+| LinkedIn        | yes                           | yes                    | yes                   | yes                      | Upload-Post                                                                          |
+| YouTube Shorts  | yes (+ watch time)            | yes                    | yes                   | yes                      | Upload-Post                                                                          |
+| Threads         | yes                           | yes                    | yes                   | yes (can't delete)       | Upload-Post                                                                          |
+| X               | yes                           | live only (not cached) | yes                   | yes                      | Upload-Post                                                                          |
+| Pinterest       | yes (+ pin / outbound clicks) | yes                    | no                    | no                       | Upload-Post; comments **deferred**                                                   |
+| Google Business | yes                           | **no**                 | no                    | no                       | Upload-Post account level only; per post and reviews **deferred** (B-11.5 if needed) |
 
 Dependent phases: **M-2.8** connect link → Upload-Post `access_url` (confirmed hand-off-able).
 **M-3.1** metrics → Upload-Post for all nine networks (Google Business per post shows "not available
@@ -332,6 +339,7 @@ Business deferred; the M-9.1 `CommentSource` contract's Meta Graph implementatio
 Upload-Post's Instagram/Facebook comments prove unreliable in the sandbox.
 
 #### Meta app (Graph) scopes
+
 The direct Meta app (`config/services.php` `facebook`) only requests `instagram_basic` +
 `instagram_content_publish` (audio search, Step 1.9; token refresh, M-2.7). Upload-Post holds its own
 Meta app approval for publishing, insights and comments, so **M-3 and M-9 need no new Meta scopes**
@@ -342,9 +350,11 @@ weeks of lead time. The current review status must be read from the Meta develop
 this audit can't reach.
 
 #### Vendor cost (upload-post.com pricing, 19 Oct 2026, USD monthly / annual per month)
+
 Free 2 profiles (10 uploads) · Basic $24 / $16, 5 profiles · Professional $50 / $33, 25 · Advanced
 $147 / $118, 75 · Business $438 / $350, 225 (unlimited via API). Add-on packs of 5 to 50 profiles at
 $15 to $115. Uploads are unlimited on paid plans.
+
 - **Today each org brings its own Upload-Post key** (`organizations.upload_post_key`), so the vendor
   cost sits with the agency, not Alima. M-10 must decide whether that stays or moves to one platform
   key (the M-10.1 margin question).
@@ -356,7 +366,8 @@ $15 to $115. Uploads are unlimited on paid plans.
   5-pack ($39) / Professional / Advanced. Revisit before M-10.1.
 
 ### Per-channel content & formats (M-2.2 / M-2.3, I-3.1 / I-3.2)
-- `UploadPostAdapter::buildFields()` publishes the *target's* effective caption / hashtags / link
+
+- `UploadPostAdapter::buildFields()` publishes the _target's_ effective caption / hashtags / link
   (override or master) composed by `App\Support\Publishing\CaptionComposer` (link appended only
   where there's no link field and caption links work; hashtags dropped where unused; dot-dash
   spacer only where `hashtag_spacer`), sends `{prefix}_title` always, `description` where
@@ -369,11 +380,12 @@ $15 to $115. Uploads are unlimited on paid plans.
   range clamp). Carousel order = `post_assets.sort_order`.
 
 ### Cancel, edit after scheduling, webhook (M-2.5 / I-3.6)
+
 - Contract: `cancel(PostTarget): CancelResult` (authenticates per org; only a confirmed 2xx is
   success, 404/409 = `tooLate`), `registerWebhook(Organization, url): ?string`.
 - A channel sent with a future `scheduled_date` is **vendor-held** (`PostTarget::isVendorHeld()`);
   `Post::canBeRecalled()` = `publishing`, at least one held, every channel held or failed.
-- `App\Services\Publishing\VendorScheduleService::recall()` cancels held channels *before* any
+- `App\Services\Publishing\VendorScheduleService::recall()` cancels held channels _before_ any
   change (throws a validation error naming the channel if the vendor refuses — nothing changes),
   `resubmit()` sends recalled channels again after commit (new attempt ids, Step I-1.3 batch).
   Used by: unschedule (`publishing → approved/draft`, new map edges guarded by policy +
@@ -383,8 +395,9 @@ $15 to $115. Uploads are unlimited on paid plans.
   (unless a secret was typed in with it) and stores the returned secret.
 
 ### Hand-off at scheduling time (2026-10-20)
+
 - Scheduling a post now sends it to Upload-Post straight away. `TransitionPostStatusAction::
-  dispatchPublishJob()` queues `App\Jobs\SendScheduledPostToVendorJob` (undelayed, `publishing`
+dispatchPublishJob()` queues `App\Jobs\SendScheduledPostToVendorJob` (undelayed, `publishing`
   queue, unique per post + dispatch id) next to the delayed `PublishPostJob`. It sends every
   unsent channel due more than `LEAD_MINUTES` (5) ahead through the normal `PublishPostTargetJob`
   batch, so the adapter adds `scheduled_date` and the vendor holds it. The post **stays
@@ -414,12 +427,14 @@ $15 to $115. Uploads are unlimited on paid plans.
 - Tests: `tests/Feature/Publishing/ScheduledPostHandOffTest.php`.
 
 ### More networks & rollout (M-2.6 / I-3.4)
+
 - `Platform`: YouTube, GoogleBusiness, Threads, Pinterest, X. `PlatformRolloutStage`: YouTubeShorts,
   GoogleBusiness, Threads, Pinterest, X, each with a `PUBLISH_ROLLOUT_*` flag (default on) and
   `forPlatform()`. The editor and the account form only offer enabled platforms; the connect page is
   narrowed to the account's network where `hosted_connect`.
 
 ## Phase M-3 additions (Step M-3.1)
+
 - `SyncPublishStatusAction` takes an optional `VendorPostRef` (`App\Support\Publishing`): a
   confirmed target stores `published_at` plus the vendor's `request_id` (`vendor_request_id`), the
   network's post id (`result.publish_id` / `post_id` → `platform_post_id`) and `result.url`
@@ -430,6 +445,7 @@ $15 to $115. Uploads are unlimited on paid plans.
   `account_metrics` / `post_metrics` flags say where metrics exist (Google Business: account only).
 
 ## Phase M-1 additions (Step M-1.1 / I-16.1)
+
 - `post_targets.publish_correlation_id` (migration `2026_10_22_100000_…`): the correlation id of
   the request/job that sent the target to the vendor, stamped next to `publish_requested_at` in
   `PublishPostTargetJob::claim()`.
@@ -444,6 +460,7 @@ $15 to $115. Uploads are unlimited on paid plans.
 ## Phase B-5 — Publishing without vendor keys (business workspaces)
 
 ### Credentials seam (B-5.1)
+
 - `App\Contracts\PublishCredentials` (bound to `App\Services\Publishing\OrganizationOrPlatformCredentials`
   in `AppServiceProvider`) is now the **single seam** for vendor credentials — nothing reads
   `organizations.upload_post_key` / `upload_post_webhook_secret` directly any more. Methods:
@@ -464,17 +481,18 @@ $15 to $115. Uploads are unlimited on paid plans.
   `RegisterUploadPostWebhookAction` stays byo-only (a managed org has no per-org key to save).
 
 ### One vendor profile per client (bugfix)
+
 **Upload-Post plans are counted in profiles, and a profile holds at most one connected account per
 platform** (publishing addresses `user` + `platform`; the Facebook/LinkedIn/Google-Business pins are
-single-valued). A profile per *account* therefore burned five plan profiles on one client with five
-networks; a profile per *organization* broke as soon as a second brand wanted the same network.
+single-valued). A profile per _account_ therefore burned five plan profiles on one client with five
+networks; a profile per _organization_ broke as soon as a second brand wanted the same network.
 
 - `social_accounts.upload_post_profile` (nullable, `#[Hidden]`) holds the account's vendor profile.
 - `App\Actions\SocialAccounts\EnsurePublishProfileAction` resolves it: the stored value if there is
   one, else a sibling account's profile **of the same client** that has no live account on this
   platform, else a newly minted `alima-client-{client_id}-{random8}`. Idempotent, and the only
   writer of the column.
-- A client with two accounts on the *same* platform genuinely needs two profiles — the vendor
+- A client with two accounts on the _same_ platform genuinely needs two profiles — the vendor
   cannot address both under one `user`.
 - A deleted account counts as holding a profile but **not** a platform slot, so deleting and
   re-adding an account reclaims its old profile instead of burning another one.
@@ -494,6 +512,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   single field breaks the second account of every client.
 
 ### Plain-language publish failures (B-5.3)
+
 - `App\Enums\PublishFailureReason`: `classify(?string $error, ?Platform): self` maps a raw vendor
   error to a cause (`token_expired`, `video_too_long`, `media_too_large`, `unsupported_media`,
   `link_rejected`, `duplicate_content`, `rate_limited`, `permission_denied`, `not_enabled_yet`,
@@ -510,8 +529,9 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `toMail`, so no business failure is silent.
 
 ## Routes / Controllers
+
 - No dedicated `/posts/:id/schedule` route — Step 1.4 reuses the existing `POST
-  /posts/{post}/transition` endpoint (`posts.transition`) as the schedule trigger. See
+/posts/{post}/transition` endpoint (`posts.transition`) as the schedule trigger. See
   `posts.md` for the full flow (`TransitionPostRequest` re-validates the §6 checklist before
   `scheduled` is even a legal `to` value; `TransitionPostStatusAction` enqueues `PublishPostJob`
   once the transition to `scheduled` lands).
@@ -556,7 +576,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `MusicTrack` as `{id, name, artist, preview_url}` JSON. When `MusicProvider` throws
   `App\Exceptions\Publishing\MusicProviderUnavailableException` (Step 1.8.6 bugfix — see below),
   the response is `{tracks: [], error: '<reason>', error_code: '<code>'}` instead of a bare empty
-  result, so the editor can tell the user *why* (no connected account, vendor rejected the
+  result, so the editor can tell the user _why_ (no connected account, vendor rejected the
   request, TikTok needs reconnecting, Instagram not connected via Facebook) rather than assuming
   search is broken. `error_code` (Step 1.9.5, e.g. `meta_not_connected`) is the exception's
   `errorCode()` — `null` unless the provider set one — and lets the editor UI render an actionable
@@ -587,6 +607,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   other server-to-server callback.
 
 ## Business Rules
+
 - **The publish webhook fails closed.** `UploadPostWebhookController` refuses any delivery it
   cannot verify — including one for an organization that has not stored a webhook secret yet. It
   used to trust those, which meant anyone who learned a `job_id` could mark a post published (with
@@ -596,14 +617,14 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
 - `publishing.webhook_allow_unsigned` (`PUBLISH_WEBHOOK_ALLOW_UNSIGNED`) accepts unsigned
   deliveries. It is a local-development escape hatch for replaying a captured payload with `curl`
   and must stay false in every deployed environment.
-- Signature *shape* checks (fresh numeric timestamp, `sha256=` prefix) run before the `PostTarget`
+- Signature _shape_ checks (fresh numeric timestamp, `sha256=` prefix) run before the `PostTarget`
   lookup, so an unsigned flood costs no queries. The HMAC itself needs the target's organization to
   resolve the secret, so it is checked after.
 - The interface is the single seam between the app and any publishing vendor — no Action/Controller
   should call a vendor SDK/HTTP client directly; they depend on `App\Contracts\PublishAdapter`.
 - `NullPublishAdapter` intentionally fails every `publish()` target and reports unhealthy accounts, so
   accidentally binding it in a non-test environment is loud rather than silently "succeeding".
-- `UploadPostAdapter` always authenticates with the *target account's own organization's*
+- `UploadPostAdapter` always authenticates with the _target account's own organization's_
   `upload_post_key` — never a shared/global key — so a per-org key rotation or omission only affects
   that org's publish calls.
 - `TargetResult::sentFields`/`skippedFields` must stay accurate: any field the adapter didn't actually
@@ -614,7 +635,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `UploadPostMusicProvider` never calls the vendor for a platform it can't actually query (only
   TikTok today) — it returns an empty-collection/`null` result instead, matching the pattern
   `PlatformRolloutGate` already uses to keep an unsupported target from ever reaching Upload-Post.
-- Step 1.8.6 bugfix: when TikTok search/find *can't* reach a real answer for a reason the editor
+- Step 1.8.6 bugfix: when TikTok search/find _can't_ reach a real answer for a reason the editor
   should actually know about — no connected TikTok `SocialAccount` for the org, the vendor request
   failing outright, or the vendor rejecting it (e.g. `tiktok_reconnect_required` when the linked
   profile's TikTok OAuth has expired/was never completed) — `UploadPostMusicProvider` now throws
@@ -628,6 +649,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   failures.
 
 ## Tests
+
 - `tests/Feature/Publishing/PublishPipelineTest.php` (Steps I-1.2/I-1.3): unschedule → reschedule
   leaves one effective publish; dragging a scheduled post re-dispatches and the stale job no-ops; a
   post moved earlier is queued for the new time; one target failing while another succeeds ends
@@ -648,7 +670,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `handleCallback`/`cancel` don't throw).
 - `tests/Unit/Services/Publishing/UploadPostAdapterTest.php`: asserts `UploadPostAdapter` is the default
   binding, and — using `Http::fake()` — that `publish()` sends the correct request (URL, `Authorization:
-  Apikey {org upload_post_key}`, body fields) for LinkedIn (common fields only), Instagram (location/
+Apikey {org upload_post_key}`, body fields) for LinkedIn (common fields only), Instagram (location/
   media_type/audio mapping), and TikTok (music/location mapping, `is_ai_generated` skipped for
   non-AI media; `tests/Feature/AI/ImageStudioHousekeepingTest.php` asserts it is sent for AI media), plus that a non-2xx vendor response yields a failed `TargetResult` with the vendor's error.
   Also covers `checkStatus()`'s resolved (matching-platform and top-level-fallback)/still-processing/
@@ -666,7 +688,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `Http::fake()` — that `search()` sends the correct request (`profile` from the acting org's
   connected TikTok account, `q`, `Authorization: Apikey {org upload_post_key}`) and maps `tracks[]`
   to `MusicTrack` DTOs; that `search()`/`find()` never call the vendor for Instagram (still an
-  empty-collection/`null`, since no vendor endpoint exists there); and that `search()` now *throws*
+  empty-collection/`null`, since no vendor endpoint exists there); and that `search()` now _throws_
   `MusicProviderUnavailableException` (rather than silently returning empty) for an org with no
   connected TikTok account, when the vendor request fails outright, and when the vendor rejects it
   — including a dedicated reconnect-specific message for `error_code: tiktok_reconnect_required`.
@@ -713,6 +735,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `UploadPostAdapter::publish()`'s `audio_id` field, unchanged from the Step 1.2 mapping.
 
 ## Known Gaps / Open Questions
+
 - Phase M-2 (2026-10-20): field names for the five new networks come from Upload-Post's docs and are
   covered by faked-vendor tests only — confirm each against a live sandbox before relying on it, and
   switch a flag off (`PUBLISH_ROLLOUT_*`) if it disagrees. Pinterest isn't on the hosted connect
@@ -729,10 +752,10 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
 - Resolved 2026-09-20: `PublishPostJob` used to resolve every target's `published`/`failed` status
   synchronously from the immediate HTTP response to `publish()`, which meant a post scheduled with
   Upload-Post could show `published` in Graphy well before the vendor actually delivered it (it
-  only means the request was *accepted*). `PublishPostJob` now leaves an accepted target `pending`
+  only means the request was _accepted_). `PublishPostJob` now leaves an accepted target `pending`
   and the post `publishing`, relying on the already-built `SyncPublishStatusAction`
   webhook/poll machinery to confirm real delivery before marking `published`. One residual risk: if
-  an org has no `upload_post_webhook_secret` configured *and* the vendor never resolves a
+  an org has no `upload_post_webhook_secret` configured _and_ the vendor never resolves a
   `checkStatus()` call to `completed`/`failed`, a post could stay `publishing` indefinitely with no
   automatic timeout/alerting — worth revisiting (e.g. a max-age check in
   `PollPendingPublishStatusesCommand`) if this is observed in practice.
@@ -807,6 +830,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   against the real API docs/sandbox if this proves too loose or too strict.
 
 ## Changelog
+
 - 2026-11-07: **Security — the publish webhook fails closed.** A delivery for an organization with
   no stored webhook secret was previously accepted unverified (`return true` with a log warning);
   it is now refused with a 401 and a `webhooks.upload_post.secret_missing` ops alert. Signature
@@ -814,7 +838,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `$request->all()` (attacker-chosen content on a public endpoint) and records only `job_id`,
   `platform` and the payload's key names. New `publishing.webhook_allow_unsigned` escape hatch,
   default false and asserted so. New `Tests\Concerns\SignsUploadPostWebhooks` — every test about
-  what a publish outcome *does* now signs its delivery. Tests:
+  what a publish outcome _does_ now signs its delivery. Tests:
   `UploadPostWebhookControllerTest` (+4: unsigned-no-secret refusal, signed-no-secret refusal with
   alert, escape hatch on and off by default, malformed header refusal), `EngagementSyncTest` (2
   webhook tests now signed). Found by the audit in `.junie/plans/market-readiness-audit.md`
@@ -961,28 +985,28 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   endpoint/payload/signature shape from the initial Step 1.5 pass with the real, documented
   contract fetched from https://docs.upload-post.com/api/webhooks and
   https://docs.upload-post.com/api/upload-status:
-  - `UploadPostAdapter::checkStatus()` now calls the real `GET /uploadposts/status?request_id=
-    &job_id=` endpoint (both params sent, since the caller doesn't track which flavor of id it
-    captured), resolves only on a top-level `completed`/`failed` status, and prefers a matching
-    entry in the response's per-platform `results[]` over the top-level status/message when one
-    exists (a single job can report several platforms' outcomes).
-  - `publishToTarget()` now captures `job_id` (falling back to `request_id`/`id`) as
-    `externalPostId`, since a scheduled publish returns `job_id`.
-  - `UploadPostWebhookController` now only handles the `upload_completed` event, reads `job_id`/
-    `platform`/`result.success`/`result.error` (not `request_id`/`status`/`error`), matches the
-    `PostTarget` on both `job_id` *and* the target's account platform (one `job_id` fans out to
-    one event per platform), and verifies `X-Upload-Post-Signature: sha256=<hex>` against
-    `HMAC_SHA256(secret, "{X-Upload-Post-Timestamp}.{raw body}")` with a 5-minute replay window —
-    not the previously-guessed plain `HMAC_SHA256(secret, raw body)`.
-  - Moved the webhook signing secret from a single `config('services.upload_post.webhook_secret')`
-    (env `UPLOAD_POST_WEBHOOK_SECRET`) to a new encrypted `organizations.upload_post_webhook_secret`
-    column (migration `2026_09_20_181800_add_upload_post_webhook_secret_to_organizations_table`),
-    since Upload-Post issues one secret per account — resolved from the matched target's
-    organization, alongside a new field on the Organization settings page/form. No automated way
-    to populate it yet (see Known Gaps).
-  - Updated `UploadPostAdapterTest`'s `checkStatus()` cases and rewrote
-    `UploadPostWebhookControllerTest` end-to-end for the real payload/signature shape, adding a
-    stale-timestamp-rejection and an unrelated-event-is-a-no-op test.
+    - `UploadPostAdapter::checkStatus()` now calls the real `GET /uploadposts/status?request_id=
+&job_id=` endpoint (both params sent, since the caller doesn't track which flavor of id it
+      captured), resolves only on a top-level `completed`/`failed` status, and prefers a matching
+      entry in the response's per-platform `results[]` over the top-level status/message when one
+      exists (a single job can report several platforms' outcomes).
+    - `publishToTarget()` now captures `job_id` (falling back to `request_id`/`id`) as
+      `externalPostId`, since a scheduled publish returns `job_id`.
+    - `UploadPostWebhookController` now only handles the `upload_completed` event, reads `job_id`/
+      `platform`/`result.success`/`result.error` (not `request_id`/`status`/`error`), matches the
+      `PostTarget` on both `job_id` _and_ the target's account platform (one `job_id` fans out to
+      one event per platform), and verifies `X-Upload-Post-Signature: sha256=<hex>` against
+      `HMAC_SHA256(secret, "{X-Upload-Post-Timestamp}.{raw body}")` with a 5-minute replay window —
+      not the previously-guessed plain `HMAC_SHA256(secret, raw body)`.
+    - Moved the webhook signing secret from a single `config('services.upload_post.webhook_secret')`
+      (env `UPLOAD_POST_WEBHOOK_SECRET`) to a new encrypted `organizations.upload_post_webhook_secret`
+      column (migration `2026_09_20_181800_add_upload_post_webhook_secret_to_organizations_table`),
+      since Upload-Post issues one secret per account — resolved from the matched target's
+      organization, alongside a new field on the Organization settings page/form. No automated way
+      to populate it yet (see Known Gaps).
+    - Updated `UploadPostAdapterTest`'s `checkStatus()` cases and rewrote
+      `UploadPostWebhookControllerTest` end-to-end for the real payload/signature shape, adding a
+      stale-timestamp-rejection and an unrelated-event-is-a-no-op test.
 - 2026-09-20: Bugfix — hashtags never showed up on published Instagram posts even though the
   caption and media published correctly. Per Upload-Post's real API reference
   (https://docs.upload-post.com/api/reference), there is no generic `hashtags` upload parameter —
@@ -998,7 +1022,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   before the vendor actually delivered it, because `PublishPostJob` treated a successful `publish()`
   response (`TargetResult::ok`) as final proof of delivery and immediately marked the target
   `published` and transitioned the post to `published`. In reality `ok: true` only means the vendor
-  *accepted* the request (returning a `job_id`/`request_id` to track it) — for a future-dated
+  _accepted_ the request (returning a `job_id`/`request_id` to track it) — for a future-dated
   `scheduled_date` the actual post to the social platform can happen much later. Fixed by having
   `PublishPostJob` leave an accepted target `pending` and the post `publishing`, so the post is only
   finalized to `published`/`failed` once the already-built `SyncPublishStatusAction` webhook/poll
@@ -1021,7 +1045,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   convention documented at https://docs.upload-post.com/api/upload-video#platform-specific-titles)
   that the previous fix only ever covered Instagram (`instagram_title`): TikTok, Facebook, and
   LinkedIn posts never got hashtags at all, since Upload-Post has no generic `hashtags` upload
-  parameter for *any* platform (only the unrelated TikTok hashtag-suggestions endpoint has a
+  parameter for _any_ platform (only the unrelated TikTok hashtag-suggestions endpoint has a
   `hashtags` field) — those three platforms were still sending only the plain `title` (no
   hashtags) with no override. The Instagram-only hashtag/spacer logic in
   `applyInstagramFields()` was extracted into a new `applyHashtagCaptionOverride()`, now called for
@@ -1032,7 +1056,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   with no override sent. Added
   `UploadPostAdapterTest::test_tiktok_facebook_and_linkedin_publish_append_hashtags_to_their_own_title_override`
   covering all three previously-unfixed platforms.
-- 2026-09-22: Bugfix (2nd follow-up) — user reported hashtags were *still* not reaching Instagram
+- 2026-09-22: Bugfix (2nd follow-up) — user reported hashtags were _still_ not reaching Instagram
   and pointed at Upload-Post's docs mentioning a `description` parameter for the caption/hashtags.
   Re-verified against the real per-platform tables in
   https://docs.upload-post.com/api/upload-video and https://docs.upload-post.com/api/upload-photo:
@@ -1047,10 +1071,10 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `[platform]_title`-only override left hashtags off the actual visible caption on those three
   platforms. `applyHashtagCaptionOverride()` now also sends the generic `description` field (same
   caption+hashtags text) for TikTok/Facebook/LinkedIn, while still deliberately omitting it for
-  Instagram. Updated `UploadPostAdapterTest`'s Instagram test to assert `description` is *not*
-  sent, and the TikTok/Facebook/LinkedIn test to assert `description` *is* sent alongside the
+  Instagram. Updated `UploadPostAdapterTest`'s Instagram test to assert `description` is _not_
+  sent, and the TikTok/Facebook/LinkedIn test to assert `description` _is_ sent alongside the
   title override.
-- 2026-09-22: Bugfix (3rd follow-up) — user reported hashtags were *still* missing on Instagram
+- 2026-09-22: Bugfix (3rd follow-up) — user reported hashtags were _still_ missing on Instagram
   even with the `instagram_title` + generic `description` combination, and pointed at Upload-Post's
   own docs example that appends hashtags directly inline in the plain `title` field itself
   (`-F 'title="Check out our new launch! #tech #startup #launch"'`, per
@@ -1081,7 +1105,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   `PlatformRolloutGateTest` and two new `UploadPostAdapterTest` cases (disabled stage skips the
   vendor; enabled stage calls it).
 - 2026-09-23: Step 1.8.1 — added `App\Contracts\MusicProvider` (`search(string $query, Platform
-  $platform): Collection<MusicTrack>` and `find(string $id, Platform $platform): ?MusicTrack`) and
+$platform): Collection<MusicTrack>` and `find(string $id, Platform $platform): ?MusicTrack`) and
   `App\Support\Publishing\MusicTrack` (readonly DTO: `id`, `name`, `artist`, `previewUrl`,
   `platform`), mirroring the `PublishAdapter`/`TargetResult` pattern so the sound-library vendor
   stays swappable/mockable. Contract-only step — no default binding, adapter, Action, or UI yet
@@ -1126,7 +1150,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   Upload-Post response and assert the track's id lands on `audio_id` (Instagram) /
   `tiktok_music_id` (TikTok) in the request actually sent to the vendor. Closes out Step 1.8.
 - 2026-09-23: Step 1.8.6 — bugfix: user reported the editor's music search "just returns an empty
-  array of tracks" for both Instagram and TikTok. Reproduced against the *real* Upload-Post API
+  array of tracks" for both Instagram and TikTok. Reproduced against the _real_ Upload-Post API
   (using a live org `upload_post_key`): the HTTP integration itself is correct (confirmed the
   vendor's actual `PROFILE_NOT_FOUND`/`tiktok_reconnect_required` responses round-trip through
   `fetchTracks()` exactly as expected) — Instagram has no vendor endpoint at all (unfixable without
@@ -1189,7 +1213,7 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
 - 2026-10-20: Step M-1.1: `publish_correlation_id`, trace ids in the publishing jobs and webhook, alert on bad webhook signatures and failed publishing jobs (`ObservabilityTest`).
 - 2026-10-21: Bugfix — moving a post to `scheduled` surfaced a per-channel error like
   `instagram (graphystudio.co): Attempted to lazy load [organization] on model
-  [App\Models\SocialAccount] but lazy loading is disabled.` `UploadPostAdapter::baseRequest()`
+[App\Models\SocialAccount] but lazy loading is disabled.` `UploadPostAdapter::baseRequest()`
   reads the Upload-Post API key from `$account->organization`, but `PublishPostTargetJob` loads
   the account via `Post::with('targets.socialAccount', …)` (no `.organization`), so the relation
   was unloaded and, with `Model::preventLazyLoading()` on outside production, the access threw;

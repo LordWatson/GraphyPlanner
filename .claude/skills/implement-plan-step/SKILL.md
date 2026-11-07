@@ -6,6 +6,7 @@ description: Implement a numbered step from .junie/plans/graphy-development-step
 # Implement a Graphy plan step
 
 ## 1. Load context (do not skip)
+
 1. Read `.junie/AGENTS.md` (core principles).
 2. Find the step in `.junie/plans/graphy-development-steps.md` (`grep -n "### Step X.Y"`), read it plus
    its phase intro and any "Done when"/exit criteria. Steps marked ✅ are done — confirm with the user
@@ -14,6 +15,7 @@ description: Implement a numbered step from .junie/plans/graphy-development-step
 4. If the step has UI, read `.junie/brand-guidelines.md` and use the `graphy-frontend-page` skill.
 
 ## 2. Build it in this order
+
 1. **Enum / migration / model / factory** — migrations named `YYYY_MM_DD_HHMMSS_...`; every
    org-owned table has `org_id`; add a factory (tests depend on them).
 2. **Contract** in `app/Contracts` if there is (or will be) more than one implementation or it hits an
@@ -32,6 +34,7 @@ description: Implement a numbered step from .junie/plans/graphy-development-step
    `Http::fake`, role/tenant denial cases).
 
 ## 3. Finish
+
 1. Run the `graphy-checks` skill.
 2. Update the module doc + README status table + the step heading (`✅ Done`) — use the
    `sync-module-docs` skill.

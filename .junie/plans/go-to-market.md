@@ -9,7 +9,7 @@ found two things had changed:
    their free plans, Planable lists MCP on every tier including Basic, and Hootsuite has
    product-level MCPs. Our MCP server (`.junie/modules/mcp.md`) is still far deeper — org-scoped,
    capability-gated, rate-limited, audited, per-org kill switch, checked-in security review — but
-   "we have agent access and they don't" is dead as a pitch. The claim becomes *depth*, not
+   "we have agent access and they don't" is dead as a pitch. The claim becomes _depth_, not
    existence (GTM-7.4).
 2. **Planoly now bundles most of CG-3/CG-4 at $14/month, on every plan**: grid planner, link in bio,
    zero-fee selling of downloads/services/bookings, physical merch, Instagram auto-DMs and a CRM.
@@ -22,6 +22,7 @@ things that shipped half-done, and close the three gaps that genuinely disqualif
 (no white label, no benchmarking, no email).
 
 Read along:
+
 - `.junie/plans/business-competitor-gap.md` — the CG phases. Steps here that say "**Closes CG-x.y**"
   build that step and mark **both** done.
 - `.junie/plans/business-workspaces.md` — the B phases and the resolved-decisions log.
@@ -41,7 +42,7 @@ Read along:
 3. **Every new capability is an `Entitlements` gate.** A new `Feature` case, a default in
    `$gateDefaults`/`$limitDefaults`, a value per plan, and one test per gate. A feature that cannot
    be sold per plan is not finished.
-4. **Cheap versions of table stakes.** We build the *credible* version of listening and ads
+4. **Cheap versions of table stakes.** We build the _credible_ version of listening and ads
    reporting (GTM-4, GTM-5), not the real one. Both are scheduled reads over data we already have
    access to, surfaced in the report the client already receives.
 5. **Thin controllers, Actions/Services, transactions, logging, tests, module docs** — as
@@ -89,11 +90,11 @@ product than we already ship. This step is a config change and a pricing page ro
 
 - Decide the agency tier shape. Starting proposal from the November review (confirm or change):
 
-  | Plan | Price | Brands | Seats | Notes |
-  |---|---|---|---|---|
-  | `agency_starter` | £49 / $59 | 5 | 3 | No white label |
-  | `agency_standard` | £99 / $119 | 15 | 10 | White label (GTM-3.1), benchmarks (GTM-4) |
-  | `agency_scale` | £199 / $239 | 50 | unlimited | Adds ads reporting (GTM-5), priority support |
+    | Plan              | Price       | Brands | Seats     | Notes                                        |
+    | ----------------- | ----------- | ------ | --------- | -------------------------------------------- |
+    | `agency_starter`  | £49 / $59   | 5      | 3         | No white label                               |
+    | `agency_standard` | £99 / $119  | 15     | 10        | White label (GTM-3.1), benchmarks (GTM-4)    |
+    | `agency_scale`    | £199 / $239 | 50     | unlimited | Adds ads reporting (GTM-5), priority support |
 
 - In `config/plans.php`: add the new plan keys with real `amount`s and `STRIPE_PRICE_AGENCY_*` env
   vars following the existing `business_pro` pattern, set `'public' => true`, set per-plan
@@ -125,10 +126,10 @@ page cannot be the headline. What Planoly, Stan and Beacons do **not** have is t
 publish-blocking disclosure and a media kit built from real metrics.
 
 - Pick one of two routes and record it:
-  - **(a) Hold £29 and change the story.** Creator Pro leads on "get paid, stay legal": deals
-    tracker, ASA/FTC disclosure enforcement, media kit with real data and sponsor share-preview.
-    Store and bio become supporting bullets, not the headline.
-  - **(b) Cut to £19/$24 and add email.** Matches the mid-market and makes GTM-2 the thing that
+    - **(a) Hold £29 and change the story.** Creator Pro leads on "get paid, stay legal": deals
+      tracker, ASA/FTC disclosure enforcement, media kit with real data and sponsor share-preview.
+      Store and bio become supporting bullets, not the headline.
+    - **(b) Cut to £19/$24 and add email.** Matches the mid-market and makes GTM-2 the thing that
     justifies the price, as it does at Stan ($29 with email marketing).
 - Rewrite `creator_pro.tagline` and `highlights` in `config/plans.php` to match the chosen route.
   The current tagline ("a storefront that pays you 100%") is the Planoly-overlapping claim.
@@ -168,8 +169,8 @@ The store is live and CG-0.2 was never answered. This is the launch blocker.
 Three known loose ends from CG-4 and CG-5, each flagged in its own module doc.
 
 **One thing changed shape.** GTM-1.1's "point the download path at S3" turned out to be two
-different jobs: the *code* (which was the real gap — the whole file was read into memory, and a
-file on the `public` disk could be sold) and the *deployment* (`composer require
+different jobs: the _code_ (which was the real gap — the whole file was read into memory, and a
+file on the `public` disk could be sold) and the _deployment_ (`composer require
 league/flysystem-aws-s3-v3`, `ASSETS_DISK=s3`, `AWS_*`). The code is done and tested; the
 dependency is **not installed** and the env is not set, because which bucket/provider holds paid
 customer files is an ops decision, not a code one. `assets.md` and `creator-store.md` now say
@@ -216,7 +217,7 @@ exactly that instead of "S3 is still pending".
   second time, so neither case leaves a partial invoice.
 - **Two deviations, both deliberate.** (1) **The deal's `DealStatus` is not moved.** The done-when
   asked for "the status moving once and only once", but `brand-deals.md` records that `DealStatus`
-  is *not* a state machine — the owner sets whichever status is true — and billing isn't delivery.
+  is _not_ a state machine — the owner sets whichever status is true — and billing isn't delivery.
   `invoice_id` is the thing that moves once, and that is what the test asserts. (2) **It is not a
   Stripe-hosted invoice** through the connected account, as the step title suggests; it is our own
   invoice, as the step body asks for. Nothing charges a card.
@@ -236,21 +237,21 @@ exactly that instead of "S3 is still pending".
 - **Done 2026-11-07.** The sweep found the docs honest: every "not built"/"still pending" hit
   outside a Known Gaps section is a dated changelog entry (history, not a current claim). The two
   live ones were closed by GTM-1.1 and GTM-1.2. Decisions recorded:
-  - **CG-3.2's AI "Draft my page" stays unbuilt for launch.** Nothing in the bio editor offers it,
-    so no copy promises a missing button (the "Draft with AI" in `business/onboarding.tsx` is the
-    brand-voice draft, which is built). Recorded in `bio-pages.md`.
-  - **The comment inbox is on Free** — answers CG open question §5.6. `business_free` now grants
-    `Feature::Inbox`, which is what the never-hard-gated `/inbox` surface already did, so the
-    config stops claiming otherwise. Buffer includes it everywhere, it is the daily-return surface,
-    its cost is bounded by Free's 3-account cap, and gating it now would take a shipped surface off
-    existing free workspaces. One config line to reverse. Recorded in `plans.md` and marked
-    answered in `business-competitor-gap.md`; the invariant test now names this one exception.
-  - **`/pricing` states the store's tax position** — sales are paid into the creator's own Stripe
-    account, so they are the seller of record and their own VAT/sales tax is theirs. Said before
-    the first sale rather than discovered after it. (This does **not** answer GTM-0.3, which is
-    still the launch blocker.)
-  - **`business_free` cannot sell at all today** (`Feature::Store` is off), so GTM-0.3's question 5
-    is a decision to make, not a hole to plug. Noted in `creator-store.md`.
+    - **CG-3.2's AI "Draft my page" stays unbuilt for launch.** Nothing in the bio editor offers it,
+      so no copy promises a missing button (the "Draft with AI" in `business/onboarding.tsx` is the
+      brand-voice draft, which is built). Recorded in `bio-pages.md`.
+    - **The comment inbox is on Free** — answers CG open question §5.6. `business_free` now grants
+      `Feature::Inbox`, which is what the never-hard-gated `/inbox` surface already did, so the
+      config stops claiming otherwise. Buffer includes it everywhere, it is the daily-return surface,
+      its cost is bounded by Free's 3-account cap, and gating it now would take a shipped surface off
+      existing free workspaces. One config line to reverse. Recorded in `plans.md` and marked
+      answered in `business-competitor-gap.md`; the invariant test now names this one exception.
+    - **`/pricing` states the store's tax position** — sales are paid into the creator's own Stripe
+      account, so they are the seller of record and their own VAT/sales tax is theirs. Said before
+      the first sale rather than discovered after it. (This does **not** answer GTM-0.3, which is
+      still the launch blocker.)
+    - **`business_free` cannot sell at all today** (`Feature::Store` is off), so GTM-0.3's question 5
+      is a decision to make, not a hole to plug. Noted in `creator-store.md`.
 
 ---
 
@@ -313,7 +314,7 @@ products to a buyer on the soft opt-in. `AudienceTrigger::requiresConsent()` is 
   plan without `EmailAutomation`.
 - **Built 2026-11-07.** One `audience_sends` row per contact + trigger + reference, claimed with
   `insertOrIgnore` **before** the mailable reaches the queue: a duplicate email can't be taken back,
-  a missing one can be re-sent. `SendAudienceTriggerJob` exists for the *delay*, not the queue —
+  a missing one can be re-sent. `SendAudienceTriggerJob` exists for the _delay_, not the queue —
   the purchase follow-up goes a day later and the consent and unsubscribe checks have to run at
   delivery, not at dispatch.
 - **Two simplifications.** The abandoned trigger fires from the existing hourly
@@ -341,7 +342,7 @@ products to a buyer on the soft opt-in. `AudienceTrigger::requiresConsent()` is 
   `WritingTool::Expand` on the owner's notes), so it inherits the Brand Brain grounding, the
   banned-phrase guardrail and the `AiTextCredits` metering without a new provider method
   (`shortcut: it writes the body, not the subject line; upgrade to its own AiProvider method when
-  subject lines or longer-form structure are wanted`).
+subject lines or longer-form structure are wanted`).
 
 ---
 
@@ -464,7 +465,7 @@ pattern.
 - **Adding a profile reads it immediately.** A handle we will never get a figure for says so there
   and then instead of looking fine until the next morning.
 - **One thing this step taught the plan config:** a new limit case defaults to `null`, which means
-  *unlimited*, so forgetting one plan gives the feature away. Noted in `plans.md`.
+  _unlimited_, so forgetting one plan gives the feature away. Noted in `plans.md`.
 
 ### Step GTM-4.2 — Benchmark view and report block [V1] ✅ Done
 
@@ -666,7 +667,7 @@ we are absent from it.
 - **A payout is a record of money already sent, not an instruction to send any.** There is no
   payment integration, on purpose: paying a partner is a bank transfer and a conversation, and
   automating it before the first partner exists would be building the wrong thing twice. What is
-  *owed* is derived when somebody settles up, so there is only ever one number that can be wrong.
+  _owed_ is derived when somebody settles up, so there is only ever one number that can be wrong.
 - Comparison and partner links are in the marketing footer, because an unlinked page earns nothing;
   a test asserts the footer slugs against config so the two can't drift.
 - **Not done: the graphics.** The comparison pages are text. No screenshots, no feature-matrix
@@ -736,13 +737,13 @@ clock is running.
 
 Every phase is built except the parts that are not code:
 
-| Phase | State |
-|---|---|
-| GTM-0 | Done except **GTM-0.3**, which is the only launch blocker left |
-| GTM-1, GTM-2, GTM-3, GTM-4, GTM-7 | Done |
-| GTM-5 | Code done; **off until `ADS_PROVIDER=meta` and `ads_read` on our Meta app** |
-| GTM-6 | Wrapper, listing copy and data-safety done; **Play listing and the on-device push check are outstanding** |
-| GTM-8 | Nothing to build, by design |
+| Phase                             | State                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| GTM-0                             | Done except **GTM-0.3**, which is the only launch blocker left                                            |
+| GTM-1, GTM-2, GTM-3, GTM-4, GTM-7 | Done                                                                                                      |
+| GTM-5                             | Code done; **off until `ADS_PROVIDER=meta` and `ads_read` on our Meta app**                               |
+| GTM-6                             | Wrapper, listing copy and data-safety done; **Play listing and the on-device push check are outstanding** |
+| GTM-8                             | Nothing to build, by design                                                                               |
 
 **The three things only a person can close**, in order of what blocks what:
 

@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
 import { Pagination } from '@/components/pagination';
 import { AssetLibraryDialog } from '@/components/post-editor/asset-library-dialog';
-import { UploadTile } from '@/components/post-editor/media-picker';
+import { UploadTile } from '@/components/post-editor/media-tiles';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { http } from '@/lib/http';

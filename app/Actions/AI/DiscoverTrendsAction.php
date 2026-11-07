@@ -33,7 +33,7 @@ class DiscoverTrendsAction
     private const CACHE_TTL_SECONDS = 2 * 60 * 60;
 
     /**
-     * How each source labels DeepSeek's model trends (as opposed to live signal).
+     * How each source labels Anthropic's model trends (as opposed to live signal).
      */
     private const MODEL_SOURCE = 'AI hypothesis';
 

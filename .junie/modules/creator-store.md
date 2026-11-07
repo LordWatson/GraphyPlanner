@@ -1,6 +1,7 @@
 # Creator Store
 
 ## Purpose
+
 Phase CG-4 of `.junie/plans/business-competitor-gap.md`. A creator sells from their bio handle —
 digital downloads, bookings, a tip jar and paid questions — and is **paid directly into their own
 Stripe account at a 0% platform fee** (Principle 3: Alima's money comes from the subscription, not a
@@ -17,6 +18,7 @@ and secret, and its own tables. Nothing is shared — a delivery signed for one 
 other (covered by a test).
 
 ## Models / Tables
+
 All created by `database/migrations/2026_11_20_100100_create_creator_store_tables.php`. Money is
 **always minor units** (`*_minor`, pence/cents) — never a float, anywhere.
 
@@ -44,6 +46,7 @@ All created by `database/migrations/2026_11_20_100100_create_creator_store_table
   idempotency ledger, deliberately **not** Cashier's `stripe_webhook_events`.
 
 ## Enums
+
 - `App\Enums\ProductType`: `download`, `booking`, `tip`, `qa`. Behaviour lives on the enum:
   `buyerSetsAmount()` (tips), `isAuthorisedThenCaptured()` (Q&A), `takesBuyerMessage()`.
 - `App\Enums\ProductStatus`: `draft`, `live`, `archived`. Only `live` renders or takes a checkout.
@@ -52,6 +55,7 @@ All created by `database/migrations/2026_11_20_100100_create_creator_store_table
 - `App\Enums\Feature::Store` — the plan gate (Creator Pro; see `plans.md`).
 
 ## Contracts / Services
+
 - `App\Contracts\PaymentProvider` — `createConnectedAccount`, `onboardingLink`, `accountStatus`,
   `createCheckout`, `capture`, `cancelAuthorisation`, `refund`, `verifyWebhook`.
 - `App\Services\Payments\StripeConnectProvider` — stripe-php (**not** Cashier). Every charge is a
@@ -59,7 +63,7 @@ All created by `database/migrations/2026_11_20_100100_create_creator_store_table
   `application_fee_amount`**: the money never touches Alima's balance. A Q&A session is created with
   `capture_method: manual`. Failures are normalised to `PaymentProviderException`, whose
   `friendlyMessage()` is what the UI shows — the vendor's own wording never reaches a page.
-- `App\Services\Payments\NullPaymentProvider` — dev/CI with no keys. Fakes the *shape* of checkout
+- `App\Services\Payments\NullPaymentProvider` — dev/CI with no keys. Fakes the _shape_ of checkout
   and **refuses every webhook**: with no signing secret there is nothing to verify, and waving
   deliveries through would be a hole in a money path.
 - Bound in `AppServiceProvider` only when `payments.provider = stripe` **and** a Connect secret
@@ -69,6 +73,7 @@ All created by `database/migrations/2026_11_20_100100_create_creator_store_table
   like a post's `scheduled_at_utc`.
 
 ## Actions
+
 - `StartConnectOnboardingAction` — creates the connected account on first run (inside a
   `lockForUpdate()` transaction, so two tabs can't open two Stripe accounts) and returns the hosted
   onboarding link. Checks `Feature::Store`.
@@ -105,8 +110,10 @@ All created by `database/migrations/2026_11_20_100100_create_creator_store_table
   copy as the fallback when AI is off or failing. Suggested slots come from `BestTimeService`.
 
 ## Routes / Controllers
+
 Business shell (`workspace:business`; every mutation needs the brand-**update** ability, i.e.
 Owner/Manager — money is not a Designer's or Viewer's to move):
+
 - `GET /store` → `Business\StoreController@index`; `POST /store/setup` → hosted onboarding
   (`Inertia::location`); `GET /store/return` → sync on the way back from Stripe.
 - `POST|PUT|DELETE /store/products[/{product}]` → `Business\ProductController` ("delete" archives, so
@@ -116,11 +123,13 @@ Owner/Manager — money is not a Designer's or Viewer's to move):
 - `POST /store/products/{product}/launch` → `StoreController@launch` (CG-4.7).
 
 Public, on the bio handle (guest, `throttle:public-token`):
+
 - `GET /@{handle}/p/{product}`, `POST /@{handle}/p/{product}/checkout`,
   `GET /@{handle}/thanks/{order}`, `POST /@{handle}/thanks/{order}/resend` (throttled 6/min)
   → `Store\CheckoutController`.
 
 Signed-link only (`['signed', 'throttle:public-token']`) — the signature **is** the authorisation:
+
 - `GET /store/download/{order}` → `Store\DownloadController`.
 - `GET|POST /store/booking/{order}[/move|/cancel]` → `Store\BookingController`.
 
@@ -134,7 +143,8 @@ Frontend: `pages/business/store.tsx`, `components/store/product-form.tsx`, `page
 `StatusPill` kinds `order` and `product` in `resources/js/lib/status.ts`.
 
 ## Business Rules
-- **A coupon redemption is claimed at checkout *start* and released when the sale does not
+
+- **A coupon redemption is claimed at checkout _start_ and released when the sale does not
   happen.** `Coupon::releaseRedemption()` is called by `ExpireStaleOrdersAction` (abandoned
   checkout), `RefundOrderAction` and the webhook's `charge.refunded` path. Without the release a
   capped code was spent by people who changed their mind — fifty abandoned tabs killed a
@@ -182,6 +192,7 @@ Frontend: `pages/business/store.tsx`, `components/store/product-form.tsx`, `page
   the `marketing_opt_in` box on the checkout form sets it. See `audience.md`.
 
 ## Tests
+
 - `tests/Feature/Store/CreatorStoreTest.php` — products created/archived behind the gate; a Free
   workspace can't create one; a Designer can't touch products, refunds or answers; another brand's
   product 404s; a live download needs a file (a draft needn't), and refuses a public-disk or
@@ -213,7 +224,7 @@ super-admin billing switch defaults off, so nothing is live today — that is th
 preventing it, and it is not a deliberate guard. Reviewed and deliberately left open at GTM-0, since
 answering 1–4 needs an accountant, not a developer.
 
-1. **Which legal entity holds the Stripe platform account** (UK or UAE), for Cashier *and* for
+1. **Which legal entity holds the Stripe platform account** (UK or UAE), for Cashier _and_ for
    Connect. Decides where our subscription revenue and the platform relationship sit.
 2. **Connect account type.** Express is the recommendation on file: Stripe-hosted onboarding and
    dashboard, least compliance surface for us. Not yet confirmed.
@@ -232,6 +243,7 @@ When answered: record the answers here, mark CG-0.2 and GTM-0.3 done, and update
 an answer changes them.
 
 ### Other gaps
+
 - **S3 is one ops step away, not a code gap** (Step GTM-1.1). The download path goes through
   `AssetStorage` end to end and streams whatever disk is configured, and a file on the `public` disk
   is now refused outright, so CG-4.3's "paid downloads must not be served from local disk" is
@@ -249,7 +261,7 @@ an answer changes them.
 - **Tax/receipt numbering, partial refunds and multi-item carts** are deliberately absent.
 - **An abandoned checkout spends a coupon redemption** until the hourly command cancels the order;
   the redemption is not given back on cancellation (`shortcut: a cancelled order keeps its
-  redemption, upgrade when a creator complains about a code running out`).
+redemption, upgrade when a creator complains about a code running out`).
 - **B-13.1 (abuse/cost safeguards) and B-13.2 (export/deletion)** are the plan's prerequisites for
   real money. Checkout is throttled and the webhook is signed and idempotent, but card-testing
   defence beyond Stripe's own, and export/deletion covering `products`/`orders`/`order_events`/
@@ -260,6 +272,7 @@ an answer changes them.
   Stripe dashboard shows the sale but not a catalogue.
 
 ## Gotchas
+
 - **Never point the Connect env vars at Cashier's.** `STRIPE_CONNECT_SECRET` /
   `STRIPE_CONNECT_WEBHOOK_SECRET` are separate from `STRIPE_SECRET` / `STRIPE_WEBHOOK_SECRET` on
   purpose; sharing them would break the isolation the plan's Principle 4 asks for (and the test that
@@ -272,16 +285,17 @@ an answer changes them.
   claiming the sale, and the email is the real delivery.
 
 ## Changelog
+
 - 2026-11-07: **Losing the booking race is a message, not an error page.** The unique index on
   `(product_id, starts_at)` is what decides the last slot, and the losing insert threw a
   `QueryException` nothing caught — so the second buyer got Laravel's error page on a public page,
   mid-purchase. The violation is now caught and rethrown as the `CheckoutUnavailableException` the
-  code already had the sentence for, out of the transaction so the order *and* any coupon
+  code already had the sentence for, out of the transaction so the order _and_ any coupon
   redemption roll back. `CheckoutController::checkout()` also has a catch-all now: a public money
   page must never render an error page. Tests: `CheckoutTest::test_losing_the_booking_race_is_a_message_not_an_error_page`.
   Audit finding 6.
 - 2026-11-07: **Bugfix — a failed Connect webhook handler no longer loses a paid order.** The claim
-  row was written with `processed_at = now()` *before* the event was handled, so a handler that
+  row was written with `processed_at = now()` _before_ the event was handled, so a handler that
   threw returned a 500, Stripe's retry was dismissed as a replay, and the card stayed charged
   against an order stuck `pending` with no deliveries left to come. `processed_at` is now nullable
   (migration `2027_01_23_100100_make_connect_webhook_events_processed_at_nullable`), stamped only

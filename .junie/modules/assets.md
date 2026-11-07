@@ -1,6 +1,7 @@
 # Assets
 
 ## Purpose
+
 Covers the asset half of Step 0.7: `Asset`s (uploaded files, Figma links, external URLs, and AI
 generated images) that belong to a client and optionally a campaign, and are consumed by
 `Post`/`PostTarget` (Step 0.8+). Also covers the storage seam (`AssetStorage`), private media
@@ -8,6 +9,7 @@ generated images) that belong to a client and optionally a campaign, and are con
 shared campaigns & assets doc in Step C-0.1).
 
 ## Models / Tables
+
 - `Asset` (`assets`): `org_id`, `client_id` (FKs, cascade on delete), `campaign_id` (nullable FK,
   null on delete), `uploaded_by` (nullable FK to `users`, null on delete), `source` (enum:
   upload/figma/url/ai), `type` (nullable enum: image/video/document/other), `disk`/`path` (populated
@@ -22,6 +24,7 @@ shared campaigns & assets doc in Step C-0.1).
   definitions in the same spirit as prior steps — revisit if the original spec surfaces later.
 
 ## Actions / Services / Contracts
+
 - `App\Contracts\AssetStorage`: abstracts where/how an uploaded file is stored (`store`, `url`,
   `signedUrl`, `delete`, `storeContents`, `contents`, `readStream`) so the spec §10 Upload-Post-style
   signed-URL/S3 flow can be dropped in later without touching any Action/Controller.
@@ -101,6 +104,7 @@ shared campaigns & assets doc in Step C-0.1).
   `AssetPreview` show it. Thumbnails are included in a client purge (`StoredFileInventory`).
 
 ## Phase M-1 additions (Step M-1.2 / I-16.2)
+
 - `App\Rules\SafeUpload` on `StoreAssetRequest`, `UploadBrandPersonaRequest` and
   `UploadInvoicePdfRequest`: the extension must be allowed **and** the type sniffed from the
   file's content must fit it (a `.jpg` must be an image; a renamed HTML/script file is refused);
@@ -113,13 +117,14 @@ shared campaigns & assets doc in Step C-0.1).
   (`frontend.md`).
 
 ## Routes / Controllers
+
 - `GET /clients/{client}/media` → `clients.media` (`ClientTabController::media`) — the client
   Assets tab (header props only; the library is browsed through the dialog below).
 - `GET /clients/{client}/assets` → `clients.assets.index` (`AssetController::index`, also under
   `preview.`) — JSON only. `SearchAssetsRequest` authorizes `AssetPolicy::viewAny` for the client
   and validates `search` (≤100 chars), `type` (`AssetType`) and `page`; delegates to
   `SearchClientAssetsAction`. Returns `{data: [{id, url, original_filename, type, is_ai_generated,
-  campaign_name, created_at, can: {delete}}], meta: {current_page, last_page, per_page, total}}`.
+campaign_name, created_at, can: {delete}}], meta: {current_page, last_page, per_page, total}}`.
   Backs the post editor's "Browse library" dialog (see `posts.md`) and the client Assets tab's
   library dialog.
 - `POST /clients/{client}/assets` → `clients.assets.store` (`AssetController::store`) — validated via
@@ -135,6 +140,7 @@ shared campaigns & assets doc in Step C-0.1).
   `manage` mode.
 
 ## Business Rules
+
 - Owner/Strategist/**Designer** can upload/link assets; Designer may only delete assets they
   personally uploaded. Viewer/Client reviewer cannot create assets (Client reviewer can view them via
   `viewAny`, same scoping as elsewhere).
@@ -154,6 +160,7 @@ shared campaigns & assets doc in Step C-0.1).
   rejects as an unterminated string literal while SQLite (the test database) accepts it.
 
 ## Tests
+
 - `tests/Feature/AssetControllerTest.php`: uploads (Owner, Designer, video auto-typing, video size
   limit, disallowed extensions), Figma links, validation, Viewer forbidden, deletion, Client
   reviewer scoping, the paginated/searchable/type-filtered library JSON, per-asset `can.delete`,
@@ -161,6 +168,7 @@ shared campaigns & assets doc in Step C-0.1).
 - `tests/Unit/Services/AI/Images/ImageStorageTest.php`: AI image storage.
 
 ## Known Gaps / Open Questions
+
 - **S3 is now installable but not deployed.** `league/flysystem-aws-s3-v3` is installed, so
   `ASSETS_DISK=s3` works; the bucket, the CDN in front of it and the env switch are outstanding.
   Until that is done the app cannot run on more than one web node — a file uploaded on node A does
@@ -185,11 +193,12 @@ shared campaigns & assets doc in Step C-0.1).
   `campaigns.md`.
 
 ## Changelog
+
 - 2026-11-07: **S3 made usable, and a way to move what is already stored.**
   `league/flysystem-aws-s3-v3` installed (`ASSETS_DISK=s3` previously failed at runtime, not boot).
   New `php artisan storage:migrate-disk --from=local --to=s3` (`MigrateStoredFilesDiskCommand`):
   copies every stored file to another disk and repoints the rows. It covers **all six** tables that
-  hold a file — `assets` (original *and* probe thumbnail, one disk column, two paths),
+  hold a file — `assets` (original _and_ probe thumbnail, one disk column, two paths),
   `brand_brains.persona_*`, `invoices.pdf_*`, `ai_image_variants.preview_*`,
   `brand_brain_reference_assets.normalized_*` and `organizations.brand_logo_*` — streams rather
   than reading files whole, never deletes the source (re-runnable and reversible), rewrites the

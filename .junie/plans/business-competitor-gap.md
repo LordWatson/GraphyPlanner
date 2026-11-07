@@ -85,32 +85,35 @@ never builds the same thing twice. How to use it (same rules as the other plans)
 ## Phase CG-0 — Decisions & groundwork
 
 ### Step CG-0.1 — Record positioning and pricing [MVP]
+
 - Write the decisions into `.junie/modules/business-workspaces.md` (Resolved open questions):
   positioning ("the AI marketing partner for one brand"), plan names and prices, currencies, and
   what each plan includes.
 - Starting proposal from the review (to confirm or change):
 
-  | Plan | Price | Includes |
-  |---|---|---|
-  | `business_free` | £0 | ~3 accounts, 30 scheduled posts/month, small AI allowance |
-  | `business_pro` | £15/month | 1 brand, all networks, unlimited scheduling, full AI allowance, insights + digest, grid planner, inbox |
-  | `creator_pro` | £29/month | Pro + public media kit, deals tracker, link in bio, store at 0% fee, 2 seats |
+    | Plan            | Price     | Includes                                                                                               |
+    | --------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+    | `business_free` | £0        | ~3 accounts, 30 scheduled posts/month, small AI allowance                                              |
+    | `business_pro`  | £15/month | 1 brand, all networks, unlimited scheduling, full AI allowance, insights + digest, grid planner, inbox |
+    | `creator_pro`   | £29/month | Pro + public media kit, deals tracker, link in bio, store at 0% fee, 2 seats                           |
 
-  Annual = two months free. USD equivalents for the US market are set in the same config.
+    Annual = two months free. USD equivalents for the US market are set in the same config.
+
 - **Done when**: the module doc records the final plan table and the open question §5.2 of
   `business-workspaces.md` (free tier) is marked resolved with these limits.
 
 ### Step CG-0.2 — Payments, tax and entity decisions [MVP]
+
 - Decide and record:
-  1. Which legal entity (UK or UAE) holds the Stripe platform account for Cashier and for Connect.
-  2. Connect account type (Express recommended: Stripe-hosted onboarding and dashboard, least
-     compliance surface for us).
-  3. Sales tax/VAT on creators' sales: the creator's responsibility with Stripe Tax offered on their
-     connected account (Planoly/Stan model), or a merchant-of-record partner (Fourthwall/Gumroad
-     model). Get an accountant's view on UK/EU VAT for digital goods first.
-  4. Launch currencies for creator sales (GBP + USD minimum; AED if Dubai matters early).
-  5. Whether the free plan can sell, and at what fee (Beacons 9%, Linktree 12%, Planoly no free web
-     plan).
+    1. Which legal entity (UK or UAE) holds the Stripe platform account for Cashier and for Connect.
+    2. Connect account type (Express recommended: Stripe-hosted onboarding and dashboard, least
+       compliance surface for us).
+    3. Sales tax/VAT on creators' sales: the creator's responsibility with Stripe Tax offered on their
+       connected account (Planoly/Stan model), or a merchant-of-record partner (Fourthwall/Gumroad
+       model). Get an accountant's view on UK/EU VAT for digital goods first.
+    4. Launch currencies for creator sales (GBP + USD minimum; AED if Dubai matters early).
+    5. Whether the free plan can sell, and at what fee (Beacons 9%, Linktree 12%, Planoly no free web
+       plan).
 - **Done when**: the answers are in the module doc and CG-4's steps are updated to match.
 
 ---
@@ -121,9 +124,11 @@ Goal: a solo user gets the grid planner, the comment inbox and real push reminde
 the features Planoly and Buffer lead with, and Alima already has all three.
 
 ### Step CG-1.1 — Comment inbox in the business shell [MVP] ✅ Done
+
 _Implemented 2026-10-27: the inbox is a shared `/inbox` surface (the `workspace:agency` guard dropped,
 page adapts via the `workspace` prop, `showAssignment` gated by seat count); comments surface on Today.
 See `inbox.md` / `business-workspaces.md`. Tests: `BusinessInboxTest`._
+
 - Today every inbox route sits under `['portal.redirect','workspace:agency']`. Add business routes
   (`business.` prefix, brand-implicit): `GET /inbox`, `GET /inbox/{conversation}`, `PATCH`,
   `POST …/reply`, `POST …/ai/draft`, `POST /inbox/refresh`, saved replies. Thin
@@ -139,9 +144,11 @@ See `inbox.md` / `business-workspaces.md`. Tests: `BusinessInboxTest`._
   stay green; `inbox.md` and `business-workspaces.md` are updated.
 
 ### Step CG-1.2 — Grid planner in the business shell [MVP] ✅ Done
+
 _Implemented 2026-10-27: `Business\GridController` (`/grid` hub + create) reusing the shared planner;
 `StoreGridPlanRequest` made brand-implicit; agency `/grids` hub now `workspace:agency`-guarded with a
 redirect to the business hub. See `grid-planner.md`. Tests: `BusinessGridTest`._
+
 - Brand-implicit business routes: `GET /grid` (the brand's grid plans), `GET /grid/{grid}/edit` and
   the existing tile/workflow/production/AI endpoints, resolving `{client}` from `CurrentWorkspace`
   (reuse `ResolvesWorkspaceBrand` in the shared Form Requests, as B-4 did).
@@ -157,11 +164,13 @@ redirect to the business hub. See `grid-planner.md`. Tests: `BusinessGridTest`._
   org; `grid-planner.md` and `business-workspaces.md` are updated.
 
 ### Step CG-1.3 — Deliver push reminders [MVP] ✅ Done
+
 _Implemented 2026-10-27: real `MinishlinkWebPushNotifier` (`minishlink/web-push`) behind a
 `push.transport` config switch (default `log`), plus the publish-failure and "nothing scheduled
 tomorrow" pushes. See `notifications.md`. Tests: `PushNotificationsTest`, `MinishlinkWebPushNotifierTest`.
 **Owner handoff:** generate the VAPID keys, set `PUSH_TRANSPORT=webpush`, and record the
 Android-Chrome / iOS-Safari device check in `business-workspaces.md`._
+
 - Bind a transport-backed `App\Contracts\PushNotifier` (Web Push with VAPID, e.g.
   `minishlink/web-push`) in place of the logging default when `push.enabled` and the VAPID key pair
   are set. Keys come from env only, never from props or logs.
@@ -174,9 +183,11 @@ Android-Chrome / iOS-Safari device check in `business-workspaces.md`._
   module doc.
 
 ### Step CG-1.4 — Today dashboard and copy for the new surfaces [V1] ✅ Done
+
 _Implemented 2026-10-27: Today's `needsYou` surfaces unanswered comments (CG-1.1) and grid-order-at-risk
 rows; `OnboardingProgress` gained the optional "Plan your grid" item for Instagram creators. See
 `business-workspaces.md`. Tests: `BusinessDashboardTest`, `OnboardingTest`._
+
 - Today's **needsYou** includes unanswered comments (CG-1.1) and grid order-at-risk (CG-1.2).
 - Onboarding checklist (`OnboardingProgress`) adds an optional "Plan your grid" item for Instagram
   creators.
@@ -203,6 +214,7 @@ little higher than GBP; the Stripe switch is global + per-org override. Inbox ga
 answered in Step GTM-1.3: Free includes the inbox, and the gate now says so._
 
 ### Step CG-2.1 — Plan definitions [MVP] ✅ Done
+
 - `config/plans.php` with `business_free`, `business_pro`, `creator_pro` (and `agency_*`
   unchanged = no limits). Each plan holds: GBP/USD monthly and annual Stripe price ids, limits for
   every `Feature`, and new boolean features this plan needs: `grid_planner`, `inbox`, `bio_page`,
@@ -211,6 +223,7 @@ answered in Step GTM-1.3: Free includes the inbox, and the gate now says so._
   plans are unlimited.
 
 ### Step CG-2.2 — `Entitlements` contract [MVP] ✅ Done
+
 - **Delivers B-9.1** as specified there, extended with the boolean features above
   (`allows(Organization, Feature)`), enforced in the Actions for CG-1.1, CG-1.2, CG-3 and CG-4
   surfaces as they land.
@@ -218,17 +231,20 @@ answered in Step GTM-1.3: Free includes the inbox, and the gate now says so._
   plan gets `PlanLimitReachedException`).
 
 ### Step CG-2.3 — AI allowance metering [MVP] ✅ Done
+
 - **Delivers B-9.2** unchanged. Allowances are set so `business_pro` beats Later Starter's 5
   credits/month by a wide margin while staying within DeepSeek/Gemini cost per seat.
 - **Done when**: B-9.2's done-when.
 
 ### Step CG-2.4 — Subscriptions with Cashier [MVP] ✅ Done
+
 - **Delivers B-9.3** (promoted from V1 to MVP: the review shows every competitor self-serves a
   trial and checkout). 14-day trial on paid plans. Stripe Checkout and Customer Portal, idempotent
   `SyncSubscriptionAction`, behind the `billing.enabled` Pennant flag.
 - **Done when**: B-9.3's done-when.
 
 ### Step CG-2.5 — Upgrade prompts and the plan page [MVP] ✅ Done
+
 - `/settings/plan`: current plan, usage meters (accounts, posts this month, AI credits), upgrade and
   manage-billing buttons. Limit hits render a friendly upgrade prompt (`PlanLimitReachedException` →
   Inertia flash + `EmptyState`-style panel naming the plan that unlocks it), never a 403.
@@ -236,10 +252,12 @@ answered in Step GTM-1.3: Free includes the inbox, and the gate now says so._
   never see billing.
 
 ### Step CG-2.6 — Super admin plan controls [V1] ✅ Done
+
 - **Delivers B-9.4** unchanged.
 - **Done when**: B-9.4's done-when.
 
 ### Step CG-2.7 — Pricing and segment pages [V1] ✅ Done
+
 - **Delivers B-12.2**: `/for-creators`, `/for-business` and a pricing table generated from
   `config/plans.php`. Copy leads with what we win on (AI that knows your brand, insights in plain
   words, nine networks). An optional "How we compare" table only states facts checked that day,
@@ -270,6 +288,7 @@ Instagram chrome; CG-3.2's AI "Draft my page" (Stretch) and I-10.4 link tracking
 the module doc's Known Gaps._
 
 ### Step CG-3.1 — Bio page model and public page [V1] ✅ Done
+
 - **Delivers B-11.3**, promoted from Stretch to V1.
 - `BioPage` (`bio_pages`: `org_id`, `client_id` unique, `handle` unique, `title`, `bio`,
   `theme` (brand tokens only, no raw hex), `published_at`) and `BioBlock` (`bio_blocks`:
@@ -283,6 +302,7 @@ the module doc's Known Gaps._
   render, and that a deleted brand's page 404s.
 
 ### Step CG-3.2 — Bio page editor [V1] ✅ Done (AI draft still Stretch, not built)
+
 - `GET/PUT /bio` in the business shell: add, reorder (drag), hide and edit blocks, with a live phone
   preview (reuse the grid planner's phone frame). Themes are presets derived from the Brand Brain
   palette.
@@ -293,6 +313,7 @@ the module doc's Known Gaps._
   and the AI draft never saving on its own.
 
 ### Step CG-3.3 — Clicks and insights [V1] ✅ Done
+
 - Count views and per-block clicks (I-10.4 link tracking, or a minimal `bio_events` table with
   daily rollups; no IPs stored raw). Show top links and views on `/insights`.
 - **Done when**: tests cover click counting, bot/self-click exclusion rules, and the insights section
@@ -328,6 +349,7 @@ Stripe's balance, no Stripe Tax/VAT (plan §5.2 still open), and an abandoned ch
 coupon redemption — see the module doc's Known Gaps._
 
 ### Step CG-4.1 — `PaymentProvider` contract and Stripe Connect onboarding [V1] ✅ Done
+
 - `App\Contracts\PaymentProvider` (`createConnectedAccount`, `onboardingLink`, `accountStatus`,
   `createCheckout`, `capture`, `cancelAuthorisation`, `refund`), bound to
   `App\Services\Payments\StripeConnectProvider` (stripe-php, **not** Cashier) and `NullPaymentProvider`.
@@ -340,10 +362,11 @@ coupon redemption — see the module doc's Known Gaps._
   disabled; replays are idempotent; no Connect secrets appear in props or logs.
 
 ### Step CG-4.2 — Products, checkout and orders [V1] ✅ Done
+
 - `products` (`org_id`, `client_id`, `type` enum `download|booking|tip|qa`, `title`, `description`,
   `price_minor`, `currency`, `status`, `cover_asset_id`), `orders` (`product_id`, buyer email/name,
   `amount_minor`, `currency`, `status` state machine `pending → paid → fulfilled | refunded |
-  cancelled`, `external_payment_id`), `order_events` (audit).
+cancelled`, `external_payment_id`), `order_events` (audit).
 - `CreateCheckoutAction` → Stripe Checkout on the connected account (direct charge, application fee
   0 per Principle 3), success/cancel pages on the bio domain. `checkout.session.completed` →
   `MarkOrderPaidAction` in a transaction.
@@ -352,6 +375,7 @@ coupon redemption — see the module doc's Known Gaps._
   status, double-delivery of the same webhook, currency mismatches, and org scoping.
 
 ### Step CG-4.3 — Digital downloads [V1] ✅ Done (S3 still pending — see the module doc)
+
 - Files via `AssetStorage` (S3, private). After payment, `FulfilDownloadAction` emails a receipt with
   a signed, expiring link (and a re-send page keyed by order + email). Download count and expiry are
   configurable per product.
@@ -359,12 +383,14 @@ coupon redemption — see the module doc's Known Gaps._
   no link, and that the file URL is never public.
 
 ### Step CG-4.4 — Coupons and checkout policies [V1] ✅ Done
+
 - `coupons` (code, percent/amount, expiry, usage limit, product scope) applied in
   `CreateCheckoutAction`. Store-level terms, privacy and refund text shown on checkout.
 - **Done when**: tests cover expiry, usage limits under concurrent redemption (row lock), and
   product scoping.
 
 ### Step CG-4.5 — Bookings, tips and paid Q&A [V1] ✅ Done
+
 - **Bookings:** availability windows + buffers on the product, slots generated in the brand's
   timezone (reuse `PostingGoalGapService`-style timezone maths), conflict check against existing
   bookings, buyer reschedule/cancel link, `.ics` attachment.
@@ -377,6 +403,7 @@ coupon redemption — see the module doc's Known Gaps._
   capture-on-answer, and expiry cancelling the authorisation.
 
 ### Step CG-4.6 — Earnings, orders and refunds [V1] ✅ Done
+
 - `/store` in the business shell: products, orders (DataTable), payout status from the connected
   account, and refunds (`RefundOrderAction` → provider → webhook confirms). Business copy only;
   status via `StatusPill`.
@@ -384,6 +411,7 @@ coupon redemption — see the module doc's Known Gaps._
   revokes download links.
 
 ### Step CG-4.7 — AI launch campaign from a product [V1] ✅ Done
+
 - The differentiator: `DraftLaunchCampaignAction` takes a product and the Brand Brain and drafts a
   collection (campaign) of launch posts (teaser, launch, reminder, social proof) with captions per
   platform, suggested dates from best times, and optional grid tiles. Everything is a **draft**;
@@ -414,10 +442,12 @@ deliverables are counts per platform, not named formats; nothing reminds the own
 and a new enquiry raises no notification — it waits on the page. See the module doc's Known Gaps._
 
 ### Step CG-5.1 — Paid partnership disclosure [V1] ✅ Done
+
 - **Delivers B-11.1** unchanged.
 - **Done when**: B-11.1's done-when.
 
 ### Step CG-5.2 — Brand deals tracker [V1] ✅ Done (no Stripe invoice — see the module doc)
+
 - **Delivers B-11.2**, promoted from Stretch to V1. Deals link to posts; deliverable progress fills
   as linked posts publish; opt-in feed to the media kit's "past partners".
 - Optional link to CG-4: a deal can raise a Stripe invoice through the connected account (Beacons
@@ -425,6 +455,7 @@ and a new enquiry raises no notification — it waits on the page. See the modul
 - **Done when**: B-11.2's done-when.
 
 ### Step CG-5.3 — Media kit rates and enquiries [Stretch] ✅ Done
+
 - Optional rates section on the media kit and an enquiry form that creates a draft deal (CG-5.2).
   Spam-protected (honeypot + throttle).
 - **Done when**: tests cover the enquiry creating a draft deal on the right brand and the throttle.
@@ -436,7 +467,9 @@ and a new enquiry raises no notification — it waits on the page. See the modul
 Goal: capture and nurture buyers and fans, matching Planoly's CRM and Stan's email flows.
 
 ### Step CG-6.1 — Buyers and subscribers [V1] ✅ Done
+
 _Built 2026-11-07 as Step GTM-2.1. See `audience.md`._
+
 - `audience_contacts` (`org_id`, `client_id`, email, name, source `order|bio_capture|import`,
   `consent_at`, `unsubscribed_at`), with an `email_capture` bio block (double opt-in), CSV import
   (opt-in email sent, never assumed consent), and a contacts list in the business shell.
@@ -444,22 +477,27 @@ _Built 2026-11-07 as Step GTM-2.1. See `audience.md`._
   export/deletion covering contacts.
 
 ### Step CG-6.2 — Automated emails [V1] ✅ Done
+
 _Built 2026-11-07 as Step GTM-2.2. One deviation: `purchase` and `abandoned` are treated as
 transactional (about the person's own order) and do not require a marketing opt-in, or neither
 could ever fire; both are still stopped by an unsubscribe, and a broadcast always needs confirmed
 consent. See `audience.md`._
+
 - Purchase follow-up, abandoned checkout (from `checkout.session.expired`) and welcome, sent through
   Resend with an unsubscribe link and the brand's styling. Queued, idempotent per contact + trigger.
 - **Done when**: tests cover each trigger firing once, unsubscribed contacts skipped, and the
   abandoned email cancelled if the order completes.
 
 ### Step CG-6.3 — Broadcasts with AI drafts [V1] ✅ Done
+
 _Built 2026-11-07 as Step GTM-2.3. See `audience.md`._
+
 - Write a one-off email to a segment (all, buyers of product X). "Draft with AI" fills it from the
   Brand Brain. The owner sends; AI never sends.
 - **Done when**: tests cover segment selection, the send being human-initiated only, and metering.
 
 ### Step CG-6.4 — Instagram auto-DM [Stretch]
+
 - Comment-keyword → DM with a link (Planoly/Stan feature). Depends on **Phase 5** (own Meta app) and
   Meta's messaging permissions. Opt-in per post, rate-limited, and logged.
 - **Done when**: blocked until Phase 5; then tests cover keyword match, one DM per user per post, and
@@ -470,6 +508,7 @@ _Built 2026-11-07 as Step GTM-2.3. See `audience.md`._
 ## Phase CG-7 — Merch, courses & memberships [Stretch]
 
 ### Step CG-7.1 — Print-on-demand merch [Stretch]
+
 - `App\Contracts\FulfilmentProvider` bound to a Printful implementation. Product type `merch`,
   catalogue picker, design upload, price editor showing profit after the manufacturing cost, order
   hand-off on payment, tracking emails, Printful's returns policy shown at checkout.
@@ -477,6 +516,7 @@ _Built 2026-11-07 as Step GTM-2.3. See `audience.md`._
   (refund + alert), and the profit calculation.
 
 ### Step CG-7.2 — Memberships and courses [Stretch]
+
 - Recurring products (Stripe subscriptions on the connected account) gating a members area of
   posts/files/videos. **Refunds and cancellations revoke access** (Planoly's known gap).
 - **Done when**: tests cover access granted on payment, revoked on refund/cancel/failed renewal.
@@ -486,11 +526,13 @@ _Built 2026-11-07 as Step GTM-2.3. See `audience.md`._
 ## Phase CG-8 — Mobile reach [Stretch]
 
 ### Step CG-8.1 — App-store presence decision [Stretch] ✅ Answered
+
 _Answered 2026-11-07 in Step GTM-6.1: **a Trusted Web Activity wrapping the existing PWA. Native is
 explicitly declined.** Web push already works through the same service worker inside a TWA, so there
 is no FCM project and no second notification path to keep alive. The wrapper, the listing copy and
 the data-safety declaration are in `android/`; the listing itself and the on-device push check are
 still outstanding. See `business-workspaces.md`._
+
 - Use CG-1.3 push delivery data and B-12.4 funnel metrics to decide between: keeping the PWA only,
   listing it in Google Play as a Trusted Web Activity, or a native app. Record the decision in the
   module doc.
@@ -501,16 +543,20 @@ still outstanding. See `business-workspaces.md`._
 ## Phase CG-9 — Launch & watch [V1]
 
 ### Step CG-9.1 — Funnel metrics [V1] ✅ Done
+
 _Built 2026-11-07 as Step GTM-7.1, which also delivers B-12.4. Store GMV is read from our own
 `orders`, never a Stripe balance, because creators are paid into their own connected accounts. See
 `super-admin.md`._
+
 - **Delivers B-12.4**, adding: trial start → paid conversion, time to first published post, % of
   creators with a published bio page, store GMV (from orders, not Stripe balance), churn by plan.
 - **Done when**: B-12.4's done-when plus fixtures for each new metric.
 
 ### Step CG-9.2 — Quarterly competitor review [V1] ✅ Done
+
 _Built 2026-11-07 as Step GTM-7.2: `competitors:review-due`, silent until the quarter is up. First
 review date 2027-02-05. It checks nothing automatically, on purpose._
+
 - A scheduled reminder (super admin notification) each quarter to re-check competitor pricing
   and refresh the gap analysis docs. The "How we compare" table (CG-2.7) is updated or removed.
 - **Done when**: the command and its test exist; the first review date is in the module doc.

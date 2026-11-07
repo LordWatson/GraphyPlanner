@@ -59,7 +59,7 @@
 > suppression plus an SPF/DKIM/DMARC check). Item 17's DNS records and the two-domain split are not
 > code and remain outstanding.
 >
-> **Verification as of 2026-11-07:** **2,498 tests, all passing on SQLite *and* MySQL 8.0.46**
+> **Verification as of 2026-11-07:** **2,498 tests, all passing on SQLite _and_ MySQL 8.0.46**
 > (identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
 > errors with nothing new. `composer audit` is clean. `npm run check` is **not** — see finding 30.
 >
@@ -90,6 +90,7 @@ assertions, 148s** (serially, with `memory_limit=1G` — see finding 11). Part 2
 competitor and agency pain-point research; sources are listed at the end.
 
 ---
+
 ---
 
 # Part 1 — Engineering findings
@@ -120,21 +121,22 @@ Concrete case: a user opens Posts, types `launch`, and gets a 500 error page. Sa
 searching their own posts in the portal, and for anyone searching the asset library.
 
 **Fix — step by step:**
+
 1. Stop using backslash as the escape character. Pick one no SQL engine treats specially.
 2. Add one shared helper, because the same two lines are copied three times. In `app/Support/`
    add `LikeSearch`:
-   ```php
-   /** A LIKE pattern matching the user's text literally, with `!` as the escape char. */
-   public static function literal(string $search): string
-   {
-       return '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search)).'%';
-   }
-   ```
+    ```php
+    /** A LIKE pattern matching the user's text literally, with `!` as the escape char. */
+    public static function literal(string $search): string
+    {
+        return '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search)).'%';
+    }
+    ```
 3. In each of the three Actions, replace the `addcslashes(...)` and `whereRaw(...)` lines with:
-   ```php
-   $query->whereRaw("lower({$column}) like ? escape '!'", [LikeSearch::literal($search)]);
-   ```
-   `'!'` needs no backslash, so it is safe in both MySQL and SQLite.
+    ```php
+    $query->whereRaw("lower({$column}) like ? escape '!'", [LikeSearch::literal($search)]);
+    ```
+    `'!'` needs no backslash, so it is safe in both MySQL and SQLite.
 4. Add one test that searches for a term containing `%` and `_`, asserting the literal row is
    found and a wildcard match is not.
 5. **Run that test against MySQL, not only SQLite.** Add a CI job that points
@@ -165,14 +167,14 @@ the same event twice, the controller inserts the Stripe event id into `connect_w
 
 **Problem — two parts.**
 
-*Part A: the claim is written before the work is done.* The row is inserted with
+_Part A: the claim is written before the work is done._ The row is inserted with
 `processed_at => now()`, which is a lie at that moment. If `MarkOrderPaidAction` then throws — the
 database hiccups, a mail driver is unreachable, a bug in fulfilment — the request returns 500.
 Stripe retries. The retry reaches `claim()`, finds the id already there, logs "replay ignored" and
 answers 200. **The sale is never marked paid, the buyer never gets their download, and Stripe
 stops retrying.** Money taken, nothing delivered.
 
-*Part B: the catch is too wide.* `catch (QueryException) { return false; }` treats *every*
+_Part B: the catch is too wide._ `catch (QueryException) { return false; }` treats _every_
 database error as "someone already claimed this". A dropped connection, a deadlock or a full disk
 all become a silently dropped paid order with a 200 response.
 
@@ -181,22 +183,23 @@ delivery 500s, the retry is swallowed as a replay, and the order sits `pending` 
 card has been charged.
 
 **Fix — step by step:**
+
 1. Claim the event id **without** `processed_at`:
    `ConnectWebhookEvent::create(['stripe_event_id' => $eventId, 'type' => $type]);`
 2. Narrow the catch to a genuine duplicate:
-   ```php
-   } catch (UniqueConstraintViolationException) {
-       return false;   // real replay
-   }
-   ```
-   Let every other `QueryException` propagate. A 500 that Stripe will retry is the correct answer
-   to "our database is broken".
+    ```php
+    } catch (UniqueConstraintViolationException) {
+        return false;   // real replay
+    }
+    ```
+    Let every other `QueryException` propagate. A 500 that Stripe will retry is the correct answer
+    to "our database is broken".
 3. Stamp `processed_at` only **after** the `match` block finishes without throwing.
 4. Treat an unfinished claim as retryable: when `claim()` finds an existing row whose
    `processed_at` is null and older than ~2 minutes, let the delivery through instead of calling
    it a replay.
 5. Add two tests: (a) a handler that throws leaves `processed_at` null and a second delivery
-   *does* process the order; (b) a second delivery of a fully processed event changes nothing.
+   _does_ process the order; (b) a second delivery of a fully processed event changes nothing.
 6. Grep `StripeWebhookEvent` and apply the same three changes if the subscription webhook uses
    the same pattern.
 
@@ -213,7 +216,7 @@ blanket `catch (QueryException)` is now `catch (UniqueConstraintViolationExcepti
 `ConnectWebhookTest` +4 (failed handler then successful retry; success stamps the claim; abandoned
 claim taken over; fresh claim left alone).
 **Step 6 resolved as "nothing to do":** `SyncSubscriptionOnStripeWebhook` already records the event
-*after* doing the work and uses `insertOrIgnore`, so Cashier's path never had this bug.
+_after_ doing the work and uses `insertOrIgnore`, so Cashier's path never had this bug.
 
 ---
 
@@ -225,7 +228,7 @@ claim taken over; fresh claim left alone).
 **What this is:** A coupon can be capped — "first 50 buyers". The cap is enforced by counting up
 `coupons.redemptions` and comparing it to `max_redemptions`.
 
-**Problem:** The count goes up when the buyer *starts* checkout, before any money moves, and
+**Problem:** The count goes up when the buyer _starts_ checkout, before any money moves, and
 nothing ever puts it back. `ExpireStaleOrdersAction` cancels abandoned checkouts and frees the
 booking slot but never touches the coupon. `RefundOrderAction` frees the slot but never touches
 the coupon. I grepped the whole tree: `redemptions` is only ever incremented, never decremented.
@@ -238,6 +241,7 @@ Stripe and change their mind. The code is now dead, and the 51st person — the 
 paid — is told "That code is not valid for this."
 
 **Fix — step by step:**
+
 1. In `ExpireStaleOrdersAction::cancelAbandoned()`, after the transition to `Cancelled`, release
    the claim with `$order->coupon?->decrement('redemptions')`. Eager-load `coupon` next to
    `product` so this stays one query per sweep.
@@ -285,6 +289,7 @@ Smaller problem on the same endpoint: the signature is only checked **after** th
 so an unsigned request still costs a database query.
 
 **Fix — step by step:**
+
 1. Change the default to refuse. With no secret, log, alert through `OpsAlerter`, and return
    `401`. A webhook you cannot verify is a webhook you must not act on.
 2. Keep one escape hatch for local work: `config('publishing.webhook_allow_unsigned')`, default
@@ -302,7 +307,7 @@ organisation that has not pasted a secret — which is every new one.
 
 **Done:** no secret now means 401 plus a `webhooks.upload_post.secret_missing` ops alert. Signature
 shape checks (fresh timestamp, `sha256=` prefix) moved ahead of the target lookup. New
-`publishing.webhook_allow_unsigned`, default false, with a test that asserts the default *and*
+`publishing.webhook_allow_unsigned`, default false, with a test that asserts the default _and_
 exercises the hatch. New `tests/Concerns/SignsUploadPostWebhooks` — six existing tests across two
 files were relying on the fail-open behaviour to pass, so they now sign their deliveries, which is
 what they should have been doing all along. Tests: `UploadPostWebhookControllerTest` +4.
@@ -336,6 +341,7 @@ every row remembers its own disk. The GTM plan lists it as an outstanding deploy
 here because it is the one open item that blocks more than one web node.
 
 **Fix — step by step:**
+
 1. `composer require league/flysystem-aws-s3-v3`.
 2. Create the bucket: private, versioning on, lifecycle rule matching
    `ai.images.prune_after_days`.
@@ -356,6 +362,7 @@ here because it is the one open item that blocks more than one web node.
 image serving competes with page rendering for the same workers.
 
 **Done (the code half):**
+
 - Step 1 ✅ `league/flysystem-aws-s3-v3` is installed, so `ASSETS_DISK=s3` now works instead of
   failing at the first upload. It pulls in `aws/aws-sdk-php`, which is large; there is no lighter
   supported path to S3 from Laravel.
@@ -400,14 +407,15 @@ this case: "That time has just gone — pick another." The `isBookable()` check 
 closes the common case but not the race, and the race is precisely what the unique index is for.
 
 **Fix — step by step:**
+
 1. Wrap the create:
-   ```php
-   try {
-       Booking::create([...]);
-   } catch (UniqueConstraintViolationException) {
-       throw new CheckoutUnavailableException(__('That time has just gone — pick another.'));
-   }
-   ```
+    ```php
+    try {
+        Booking::create([...]);
+    } catch (UniqueConstraintViolationException) {
+        throw new CheckoutUnavailableException(__('That time has just gone — pick another.'));
+    }
+    ```
 2. Throwing out of the `DB::transaction()` closure rolls back the order and the coupon claim,
    which is what you want — confirm that in the test.
 3. Add a test that inserts a conflicting booking and asserts the friendly toast, not a 500.
@@ -429,7 +437,7 @@ images (`ai_image_credits`). Before each call the guard counts what has been use
 refuses once the count reaches the allowance.
 
 **Problem:** This is "check, then do" with nothing holding the gap. The count comes from rows
-written *after* the vendor call returns, so twenty requests starting in the same second all see
+written _after_ the vendor call returns, so twenty requests starting in the same second all see
 the same low count and all pass. The class comment accepts that "a single request can tip usage
 slightly past the ceiling" — true of one request, not of many. Images are the expensive side, with
 a real per-image cost at the vendor, and both the grid AI fill and the campaign planner fan work
@@ -440,13 +448,14 @@ dispatches 9 jobs. All 9 read "used 48 of 50" before any has written a row. You 
 and bill for 2.
 
 **Fix — step by step:**
+
 1. Reserve before you spend instead of counting after. Add a monthly counter (Redis, or a small
    `ai_usage_counters` row) and claim it atomically:
-   ```php
-   $used = Cache::increment("ai:{$org->id}:".now()->format('Y-m').":images", $n);
-   if ($used > $quota) { Cache::decrement(/* … */); throw new AiBudgetExceededException(...); }
-   ```
-   `INCR` is atomic, so twenty callers get twenty different numbers.
+    ```php
+    $used = Cache::increment("ai:{$org->id}:".now()->format('Y-m').":images", $n);
+    if ($used > $quota) { Cache::decrement(/* … */); throw new AiBudgetExceededException(...); }
+    ```
+    `INCR` is atomic, so twenty callers get twenty different numbers.
 2. Keep `ai_usage_logs` as the record of truth for billing and the usage page. Reconcile the
    counter from the logs daily and whenever it is missing, so a cache flush cannot grant a free
    month.
@@ -473,6 +482,7 @@ There is also no pacing: 5,000 jobs land at once and the workers throw them at t
 fast as they can, which is how you collect 429s and damage your sending reputation.
 
 **Fix — step by step:**
+
 1. Have the Action create the `AudienceBroadcast` row and dispatch **one** job
    (`SendAudienceBroadcastJob::dispatch($broadcast->id)`), then return.
 2. In that job, select recipients with `chunkById(500)` so memory stays flat, and push mails per
@@ -508,6 +518,7 @@ roster. It was also the single most repeated complaint in the agency research: j
 end up with access to every client's account.
 
 **Fix — step by step:**
+
 1. Add `client_user` (`client_id`, `user_id`, optional `role`, unique pair) plus
    `Client::members()` / `User::clients()`.
 2. Add one organisation flag, `restrict_staff_to_assigned_clients`, default **off**, so nothing
@@ -550,6 +561,7 @@ is the one that keeps the workflow inside your product — which is also what ke
 data true.
 
 **Fix — step by step:**
+
 1. Ship a Slack implementation behind the existing contract. Incoming webhooks are the small
    version: one URL per organisation, stored encrypted, posted to with `Http::post`. No OAuth app,
    no review queue.
@@ -601,11 +613,12 @@ Separately, `composer test --parallel` failed outright because `brianium/parates
 installed.
 
 **Fix — step by step:**
+
 1. ✅ Add `<ini name="memory_limit" value="512M"/>` to `phpunit.xml`. Verified: `tests/Unit` now
    passes at PHP's default limit with no `-d` flag.
 2. ✅ `composer require --dev brianium/paratest`. `php artisan test --parallel` now runs the full
    suite: **2,309 passed**.
-   *Measured caveat:* parallel took 316 s against 209 s serial on this machine, so the "roughly a
+   _Measured caveat:_ parallel took 316 s against 209 s serial on this machine, so the "roughly a
    quarter of the time" guess in the first version of this finding was also wrong — it is process
    startup cost against few cores. CI was therefore left running the suite serially: switching it
    would be a guess about runner width, and `composer ci:check` is the same command developers run
@@ -640,6 +653,7 @@ the next sweep starts before the last finished. Everything on `reports` and `def
 behind it, including user-facing exports.
 
 **Fix — step by step:**
+
 1. Measure one real job: log duration and vendor-call count in `SyncOrganizationEngagementJob`.
 2. Compute the ceiling: `orgs × seconds ÷ (processes × 1800)`. Above 1 means the sweep cannot keep
    up.
@@ -671,6 +685,7 @@ dead weight in the artifact rather than a page-load cost. I checked, and the tes
 not leak into the shared chunks, so the damage is contained.
 
 **Fix — step by step:**
+
 1. Move the file to `resources/js/pages/inbox/__tests__/composer.test.tsx` (outside the glob) or to
    a `resources/js/tests/` tree, and fix its imports.
 2. Confirm `vp test run` still finds it; adjust `test.include` if not.
@@ -758,6 +773,7 @@ referenced by nothing, indefinitely. For a product that advertises white-label b
 asked a data-retention question, that is a file nobody can account for.
 
 **Fix — step by step:**
+
 1. Add `StoredFileInventory::forOrganizations(array $orgIds)` returning the `brand_logo_disk` /
    `brand_logo_path` pairs, built with the same private `pairs()` helper.
 2. In `PurgeOrganizationJob`, merge it into the file list already being deleted — one extra line
@@ -785,6 +801,7 @@ code are identical, so this is pre-existing and not something phase two introduc
 the `tests` workflow is red on that step right now, independently of any code change.
 
 **Fix — step by step:**
+
 1. `composer update symfony/* --with-all-dependencies` to pick up 7.4.23 / 8.1.11 or later, which
    is where the fixes landed.
 2. Run the full suite. Symfony patch releases inside a Laravel major are usually uneventful, but
@@ -829,7 +846,7 @@ block. Failing: `OrganizationReportTest` (×2), `CampaignBriefTest`, `PostMediaF
 `2026_10_18_110000_add_soft_deletes_and_protect_invoices` set `invoices.client_id` to
 `noActionOnDelete()`, with the comment: "NO ACTION (checked at the end of the statement) rather
 than RESTRICT (checked immediately), so purging a whole organization — which cascades to its
-clients *and* its invoices in the same statement — still works."
+clients _and_ its invoices in the same statement — still works."
 
 **That premise is false on InnoDB.** MySQL treats `NO ACTION` as a synonym for `RESTRICT` and
 checks it immediately; it does not implement deferred foreign keys. SQLite does, which is why the
@@ -843,19 +860,20 @@ honest answer today is "on MySQL, nothing". Failing:
 `SuperAdmin\OrganizationManagementTest`, `Clients\ClientArchiveTest`.
 
 **Fix — step by step:**
+
 1. **Group C first**, because it is the only one that loses data. In `PurgeOrganizationJob`, delete
    the invoices inside the existing transaction before `forceDelete()`:
-   ```php
-   DB::transaction(function () use ($organization, $clientIds) {
-       // InnoDB checks NO ACTION immediately — it is a synonym for RESTRICT there, whatever the
-       // migration comment says — so invoices must go before the clients they reference.
-       DB::table('invoices')->whereIn('client_id', $clientIds)->delete();
-       $organization->forceDelete();
-   });
-   ```
-   `invoice_items` cascades from `invoices` and `brand_deals.invoice_id` is `nullOnDelete`, so
-   nothing else needs ordering. Deleting them is the documented intent — the migration says an org
-   purge should remove invoices; only its mechanism was wrong.
+    ```php
+    DB::transaction(function () use ($organization, $clientIds) {
+        // InnoDB checks NO ACTION immediately — it is a synonym for RESTRICT there, whatever the
+        // migration comment says — so invoices must go before the clients they reference.
+        DB::table('invoices')->whereIn('client_id', $clientIds)->delete();
+        $organization->forceDelete();
+    });
+    ```
+    `invoice_items` cascades from `invoices` and `brand_deals.invoice_id` is `nullOnDelete`, so
+    nothing else needs ordering. Deleting them is the documented intent — the migration says an org
+    purge should remove invoices; only its mechanism was wrong.
 2. Correct that migration's comment in place. It is load-bearing documentation and it is currently
    teaching the next person something untrue about InnoDB.
 3. Check whether any other table relies on the same deferred-FK assumption:
@@ -872,6 +890,7 @@ honest answer today is "on MySQL, nothing". Failing:
    `.github/workflows/tests.yml`, so the gate starts holding the line.
 
 **Already fixed as part of this phase (2 of the 16):**
+
 - `Schema::getTables()` / `getTableListing()` read `information_schema` on MySQL and are
   **server-wide**: on the development machine they returned 388 tables across eight databases,
   including other projects, `sakila` and `world`. Both calls are now scoped to the connection's own
@@ -885,6 +904,7 @@ engine-specific bug ships exactly the way the `ESCAPE '\'` one did. Meanwhile an
 asks to be deleted is not deleted.
 
 **Done — all 16, and the gate is blocking:**
+
 1. ✅ Group C. `PurgeOrganizationJob` deletes the organisation's invoices inside its existing
    transaction before `forceDelete()`. The existing test already asserted invoices should be gone
    after an org purge, so this was the documented intent with a broken mechanism — nothing about
@@ -894,11 +914,11 @@ asks to be deleted is not deleted.
    InnoDB. `grep -rn "noActionOnDelete"` confirms this was the only place relying on it.
 3. ✅ Group A, fixed once at the root: a `PostTarget::scheduledLocalTime` read accessor returning
    `H:i`. Checked first that nothing compares the column in SQL — every reader either parses it
-   with Carbon, presents it, or copies it forward — so one accessor fixes all seven tests *and*
+   with Carbon, presents it, or copies it forward — so one accessor fixes all seven tests _and_
    the production display. It also makes `SendPostPushRemindersAction`'s two branches agree, since
    its fallback already used `format('H:i')`. 40 tests green on MySQL.
 4. ✅ Group B: `assertSame` → `assertEquals` on the four stored-JSON assertions. PHP's `==` on
-   arrays ignores object key order while still comparing nested *lists* in order, which is exactly
+   arrays ignores object key order while still comparing nested _lists_ in order, which is exactly
    the contract — `metrics` order is meaningful, key order is not. I deliberately did **not** use
    `assertEqualsCanonicalizing` (it would sort the lists too) and did not sort JSON on write.
    45 tests green on MySQL.
@@ -926,6 +946,7 @@ CI gate passes. I had run `composer audit`, Pint, PHPStan, `tsc` and the full su
 run the frontend guards. That claim was wrong.
 
 **Fix — step by step:**
+
 1. Split each of the three by **job**, not by line count. `media-picker.tsx` at 385 lines almost
    certainly contains a browse-library concern and an upload concern that can stand apart; the
    guard is a smell detector, and satisfying it by extracting helpers that exist only to shorten a
@@ -954,7 +975,7 @@ is parameterised everywhere I looked, rate limits are in place, and 2,291 tests 
 
 Fix in this order: **1** (search is broken on the production database), **2** (a paid order can be
 lost forever), **4** (an open webhook), **3** (coupons), then **5** (S3, which is what lets you run
-more than one server). *Findings 1–4 were fixed on 2026-11-07; **5** is now the top of the list.*
+more than one server). _Findings 1–4 were fixed on 2026-11-07; **5** is now the top of the list._
 
 **Lean:** about −425 KB of build output and −3 duplicated query blocks are available from findings
 13 and 1. Nothing here is over-engineered enough to delete. The one-implementation contracts
@@ -966,12 +987,13 @@ planner internals, the MCP server, or the DeepSeek and Upload-Post adapters line
 1,038 lines), and I did not review the invoice/tax maths. I did not run `tsc`, Vitest or Playwright.
 No load test was run, so finding 12 is a task, not a result.
 
-*Updated 2026-11-07:* Pint and PHPStan have since been run (PHPStan has 87 pre-existing errors,
+_Updated 2026-11-07:_ Pint and PHPStan have since been run (PHPStan has 87 pre-existing errors,
 none in files this work touched), and the MySQL caveat is closed — there was a MySQL 8.0.46 on the
 development machine after all, finding 1 was reproduced on it directly (error 1064), and the suite
 now runs against MySQL both locally and in CI.
 
 ---
+
 ---
 
 # Part 2 — Market readiness
@@ -981,22 +1003,22 @@ now runs against MySQL both locally and in CI.
 The recurring complaints in the 2026 agency-tooling coverage line up in a clear order, and Graphy
 already answers most of them. Worth saying plainly, because it changes what to build next.
 
-| What agencies complain about | Where Graphy stands |
-|---|---|
-| Login walls delay client approval | **Already solved.** Token review links, no account needed. |
-| Approvals have no audit trail | **Already solved.** `post_activity_logs`, approval SLA, reminders. |
+| What agencies complain about                  | Where Graphy stands                                                               |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
+| Login walls delay client approval             | **Already solved.** Token review links, no account needed.                        |
+| Approvals have no audit trail                 | **Already solved.** `post_activity_logs`, approval SLA, reminders.                |
 | One global approval workflow for every client | **Ahead of the market.** Per-client `any` / `all` / `sequential` approver chains. |
-| Approval features locked to a $100+ tier | **Positioning advantage.** They are core here. |
-| White-label branding locked to a $200 tier | **Already solved.** Branding resolver, verified custom domains. |
-| Reporting behind a "Power Reports" upsell | **Already solved.** Saved reports, scheduled email, CSV/PDF. |
-| Per-seat pricing creeping toward ~$900/mo | **Positioning advantage** if you keep seats generous. |
-| Instagram/TikTok DMs missing from the inbox | **Gap** — comments only; DMs deferred. |
-| Junior staff can see every client | **Gap** — finding 9. |
-| Approvals happen in Slack, not the tool | **Gap** — finding 10. |
-| Approval emails land in spam | **Gap** — item 17. |
-| Onboarding a new client is the bottleneck | **Partial** — campaign templates exist, client onboarding templates do not. |
+| Approval features locked to a $100+ tier      | **Positioning advantage.** They are core here.                                    |
+| White-label branding locked to a $200 tier    | **Already solved.** Branding resolver, verified custom domains.                   |
+| Reporting behind a "Power Reports" upsell     | **Already solved.** Saved reports, scheduled email, CSV/PDF.                      |
+| Per-seat pricing creeping toward ~$900/mo     | **Positioning advantage** if you keep seats generous.                             |
+| Instagram/TikTok DMs missing from the inbox   | **Gap** — comments only; DMs deferred.                                            |
+| Junior staff can see every client             | **Gap** — finding 9.                                                              |
+| Approvals happen in Slack, not the tool       | **Gap** — finding 10.                                                             |
+| Approval emails land in spam                  | **Gap** — item 17.                                                                |
+| Onboarding a new client is the bottleneck     | **Partial** — campaign templates exist, client onboarding templates do not.       |
 
-Honest summary: the *workflow* is competitive or better. The gaps are in **reach** (DMs,
+Honest summary: the _workflow_ is competitive or better. The gaps are in **reach** (DMs,
 listening), **plumbing** (API, deliverability), **trust** (SSO, SOC 2, export) and **proof**
 (nobody knows this exists). Items below are ordered by what I would do first.
 
@@ -1004,13 +1026,13 @@ listening), **plumbing** (API, deliverability), **trust** (SSO, SOC 2, export) a
 
 ### 17. Make approval emails arrive — ◐ code done 2026-11-07, DNS outstanding
 
-**Why:** The research named email landing in spam as *the* biggest source of approval delay in
-2026. Every clever thing you built — token links, reminder nudges, SLA tracking — depends on one
+**Why:** The research named email landing in spam as _the_ biggest source of approval delay in 2026. Every clever thing you built — token links, reminder nudges, SLA tracking — depends on one
 email arriving. You also cannot send a single audience broadcast until this is right
 (`MAIL_MAILER=resend` is already an outstanding launch step), and one bad list can poison the
 domain your approval mail uses.
 
 **Steps:**
+
 1. Use two sending domains, not one: `mail.<yourdomain>` for transactional (approvals, invites,
    receipts) and `news.<yourdomain>` for marketing and audience broadcasts. A complaint against
    the second must never hurt the first.
@@ -1037,6 +1059,7 @@ comparison pages already in the GTM plan. The MCP server is genuinely differenti
 assistant protocol is not a substitute for `POST /v1/posts` when the buyer's ops person asks.
 
 **Steps:**
+
 1. Reuse what exists. `McpToken` already gives org-scoped bearer tokens with a capability scope
    set — extend that model rather than inventing a second auth system.
 2. Add `routes/api.php` with a thin `/v1` surface over existing Actions; nothing new in the domain
@@ -1046,7 +1069,7 @@ assistant protocol is not a substitute for `POST /v1/posts` when the buyer's ops
    `RateLimits` helper.
 4. Add outgoing webhooks: a `webhook_endpoints` table per organisation, with events for
    `post.published`, `post.failed`, `post.approved`, `post.changes_requested`, `invoice.paid`,
-   `order.paid`. Sign deliveries exactly the way you *verify* Upload-Post's (HMAC over
+   `order.paid`. Sign deliveries exactly the way you _verify_ Upload-Post's (HMAC over
    `timestamp.body`) — you already have the code, and finding 4 is the lesson: never fail open.
 5. Deliver from a queue with retries and a dead-letter view the customer can see and replay.
 6. Publish an OpenAPI spec, generate the docs page from it, and add "API access" to the plan
@@ -1064,13 +1087,14 @@ nothing for the step before: standing up a new client. For an agency signing two
 this is the difference between your tool being where work starts and where work gets copied to.
 
 **Steps:**
+
 1. Add `client_templates` holding a snapshot: brand brain fields, approval policy and approver
    roles, posting cadence, default platforms and channel formats, hashtag sets, linked campaign
    templates, report schedule, invoice/retainer defaults.
 2. Add "Save as template" on an existing client, capturing that snapshot.
 3. Add "New client from template" to the create flow, with a checklist of what will be copied.
-4. Ship 3 templates in the box, because an empty template list teaches nobody: *Local service
-   business*, *E-commerce brand*, *B2B thought leadership*.
+4. Ship 3 templates in the box, because an empty template list teaches nobody: _Local service
+   business_, _E-commerce brand_, _B2B thought leadership_.
 5. Add a per-client onboarding checklist (connect accounts, invite approvers, fill brand brain,
    set cadence, first post) and surface "onboarding incomplete" through the existing client health
    signals — the machinery is already there.
@@ -1087,6 +1111,7 @@ buyers ask in demos and score it. Today the honest answer is "comments only", an
 the deal against anyone who has DMs even partially.
 
 **Steps:**
+
 1. Decide the vendor path first. DMs need the Meta app with `instagram_manage_messages` — the same
    Phase 5 work the GTM plan defers. Check whether Upload-Post exposes DMs before building
    anything; if it does, this is a `CommentSource` sibling and cheap.
@@ -1109,6 +1134,7 @@ SOC 2 comes up in every procurement conversation above a certain deal size. You 
 50-seat agency without at least a straight answer on each.
 
 **Steps:**
+
 1. Add SAML/OIDC single sign-on. Fortify is already in place; add a per-organisation provider
    (`sso_connections`) with an "SSO only" enforcement option. Price it on the top plan.
 2. ✅ **Done.** `organizations.require_two_factor` plus `EnsureTwoFactorEnrolled`, appended to the
@@ -1139,7 +1165,7 @@ SOC 2 comes up in every procurement conversation above a certain deal size. You 
    (`social_accounts.meta_access_token`) while this was being written. Retention is enforced, not
    just stated: `exports:purge-expired` deletes the archive on day seven and leaves the row as a
    receipt. **Not included:** media bytes (the archive lists every asset instead), and there is
-   still no per-*person* subject-access export — this is per organisation.
+   still no per-_person_ subject-access export — this is per organisation.
 6. Start the SOC 2 Type 1 clock when revenue justifies it, and say "in progress, Type 1 expected
    <date>" rather than nothing.
 
@@ -1153,6 +1179,7 @@ double-price tiers. That is a positioning gift. Graphy's approvals, white-label 
 core, which is already the right answer; the job is to say so where buyers compare.
 
 **Steps:**
+
 1. Keep seats unlimited or very generous, and meter what actually costs you money: social
    accounts/brands, AI credits, storage. Honest and defensible.
 2. Never gate approvals, white-label or client portal access by tier. They are the reason to pick
@@ -1176,6 +1203,7 @@ joins them. Most competitors stop at scheduling, so this is a genuine wedge, and
 joins over data you already store.
 
 **Steps:**
+
 1. Capture effort without a timesheet, because nobody fills those in. Infer from what the app
    already sees: posts produced, revisions requested, approval rounds, AI calls, assets uploaded,
    inbox replies. Add one optional manual "hours this month" per client for agencies that do track
@@ -1195,9 +1223,10 @@ joins over data you already store.
 
 **Why:** Nine networks is a competitive set, but Bluesky is now standard on competitor grids and is
 cheap to add. Real social listening is explicitly deferred in your plan and I agree with that call
-— but the *claim* needs managing, because buyers compare feature grids.
+— but the _claim_ needs managing, because buyers compare feature grids.
 
 **Steps:**
+
 1. Add Bluesky. Public API, no app review, fits `PlatformCapabilities` plus the rollout gate you
    already have. Likely the cheapest platform you will ever add.
 2. Evaluate Reddit and Mastodon the same way. Reddit matters for B2B clients and has a real API.
@@ -1224,6 +1253,7 @@ right moves. What no plan can skip is evidence. An agency buying a tool to run t
 brands will ask who else uses it, and the answer cannot be nobody.
 
 **Steps:**
+
 1. Pick ten design-partner agencies. Free for a year in exchange for a named case study and the
    right to email them with questions.
 2. Instrument the three numbers that show whether the product works, per organisation: time from
@@ -1242,10 +1272,11 @@ brands will ask who else uses it, and the answer cannot be nobody.
 ### 26. Localisation, when a market asks for it
 
 **Why:** There is no `lang/` directory. Every string is English, wrapped in `__()` so the machinery
-is ready but nothing is translated. Correctly *not* a launch blocker — but it is a hard ceiling on
+is ready but nothing is translated. Correctly _not_ a launch blocker — but it is a hard ceiling on
 EU and LatAm agencies, and the cost rises with every new string.
 
 **Steps:**
+
 1. Add `lang/en/` now and extract the strings, while there are hundreds and not thousands. The
    `__()` calls are already there, which is the expensive part.
 2. Add a per-user locale and a per-organisation default. The timezone handling already follows
@@ -1308,8 +1339,8 @@ records and the transactional/marketing domain split still to do by hand.
 ## Sources for Part 2
 
 Agency pain points and competitor positioning were drawn from the 2026 coverage below. Most of it
-is vendor-published and therefore marketing-influenced: the *complaints* recur across independent
-sources, but the *rankings and prices* should be re-verified against each vendor before you quote
+is vendor-published and therefore marketing-influenced: the _complaints_ recur across independent
+sources, but the _rankings and prices_ should be re-verified against each vendor before you quote
 them on a comparison page.
 
 - [Client Approval Workflow for Social Media Agencies (2026 Playbook) — PlanMyGrid](https://www.planmygrid.com/blog/client-approval-workflow-for-social-media-agencies)

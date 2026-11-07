@@ -1,6 +1,7 @@
 # Social Inbox
 
 ## Purpose
+
 The social inbox (Phase M-9, `.junie/plans/mvp.md`): one place to handle the comments the public leaves
 on a client's published posts, triage them, assign them, and send an **on-brand reply that a human always
 sends** — never an auto-reply. Covers M-9.1 (ingestion), M-9.2 (inbox UI, assignment, saved replies,
@@ -11,6 +12,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
 `comments => false`** in `config/platforms.php` and never ingest.
 
 ## Models / Tables
+
 - `InboxConversation` (`inbox_conversations`): one thread per root comment on a `post_target`. Holds the
   assignment, triage `sentiment`, workflow `status` (`open`/`snoozed`/`resolved`), `is_reply_needed`, SLA
   stamps (`last_inbound_at`, `first_response_at`, `reminder_sent_at`) and the author. Unique on
@@ -31,6 +33,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   `needsReply()` true for question/negative), `MessageDirection`, `MessageDeliveryStatus`.
 
 ## Actions / Services / Contracts
+
 - `App\Contracts\CommentSource` → `UploadPostCommentSource` (reads `GET /uploadposts/comments`, replies via
   `POST /uploadposts/comments/create`) / `NullCommentSource` (safe no-op). Its own seam (not `PublishAdapter`
   / `EngagementSource`) so a Meta Graph fallback can slot in; **not** a Phase-4 second adapter. Reads retry
@@ -49,13 +52,13 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   `TransitionConversationAction` (open/snooze/resolve/reopen), `SaveSavedReplyAction`.
 - `App\Actions\Inbox\DraftInboxReplyAction`: AI draft — `AiAccess` gate, `AiUsageGuard` budget, metered on
   `ai_usage_logs` (method `inbox_reply`), guardrail drops a `never_use` phrase. **Returns text only; never
-  persists, never sends.** `App\Contracts\ReplyAssistant` → DeepSeek / Null (same DeepSeek-or-Null binding as
+  persists, never sends.** `App\Contracts\ReplyAssistant` → Anthropic / Null (same Anthropic-or-Null binding as
   `WritingAssistant`).
 - `App\Actions\Inbox\SendInboxReplyAction`: the **only** caller of `CommentSource::reply()`, only from an
   explicit human request. Records the outbound message `pending`, calls the vendor outside the transaction
   (a failure leaves a visible `failed` row to retry), stamps delivery + the thread's first-response on success.
 - Jobs/commands: `SyncOrganizationCommentsJob` + `inbox:sync-comments` (hourly), `SendOverdueInboxRemindersJob`
-  + `inbox:send-overdue-reminders` (daily). Both registered in `SchedulerHeartbeat::COMMANDS`.
+    - `inbox:send-overdue-reminders` (daily). Both registered in `SchedulerHeartbeat::COMMANDS`.
 - Notification: `InboxReplyOverdue` (database, `Comments` category) to the assignee or the studio, once/24h.
 - `App\Services\Inbox\MentionAlerts`: keyword alerts over the comments **already ingested** — the
   narrow, honest version of listening (nothing is crawled; say so on the comparison pages).
@@ -70,6 +73,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   Carries the term, the author and a link; **not** the comment body, which is one click away.
 
 ## Routes / Controllers
+
 - `GET /inbox` → `InboxController@index` — Inertia `inbox/index` (list + filters + saved replies + counts).
 - `GET /inbox/{conversation}` → `@show` — JSON thread detail for the right pane.
 - `PATCH /inbox/{conversation}` → `@update` — assign / snooze / resolve / reopen (JSON).
@@ -91,6 +95,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   reviewers, so the dropped middleware changes no authorization.
 
 ### Business shell (Step CG-1.1)
+
 - The inbox page (`resources/js/pages/inbox/index.tsx`) is a thin wrapper over the shared
   `components/inbox/inbox-workspace.tsx` (`InboxWorkspace`, extracted from the old single-file page so
   the agency `Composer` export/path and its test are unchanged). It flips **`multiClient`** off from
@@ -107,6 +112,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   `type: 'comment'` rows (linking to `/inbox`); see `business-workspaces.md`.
 
 ## Business Rules
+
 - Tenant isolation: every query is org-scoped (`OrganizationScope`); the policy refuses a bound conversation
   from another org.
 - Idempotent ingestion: re-running the sweep never duplicates a comment, and never flips a sent reply inbound.
@@ -116,6 +122,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
 - Sending stamps `first_response_at` (SLA met) and clears `is_reply_needed`; a saved reply's `usage_count` ticks.
 
 ## Tests
+
 - `tests/Unit/Inbox/SentimentClassifierTest.php` — the deterministic classifier + enum precedence.
 - `tests/Feature/Inbox/CommentIngestionTest.php` — threading, sentiment roll-up, idempotency, platform gating,
   suspended/failed handling.
@@ -132,6 +139,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   human-sends a reply, a Viewer can't reply, and another org's conversation is refused 403.
 
 ## Known Gaps / Open Questions
+
 - **DMs are deferred** (comments only, per M-0.2) — the `CommentSource` contract is ready for them.
 - **Pinterest / Google Business comments deferred** (vendor gap). The Meta Graph `CommentSource` fallback is
   only needed if Upload-Post's IG/FB comments prove unreliable in a live sandbox (still due from M-0.2).
@@ -141,6 +149,7 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   the inbox can follow.
 
 ## Changelog
+
 - 2026-10-27: Step CG-1.1 — the inbox switched on for the business/creator shell. The route group
   became shared (`workspace:agency` dropped, `portal.redirect` kept), the single-file page was
   extracted into the shared `InboxWorkspace` component (agency `Composer` export/path + test

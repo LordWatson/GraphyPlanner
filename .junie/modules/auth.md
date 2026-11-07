@@ -1,15 +1,18 @@
 # Authentication & Profile/Security Settings
 
 ## Purpose
+
 Handles user authentication (via Laravel Fortify) and the user-facing settings pages for profile
 and security (password/2FA). Corresponds to the base scaffolding from Step 0.1 of the plan, ahead of
 org/role modeling (Step 0.2).
 
 ## Models / Tables
+
 - `User` (`users`): Laravel default auth model (name, email, password), now also carries `org_id` and
   `role` (see `organizations-users.md` for details, added in Step 0.2).
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Fortify\ResetUserPassword`: Fortify's password reset action. (`CreateNewUser` was
   removed in Phase 15 — Fortify registration is disabled; signup goes through
   `/register-organization`, see `super-admin.md`.)
@@ -21,12 +24,14 @@ org/role modeling (Step 0.2).
   over the role-based default.
 
 ## Routes / Controllers
+
 - `App\Http\Controllers\Settings\ProfileController`: profile settings page (view/update).
 - `App\Http\Controllers\Settings\SecurityController`: password/security settings page.
 - Auth routes are provided by Fortify (login/register/password reset), configured in
   `routes/settings.php` for the settings-specific routes.
 
 ## Organisation-wide two-factor
+
 - `organizations.require_two_factor` (boolean, default **false**) is the Owner switch on
   Settings -> Organization: "everyone in this organisation must use two-factor authentication".
 - `App\Http\Middleware\EnsureTwoFactorEnrolled` enforces it. Appended to the **`web` group**
@@ -45,11 +50,13 @@ org/role modeling (Step 0.2).
   (`viewer_has_two_factor`).
 
 ## Phase M-1 additions
+
 - Fortify's password confirmation (`auth/confirm-password`, `password.confirm` middleware) now
   guards org settings and data exports; irreversible deletes check `current_password` in their
   Form Requests (see `ops.md`).
 
 ## Business Rules
+
 - Post-login redirect is role-aware: `Role::ClientReviewer` -> `/portal`, `Role::SuperAdmin` ->
   `/super-admin`, all other roles -> `/dashboard`, unless an intended URL is present in the session
   (`redirect()->intended()`), which always takes priority for any role.
@@ -70,6 +77,7 @@ org/role modeling (Step 0.2).
   pages redirect them to `/super-admin` (`org.member`).
 
 ## Tests
+
 - `tests/Feature/Security/TwoFactorEnforcementTest.php`: enforcement, the exemptions, that the
   pages needed to comply stay reachable, and that an owner without a second factor cannot switch it
   on.
@@ -78,10 +86,12 @@ org/role modeling (Step 0.2).
   reviewers.
 
 ## Known Gaps / Open Questions
+
 - Org/role/policy documentation now lives in `organizations-users.md`; this file stays focused on
   pure authentication.
 
 ## Changelog
+
 - 2026-11-07: Organisation-wide two-factor enforcement (`organizations.require_two_factor`,
   `EnsureTwoFactorEnrolled`). Audit log export lives in `settings.md`.
 - 2026-10-25: Self-serve signups now receive a single welcome email whose one button is a signed

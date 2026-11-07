@@ -1,12 +1,14 @@
 # Settings
 
 ## Purpose
+
 Org-level settings, Owner-only: the Upload-Post API key, the xAI (Grok) API key, the organization's
 default timezone (Step 0.15), and the organization's default currency (preselected for new invoices and used to display org-level
 amounts like retainers — no conversions, display only; each invoice carries its own currency). Complements `auth.md`, which covers the per-user
 Profile/Security/Appearance settings pages.
 
 ## Models / Tables
+
 - `Organization` (`organizations`): existing `default_timezone` column, a `default_currency` string(3)
   column (default `'USD'`, migration `2026_09_20_130642_add_default_currency_to_organizations_table`),
   plus nullable `upload_post_key`/`xai_key` text columns (migration
@@ -20,11 +22,13 @@ Profile/Security/Appearance settings pages.
   `Organization` model itself were ever passed to a view.
 
 ## Phase M-6.7 (I-12.1) — notification preferences
+
 - `settings/notifications` (`NotificationPreferenceController`, `settings/notifications.tsx`, in the
   settings sidebar) — per-user `users.notification_preferences`: for each `NotificationCategory`,
   toggle in-app and daily-digest. See `notifications.md` › Phase M-6.7.
 
 ## Phase M-6.5 (Phase 9) — approval SLA
+
 - `organizations.approval_sla_hours` (nullable, default 48; migration `2026_11_07_100100`) — hours a
   post may wait on review before it's "overdue". Owner-only, edited on the org settings page
   ("Approval SLA (hours)"), validated 1–720, cleared with a blank value (null = no SLA).
@@ -32,6 +36,7 @@ Profile/Security/Appearance settings pages.
   (overdue computation) in `posts.md` / `home.md` and the reminder job in `notifications.md`.
 
 ## Phase M-9 — inbox reply SLA
+
 - `organizations.inbox_sla_hours` (nullable; migration `2026_11_12_100100`) — hours a public comment may
   wait on a reply before it's "overdue" in the social inbox. Falls back to `config('inbox.sla.default_hours')`
   (24) when unset, so the inbox has a sensible SLA out of the box; a zero/negative effective value turns it
@@ -39,6 +44,7 @@ Profile/Security/Appearance settings pages.
   overdue flag in the inbox. See `inbox.md`.
 
 ## Audit log (Owner only)
+
 - `settings/audit-log` (`audit-log.index`) and `settings/audit-log/export`
   (`audit-log.export`, behind `throttle:exports` + `RequirePassword`, like the analytics and
   invoice exports) -> `App\Http\Controllers\Settings\AuditLogController`, page
@@ -74,7 +80,7 @@ product feature rather than a support ticket.
   expired, with `row_count`, `size_bytes`, `failure_reason` and `expires_at`. The row **outlives the
   file** on purpose: once purged it is the receipt that the export happened and is gone.
 - `App\Services\Security\OrganizationDataExport` writes the archive: one CSV per set, plus a
-  `README.txt` that says what is *not* in it. `BuildOrganizationDataExportJob` (reports queue,
+  `README.txt` that says what is _not_ in it. `BuildOrganizationDataExportJob` (reports queue,
   `ShouldBeUnique`, 900s) streams it to the private assets disk and notifies the requester
   (`DataExportReady`, database channel only — a link to an organisation's whole record does not go
   in an email).
@@ -88,7 +94,7 @@ product feature rather than a support ticket.
   plumbing. Media **bytes** are not in the archive either (it would run to gigabytes) — `assets.csv`
   lists every file instead, and the README says so.
 - **Credentials never travel**: `::REDACTED` blanks the named columns, and `::NOT_CREDENTIALS`
-  records the columns whose names only look like one (`ai_monthly_token_budget`, a token *budget*).
+  records the columns whose names only look like one (`ai_monthly_token_budget`, a token _budget_).
 - Three drift guards in `tests/Feature/Security/DataExportTest.php`: every table must be in `SETS`
   or `EXCLUDED`; every credential-looking column in an exported set must be redacted or reviewed;
   every set and redaction must name a table and column that exist. The second guard found a real
@@ -98,11 +104,13 @@ product feature rather than a support ticket.
 - `ext-zip` is now a declared requirement in `composer.json` (the archive is a ZIP).
 
 ## Organisation-wide two-factor
+
 - `organizations.require_two_factor` (boolean, default false; migration `2027_03_19_100100`), the
   Owner switch on this page. Enforcement, the exemptions and the lockout guard are documented in
   `auth.md` ("Organisation-wide two-factor").
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Organizations\UpdateOrganizationSettingsAction`: `DB::transaction`-wrapped upsert of
   `default_timezone`, `default_currency`, plus the three keys. A blank/omitted key in the request
   leaves the currently stored key untouched (so the edit form never needs to redisplay — or
@@ -119,11 +127,13 @@ product feature rather than a support ticket.
   secret (the poll fallback still confirms deliveries).
 
 ## Phase M-1 additions (Step M-1.2)
+
 - `GET`/`PUT settings/organization` are behind `password.confirm` (the page holds the Upload-Post
   key, webhook secret and xAI key): the Owner re-enters their password at most every
   `auth.password_timeout` (3 h). Tests use `TestCase::confirmPassword()`.
 
 ## Routes / Controllers
+
 - `GET /settings/organization` → `App\Http\Controllers\Settings\OrganizationController@edit`
   (`organization.edit`) — renders `resources/js/pages/settings/organization.tsx` with
   `default_timezone`, `default_currency`, three booleans (`has_upload_post_key`,
@@ -164,6 +174,7 @@ existing org already has.
 - Both logo routes sit behind `RequirePassword` like the rest of this page.
 
 ## Business Rules
+
 - Owner-only, scoped to the acting user's own org: enforced by `App\Policies\OrganizationPolicy::update`
   (`$user->org_id === $organization->id && $user->isOwner()`), checked both in
   `OrganizationSettingsUpdateRequest::authorize()` and via `$this->authorize()` in the controller's
@@ -181,6 +192,7 @@ existing org already has.
   amounts (e.g. `Client::retainer_amount`) that don't carry their own currency.
 
 ## Tests
+
 - `tests/Feature/Settings/OrganizationSettingsControllerTest.php`: guest redirect; Owner can view/update;
   non-Owner is forbidden on both routes; blank keys don't overwrite existing stored keys; a non-owner
   can't reach another org's settings; and an automated assertion (`assertDontSee`) that the rendered
@@ -188,6 +200,7 @@ existing org already has.
   plan's "Done when" criterion.
 
 ## Known Gaps / Open Questions
+
 - **No per-agency sending domain** (Step GTM-3.1). A white-label email carries the agency's display
   name and reply-to, but the envelope from-address stays our own verified domain, because SPF and
   DKIM are signed for it and spoofing the from-address would land their mail in spam. A real
@@ -197,11 +210,12 @@ existing org already has.
   lapses, so a logo there would be unreliable either way.
 - `upload_post_key` / `upload_post_webhook_secret` are consumed by the Upload-Post adapter, webhook
   verification and webhook auto-registration (see `publishing.md`). `xai_key` is stored but still has
-  no provider behind it (AI text runs on DeepSeek from app config). (Corrected 2026-10-19, I-16.5.)
+  no provider behind it (AI text runs on Anthropic from app config). (Corrected 2026-10-19, I-16.5.)
 - Resolved 2026-10-18 (Step I-1.6): the last four characters of each stored key are shown in its
   placeholder.
 
 ## Changelog
+
 - 2026-11-07: Added the Owner-only **Data export** (`data_exports`, `OrganizationDataExport`,
   `BuildOrganizationDataExportJob`, `exports:purge-expired`, `settings/data-export.tsx`) — see the
   section above and `ops.md` for retention.
@@ -226,7 +240,7 @@ existing org already has.
   longer than 8 characters) and has a "Test connection" button for Upload-Post
   (`POST settings/organization/test-upload-post`, Owner, throttled 6/min,
   `TestUploadPostConnectionAction` → new `PublishAdapter::verifyCredentials()`). No AI-key test: the
-  only per-org AI key (`xai_key`) has no provider behind it yet, and DeepSeek's key is app config.
+  only per-org AI key (`xai_key`) has no provider behind it yet, and Anthropic's key is app config.
 - 2026-10-16: Brand-book overhaul (UI only): the settings nav is Contents-style (mono number +
   title) with an Ink pill for the active section; the header eyebrow no longer repeats the chapter
   ("Account & studio"); `Heading variant="small"` is now a ruled spec header (ink hairline over a

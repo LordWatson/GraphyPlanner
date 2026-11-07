@@ -1,6 +1,7 @@
 # Competitor Benchmarks
 
 ## Purpose
+
 Phase GTM-4 of `.junie/plans/go-to-market.md`. The credible version of "listening": a brand's own
 figures beside the public figures of profiles it chooses to track, on its analytics page and in its
 monthly client report.
@@ -12,6 +13,7 @@ mention-volume crawling or sentiment over the open web (plan §1.1) — it is a 
 handful of named public profiles.
 
 ## The sourcing question, answered (CG open question §5.7 / GTM plan §7)
+
 **Instagram only, through Meta's Business Discovery.** That endpoint
 (`business_discovery.username(...)` on an IG user we own) is what Meta provides for exactly this
 job: it is asked **through an Instagram Business account the brand itself owns**, returns only
@@ -27,6 +29,7 @@ This is the answer to "is GTM-4 one platform or four": **one**, until a platform
 equivalent endpoint.
 
 ## Models / Tables
+
 `2026_12_19_100100_create_tracked_profile_tables.php`, deliberately the same shape as
 `social_account_metrics` so our figures and theirs are compared like with like:
 
@@ -41,12 +44,14 @@ equivalent endpoint.
   time that matters.
 
 ## Enums / Features
+
 - `App\Enums\Feature::CompetitorBenchmarks` — the gate (Pro, Creator Pro and every agency tier).
 - `App\Enums\Feature::TrackedProfiles` — the **limit**: free 0, Pro and Creator Pro 3, agency
   Starter 25 / Standard 50 / Scale 100, `agency_legacy` unlimited. A capacity limit rather than a
   switch, because every profile is a nightly read against somebody else's rate limit.
 
 ## Actions / Services / Contracts
+
 - `App\Contracts\CompetitorProfileSource` (`profile()`, `key()`) — public figures for a handle we
   don't own, alongside `ProfileFeedSource` which reads one we do. Bound to
   `CompositeCompetitorProfileSource`.
@@ -66,7 +71,9 @@ equivalent endpoint.
   plain-English takeaway through the existing `InsightsSummarizer` seam.
 
 ## Routes / Controllers
+
 Agency shell, inside the `workspace:agency` analytics group:
+
 - `POST /clients/{client}/benchmarks` → `Analytics\BenchmarkController@store`
 - `POST /clients/{client}/benchmarks/{profile}/sync` → `@sync` (read one now)
 - `DELETE /clients/{client}/benchmarks/{profile}` → `@destroy`
@@ -79,6 +86,7 @@ Frontend: `components/analytics/benchmarks-panel.tsx` on `pages/analytics/client
 studio) and in `resources/views/pdf/client-report.blade.php`.
 
 ## Business Rules
+
 - **A gap is a gap, never a zero.** This is the rule the whole module is built around. A source
   that can't read a profile returns `null` → **no row is written** → the panel shows an em dash and
   the reason. Every figure is nullable from the Graph response through the column, the payload and
@@ -103,6 +111,7 @@ studio) and in `resources/views/pdf/client-report.blade.php`.
   posts in the window, and interactions per post. Nothing stores a competitor's content.
 
 ## Tests
+
 - `tests/Feature/Analytics/BenchmarksTest.php` — one row a day with a second run overwriting it;
   a refusing source leaving no row at all, and a partial reading storing only the reported fields;
   the per-plan limit counted across the whole org; a plan without the gate neither tracking nor
@@ -114,6 +123,7 @@ studio) and in `resources/views/pdf/client-report.blade.php`.
   rendering it); another org's profile invisible and untouchable.
 
 ## Known Gaps / Open Questions
+
 - **One platform.** See the sourcing answer above. This is a deliberate limit, not an omission, and
   the UI says so where somebody might otherwise wonder.
 - **No follower-growth chart over time**, only the first-and-last change across the window. The
@@ -128,11 +138,12 @@ studio) and in `resources/views/pdf/client-report.blade.php`.
   lands. Deleting a brand or an org cascades both today.
 
 ## Gotchas
+
 - **The handle is normalised, the display name isn't.** `@Rival` and `rival` are the same row;
   `label` is whatever the owner typed and is what charts show.
 - **`AddTrackedProfileAction` reads immediately but the read is outside the transaction.** A Graph
   call inside a transaction would hold a row lock for the length of an HTTP request.
-- **A reading is dated in the *organization's* timezone**, not the server's, so it lines up with
+- **A reading is dated in the _organization's_ timezone**, not the server's, so it lines up with
   `social_account_metrics` (which are dated in the account's).
 - **Benchmarks are a page prop on `analytics/client`, not part of
   `GetOrganizationAnalyticsSummaryAction`.** That summary feeds four surfaces (studio analytics,
@@ -140,6 +151,7 @@ studio) and in `resources/views/pdf/client-report.blade.php`.
   on exactly one of them.
 
 ## Changelog
+
 - 2026-11-07: Phase GTM-4 (GTM-4.1, GTM-4.2) built: `tracked_profiles` /
   `tracked_profile_metrics`, the `CompetitorProfileSource` contract with Meta Business Discovery
   and a null implementation, the nightly `benchmarks:sync` sweep, `Feature::TrackedProfiles` and

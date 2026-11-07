@@ -1,6 +1,7 @@
 # Link in Bio (Bio Pages)
 
 ## Purpose
+
 Phase CG-3 of `.junie/plans/business-competitor-gap.md` (delivers B-11.3, promoted to V1). One public
 page per brand — the single link a creator puts in every profile bio — owned by Alima rather than
 Linktree/Planoly/Later. It is the surface the creator store (CG-4), email capture (CG-6) and the
@@ -10,6 +11,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
 (GTM-2.1) blocks, a per-day view/click rollup, and the numbers on `/insights`.
 
 ## Models / Tables
+
 - `BioPage` (`bio_pages`): `org_id`, `client_id` **unique** (one page per primary brand), `handle`
   **globally unique** (the public namespace, lowercase, 3–32 chars), `title`, `bio`, `theme`
   (`BioTheme` — a brand **token name**, never a raw hex), `published_at` (null = the page 404s).
@@ -25,6 +27,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
   duplicates; every read SUMs, so the total is right either way.
 
 ## Enums
+
 - `App\Enums\BioBlockType`: `link`, `latest_posts`, `media_kit`, `product`, `email_capture`,
   `booking`. `live()` is what renders today — the five including `product` (CG-4.2) and
   `email_capture` (GTM-2.1); a type outside `live()` is rejected by validation, so a page can never
@@ -35,6 +38,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
 - `App\Enums\Feature::BioPage` — the plan gate (Creator Pro; see `plans.md`).
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Business\SaveBioPageAction`: the whole page in one `DB::transaction()` — details plus
   the full ordered block list. Add/edit/hide/reorder/remove are the same operation, so a page is
   never half-reordered. Checks `Entitlements::ensure(Feature::BioPage)` **only when publishing**.
@@ -50,6 +54,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
 - No new contract: there is one implementation of each and nothing external to swap.
 
 ## Routes / Controllers
+
 - `GET /@{handle}` → `BioPageController@show` — the public page (guest, `throttle:public-token`).
   404s when the page is unpublished or the brand is gone.
 - `GET /@{handle}/go/{block}` → `BioPageController@click` — counts the tap, then `redirect()->away()`
@@ -79,6 +84,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
   in the business shell. The DNS/TLS operational requirement is in `ops.md`.
 
 ## Business Rules
+
 - **A custom domain serves only the root, and only when verified** (Step GTM-3.2). `/` on a
   verified hostname renders that creator's page; on our own host it is the marketing page. An
   unverified claim serves nothing, and an unpublished page still 404s/falls through. Every other
@@ -106,6 +112,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
 - Max 20 blocks (`SaveBioPageRequest::MAX_BLOCKS`); link URLs must be `http`/`https`.
 
 ## Tests
+
 - `tests/Feature/Business/BioPageTest.php`: save + publish + public render; handle uniqueness,
   reserved words and normalisation; unpublished and deleted-brand 404s; hidden blocks and
   unpublished posts never render; one save that adds/edits/reorders/hides/removes; another brand's
@@ -114,6 +121,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
   owner are not; the insights payload with and without data.
 
 ## Known Gaps / Open Questions
+
 - **Reorder is up/down buttons, not drag.** `@dnd-kit/sortable` isn't installed and the shell is
   phone-first (HTML5 drag doesn't work on touch); arrows are also the keyboard-accessible path. Add
   drag only if a dependency lands for another reason.
@@ -135,6 +143,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
   `bio_pages`/`bio_blocks`/`bio_events` when it covers the new tables.
 
 ## Gotchas
+
 - **Never name a page prop `preview`.** `HandleInertiaRequests` shares `preview` (true on
   `/preview/*`); an Inertia page prop of the same name shadows it, and `usePreviewGuard` then
   cancels every link on the page with "That page isn't part of the preview." while `PreviewBanner`
@@ -143,6 +152,7 @@ Live today: **link**, **latest posts**, **media kit**, **product** (CG-4.2) and 
   Covered by `BioPageTest::test_the_editor_never_shadows_the_shared_preview_prop`.
 
 ## Changelog
+
 - 2026-11-07: Step GTM-3.2 — `bio_page_domains`, the `DnsResolver` contract, CNAME/TXT
   verification, the nightly `bio-domains:reverify` sweep, custom-domain serving at the root, and
   the domain panel in the editor. DNS/TLS operations are in `ops.md`.

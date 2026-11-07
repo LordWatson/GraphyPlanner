@@ -1,12 +1,14 @@
 # SocialAccount
 
 ## Purpose
+
 Covers Step 0.6: the social media accounts (per platform) a client posts to — their timezone,
 locale, default posting windows and persona override, plus vendor connection state. This is the
 account-level record `Post`/`PostTarget` (Step 0.8+) and Phase 1's publish adapter will target; no
 vendor is wired up yet.
 
 ## Models / Tables
+
 - `SocialAccount` (`social_accounts`): `org_id`, `client_id` (FKs, cascade on delete), `platform`
   (enum: instagram/tiktok/facebook/linkedin), `handle`, `display_name`, `timezone` (required IANA
   string, validated against `DateTimeZone::listIdentifiers()` via Laravel's `timezone` rule),
@@ -28,6 +30,7 @@ vendor is wired up yet.
   revisit if the original spec surfaces later.
 
 ## Actions / Services / Contracts
+
 - `App\Actions\SocialAccounts\CreateSocialAccountAction`: creates a `SocialAccount` scoped to a
   `Client` (sets `org_id`/`client_id`), wrapped in `DB::transaction`, logs the creation.
 - `App\Actions\SocialAccounts\UpdateSocialAccountAction`: updates an existing `SocialAccount`,
@@ -59,6 +62,7 @@ vendor is wired up yet.
   token. Purely additive — never touches `connection_status`/`external_profile_id`.
 
 ## Console Commands
+
 - `App\Console\Commands\CheckSocialAccountsHealthCommand` (`social-accounts:check-health`, Step
   1.6): runs `CheckAllSocialAccountsHealthAction` against the bound `PublishAdapter`. Scheduled
   hourly in `routes/console.php`, mirroring Step 1.5's `publishing:poll-pending-statuses` pattern.
@@ -87,11 +91,12 @@ vendor is wired up yet.
   `ConnectStateStore::issue()` carries `connect_invite_id` / `via` to the callback.
   Routes: `POST /clients/{client}/connect-invites`, `DELETE /connect-invites/{connectInvite}`
   (`ConnectInviteController`), public `GET /connect/{token}` + `POST /connect/{token}/accounts/
-  {socialAccount}` (`PublicConnectController`, throttled), portal
+{socialAccount}` (`PublicConnectController`, throttled), portal
   `POST /portal/accounts/{socialAccount}/connect` (`PortalAccountConnectController`,
   `SocialAccountPolicy::connectAsClient`). Pages: `connect/show`, Accounts tab invite panel.
 
 ## Routes / Controllers
+
 - `POST /clients/{client}/social-accounts` → `clients.social-accounts.store`
   (`SocialAccountController::store`) — validated via `StoreSocialAccountRequest`, delegates to
   `CreateSocialAccountAction`.
@@ -136,12 +141,14 @@ vendor is wired up yet.
   edit pages). See the 2026-09-16 Tabs redesign note below.
 
 ## Seeders
+
 - `Database\Seeders\DemoContentSeeder`: for each of `ClientSeeder`'s `Recommendo`/`Frzn` clients,
   creates three connected `SocialAccount`s (Instagram/TikTok/LinkedIn) alongside campaigns, assets,
   and posts — see `campaigns.md`/`assets.md`/`posts.md` for the rest of what it seeds. Called from
   `DatabaseSeeder` after `InvoiceSeeder`.
 
 ## Business Rules
+
 - `timezone` is required and validated as a real IANA identifier (`timezone:all` rule) — an account
   cannot be created/updated without one.
 - Only Owner/Strategist can create/update/delete/connect accounts for a client in their org (`connect`
@@ -156,6 +163,7 @@ vendor is wired up yet.
   steps; `external_profile_id`/`connected_at` are now populated by the Step 1.3 callback.
 
 ## Tests
+
 - `tests/Feature/SocialAccountControllerTest.php`: Owner can create with a valid IANA timezone;
   creation is rejected without a timezone or with an invalid one; Designer and cross-org users are
   forbidden from creating; Owner can update and delete; Owner can start the connect flow and receives
@@ -170,6 +178,7 @@ vendor is wired up yet.
   `connected` accounts.
 
 ## Known Gaps / Open Questions
+
 - 2026-10-20: the invite's "activity entry" is the invite row itself (`used_at`,
   `connected_account_ids`) plus a bell notification — there's no client activity feed to write to.
 - The exact §4.4 field list/platform set wasn't available in this repo; platforms were inferred from
@@ -185,6 +194,7 @@ vendor is wired up yet.
   revisit if this proves confusing in practice (e.g. show a manual "Refresh status" affordance).
 
 ## Changelog
+
 - 2026-11-07: Bugfix — `upload_post_profile` added; one vendor profile per client instead of one
   per account (which exhausted the Upload-Post plan). Detail in `publishing.md`.
 - 2026-10-20: Phase 18 (grid planner) — `App\Contracts\ProfileFeedSource` reads an Instagram account's recent feed for the grid preview: `MetaGraphProfileFeedSource` uses the Step 1.9 `meta_access_token` (`/{ig-user-id}` + `/media`, cached 15 min per account, never logs the token or media URLs), falling back to `PublishedPostsProfileFeedSource` (posts sent from the app). A grid plan belongs to one Instagram account of its client. Tests: `ProfileFeedSourceTest`.
@@ -244,8 +254,8 @@ vendor is wired up yet.
   card to a tab inside a `Tabs`/`TabsList`/`TabsContent` layout on
   `resources/js/pages/clients/show.tsx` — see `clients.md`'s changelog for the full redesign note.
 - 2026-09-16: Added `Database\Seeders\DemoContentSeeder` (seeds social accounts + campaigns + assets
-  + posts/comments/activity logs for the `ClientSeeder` demo clients) and wired it into
-  `DatabaseSeeder` after `InvoiceSeeder`.
+    - posts/comments/activity logs for the `ClientSeeder` demo clients) and wired it into
+      `DatabaseSeeder` after `InvoiceSeeder`.
 - 2026-09-08: Social accounts card on the client show page is now collapsible (folded by default),
   matching the "Billing history" section's toggle pattern.
 - 2026-09-08: Initial `SocialAccount` model/migration/policy/actions/controller/requests, inline

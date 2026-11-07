@@ -16,7 +16,7 @@ use App\Models\GridPlan;
 use App\Models\GridTile;
 use App\Models\User;
 use App\Services\AI\AiGuardrailService;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\Images\ImageNormalizer;
 use App\Services\Grids\GridPlanService;
 use App\Support\AI\Images\GenerateImageSetData;
@@ -204,19 +204,19 @@ class GridAiAssist
 
     private function record(GridPlan $plan, User $user, string $method, bool $succeeded, float $startedAt): void
     {
-        $isDeepSeek = $this->ai instanceof DeepSeekProvider;
+        $isAnthropic = $this->ai instanceof AnthropicProvider;
 
         AiUsageLog::create([
             'org_id' => $plan->org_id,
             'client_id' => $plan->client_id,
             'campaign_id' => $plan->campaign_id,
             'user_id' => $user->id,
-            'provider' => $isDeepSeek ? 'deepseek' : 'null',
-            'model' => $isDeepSeek ? (string) config('ai.deepseek.model', 'deepseek-flash') : 'none',
+            'provider' => $isAnthropic ? 'anthropic' : 'null',
+            'model' => $isAnthropic ? (string) config('ai.anthropic.model', 'claude-sonnet-5-5') : 'none',
             'method' => $method,
             'succeeded' => $succeeded,
             'error_code' => $succeeded ? null : 'empty_response',
-            'cost_estimate' => $isDeepSeek && $succeeded ? (float) config('ai.deepseek.estimated_cost_per_call', 0) : 0,
+            'cost_estimate' => $isAnthropic && $succeeded ? (float) config('ai.anthropic.estimated_cost_per_call', 0) : 0,
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
         ]);
     }

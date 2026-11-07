@@ -9,7 +9,7 @@ return [
     |
     | Checked by App\Http\Controllers\AiController and the editor/dashboard UI props before
     | exposing any AI endpoints or panels. The per-org enable switch and the logic that
-    | actually swaps AppServiceProvider's AiProvider::class binding to DeepSeekProvider are
+    | actually swaps AppServiceProvider's AiProvider::class binding to AnthropicProvider are
     | still Step 2.7's job — until then this only gates the UI/controller surface added here,
     | while the Actions themselves keep resolving the safe NullAiProvider.
     |
@@ -18,24 +18,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | DeepSeek (Phase 2 AI provider, Step 2.2)
+    | Anthropic (Phase 2 AI provider, Step 2.2)
     |--------------------------------------------------------------------------
     |
-    | Credentials and request tuning for App\Services\AI\DeepSeekProvider. Provider
+    | Credentials and request tuning for App\Services\AI\AnthropicProvider. Provider
     | selection (whether this is actually bound against App\Contracts\AiProvider,
     | vs. the safe App\Services\AI\NullAiProvider default) is handled separately in
-    | Step 2.7 — this file only configures the DeepSeek client itself.
+    | Step 2.7 — this file only configures the Anthropic client itself (the Messages API,
+    | POST /v1/messages).
+    |
+    | `model` is the reasoning model every text method uses; `cheap_model` is the fast/cheap one
+    | the art-direction brief uses (see `images.brief_model`). `effort` tunes how much thinking
+    | the model spends before answering — these are short, fully-specified JSON jobs, so `low`
+    | keeps latency and token spend down; raise it if output quality suffers.
     |
     */
-    'deepseek' => [
-        'api_key' => env('DEEPSEEK_API_KEY'),
-        'model' => env('DEEPSEEK_MODEL', 'deepseek-flash'),
-        'base_url' => env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
-        'timeout' => (int) env('DEEPSEEK_TIMEOUT', 90),
-        'max_tokens' => (int) env('DEEPSEEK_MAX_TOKENS', 1024),
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('AI_MODEL_REASONING', 'claude-sonnet-5-5'),
+        'cheap_model' => env('AI_MODEL_CHEAP', 'claude-haiku-5-5'),
+        'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
+        'version' => env('ANTHROPIC_VERSION', '2023-06-01'),
+        'effort' => env('ANTHROPIC_EFFORT', 'low'),
+        'timeout' => (int) env('ANTHROPIC_TIMEOUT', 90),
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
         // Campaigns enhancement C-8.3: an estimated cost per successful campaign AI call (USD),
         // recorded on `ai_usage_logs.cost_estimate` so campaign profitability can show AI spend.
-        'estimated_cost_per_call' => (float) env('DEEPSEEK_ESTIMATED_COST_PER_CALL', 0.002),
+        'estimated_cost_per_call' => (float) env('ANTHROPIC_ESTIMATED_COST_PER_CALL', 0.01),
     ],
 
     /*
@@ -62,7 +71,7 @@ return [
     |
     | How many trends/ideas a single request asks the model for. Step 2.13 targets 5–10 relevant
     | ideas per client; the earlier interim cap of 3 (kept small for speed) is lifted here. The
-    | DeepSeek provider clamps to 1–10 whatever is configured.
+    | Anthropic provider clamps to 1–10 whatever is configured.
     |
     */
     'suggestions' => [
@@ -145,9 +154,9 @@ return [
         // Optional second adapter for briefs with a headline (Step 16.12): `openai` or null.
         'text_provider' => env('AI_IMAGE_TEXT_PROVIDER'),
 
-        // DeepSeek model used only for the art-direction brief (Step 16.5). A fast non-reasoning
-        // model keeps "Generate" snappy; falls back to ai.deepseek.model when empty.
-        'brief_model' => env('AI_IMAGE_BRIEF_MODEL'),
+        // Anthropic model used only for the art-direction brief (Step 16.5). The cheap/fast model
+        // keeps "Generate" snappy; set AI_IMAGE_BRIEF_MODEL to override it per environment.
+        'brief_model' => env('AI_IMAGE_BRIEF_MODEL') ?: env('AI_MODEL_CHEAP', 'claude-haiku-5-5'),
         'brief_max_tokens' => (int) env('AI_IMAGE_BRIEF_MAX_TOKENS', 1500),
         'brief_cache_ttl_hours' => (int) env('AI_IMAGE_BRIEF_CACHE_TTL_HOURS', 24),
 

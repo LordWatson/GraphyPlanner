@@ -1,5 +1,11 @@
 import { Head } from '@inertiajs/react';
-import { ImagePlus, LinkIcon, Loader2, LockKeyhole, ShieldCheck } from 'lucide-react';
+import {
+    ImagePlus,
+    LinkIcon,
+    Loader2,
+    LockKeyhole,
+    ShieldCheck,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/page';
@@ -142,15 +148,16 @@ function UploadSlot({
 
         if (!result.ok || !result.data.asset) {
             toast.error(
-                result.ok
-                    ? `Couldn’t upload ${file.name}.`
-                    : result.message,
+                result.ok ? `Couldn’t upload ${file.name}.` : result.message,
             );
 
             return;
         }
 
-        setUploaded((current) => [...current, result.data.asset as UploadedAsset]);
+        setUploaded((current) => [
+            ...current,
+            result.data.asset as UploadedAsset,
+        ]);
     };
 
     const handleFiles = (files: FileList | null) => {
@@ -203,7 +210,9 @@ function UploadSlot({
                     <ImagePlus className="size-5" />
                 )}
                 <span className="text-foreground font-medium">
-                    {uploading > 0 ? `Uploading ${uploading}…` : 'Upload or drop files'}
+                    {uploading > 0
+                        ? `Uploading ${uploading}…`
+                        : 'Upload or drop files'}
                 </span>
                 <span>You can add several at once.</span>
             </button>

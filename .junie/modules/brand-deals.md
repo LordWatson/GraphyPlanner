@@ -1,6 +1,7 @@
 # Brand Deals & Paid Partnerships
 
 ## Purpose
+
 Phase CG-5 of `.junie/plans/business-competitor-gap.md` (delivers **B-11.1** unchanged and **B-11.2**,
 promoted Stretch → V1). The sponsor side of a creator's work, in two halves:
 
@@ -14,6 +15,7 @@ promoted Stretch → V1). The sponsor side of a creator's work, in two halves:
 It completes the sponsor workflow that only Beacons partly offers, on top of the media kit (B-8.4).
 
 ## Models / Tables
+
 - `posts.is_paid_partnership` (bool, default false), `posts.partner_name`, `posts.partner_handle`
   (`2026_11_25_100100_add_paid_partnership_to_posts.php`). The declaration is the owner's; the
   checklist enforces the consequence.
@@ -33,6 +35,7 @@ It completes the sponsor workflow that only Beacons partly offers, on top of the
 tracker cannot claim a post went out when it didn't (or lag one that did).
 
 ## Enums
+
 - `App\Enums\DealStatus`: `enquiry`, `pitched`, `agreed`, `delivered`, `paid`, `declined`.
   Deliberately **not** a state machine — real deals go backwards or skip steps, so the owner sets
   whichever status is true and nothing refuses a move. `enquiry` is the only one the app sets itself
@@ -41,6 +44,7 @@ tracker cannot claim a post went out when it didn't (or lag one that did).
 - `App\Enums\Feature::BrandDeals` — the plan gate (Creator Pro; see `plans.md`).
 
 ## Support / Actions
+
 - `App\Support\Posts\PartnershipDisclosure` — the single rule. `MARKERS` is the accepted wording
   (`#ad`, `#sponsored`, `#paidpartnership`, `#gifted`, "paid partnership", "sponsored by", …),
   matched case-insensitively; `SUGGESTED` is what the editor and the checklist detail show, so the
@@ -68,7 +72,9 @@ tracker cannot claim a post went out when it didn't (or lag one that did).
   `rates`, `currency` and `accepts_enquiries`.
 
 ## Routes / Controllers
+
 Business shell (`workspace:business`; writes need the brand-**update** ability, Owner/Manager):
+
 - `GET /deals` → `Business\BrandDealController@index`
 - `POST /deals`, `PUT /deals/{deal}`, `DELETE /deals/{deal}` → same controller
 - `POST /deals/{deal}/invoice` → `invoice` (Step GTM-1.2): raise, PDF and email the sponsor's
@@ -76,6 +82,7 @@ Business shell (`workspace:business`; writes need the brand-**update** ability, 
 - `PUT /media-kit` (B-8.4) now also carries `rates` and `enquiries_enabled`
 
 Public:
+
 - `POST /kit/{token}/enquire` → `MediaKitShareController@enquire` — guest, inside the
   `throttle:public-token` group **and** its own `throttle:6,1`, honeypot (`website`), and only
   answered while the owner has the form on. The response is identical either way, so the form can't
@@ -94,8 +101,9 @@ rates + past partners in `resources/views/pdf/media-kit.blade.php`. Nav: **Deals
 the **Brand** chapter (prefix `/deals`) — no new chapter number. `StatusPill` kind `deal`.
 
 ## Business Rules
+
 - **Disclosure is per channel, and per platform for free.** The check reads each target's
-  *published* caption, which is composed per platform — so on a platform that strips hashtags
+  _published_ caption, which is composed per platform — so on a platform that strips hashtags
   (Google Business) `#ad` in the hashtag field doesn't count and the owner must write it into the
   text, while on Instagram either place works.
 - **We never guess that a post is an ad.** Only the owner's declaration triggers the requirement: a
@@ -117,6 +125,7 @@ the **Brand** chapter (prefix `/deals`) — no new chapter number. `StatusPill` 
 - Progress is capped at what was agreed (3 published against 2 agreed reads `2/2`).
 
 ## Tests
+
 - `tests/Feature/Posts/PaidPartnershipTest.php` — an ordinary post is never asked to disclose; a
   declared one without a disclosure fails the checklist (hard, not soft) **and** is refused by the
   transition endpoint; a disclosure in the caption or in the hashtags passes on Instagram; a
@@ -133,9 +142,10 @@ the **Brand** chapter (prefix `/deals`) — no new chapter number. `StatusPill` 
   and another brand's deal 404s before the plan gate is reached (GTM-1.2).
 
 ## Known Gaps / Open Questions
+
 - **No branded-content flags at the platform.** Instagram's "Paid partnership" label and TikTok's
   disclosure toggle are platform settings Upload-Post doesn't expose, so disclosure is caption-based
-  only. If an adapter gains the flag, set it *and* keep the caption rule.
+  only. If an adapter gains the flag, set it _and_ keep the caption rule.
 - **A deal invoice is our invoice, not a Stripe-hosted one** (Step GTM-1.2). `IssueDealInvoiceAction`
   raises a normal `Invoice` for the deal's fee, PDFs it and emails the sponsor through the existing
   pipeline (so reminders, payment reporting and the ledger all work on it). CG-5.2's wording said
@@ -159,6 +169,7 @@ the **Brand** chapter (prefix `/deals`) — no new chapter number. `StatusPill` 
 - **B-13.2 (export/deletion)** must list `brand_deals` when it covers the new tables.
 
 ## Gotchas
+
 - **The disclosure item is intentionally hard.** Making it `soft` would quietly turn a legal
   requirement into a style note; if it has to be bypassed, that belongs in an explicit override
   (like `overrideApproval()`), not a softened check.
@@ -168,6 +179,7 @@ the **Brand** chapter (prefix `/deals`) — no new chapter number. `StatusPill` 
   as the creator store (`creator-store.md`).
 
 ## Changelog
+
 - 2026-11-07: Step GTM-1.2 — `brand_deals.invoice_id` + `IssueDealInvoiceAction`: one deal becomes
   one invoice on the existing invoice pipeline, emailed to the sponsor's `contact_email`. Refused
   without a fee or an address, and refused a second time. The deal's own `DealStatus` is **not**

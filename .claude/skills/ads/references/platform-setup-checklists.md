@@ -3,6 +3,7 @@
 Complete setup checklists for major ad platforms.
 
 ## Contents
+
 - Google Ads Setup (Account Foundation, Conversion Tracking, Analytics Integration, Audience Setup, Campaign Readiness, Ad Extensions, Brand Protection)
 - Meta Ads Setup (Business Manager Foundation, Pixel & Tracking, Domain & Aggregated Events, Audience Setup, Catalog, Creative Assets, Compliance)
 - LinkedIn Ads Setup (Campaign Manager Foundation, Insight Tag & Tracking, Audience Setup, Lead Gen Forms, Document Ads, Creative Assets, Budget Considerations)
@@ -39,18 +40,18 @@ Complete setup checklists for major ad platforms.
 
 - [ ] Remarketing tag verified
 - [ ] Website visitor audiences created:
-  - All visitors (180 days)
-  - Key page visitors (pricing, demo, features)
-  - Converters (for exclusion)
+    - All visitors (180 days)
+    - Key page visitors (pricing, demo, features)
+    - Converters (for exclusion)
 - [ ] Customer match lists uploaded
 - [ ] Similar audiences enabled
 
 ### Campaign Readiness
 
 - [ ] Negative keyword lists created:
-  - Universal negatives (free, jobs, careers, reviews, complaints)
-  - Competitor negatives (if needed)
-  - Irrelevant industry terms
+    - Universal negatives (free, jobs, careers, reviews, complaints)
+    - Competitor negatives (if needed)
+    - Irrelevant industry terms
 - [ ] Location targeting set (include/exclude)
 - [ ] Language targeting set
 - [ ] Ad schedule configured (if B2B, business hours)
@@ -88,12 +89,12 @@ Complete setup checklists for major ad platforms.
 
 - [ ] Meta Pixel installed on all pages
 - [ ] Standard events configured:
-  - PageView (automatic)
-  - ViewContent (product/feature pages)
-  - Lead (form submissions)
-  - Purchase (conversions)
-  - AddToCart (if e-commerce)
-  - InitiateCheckout (if e-commerce)
+    - PageView (automatic)
+    - ViewContent (product/feature pages)
+    - Lead (form submissions)
+    - Purchase (conversions)
+    - AddToCart (if e-commerce)
+    - InitiateCheckout (if e-commerce)
 - [ ] Conversions API (CAPI) set up for server-side tracking
 - [ ] Event Match Quality score > 6
 - [ ] Test events in Events Manager
@@ -108,11 +109,11 @@ Complete setup checklists for major ad platforms.
 ### Audience Setup
 
 - [ ] Custom audiences created:
-  - Website visitors (all, 30/60/90/180 days)
-  - Key page visitors
-  - Video viewers (25%, 50%, 75%, 95%)
-  - Page/Instagram engagers
-  - Customer list uploaded
+    - Website visitors (all, 30/60/90/180 days)
+    - Key page visitors
+    - Video viewers (25%, 50%, 75%, 95%)
+    - Page/Instagram engagers
+    - Customer list uploaded
 - [ ] Lookalike audiences created (1%, 1-3%)
 - [ ] Saved audiences for common targeting
 
@@ -126,9 +127,9 @@ Complete setup checklists for major ad platforms.
 ### Creative Assets
 
 - [ ] Images in correct sizes:
-  - Feed: 1080x1080 (1:1)
-  - Stories/Reels: 1080x1920 (9:16)
-  - Landscape: 1200x628 (1.91:1)
+    - Feed: 1080x1080 (1:1)
+    - Stories/Reels: 1080x1920 (9:16)
+    - Landscape: 1200x628 (1.91:1)
 - [ ] Videos in correct formats
 - [ ] Ad copy variations ready
 - [ ] UTM parameters in all destination URLs
@@ -155,16 +156,16 @@ Complete setup checklists for major ad platforms.
 - [ ] LinkedIn Insight Tag installed on all pages
 - [ ] Tag verified and firing
 - [ ] Conversion tracking configured:
-  - URL-based conversions
-  - Event-specific conversions
+    - URL-based conversions
+    - Event-specific conversions
 - [ ] Conversion values set (if applicable)
 
 ### Audience Setup
 
 - [ ] Matched Audiences created:
-  - Website retargeting audiences
-  - Company list uploaded (for ABM)
-  - Contact list uploaded
+    - Website retargeting audiences
+    - Company list uploaded (for ABM)
+    - Contact list uploaded
 - [ ] Lookalike audiences created
 - [ ] Saved audiences for common targeting
 
@@ -188,8 +189,8 @@ Complete setup checklists for major ad platforms.
 - [ ] Carousel images ready
 - [ ] Video specs met (if using)
 - [ ] Ad copy within character limits:
-  - Intro text: 600 max, 150 recommended
-  - Headline: 200 max, 70 recommended
+    - Intro text: 600 max, 150 recommended
+    - Headline: 200 max, 70 recommended
 
 ### Budget Considerations
 
@@ -217,8 +218,8 @@ Complete setup checklists for major ad platforms.
 ### Audience Setup
 
 - [ ] Tailored audiences created:
-  - Website visitors
-  - Customer lists
+    - Website visitors
+    - Customer lists
 - [ ] Follower lookalikes identified
 - [ ] Interest and keyword targets researched
 

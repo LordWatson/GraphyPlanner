@@ -1,15 +1,17 @@
 # Paid Ads Reporting (read-only)
 
 ## Purpose
+
 Phase GTM-5 of `.junie/plans/go-to-market.md`. Agencies report on ad spend every month, and
 reporting is roughly a tenth of the work of managing ads and most of the value. So Alima reports:
 spend, results and cost per result per ad account per day, beside the organic figures, on the
 client's analytics page and in their monthly report.
 
-**Paid ads *management* is an explicit non-goal** (plan §1.1), and this module is built so a later
+**Paid ads _management_ is an explicit non-goal** (plan §1.1), and this module is built so a later
 step cannot quietly become one.
 
 ## READ-ONLY BY CONSTRUCTION
+
 `App\Contracts\AdsSource` has exactly two methods: `key()` and `accountMetrics()`. There is no
 `createCampaign`, no `updateBudget`, no `pause`, and **no write method is to be added to it.**
 
@@ -23,6 +25,7 @@ That is a design rule, not a preference:
   method list by reflection, so a write method fails the suite before it reaches a reviewer.
 
 ## Models / Tables
+
 `2026_12_26_100100_create_ad_account_tables.php`, following `social_accounts` /
 `social_account_metrics` exactly:
 
@@ -41,6 +44,7 @@ Money is minor units in the ad account's **own** currency. Nothing is ever conve
 shows each account in the currency it spent.
 
 ## Actions / Services / Contracts
+
 - `App\Contracts\AdsSource` — bound in `AppServiceProvider` from `config('ads.provider')`.
 - `App\Services\Analytics\Ads\NullAdsSource` — the **default**. No provider configured means no
   figures, so a fresh install shows honest gaps rather than wrong numbers.
@@ -55,12 +59,14 @@ shows each account in the currency it spent.
   figures for the side-by-side.
 
 ## Routes / Controllers
+
 Agency shell, inside the `workspace:agency` analytics group:
+
 - `POST /clients/{client}/ad-accounts` → `Analytics\AdAccountController@store`
 - `POST /clients/{client}/ad-accounts/{adAccount}/sync` → `@sync` (read one now)
 - `DELETE /clients/{client}/ad-accounts/{adAccount}` → `@destroy`
 
-Every one of them records *what to read*, reads it, or stops reading it. Writes need the
+Every one of them records _what to read_, reads it, or stops reading it. Writes need the
 client-update ability.
 
 Frontend: `components/analytics/ads-panel.tsx` on `pages/analytics/client.tsx`, the "Paid and
@@ -68,6 +74,7 @@ organic" block in `components/client-reports/client-report-document.tsx` and in
 `resources/views/pdf/client-report.blade.php`.
 
 ## Business Rules
+
 - **A gap is a gap, never a zero.** A disconnected account, or one the platform wouldn't answer
   for, shows em dashes and the reason. In a spend report a 0 would read as "we spent nothing",
   which is a different and false claim.
@@ -84,6 +91,7 @@ organic" block in `components/client-reports/client-report-document.tsx` and in
   twice with and without the prefix.
 
 ## Tests
+
 - `tests/Feature/Analytics/AdsReportingTest.php` — the contract's method list by reflection (the
   read-only guarantee); one row a day with a re-read restating it; a refusing source disconnecting
   the account and writing no zeroes; a disconnected account never read until retried; CPC derived
@@ -94,6 +102,7 @@ organic" block in `components/client-reports/client-report-document.tsx` and in
   reporting nothing rather than guessing.
 
 ## Known Gaps / Open Questions
+
 - **`ads_read` is not granted on our Meta app**, which is Phase 5 work. `ADS_PROVIDER` therefore
   defaults to none, and until both are in place every read returns null and every panel shows gaps.
   **This is the main thing standing between the code and a usable feature.**
@@ -113,6 +122,7 @@ organic" block in `components/client-reports/client-report-document.tsx` and in
 - **B-13.2 (export/deletion)** must list `ad_accounts` and `ad_account_metrics` when it lands.
 
 ## Gotchas
+
 - **`connection_status` is optimistic on create.** The first read is what proves access, and it
   flips the account to not-connected with the reason when it fails. That is why adding an account
   can immediately show an error toast.
@@ -122,6 +132,7 @@ organic" block in `components/client-reports/client-report-document.tsx` and in
   write tomorrow's empty row.
 
 ## Changelog
+
 - 2026-11-07: Phase GTM-5 (GTM-5.1, GTM-5.2) built: the read-only `AdsSource` contract with Meta
   and null implementations, `ad_accounts` / `ad_account_metrics`, the nightly `ads:sync` sweep,
   `Feature::AdsReporting`, the "Ad spend" panel on the client analytics page, and the "Paid and

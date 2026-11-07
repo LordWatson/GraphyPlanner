@@ -209,7 +209,7 @@ class AiControllerTest extends TestCase
 
     public function test_post_editor_props_expose_ai_flags_without_secrets(): void
     {
-        Config::set('ai.deepseek.api_key', 'secret-test-key-should-not-leak');
+        Config::set('ai.anthropic.api_key', 'secret-test-key-should-not-leak');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -223,6 +223,6 @@ class AiControllerTest extends TestCase
             ->where('ai.enabled', true)
             ->where('ai.canUse', true)
         );
-        $response->assertDontSee(config('ai.deepseek.api_key'));
+        $response->assertDontSee(config('ai.anthropic.api_key'));
     }
 }

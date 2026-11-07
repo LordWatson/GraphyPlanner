@@ -1,6 +1,7 @@
 # Posts
 
 ## Purpose
+
 Core content data model: a `Post` (the piece of content) and its `PostTarget`s (one row per selected
 social account, with independent per-target scheduling), the Step 0.9 status-transition state
 machine, approval records, activity log, comments (with `internal_only`), the `ReviewToken` model,
@@ -11,6 +12,7 @@ the Step 0.13 unauthenticated client review portal (`/review/:token`), which ema
 Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
 
 ## Models / Tables
+
 - `Post` (`posts`): `org_id`, `client_id`, `campaign_id` (nullable), `created_by` (nullable),
   `status` (`App\Enums\PostStatus`, default `idea`), `approval_mode` (`App\Enums\ApprovalMode`,
   default `client_required`), `master_caption`, `review_message` (nullable text — a free-form note
@@ -55,6 +57,7 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
   uploaded/linked to its client rather than duplicating storage.
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Posts\ListClientPostsAction`: the client page's Posts tab — a client's posts
   newest first, 8/page (`PER_PAGE`), filtered by caption search (case-insensitive, `%`/`_`
   matched literally), `status`, `campaign` (id) and `platform` (any target on that channel).
@@ -110,25 +113,25 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
 - `App\Actions\Posts\SendClientReviewRequestedEmailAction` (Step 0.13): issues a fresh `ReviewToken`
   scoped to the post's client/post via `CreateReviewTokenAction`, builds the `/review/{token}` link,
   and sends `App\Mail\ClientReviewRequestedMail` (via Resend, `resources/views/emails/client-review-
-  requested.blade.php`) to `Client::approval_email`. If the client has no `approval_email` on file,
+requested.blade.php`) to `Client::approval_email`. If the client has no `approval_email` on file,
   the send is skipped (with a warning log) and `null` is returned rather than failing the transition.
   Invoked from `TransitionPostStatusAction` whenever the destination status is `waiting_client`; the
   returned URL (or `null`) is stored on the resulting `PostActivityLog::review_url`.
 - `App\Actions\Posts\ResendClientReviewEmailAction`: re-sends `ClientReviewRequestedMail` to
   `Client::approval_email`, reusing the signed URL already stored on a given `PostActivityLog::
-  review_url` (no new `ReviewToken` is issued) — used when an org user needs to help a client who
+review_url` (no new `ReviewToken` is issued) — used when an org user needs to help a client who
   lost/never received the original email. Throws `InvalidArgumentException` if the log has no
   `review_url`; skips (with a warning log) if the client has no `approval_email` on file.
 - `App\Actions\Posts\SendUpcomingPostReminderEmailsAction`: finds every `PostStatus::Scheduled`
   post's `PostTarget` whose `scheduled_at_utc` falls within the next `$days` days (default 3) and
   whose `reminder_sent_at` is still null, groups them by organization, and emails every user of that
   organization one `App\Mail\UpcomingPostReminderMail` digest (`resources/views/emails/upcoming-
-  post-reminder.blade.php`) listing all due occurrences. Marks each notified target's
+post-reminder.blade.php`) listing all due occurrences. Marks each notified target's
   `reminder_sent_at` (wrapped in `DB::transaction` per organization, alongside the sends) so a re-run
   never double-emails the same target. Logs `Upcoming post reminder emails sent` with `org_id`/
   `target_count`/`user_count`. Invoked by the `posts:send-upcoming-reminders` artisan command.
 - `App\Actions\Posts\ReschedulePostAction` — the calendar's drag-and-drop move. Shifts every dated
-  `PostTarget` of a post by `$days` whole days *in place* (ids/status kept): only
+  `PostTarget` of a post by `$days` whole days _in place_ (ids/status kept): only
   `scheduled_local_date` moves, `scheduled_local_time` is untouched, and `scheduled_at_utc` is
   re-derived per target from its own account timezone (so a move across a DST change keeps the local
   wall-clock time). Clears `reminder_sent_at` so the upcoming-post reminder fires for the new date.
@@ -141,11 +144,12 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
   `scheduled_at_utc` is re-derived from that account's timezone and `reminder_sent_at` cleared. The
   post's siblings are untouched, so independently-scheduled local times are never collapsed. Same
   vendor-recall (`VendorScheduleService`) + scheduled-re-dispatch (`ReschedulePostAction::
-  redispatchIfScheduled`) lifecycle as the whole-post move. Rejects a past landing as a
+redispatchIfScheduled`) lifecycle as the whole-post move. Rejects a past landing as a
   `ValidationException` on `scheduled_local_date`. Wrapped in `DB::transaction`; logs
   `Post target rescheduled from calendar` with `post_id`/`target_id`/`org_id`/`user_id`/`has_time`.
 
 ## Console Commands
+
 - `posts:send-upcoming-reminders {--days=3}` (`App\Console\Commands\SendUpcomingPostRemindersCommand`):
   runs `SendUpcomingPostReminderEmailsAction`, printing how many `PostTarget`s were reminded about.
   Scheduled daily at 08:00 in `routes/console.php` (`Schedule::command(...)->dailyAt('08:00')`).
@@ -171,7 +175,7 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
   `first_comment`, `media_framing` (+ a one-click crop fix for full-screen photo formats). Each
   failing item carries `detail` (one line per channel).
 - **Approval mode (M-2.9)**: `PostStatusTransitionMap::isAllowedFor()/needsClientApproval()/
-  allowedFor()` — a `client_required` post can't go `internal_review → approved`;
+allowedFor()` — a `client_required` post can't go `internal_review → approved`;
   `TransitionPostStatusAction::overrideApproval()` (Owner, `PostPolicy::overrideApproval`, reason
   required, recorded as "Approval override: …" on the activity log and approval). New posts take
   `clients.default_approval_mode`. The factory default is `internal_only` so older tests keep their
@@ -188,50 +192,51 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
   and first comment (`PostMediaPresenter::channelPreview()`), never raw overrides.
 - **Editor layout (Step 24.10 — guided stepper).** `pages/posts/edit.tsx` composes the editor as a
   five-step guided flow instead of stacking every control at once:
-  - A progress spine (`editor/step-spine.tsx` → `StepSpine`) over the steps **Write · Where & when ·
-    Media · Settings · Review & send**; each step's disc shows its live readiness
-    (`editor/editor-steps.ts`: `tabStatus` for the four build steps, `reviewStatus` for Review, plus
-    a server-error overlay). Steps are free to click — navigation never blocks.
-  - One build step shows at a time (`editor/editor-stepper.tsx` → `StepPanel`, all panels stay
-    mounted so every field still submits; `ErrorStepSwitcher` jumps to the first step with a server
-    error) beside a **constant live preview** in the right rail (`editor/editor-sidebar.tsx`), which
-    also carries a compact readiness nudge (hidden on the Review step) into Review & send.
-  - A single action bar (`editor/step-action-bar.tsx` → `StepActionBar`) carries the save state,
-    Back / Next (Next advances through the steps; the Review step has no Next), and Save.
-  - **All lifecycle actions now live only in the final Review & send step** (`editor/review-step.tsx`
-    → `ReviewStep`): read top-down as "a last look, then move it along" — the full
-    `ReadinessChecklist`, the business quick-schedule bar (`business-schedule-bar.tsx`),
-    `post-workflow.tsx` (stage track, the one recommended move, and every other legal move), the
-    client feedback board (`FeedbackSection`), then the `PostDiscussion` (comments + activity). They
-    are no longer stacked above the work.
-  - **Step 24.11 — nothing orphaned at the bottom.** The three modules that used to sit full-width
-    below the two-column grid (with a big empty gap before them) now live in the steps they belong
-    to: the AI image studio (`ImageStudioSection`, "Make it visual") is appended to the **Media**
-    step; the feedback board (`FeedbackSection`) and the discussion (`PostDiscussion`) moved into
-    **Review & send** (see above). Each therefore sits in the left column beside the preview rail at a
-    readable width, never full-width. When there's feedback to read (`changes_requested`, `failed`,
-    `partially_published`), the editor opens straight on Review & send (`useEditorNavigation` takes an
-    `initialTab`) with the discussion on its activity tab.
-  - **Open step survives a save.** A successful save remounts the page (Inertia drops the component
-    state when there are no validation errors), which would otherwise snap back to Write.
-    `useEditorNavigation` takes a `persistKey` (`post-editor-step:{post.id}` from `edit.tsx`) and
-    mirrors the active step to `sessionStorage`, reading it back as the initial step on remount, so
-    the user stays on the step they were working on (e.g. Media). `initialTab`/`needsFeedback` is the
-    fallback when nothing is stored (first load).
-  - **Media reordering (Media step).** `media-picker.tsx` lets attached tiles be reordered the way
-    `grid-board.tsx` does: drag a tile onto another (mouse) or focus a tile's grip handle and press
-    space to lift, the arrow keys to move, space to drop (escape cancels), announced via an
-    `aria-live` region. A keyboard drag stages its order (`lifted`) until dropped; the numbered badge
-    is the live publish order; `onChange` commits the new order into editor state (`asset_ids` hidden
-    inputs), saved like any other edit. Thumbnails are `draggable={false}` so the tile owns the drag.
-  - Read-only viewers skip the stepper entirely (`editor/read-only-editor.tsx` → `ReadOnlyEditor`,
-    extracted from `edit.tsx` to keep it under the 300-line editor budget): `ReadOnlyContent` +
-    feedback + discussion + image studio in the left column beside the preview, with
-    `BusinessScheduleBar`/`PostWorkflow` shown above it (so "move it back from the workflow above"
-    still reads true for a locked post). The pure step helpers are unit-tested in
-    `editor/editor-stepper.test.ts`.
+    - A progress spine (`editor/step-spine.tsx` → `StepSpine`) over the steps **Write · Where & when ·
+      Media · Settings · Review & send**; each step's disc shows its live readiness
+      (`editor/editor-steps.ts`: `tabStatus` for the four build steps, `reviewStatus` for Review, plus
+      a server-error overlay). Steps are free to click — navigation never blocks.
+    - One build step shows at a time (`editor/editor-stepper.tsx` → `StepPanel`, all panels stay
+      mounted so every field still submits; `ErrorStepSwitcher` jumps to the first step with a server
+      error) beside a **constant live preview** in the right rail (`editor/editor-sidebar.tsx`), which
+      also carries a compact readiness nudge (hidden on the Review step) into Review & send.
+    - A single action bar (`editor/step-action-bar.tsx` → `StepActionBar`) carries the save state,
+      Back / Next (Next advances through the steps; the Review step has no Next), and Save.
+    - **All lifecycle actions now live only in the final Review & send step** (`editor/review-step.tsx`
+      → `ReviewStep`): read top-down as "a last look, then move it along" — the full
+      `ReadinessChecklist`, the business quick-schedule bar (`business-schedule-bar.tsx`),
+      `post-workflow.tsx` (stage track, the one recommended move, and every other legal move), the
+      client feedback board (`FeedbackSection`), then the `PostDiscussion` (comments + activity). They
+      are no longer stacked above the work.
+    - **Step 24.11 — nothing orphaned at the bottom.** The three modules that used to sit full-width
+      below the two-column grid (with a big empty gap before them) now live in the steps they belong
+      to: the AI image studio (`ImageStudioSection`, "Make it visual") is appended to the **Media**
+      step; the feedback board (`FeedbackSection`) and the discussion (`PostDiscussion`) moved into
+      **Review & send** (see above). Each therefore sits in the left column beside the preview rail at a
+      readable width, never full-width. When there's feedback to read (`changes_requested`, `failed`,
+      `partially_published`), the editor opens straight on Review & send (`useEditorNavigation` takes an
+      `initialTab`) with the discussion on its activity tab.
+    - **Open step survives a save.** A successful save remounts the page (Inertia drops the component
+      state when there are no validation errors), which would otherwise snap back to Write.
+      `useEditorNavigation` takes a `persistKey` (`post-editor-step:{post.id}` from `edit.tsx`) and
+      mirrors the active step to `sessionStorage`, reading it back as the initial step on remount, so
+      the user stays on the step they were working on (e.g. Media). `initialTab`/`needsFeedback` is the
+      fallback when nothing is stored (first load).
+    - **Media reordering (Media step).** `media-picker.tsx` lets attached tiles be reordered the way
+      `grid-board.tsx` does: drag a tile onto another (mouse) or focus a tile's grip handle and press
+      space to lift, the arrow keys to move, space to drop (escape cancels), announced via an
+      `aria-live` region. A keyboard drag stages its order (`lifted`) until dropped; the numbered badge
+      is the live publish order; `onChange` commits the new order into editor state (`asset_ids` hidden
+      inputs), saved like any other edit. Thumbnails are `draggable={false}` so the tile owns the drag.
+    - Read-only viewers skip the stepper entirely (`editor/read-only-editor.tsx` → `ReadOnlyEditor`,
+      extracted from `edit.tsx` to keep it under the 300-line editor budget): `ReadOnlyContent` +
+      feedback + discussion + image studio in the left column beside the preview, with
+      `BusinessScheduleBar`/`PostWorkflow` shown above it (so "move it back from the workflow above"
+      still reads true for a locked post). The pure step helpers are unit-tested in
+      `editor/editor-stepper.test.ts`.
 
 ## Phase M-3 additions (Step M-3.2)
+
 - `PostController@edit` adds `best_time` to each `targetAccounts` entry (`BestTimeService`). A
   channel row in `ChannelSchedule` shows "Best times" chips (or "Best times appear after N measured
   posts"); a chip sets that row to the next such slot on the account's clock (`nextWeeklySlot()`).
@@ -241,20 +246,21 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
 
 `post_comments` gained `anchor_type` (`CommentAnchorType`: image/video/caption), `anchor` (JSON:
 image `{asset_id,x,y}`, video `{asset_id,t}`, caption `{channel,start,end,quote}`), `suggested_edit`
-+ `suggestion_resolved_at`, `parent_id` (thread replies), and `resolved_at` / `resolved_by_user_id`
-(migration `2026_11_06_100100`). `PostComment::isFeedback()` = a root comment that is pinned or
-carries a suggestion; `Post::hasUnresolvedFeedback()` (root, unresolved, pinned-or-suggestion) gates
-approval — `TransitionPostStatusAction` refuses `→ approved` with open feedback unless an Owner
-overrides. `CreatePostCommentAction` takes `anchorType`/`anchor`/`parentId`/`suggestedEdit`;
-`ResolvePostCommentAction` and `AcceptSuggestedEditAction` (applies a suggested caption to
-`master_caption` via `UpdatePostAction`, then resolves) live in `App\Actions\Posts\Feedback`.
-`PostFeedbackPresenter::threads($post, $viewer, $forClient)` shapes threads for the three surfaces
-(internal threads hidden from clients). Staff routes `comments.resolve` / `comments.accept-suggestion`
-/ `comments.dismiss-suggestion` (`PostFeedbackController`); the portal has `portal.comments.resolve`.
-Frontend: the shared `components/feedback/*` board (pin overlay with click-to-place, caption
-select-to-comment, video timestamps, threads, resolve, suggested-edit accept) is used in the editor
-(staff), the portal (reviewers) and the review link (read-only render). Tests:
-`tests/Feature/Feedback/VisualFeedbackTest`.
+
+- `suggestion_resolved_at`, `parent_id` (thread replies), and `resolved_at` / `resolved_by_user_id`
+  (migration `2026_11_06_100100`). `PostComment::isFeedback()` = a root comment that is pinned or
+  carries a suggestion; `Post::hasUnresolvedFeedback()` (root, unresolved, pinned-or-suggestion) gates
+  approval — `TransitionPostStatusAction` refuses `→ approved` with open feedback unless an Owner
+  overrides. `CreatePostCommentAction` takes `anchorType`/`anchor`/`parentId`/`suggestedEdit`;
+  `ResolvePostCommentAction` and `AcceptSuggestedEditAction` (applies a suggested caption to
+  `master_caption` via `UpdatePostAction`, then resolves) live in `App\Actions\Posts\Feedback`.
+  `PostFeedbackPresenter::threads($post, $viewer, $forClient)` shapes threads for the three surfaces
+  (internal threads hidden from clients). Staff routes `comments.resolve` / `comments.accept-suggestion`
+  / `comments.dismiss-suggestion` (`PostFeedbackController`); the portal has `portal.comments.resolve`.
+  Frontend: the shared `components/feedback/*` board (pin overlay with click-to-place, caption
+  select-to-comment, video timestamps, threads, resolve, suggested-edit accept) is used in the editor
+  (staff), the portal (reviewers) and the review link (read-only render). Tests:
+  `tests/Feature/Feedback/VisualFeedbackTest`.
 
 ## Phase M-6 additions (Step M-6.3 — multi-approver approvals)
 
@@ -376,10 +382,10 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   reviewer and/or assignee when set (agency), falling back to every internal user when a post is
   unassigned — so assignment stops the whole-org ping.
 - **"My work"** (`/my-work`, `MyWorkController` + `GetMyWorkAction`, staff-only via `portal.redirect`
-  + `PostPolicy::viewHub`): a person's own posts across clients in four buckets — **due** (assigned,
-  due within 3 days or overdue), **review** (reviewer, in internal review), **assigned** (the rest),
-  and **mentioned** (tagged in a comment). Reachable from the sidebar ("My work") and the command
-  palette. Page `resources/js/pages/my-work/index.tsx`.
+    - `PostPolicy::viewHub`): a person's own posts across clients in four buckets — **due** (assigned,
+      due within 3 days or overdue), **review** (reviewer, in internal review), **assigned** (the rest),
+      and **mentioned** (tagged in a comment). Reachable from the sidebar ("My work") and the command
+      palette. Page `resources/js/pages/my-work/index.tsx`.
 - **Content hub:** gains an assignee filter (incl. "Unassigned" = `0`), an Assignee·due column, and a
   bulk **Assign** action (`BulkUpdatePostsAction::ASSIGN`) — the assignee bits deferred from M-5.1.
   `ContentHubPresenter::row` now carries `assignee`/`due_at`; `filterOptions.staff` added.
@@ -407,7 +413,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
 - **Bulk CSV import (Phase 10):** `BulkPostImportController` (`clients/{client}/posts/bulk-import`:
   `index` page, `template` download, `preview` JSON, `bulk-store`). `ParseBulkPostImportAction` turns
   a client-scoped CSV (columns `caption, hashtags, accounts, date, time, format, first_comment, link,
-  campaign` — only `accounts` required; handles `;`-separated and resolved against the client;
+campaign` — only `accounts` required; handles `;`-separated and resolved against the client;
   campaign by code) into `BulkPostRow`s + per-row errors (`BulkImportParseResult`), never throwing.
   `CreatePostsInBulkAction` creates the whole batch in one `DB::transaction` via `CreatePostAction`
   (each post a `draft`, per-target `scheduled_at_utc` computed independently; `format` applied to the
@@ -418,6 +424,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   the page cover access; a Home panel can follow.
 
 ## Phase B-3 additions (per-org-type workflow, quick schedule, share preview)
+
 - **`App\Contracts\PostWorkflow`** (Step B-3.1) — the post lifecycle for one workspace type:
   `allowedTransitions(Post, ?User): list<PostStatus>`, `defaultApprovalMode(): ApprovalMode`,
   `requiresReview(Organization): bool`. Implementations `App\Services\Posts\AgencyPostWorkflow`
@@ -461,6 +468,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `resources/js/components/post-editor/share-preview-dialog.tsx`.
 
 ## Phase M-1 additions (Step M-1.6 / I-4.6 — editor decomposition)
+
 - `pages/posts/edit.tsx` is composition only (~200 lines). Under `components/post-editor/editor/`:
   `usePostEditor` (one `EditorState` object instead of 17 `useState`s; actions; Undo toasts when
   a channel or media is removed or changes are discarded), `editor-state.ts` (initial state,
@@ -525,6 +533,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   — still confirmed in the dialog — ⌘/Ctrl+K palette, `?` lists them.
 
 ## Routes / Controllers
+
 - `POST /clients/{client}/posts` → `clients.posts.store` (`PostController::store`) — validates via
   `StorePostRequest`, authorizes via `PostPolicy::create`, delegates to `CreatePostAction`, flashes a
   "Post created." toast and redirects straight to the new post's editor (`posts.edit`). The create
@@ -595,7 +604,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   otherwise the client's latest `waiting_client` post), 404s (`NotFoundHttpException`) on any invalid/
   revoked/expired/cross-client token, and renders the `review/show` Inertia page with a minimal,
   money-free payload (`client.name`, and `post.{id,status,status_label,master_caption,review_message,
-  hashtags,assets,targets,can_decide,comments}` — no `retainer_amount` or any other client field).
+hashtags,assets,targets,can_decide,comments}` — no `retainer_amount` or any other client field).
   `post.comments` is the post's `PostComment`s filtered to `internal_only = false` only, so internal
   notes never leak through this unauthenticated endpoint.
 - `POST /review/{token}` → `review.decide` (`ReviewController::decide`, Step 0.13) — body
@@ -606,6 +615,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `review.show`.
 
 ## Business Rules
+
 - **`scheduled_local_time` always reads as `HH:MM`.** It is the schema's only `TIME` column, and
   MySQL returns a `TIME` as `09:00:00` where SQLite returns the `09:00` that was written. A
   `PostTarget` read accessor normalises it, so the calendar, the editor, grid tiles and the push
@@ -659,7 +669,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   to Owner/Strategist. Registered in `AppServiceProvider::boot()`.
 - `PostPolicy::reschedule` = `update` (so Owner/Strategist/Designer, same org, not `scheduled`/
   `published`) **and** not `publishing`/`archived` **and** no target already `PostTargetStatus::
-  Published`. `scheduled` stays locked because its `PublishPostJob` is already queued with a delay for
+Published`. `scheduled` stays locked because its `PublishPostJob` is already queued with a delay for
   the old time — move it back out of `scheduled` first.
 - `PostPolicy::update` also locks a post's content once it reaches `scheduled` or `published` — it
   returns `false` regardless of role while the post is in either status, so `UpdatePostRequest`
@@ -697,7 +707,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   and defensively inside `TransitionPostStatusAction` itself (throws `InvalidArgumentException` if
   ever called with an illegal move bypassing the request layer).
 - Frontend access: the Posts module is reachable from the client detail page (`resources/js/pages/
-  clients/show.tsx`), in a collapsible "Posts" section alongside Social accounts/Campaigns/Assets.
+clients/show.tsx`), in a collapsible "Posts" section alongside Social accounts/Campaigns/Assets.
   Users with `can.createPost` see a quick create form (caption, toggle-selectable target accounts,
   one shared local date/time applied to all selected targets' hidden `targets[i][...]` inputs — each
   target still gets its own independently-computed `scheduled_at_utc` server-side) submitted via
@@ -718,71 +728,71 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   "one composer, every channel") is a single page, no tabs: `PageHeader` (client name, status pill,
   campaign chip) → the **workflow panel** (`components/post-editor/post-workflow.tsx`) → a two-column
   body. Left, numbered panels:
-  - **01 Write** — `ChannelScopeBar` + `Composer` (`components/post-editor/composer.tsx`). The scope
-    bar is the editor's *one* channel switcher: "All channels" edits the master caption/hashtags/
-    link/first comment (AI suggestions live here); picking a channel shows the same fields as that
-    channel will publish them. Typing there creates an override (`ChannelState`), each field carries
-    a "Same as all channels" / "Only on {platform}" tag with Reset, and a value typed back to match
-    the master falls back to inheriting (`null`). Format (Auto/Reel/Story…) is set in channel
-    scope. Pills mark customized channels with a dot and over-limit channels with "Too long". The
-    caption meter shows the tightest inheriting channel in All scope, that channel's limit
-    otherwise. Link and first comment hide behind "+ Link" / "+ First comment" chips until used.
-    The composer's inputs are unnamed — hidden `master_caption`, `hashtags[i]`, `link_url`,
-    `first_comment` inputs submit the master; `TargetFields` (`target-fields.tsx`) submits overrides.
-  - **02 Where & when** — `ChannelSchedule`, one row per client social account with a checkbox, its
-    own local date/time, and caption/hashtag usage against that platform's limits.
-  - **03 Media** — `MediaPicker`, only the *attached* assets in publish order (numbered, removable)
-    followed by two tiles — Upload (click or drop; posts JSON to `clients.assets.store`) and Browse
-    library (`UploadTile` / `BrowseLibraryTile`, also reused by the client Assets tab), which opens
-    `AssetLibraryDialog`: filename search (debounced), All/Images/Videos/Documents filter,
-    24-per-page pagination via `clients.assets.index` (see `assets.md`), and a draft multi-selection
-    applied on "Attach" (existing picks keep their order, new ones append). The editor no longer
-    preloads the client's library (`availableAssets` prop removed); it only keeps details for assets
-    in use. `MediaDetails` (alt text, video cover/frame) follows.
-  - **04 Post settings** — folded by default to a one-line spec summary (campaign · approval ·
-    sound · location); "Edit" or clicking the summary opens `CampaignField`, approval mode,
-    `MusicField` and location. The content is `forceMount`ed so its inputs (incl. `MusicField`'s
-    hidden `music[...]`) still submit while folded.
-  Right, a sticky rail: `ReadinessChecklist` (open items first, done items folded behind "Show N
-  done"; every item is a jump link — `checkSection` in `edit.tsx` maps check keys to a section,
-  which scrolls into view with a brief focus ring, opens Post settings, or focuses the caption) and
-  `PreviewPanel`, whose active channel follows the composer scope (and, while a channel is scoped,
-  switching the preview switches the composer too). `PostDiscussion` (Comments / Activity tabs)
-  sits under the composer. All hidden form input names (`targets[i][...]`, `asset_ids[i]`,
-  `hashtags[i]`, `music[...]`, `location[name]`) are unchanged. Read-only viewers (`can.update:
-  false`, incl. the scheduled/published lock) get read-only panels and a lock notice.
-  - **Workflow panel.** A six-stage track (Draft → Internal review → Client review → Approved →
-    Scheduled → Live; `lib/post-workflow.ts` maps every `PostStatus` onto a stage, archived dims the
-    track) plus a one-line guidance headline for the current status. `allowedTransitions` from the
-    server are turned into verb-labelled actions (`describeTransition`, e.g. "Send to client",
-    "Approve without client", "Back to draft"): the single recommended next step
-    (`primaryTransitionFor`, which picks `approved` over `waiting_client` from internal review when
-    `approval_mode` is `internal_only`) is the primary (Ink) button, other forward moves are outline
-    buttons, and backward/manual-override/archive moves sit in a "More" menu. Every move opens a
-    confirm dialog showing from → to pills, an optional **note** (sent as the transition `comment`,
-    stored on the activity log), the failing checklist items when scheduling is blocked (confirm
-    disabled — server stays the gate), and an unsaved-edits warning. While `waiting_client`, the
-    latest `review_url` is shown with Copy and (with `can.resend_review_email`) Resend buttons.
-    `lib/post-workflow.ts` is presentation only — `PostStatusTransitionMap` remains the source of
-    truth for legality.
-  - **Unsaved changes.** The page compares its local state to the props snapshot to derive
-    `isDirty`, shows a sticky save bar ("Unsaved changes" / "All changes saved", Discard, Save),
-    supports Ctrl/⌘+S, and `hooks/use-unsaved-changes-guard.ts` holds any real Inertia GET
-    navigation behind the styled `confirmDialog` ("Leave without saving?") and re-issues it only
-    if the user chooses to leave. Tab close/refresh is not guarded (only a native browser prompt is
-    possible there, and the app avoids native dialogs). Applying an AI caption over an existing one
-    also confirms via `confirmDialog`. The update/transition forms use `preserveState: 'errors'` (edits survive
-    a validation error; the page remounts with fresh props on success); comment and resend-email
-    forms use `preserveState: true` so posting a comment never discards unsaved edits.
-  - **Live readiness.** `liveChecklist()` mirrors `EvaluatePostChecklistAction` against unsaved
-    state (using `targetAccounts[].is_text_only_capable`) so the checklist reacts while editing;
-    the server re-evaluates on save and before any move to `scheduled`.
-  - **"Use for all channels"** on a channel row copies that row's date/time into the other
-    selected rows on an explicit click — each target is still stored and converted to UTC
-    independently (spec §4.6).
-  - The Music field (Step 1.8.4) is a live search box shown only while an Instagram/TikTok channel
-    is selected (platform toggle when both are) that calls `PostController::musicSearch` (see
-    `publishing.md`) and writes `{id, name}` into hidden `music[id]`/`music[name]` inputs.
+    - **01 Write** — `ChannelScopeBar` + `Composer` (`components/post-editor/composer.tsx`). The scope
+      bar is the editor's _one_ channel switcher: "All channels" edits the master caption/hashtags/
+      link/first comment (AI suggestions live here); picking a channel shows the same fields as that
+      channel will publish them. Typing there creates an override (`ChannelState`), each field carries
+      a "Same as all channels" / "Only on {platform}" tag with Reset, and a value typed back to match
+      the master falls back to inheriting (`null`). Format (Auto/Reel/Story…) is set in channel
+      scope. Pills mark customized channels with a dot and over-limit channels with "Too long". The
+      caption meter shows the tightest inheriting channel in All scope, that channel's limit
+      otherwise. Link and first comment hide behind "+ Link" / "+ First comment" chips until used.
+      The composer's inputs are unnamed — hidden `master_caption`, `hashtags[i]`, `link_url`,
+      `first_comment` inputs submit the master; `TargetFields` (`target-fields.tsx`) submits overrides.
+    - **02 Where & when** — `ChannelSchedule`, one row per client social account with a checkbox, its
+      own local date/time, and caption/hashtag usage against that platform's limits.
+    - **03 Media** — `MediaPicker`, only the _attached_ assets in publish order (numbered, removable)
+      followed by two tiles — Upload (click or drop; posts JSON to `clients.assets.store`) and Browse
+      library (`UploadTile` / `BrowseLibraryTile`, also reused by the client Assets tab), which opens
+      `AssetLibraryDialog`: filename search (debounced), All/Images/Videos/Documents filter,
+      24-per-page pagination via `clients.assets.index` (see `assets.md`), and a draft multi-selection
+      applied on "Attach" (existing picks keep their order, new ones append). The editor no longer
+      preloads the client's library (`availableAssets` prop removed); it only keeps details for assets
+      in use. `MediaDetails` (alt text, video cover/frame) follows.
+    - **04 Post settings** — folded by default to a one-line spec summary (campaign · approval ·
+      sound · location); "Edit" or clicking the summary opens `CampaignField`, approval mode,
+      `MusicField` and location. The content is `forceMount`ed so its inputs (incl. `MusicField`'s
+      hidden `music[...]`) still submit while folded.
+      Right, a sticky rail: `ReadinessChecklist` (open items first, done items folded behind "Show N
+      done"; every item is a jump link — `checkSection` in `edit.tsx` maps check keys to a section,
+      which scrolls into view with a brief focus ring, opens Post settings, or focuses the caption) and
+      `PreviewPanel`, whose active channel follows the composer scope (and, while a channel is scoped,
+      switching the preview switches the composer too). `PostDiscussion` (Comments / Activity tabs)
+      sits under the composer. All hidden form input names (`targets[i][...]`, `asset_ids[i]`,
+      `hashtags[i]`, `music[...]`, `location[name]`) are unchanged. Read-only viewers (`can.update:
+false`, incl. the scheduled/published lock) get read-only panels and a lock notice.
+    - **Workflow panel.** A six-stage track (Draft → Internal review → Client review → Approved →
+      Scheduled → Live; `lib/post-workflow.ts` maps every `PostStatus` onto a stage, archived dims the
+      track) plus a one-line guidance headline for the current status. `allowedTransitions` from the
+      server are turned into verb-labelled actions (`describeTransition`, e.g. "Send to client",
+      "Approve without client", "Back to draft"): the single recommended next step
+      (`primaryTransitionFor`, which picks `approved` over `waiting_client` from internal review when
+      `approval_mode` is `internal_only`) is the primary (Ink) button, other forward moves are outline
+      buttons, and backward/manual-override/archive moves sit in a "More" menu. Every move opens a
+      confirm dialog showing from → to pills, an optional **note** (sent as the transition `comment`,
+      stored on the activity log), the failing checklist items when scheduling is blocked (confirm
+      disabled — server stays the gate), and an unsaved-edits warning. While `waiting_client`, the
+      latest `review_url` is shown with Copy and (with `can.resend_review_email`) Resend buttons.
+      `lib/post-workflow.ts` is presentation only — `PostStatusTransitionMap` remains the source of
+      truth for legality.
+    - **Unsaved changes.** The page compares its local state to the props snapshot to derive
+      `isDirty`, shows a sticky save bar ("Unsaved changes" / "All changes saved", Discard, Save),
+      supports Ctrl/⌘+S, and `hooks/use-unsaved-changes-guard.ts` holds any real Inertia GET
+      navigation behind the styled `confirmDialog` ("Leave without saving?") and re-issues it only
+      if the user chooses to leave. Tab close/refresh is not guarded (only a native browser prompt is
+      possible there, and the app avoids native dialogs). Applying an AI caption over an existing one
+      also confirms via `confirmDialog`. The update/transition forms use `preserveState: 'errors'` (edits survive
+      a validation error; the page remounts with fresh props on success); comment and resend-email
+      forms use `preserveState: true` so posting a comment never discards unsaved edits.
+    - **Live readiness.** `liveChecklist()` mirrors `EvaluatePostChecklistAction` against unsaved
+      state (using `targetAccounts[].is_text_only_capable`) so the checklist reacts while editing;
+      the server re-evaluates on save and before any move to `scheduled`.
+    - **"Use for all channels"** on a channel row copies that row's date/time into the other
+      selected rows on an explicit click — each target is still stored and converted to UTC
+      independently (spec §4.6).
+    - The Music field (Step 1.8.4) is a live search box shown only while an Instagram/TikTok channel
+      is selected (platform toggle when both are) that calls `PostController::musicSearch` (see
+      `publishing.md`) and writes `{id, name}` into hidden `music[id]`/`music[name]` inputs.
 - Activity entries (`PostDiscussion`) render as a timeline: actor, from → to status pills,
   timestamp, the full note as a quote, and for `waiting_client` hops the review link plus (with
   `can.resend_review_email`) a "Resend email" button posting to `PostController::resendReviewEmail`.
@@ -795,6 +805,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   simple internal/client-required toggle) wasn't available in this repo — see Known Gaps below.
 
 ## Tests
+
 - `tests/Feature/PostEditorControllerTest.php::test_update_drops_a_target_whose_account_was_disconnected`
   — a soft-deleted target account is not offered to the editor, re-sending it is rejected, and a
   save without it succeeds and removes the dead target.
@@ -826,32 +837,32 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `test_music_search_short_circuits_for_platforms_without_a_music_lookup` (Step 1.8.4) cover
   `posts.music-search` — see `publishing.md` for `PostController::musicSearch` itself.
 - `tests/Feature/PostControllerTest.php`:
-  - `test_targets_on_different_timezone_accounts_keep_independent_local_times` — the §12 acceptance
-    test: creates a post with two targets (Europe/London and Asia/Dubai social accounts) at the same
-    local wall-clock time and asserts both the local date/time and the derived UTC instants stay
-    independent (and are not equal to each other).
-  - `test_designer_cannot_create_a_post_outside_their_org` — cross-org authorization rejection.
-  - `test_client_show_page_exposes_posts_and_target_accounts` — asserts the `clients/show` Inertia
-    response includes `posts`/`targetAccounts`/`can.createPost`, confirming the module is reachable
-    from the frontend.
+    - `test_targets_on_different_timezone_accounts_keep_independent_local_times` — the §12 acceptance
+      test: creates a post with two targets (Europe/London and Asia/Dubai social accounts) at the same
+      local wall-clock time and asserts both the local date/time and the derived UTC instants stay
+      independent (and are not equal to each other).
+    - `test_designer_cannot_create_a_post_outside_their_org` — cross-org authorization rejection.
+    - `test_client_show_page_exposes_posts_and_target_accounts` — asserts the `clients/show` Inertia
+      response includes `posts`/`targetAccounts`/`can.createPost`, confirming the module is reachable
+      from the frontend.
 - `tests/Feature/PostTransitionControllerTest.php` (Step 0.9's Done-when acceptance coverage — both
   valid and rejected transitions):
-  - `test_owner_can_move_a_post_through_the_valid_transition_chain` — walks a post
-    `draft → internal_review → waiting_client → approved → scheduled`, asserting each hop persists
-    and that exactly one `PostActivityLog` row is created per hop and one `PostApproval` row overall.
-  - `test_illegal_transition_is_rejected` — `idea → published` is rejected as a 422 validation error
-    on `to`, and no status change/activity log row is created.
-  - `test_designer_from_another_org_cannot_transition_a_post` — cross-org authorization rejection.
-  - `test_client_reviewer_can_approve_a_post_waiting_on_them_and_it_creates_an_approval_record` —
-    asserts the `PostApproval` row (`decision`, `comment`, `user_id`).
-  - `test_client_reviewer_cannot_transition_a_post_that_is_not_waiting_on_them` and
-    `test_client_reviewer_cannot_review_another_clients_post` — the two review-portal-adjacent
-    rejection cases from `PostPolicy::transition`.
-  - `test_a_comment_can_be_added_to_a_post_with_an_internal_only_flag` and
-    `test_client_reviewer_comments_are_never_stored_as_internal_only` — comment creation and the
-    forced-`internal_only = false` rule for client reviewers.
-  - `test_scheduling_is_blocked_when_the_checklist_has_not_passed` (Step 0.10) — a post with no
-    targets/media is rejected with a 422 on `to` when transitioning to `scheduled`.
+    - `test_owner_can_move_a_post_through_the_valid_transition_chain` — walks a post
+      `draft → internal_review → waiting_client → approved → scheduled`, asserting each hop persists
+      and that exactly one `PostActivityLog` row is created per hop and one `PostApproval` row overall.
+    - `test_illegal_transition_is_rejected` — `idea → published` is rejected as a 422 validation error
+      on `to`, and no status change/activity log row is created.
+    - `test_designer_from_another_org_cannot_transition_a_post` — cross-org authorization rejection.
+    - `test_client_reviewer_can_approve_a_post_waiting_on_them_and_it_creates_an_approval_record` —
+      asserts the `PostApproval` row (`decision`, `comment`, `user_id`).
+    - `test_client_reviewer_cannot_transition_a_post_that_is_not_waiting_on_them` and
+      `test_client_reviewer_cannot_review_another_clients_post` — the two review-portal-adjacent
+      rejection cases from `PostPolicy::transition`.
+    - `test_a_comment_can_be_added_to_a_post_with_an_internal_only_flag` and
+      `test_client_reviewer_comments_are_never_stored_as_internal_only` — comment creation and the
+      forced-`internal_only = false` rule for client reviewers.
+    - `test_scheduling_is_blocked_when_the_checklist_has_not_passed` (Step 0.10) — a post with no
+      targets/media is rejected with a 422 on `to` when transitioning to `scheduled`.
 - `tests/Unit/Actions/PostStatusTransitionMapTest.php` — asserts every `PostStatus` case has an
   explicit map entry (no silently-missing state), spot-checks a few valid/invalid edges, and checks
   the `published` terminal state can only move to `archived`.
@@ -873,6 +884,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   are ignored entirely.
 
 ## Seeders
+
 - `Database\Seeders\DemoContentSeeder`: for each of `ClientSeeder`'s `Recommendo`/`Frzn` clients,
   creates four posts (published/scheduled/waiting_client/draft) each with a `PostTarget`, an attached
   demo `Asset`, one internal-only + one client-visible `PostComment`, and one `PostActivityLog`
@@ -880,6 +892,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `DatabaseSeeder` after `InvoiceSeeder`.
 
 ## Known Gaps / Open Questions
+
 - 2026-10-20: the editor page is still one large file plus new feature components — M-1.6 (editor
   decomposition, I-4.6) hasn't been done yet and should precede more editor work.
 - Alt text is per image (shared by every channel), not per channel.
@@ -915,6 +928,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   — worth revisiting since it's unauthenticated and token-guessing-resistant only via token entropy.
 
 ## Changelog
+
 - 2026-11-07: **Bugfix — the calendar showed seconds on MySQL.**
   `post_targets.scheduled_local_time` is a `TIME` column, so MySQL handed it back as `09:00:00`
   while SQLite returned `09:00`. The value went straight to the frontend
@@ -934,7 +948,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
 - 2026-11-06: Step CG-5.1 (B-11.1) added paid-partnership disclosure to posts:
   `posts.is_paid_partnership`, `partner_name`, `partner_handle` (and `brand_deal_id` from CG-5.2),
   plus a **hard** `partnership_disclosure` item in `EvaluatePostChecklistAction` that blocks
-  scheduling until every channel's *published* caption discloses
+  scheduling until every channel's _published_ caption discloses
   (`App\Support\Posts\PartnershipDisclosure`). Caption-based by design, so it is per-platform for
   free: a platform that strips hashtags needs the words in the caption. Details in `brand-deals.md`.
 
@@ -953,9 +967,9 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   with advanced schedule), `GenerateRecurringPostDraftsAction` + `posts:generate-recurring-drafts`
   (daily), Home "Ready to recycle" bucket, `posts.recycle` route + `PostPolicy::recycle`, editor "06
   Repeat & reuse" panel. Phase 10 CSV import: `BulkPostImportController` + `ParseBulkPostImportAction`
-  + `CreatePostsInBulkAction` + `BulkPostRow`/`BulkImportParseResult`, `bulk-import.tsx`, "Import CSV"
-  on the client Posts tab. Tests `tests/Feature/Posts/RecyclePostTest.php`, `BulkPostImportTest.php`.
-  See "Phase M-5 › M-5.8", `home.md`, `calendar.md`.
+    - `CreatePostsInBulkAction` + `BulkPostRow`/`BulkImportParseResult`, `bulk-import.tsx`, "Import CSV"
+      on the client Posts tab. Tests `tests/Feature/Posts/RecyclePostTest.php`, `BulkPostImportTest.php`.
+      See "Phase M-5 › M-5.8", `home.md`, `calendar.md`.
 - 2026-10-23: Content hub toolbar UX — the six filter dropdowns + date range are consolidated into a
   single **Filters** slide-over (`Sheet`, with an active-count badge); active filters show as
   individually removable chips below the row, leaving just Search · Filters · Views · Clear. A Sheet is
@@ -1164,7 +1178,7 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `post` fields instead of live form state. No backend/data changes; all existing hidden form inputs
   and read-only fields are unchanged.
 - 2026-09-20: The dashboard's new "Publish reliability" chart (`App\Actions\Posts\
-  GetPublishReliabilityStatsAction`) reads `PostActivityLog::to_status` transitions to `Failed`/
+GetPublishReliabilityStatsAction`) reads `PostActivityLog::to_status` transitions to `Failed`/
   `Published` (scoped to `Post`s in the org) to show monthly failed/published counts and the
   average number of attempts it takes a post to reach `Published` — see `.junie/modules/home.md`
   for the dashboard-side write-up.
@@ -1249,18 +1263,18 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `App\Actions\Posts\SendUpcomingPostReminderEmailsAction`, which finds `Scheduled` posts' targets
   due to publish within the window and not yet reminded about, and emails every user of the owning
   organization one `App\Mail\UpcomingPostReminderMail` digest (`resources/views/emails/upcoming-
-  post-reminder.blade.php`). New nullable `reminder_sent_at` timestamp on `post_targets` (migration
+post-reminder.blade.php`). New nullable `reminder_sent_at` timestamp on `post_targets` (migration
   `2026_09_16_150000_add_reminder_sent_at_to_post_targets_table`) prevents double-sending on re-run.
 - 2026-09-16: The signed `/review/{token}` link emailed on a `waiting_client` transition is now
   recorded on the resulting `PostActivityLog::review_url` (new nullable `text` column, migration
   `2026_09_16_140000_add_review_url_to_post_activity_logs_table`) — `SendClientReviewRequestedEmailAction`
   now returns the URL (or `null` if skipped) instead of `void`. Added `ResendClientReviewEmailAction`
-  + `PostPolicy::resendReviewEmail` + `PostController::resendReviewEmail` (route
-  `posts.activity-logs.resend-review-email`) so an org user can re-send the email straight from the
-  activity log without issuing a new `ReviewToken`. On `posts/edit.tsx`, `ActivityLogEntry` now shows
-  the stored review link (with a "Resend email" button for authorized users) and applies
-  `break-words`/`break-all` to the expanded note/link content, fixing an overflow bug where a long
-  note (or an unbroken URL) could spill outside the card.
+    - `PostPolicy::resendReviewEmail` + `PostController::resendReviewEmail` (route
+      `posts.activity-logs.resend-review-email`) so an org user can re-send the email straight from the
+      activity log without issuing a new `ReviewToken`. On `posts/edit.tsx`, `ActivityLogEntry` now shows
+      the stored review link (with a "Resend email" button for authorized users) and applies
+      `break-words`/`break-all` to the expanded note/link content, fixing an overflow bug where a long
+      note (or an unbroken URL) could spill outside the card.
 - 2026-09-16: Redesigned `resources/js/pages/posts/edit.tsx`'s navigation: the previously long,
   stacked list of sections (editor form, checklist, move status, comments, activity log) is now a
   `Tabs`/`TabsList`/`TabsContent` layout (shadcn `components/ui/tabs`) with four tabs — "Editor",
@@ -1269,8 +1283,8 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   instead of scrolling past everything. Section contents/forms are unchanged. The client show page's
   "Posts" section (see `clients.md`) got the same Tabs treatment.
 - 2026-09-16: Added `Database\Seeders\DemoContentSeeder` (seeds posts/targets/comments/activity logs
-  + social accounts + campaigns + assets for the `ClientSeeder` demo clients) and wired it into
-  `DatabaseSeeder` after `InvoiceSeeder`.
+    - social accounts + campaigns + assets for the `ClientSeeder` demo clients) and wired it into
+      `DatabaseSeeder` after `InvoiceSeeder`.
 - 2026-09-09: Added a nullable `review_message` text field on `Post` — a note for the client, edited
   via a new textarea on `posts/edit.tsx` (submitted through the existing `PostController::update`/
   `UpdatePostAction`), shown to the client in `ClientReviewRequestedMail`'s email body and on the
@@ -1296,13 +1310,13 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
 - 2026-09-09 (Step 0.10): Added the full editor UI. New `App\Actions\Posts\EvaluatePostChecklistAction`
   (interim §6 checklist: caption/targets/schedule/media, with a text-only-capable-platform exemption
   from media via new `Platform::isTextOnlyCapable()`/`Platform::captionLimit()`), `UpdatePostAction`
-  + `UpdatePostRequest`, `PostController::edit`/`update` (routes `posts.edit`/`posts.update`), the
-  `post_assets` pivot (`Post::assets()`/`Asset::posts()`), and `resources/js/pages/posts/edit.tsx`
-  (caption/hashtags/music/location, independent per-target schedule rows with char counts, asset
-  picker, checklist panel, transition buttons, comments, activity log). `TransitionPostStatusAction`
-  now refreshes `checklist_snapshot` on every transition, and `TransitionPostRequest` re-validates the
-  checklist server-side before any move to `scheduled` (Phase 0 exit criterion: "Schedule blocked
-  without media unless platform is text-only"). The client page's post cards now link to the editor.
+    - `UpdatePostRequest`, `PostController::edit`/`update` (routes `posts.edit`/`posts.update`), the
+      `post_assets` pivot (`Post::assets()`/`Asset::posts()`), and `resources/js/pages/posts/edit.tsx`
+      (caption/hashtags/music/location, independent per-target schedule rows with char counts, asset
+      picker, checklist panel, transition buttons, comments, activity log). `TransitionPostStatusAction`
+      now refreshes `checklist_snapshot` on every transition, and `TransitionPostRequest` re-validates the
+      checklist server-side before any move to `scheduled` (Phase 0 exit criterion: "Schedule blocked
+      without media unless platform is text-only"). The client page's post cards now link to the editor.
 - 2026-09-08: Initial implementation of `Post`/`PostTarget` models, migrations, `PostPolicy`,
   `CreatePostAction`, `StorePostRequest`, `PostController::store`, and the London/Dubai independent-
   timezone PHPUnit test (Step 0.8).
@@ -1334,6 +1348,6 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
 - 2026-10-17: Phase 16 (Step 16.10): `AttachGeneratedImagesToPostAction` attaches AI Image Studio variants to `post_assets` in one transaction, marks them selected, re-runs `EvaluatePostChecklistAction` and logs a `PostActivityLog` note ("Added 2 AI images") without changing status. `POST ai-image-generations/{generation}/use` creates the idea's draft first when needed. `Post::hasAiGeneratedMedia()` feeds AI disclosure on publish. The editor shows the studio below the form (`imageStudio` prop) and an "AI" tag on AI media. ClientReviewers only ever see attached assets (portal regression in `ImageStudioHousekeepingTest`).
 - 2026-10-20: A post is sent to Upload-Post as soon as it's `scheduled` and stays `scheduled` while
   the vendor holds it (`Post::isHeldByVendor()`). Leaving `scheduled` (`PostStatusTransitionMap::
-  leavesSchedule()`), moving, editing or deleting such a post cancels the held channels first. See
+leavesSchedule()`), moving, editing or deleting such a post cancels the held channels first. See
   `publishing.md` ("Hand-off at scheduling time").
 - 2026-10-20: Step M-1.6: editor split into feature components (≤ 300 lines each, CI-guarded), shared `DateTimePicker` with viewer-time hint and explicit "Same moment", keyboard shortcuts + `?` dialog, Undo toasts.

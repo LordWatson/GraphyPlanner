@@ -57,6 +57,11 @@ export default defineConfig({
             'node_modules/**',
             'public/**',
             'bootstrap/ssr/**',
+            // Finding 30: installed agent tooling, not project source — `.claude/skills/**`
+            // alone contributed 21 `denyWarnings` lint warnings. Same reasoning as `fmt` below.
+            '.agents/**',
+            '.claude/**',
+            '.cursor/**',
             'tailwind.config.js',
             'resources/js/actions/**',
             'resources/js/components/ui/*',
@@ -80,6 +85,18 @@ export default defineConfig({
             'composer.json',
             'resources/js/components/ui/*',
             'resources/views/mail/*',
+            // Finding 30: the formatter's default scope swept 323 installed skill files under
+            // `.claude/` and 51 hand-written docs under `.junie/`, which is why `npm run check`
+            // had been red. Neither is project source. Reformatting `.claude/**` churns
+            // third-party content that churns again on the next skill update, and on `.junie/**`
+            // the markdown formatter de-indents bullet continuation lines, which breaks inline
+            // code spans that wrap across lines (e.g. a `resources/views/...blade.php` path split
+            // over two lines ends up at column 0, out of its bullet). Same set the dev server's
+            // watcher already ignores above.
+            '.agents/**',
+            '.claude/**',
+            '.cursor/**',
+            '.junie/**',
         ],
         sortTailwindcss: {
             functions: ['clsx', 'cn', 'cva'],

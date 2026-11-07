@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 
 /**
  * Builds image briefs straight from the Brand Brain, with no AI call (Step 16.5):
- * - defaults(): the deterministic brief NullAiProvider returns, DeepSeek falls back to, and the
+ * - defaults(): the deterministic brief NullAiProvider returns, Anthropic falls back to, and the
  *   studio pre-fills its art-direction panel with before anything is generated;
  * - finalize(): applies what must never be left to a model on top of any drafted brief: the
  *   person's own overrides, excluded colours, the headline switch, the brand's real reference

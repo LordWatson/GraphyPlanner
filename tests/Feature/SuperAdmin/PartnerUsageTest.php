@@ -92,7 +92,7 @@ class PartnerUsageTest extends TestCase
             'org_id' => $org->id,
             'client_id' => $client->id,
             'user_id' => null,
-            'provider' => 'deepseek',
+            'provider' => 'anthropic',
             'model' => 'test-model',
             'method' => 'text.caption',
             'succeeded' => $succeeded,

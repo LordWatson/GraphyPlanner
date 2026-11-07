@@ -73,7 +73,7 @@ use App\Policies\StaffInvitationPolicy;
 use App\Policies\StaffPolicy;
 use App\Policies\SuperAdminReportPolicy;
 use App\Policies\TaxRatePolicy;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\GeminiVisionProvider;
 use App\Services\AI\Images\GeminiImageProvider;
 use App\Services\AI\Images\NullImageProvider;
@@ -234,41 +234,41 @@ class AppServiceProvider extends ServiceProvider
         // done the Facebook Login connect, else the posts the app published; never throws.
         $this->app->bind(ProfileFeedSource::class, CompositeProfileFeedSource::class);
 
-        // AiProvider contract (Step 2.1) resolves to DeepSeekProvider (Step 2.2) only when
-        // AI is enabled (config('ai.enabled'), env AI_ENABLED) AND a non-empty DEEPSEEK_API_KEY
+        // AiProvider contract (Step 2.1) resolves to AnthropicProvider (Step 2.2) only when
+        // AI is enabled (config('ai.enabled'), env AI_ENABLED) AND a non-empty ANTHROPIC_API_KEY
         // is configured; otherwise it safely falls back to NullAiProvider, which never calls an
         // external service. No caller of App\Contracts\AiProvider needs to change.
         $this->app->bind(AiProvider::class, function () {
             $enabled = (bool) config('ai.enabled', false);
-            $apiKey = (string) config('ai.deepseek.api_key', '');
+            $apiKey = (string) config('ai.anthropic.api_key', '');
 
             if ($enabled && $apiKey !== '') {
-                return $this->app->make(DeepSeekProvider::class);
+                return $this->app->make(AnthropicProvider::class);
             }
 
             return $this->app->make(NullAiProvider::class);
         });
 
-        // Step 18.12: the grid planner's AI help — same rule as AiProvider (DeepSeek only when AI is
+        // Step 18.12: the grid planner's AI help — same rule as AiProvider (Anthropic only when AI is
         // enabled and a key is set; otherwise the Null provider, which never calls a vendor).
         $this->app->bind(GridAiProvider::class, function () {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $this->app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $this->app->make(AnthropicProvider::class)
                 : $this->app->make(NullAiProvider::class);
         });
 
-        // Step B-6.1: the business shell's local/seasonal idea engine — same DeepSeek-or-Null rule,
+        // Step B-6.1: the business shell's local/seasonal idea engine — same Anthropic-or-Null rule,
         // kept as its own contract so the agency AiProvider path (and its test doubles) is untouched.
         $this->app->bind(LocalIdeaProvider::class, function () {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $this->app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $this->app->make(AnthropicProvider::class)
                 : $this->app->make(NullAiProvider::class);
         });
 
-        // Step B-6.4: repurpose-across-platforms — same DeepSeek-or-Null rule, its own contract.
+        // Step B-6.4: repurpose-across-platforms — same Anthropic-or-Null rule, its own contract.
         $this->app->bind(CaptionRepurposer::class, function () {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $this->app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $this->app->make(AnthropicProvider::class)
                 : $this->app->make(NullAiProvider::class);
         });
 
@@ -276,24 +276,24 @@ class AppServiceProvider extends ServiceProvider
         // contract so Google Trends / TikTok Creative Center can slot in later, and so tests swap it.
         $this->app->bind(TrendSource::class, TopPostsTrendSource::class);
 
-        // Step M-7.3: editor writing tools (shorten/tone/adapt) — same DeepSeek-or-Null rule.
+        // Step M-7.3: editor writing tools (shorten/tone/adapt) — same Anthropic-or-Null rule.
         $this->app->bind(WritingAssistant::class, function () {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $this->app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $this->app->make(AnthropicProvider::class)
                 : $this->app->make(NullAiProvider::class);
         });
 
-        // Step M-9.3: on-brand inbox reply drafts — same DeepSeek-or-Null rule. A human always sends.
+        // Step M-9.3: on-brand inbox reply drafts — same Anthropic-or-Null rule. A human always sends.
         $this->app->bind(ReplyAssistant::class, function () {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $this->app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $this->app->make(AnthropicProvider::class)
                 : $this->app->make(NullAiProvider::class);
         });
 
-        // Step B-8.2: plain-language insight takeaways — same DeepSeek-or-Null rule, its own contract.
+        // Step B-8.2: plain-language insight takeaways — same Anthropic-or-Null rule, its own contract.
         $this->app->bind(InsightsSummarizer::class, function () {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $this->app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $this->app->make(AnthropicProvider::class)
                 : $this->app->make(NullAiProvider::class);
         });
 

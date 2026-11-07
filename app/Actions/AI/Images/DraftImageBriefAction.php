@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  * Step 16.5: the art-direction brief for one image set ("brief once, render many"). Asks the
  * AiProvider to draft it, runs it through AiGuardrailService::filterImageBrief(), and caches the
  * result by `brief_hash` (idea + brand fingerprint + art-direction overrides) so regenerating a
- * set with the same inputs costs zero DeepSeek tokens.
+ * set with the same inputs costs zero Anthropic tokens.
  */
 class DraftImageBriefAction
 {

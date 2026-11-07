@@ -28,7 +28,7 @@ class PlanCampaignJob implements ShouldQueue
 
     public int $tries = 1;
 
-    /** Below the Horizon `ai` supervisor's 150s; DeepSeek planning alone can take 60–90s. */
+    /** Below the Horizon `ai` supervisor's 150s; Anthropic planning alone can take 60–90s. */
     public int $timeout = 140;
 
     public function __construct(

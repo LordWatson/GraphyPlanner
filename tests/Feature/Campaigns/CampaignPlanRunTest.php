@@ -70,7 +70,7 @@ class CampaignPlanRunTest extends TestCase
 
     public function test_a_provider_exception_fails_the_run_with_a_readable_message(): void
     {
-        $this->fakeAi(fn () => throw new RuntimeException('DeepSeek exploded'));
+        $this->fakeAi(fn () => throw new RuntimeException('Anthropic exploded'));
 
         $job = new PlanCampaignJob($this->campaign->id, $this->strategist()->id, $runId = app(CampaignPlanRuns::class)->start($this->campaign, $this->strategist()));
 

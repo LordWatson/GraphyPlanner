@@ -19,7 +19,7 @@ Check each changed file against these rules and only report concrete violations 
 3. **Contracts**: external APIs and swappable implementations go through `app/Contracts/*` bound in
    `AppServiceProvider`; consumers type-hint the interface, not the concrete class.
 4. **Transactions**: any Action doing >1 related write (incl. status change + activity log/notification
-   row) must use `DB::transaction()`. Flag external HTTP calls *inside* a transaction.
+   row) must use `DB::transaction()`. Flag external HTTP calls _inside_ a transaction.
 5. **Logging**: `Log::info` at milestones, `warning`/`error` on failures, context array with ids
    (`org_id`, `post_id`, `client_id`, `user_id`). **Flag any API key, token, password, signature or
    full vendor payload being logged.**

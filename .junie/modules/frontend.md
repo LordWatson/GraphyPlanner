@@ -1,15 +1,18 @@
 # Frontend foundation (shared primitives, http, tests)
 
 ## Purpose
+
 The cross-cutting frontend pieces every module builds on: the shared list table, date/time and
 search pickers, the one JSON `http` helper, the CI guard rails, and the frontend test harness
 (Vitest + React Testing Library, Playwright journeys). Covers Steps M-1.4 (I-14.2) and M-1.5
 (I-14.6) of `.junie/plans/mvp.md`; the editor-specific pieces of M-1.6 are in `posts.md`.
 
 ## Models / Tables
+
 - None.
 
 ## Components / Hooks / Helpers
+
 - **shadcn primitives** (`components/ui/`, Alima-restyled: `rounded-xl`, `shadow-paper`, mono
   uppercase headers): `table`, `popover`, `command` (cmdk), `calendar` (react-day-picker 9, weeks
   start Monday), `progress`.
@@ -20,7 +23,7 @@ search pickers, the one JSON `http` helper, the CI guard rails, and the frontend
   `label` (visibility menu), `hideBelow` (`sm`/`md`/`lg`), `align: 'right'`, `className`.
   `bulkActions` adds a selection column and an Ink bulk bar; `rowHref` makes rows open a page
   (keep a real link in the main cell for keyboards); `storageKey` remembers hidden columns per
-  browser (`localStorage`, try/catch). Cell/header renderers are *called*, not mounted as
+  browser (`localStorage`, try/catch). Cell/header renderers are _called_, not mounted as
   components, so inline column definitions don't remount every cell each render (they mustn't use
   hooks). Used by: clients roster + archive, client Posts tab, invoices ledger (+ Billing tab),
   staff roster + invitations, super-admin organizations, analytics and super-admin saved reports.
@@ -36,7 +39,7 @@ search pickers, the one JSON `http` helper, the CI guard rails, and the frontend
   dialog's outside `pointer-events: none` and can't be clicked (found by the E2E journey).
 - **`http`** (`lib/http.ts`): `get/post/put/patch/delete`; same-origin cookies + `X-XSRF-TOKEN`;
   JSON bodies or `FormData` (multipart); never throws — `{ ok, data }` or `{ ok: false, status,
-  message, errors, aborted }` with readable messages (422 first error, 413, 419, 429, 5xx,
+message, errors, aborted }` with readable messages (422 first error, 413, 419, 429, 5xx,
   offline); `toastOnError`; `rateLimitMessage`; `firstErrors()` for `InputError`. `lib/campaigns`
   `postJson`/`getJson` wrap it with the AI rate-limit wording.
 - **`confirmWithPassword()`** (`components/confirm-dialog.tsx`): the shared confirm dialog with a
@@ -72,10 +75,12 @@ search pickers, the one JSON `http` helper, the CI guard rails, and the frontend
   the two never drift. Hidden when the viewer can create nothing.
 
 ## Guard rails (`scripts/frontend-guards.mjs`, part of `npm run check`)
+
 - No raw `fetch(` outside `lib/http.ts`.
 - No post-editor file (`pages/posts/edit.tsx`, `components/post-editor/**`) over 300 lines.
 
 ## Tests
+
 - **Vitest + RTL** (`npm test`, config in `vite.config.ts` `test` block, jsdom 26, setup in
   `resources/js/test/setup.ts`): `lib/http.test.ts`, `lib/timezones.test.ts`,
   `lib/post-workflow.test.ts`, `lib/grid-layout.test.ts`, `components/data-table.test.tsx`,
@@ -87,18 +92,20 @@ search pickers, the one JSON `http` helper, the CI guard rails, and the frontend
   mail log) → client → LinkedIn channel → post with a date/time → start drafting → internal
   review → Owner approves without the client → schedule. `tests/e2e/support/server.mjs` migrates a
   fresh `database/e2e.sqlite` and serves `public/` with PHP's built-in server (not `artisan
-  serve`, which would drop env vars also in `.env`); `support/env.mjs` holds the isolated
+serve`, which would drop env vars also in `.env`); `support/env.mjs` holds the isolated
   environment (SQLite, file cache/sessions, `MAIL_MAILER=log`, JSON log at
   `storage/logs/e2e.log`, database queue never worked). `E2E_PHP` picks the PHP binary.
 - CI runs both on every PR (`.github/workflows/tests.yml`).
 
 ## Known Gaps / Open Questions
+
 - Only the first of the four I-14.6 journeys exists; the portal approval, publish-failure retry
   and invoice → paid journeys land with M-4 / M-6 / M-11 (per the MVP note on M-1.5).
 - `DataTable` has no virtualisation; lists stay server-paginated (25 per page by default).
 - Playwright runs Chromium only; mobile viewports and axe checks come with M-6.6 / M-11.1.
 
 ## Changelog
+
 - 2026-11-07: **425KB of test code removed from the production build.**
   `resources/js/pages/inbox/composer.test.tsx` sat inside the Inertia page glob
   (`pages/**/*.tsx`), so it was compiled into the build as if it were a page — a 425KB chunk of

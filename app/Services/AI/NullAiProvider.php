@@ -33,7 +33,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Temporary placeholder implementation of AiProvider (Step 2.1), bound by
  * default until provider selection (Step 2.7) switches the binding to a real
- * vendor (DeepSeekProvider, Step 2.2) when AI is enabled and configured.
+ * vendor (AnthropicProvider, Step 2.2) when AI is enabled and configured.
  * Always returns empty result collections; never calls an external service.
  */
 class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, ReplyAssistant, WritingAssistant
@@ -96,7 +96,7 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurpose
 
     /**
      * No vendor call: a deterministic brief built from the Brand Brain, so the Image Studio still
-     * works end to end without DeepSeek (Step 16.5).
+     * works end to end without Anthropic (Step 16.5).
      */
     public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
     {
@@ -149,7 +149,7 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurpose
 
     /**
      * Makes "AI returns nothing" traceable to the provider binding itself: this class is only
-     * resolved when AI_ENABLED is off or DEEPSEEK_API_KEY is empty (see AppServiceProvider).
+     * resolved when AI_ENABLED is off or ANTHROPIC_API_KEY is empty (see AppServiceProvider).
      *
      * @param  array<string, mixed>  $context
      */
@@ -159,7 +159,7 @@ class NullAiProvider implements AiProvider, CampaignAiProvider, CaptionRepurpose
             ...$context,
             'method' => $method,
             'ai_enabled' => (bool) config('ai.enabled', false),
-            'api_key_configured' => (string) config('ai.deepseek.api_key', '') !== '',
+            'api_key_configured' => (string) config('ai.anthropic.api_key', '') !== '',
         ]);
     }
 }

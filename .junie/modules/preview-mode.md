@@ -1,36 +1,40 @@
 # Preview Mode
 
 ## Purpose
+
 Provides a read-only `/preview/*` mirror of the main app, backed by frozen fixture data, so the
 product can be demoed without any risk of touching real client data (Step 0.14). Every mutating
 request made under `/preview/*` is rejected with a 403 before it reaches any controller/Action.
 
 ## Models / Tables
+
 No new tables. Reuses `Organization`, `User`, `Client`, `Campaign`, `SocialAccount`, `Post`,
 `PostTarget` — scoped to one dedicated fixture organization (`organizations.slug =
 'preview-studio'`) created by `Database\Seeders\PreviewSeeder`.
 
 ## Actions / Services / Contracts
+
 - `Database\Seeders\PreviewSeeder`: idempotent (`updateOrCreate`) seeder that creates/refreshes the
   "Preview Studio" organization, its Owner user (`preview@graphy.test`), one client ("Fixture &
   Co"), one campaign, one connected social account, and one post with a scheduled target. Called
   from `DatabaseSeeder` so it's always present after `php artisan db:seed`/`migrate:fresh --seed`.
 - `App\Http\Middleware\EnsurePreviewMode` (aliased as `preview`): applied to every route in the
   `/preview/*` group.
-  - Aborts with `403` on any request whose method isn't `GET`/`HEAD`, *before* any controller runs.
-  - Otherwise, resolves the seeded Preview Studio owner as the user **for this request only**
-    (`Auth::guard()->setUser()`, restoring the previous user — or none — once the response is
-    built), so the existing controllers/policies — which all scope by `$user->org_id` —
-    transparently return only the fixture data with zero per-controller preview branching. Nothing
-    is written to the session (Step I-1.1): a guest is still a guest on the next real request, and
-    a logged-in user is still themselves.
+    - Aborts with `403` on any request whose method isn't `GET`/`HEAD`, _before_ any controller runs.
+    - Otherwise, resolves the seeded Preview Studio owner as the user **for this request only**
+      (`Auth::guard()->setUser()`, restoring the previous user — or none — once the response is
+      built), so the existing controllers/policies — which all scope by `$user->org_id` —
+      transparently return only the fixture data with zero per-controller preview branching. Nothing
+      is written to the session (Step I-1.1): a guest is still a guest on the next real request, and
+      a logged-in user is still themselves.
 - `App\Http\Middleware\RejectPreviewUserOutsidePreview` (appended to the `web` group, Step I-1.1):
   if the preview owner (`User::isPreviewUser()`, matched on `User::PREVIEW_EMAIL`) is ever
   authenticated on a non-`/preview/*` URL — e.g. an old session persisted before the fix — it is
   logged at `warning`, signed out (session invalidated) and the request gets a `403`.
-  - Aborts with `404` if the fixture hasn't been seeded yet.
+    - Aborts with `404` if the fixture hasn't been seeded yet.
 
 ## Routes / Controllers
+
 `routes/web.php` defines a `Route::prefix('preview')->name('preview.')->middleware(['preview'])`
 group that mirrors the authenticated app route group one-for-one (same controllers, same route
 paths, `preview.` name prefix): `dashboard`, `calendar`, `home` (`needs-attention`), the `clients`
@@ -39,13 +43,14 @@ resource, brand-brain edit/update, invoices, social-accounts, campaigns, assets,
 acceptance test can assert they're rejected, not just omitted from the route list.
 
 ## Business Rules
+
 - Preview is **read-only, full stop**: any non-GET/HEAD request anywhere under `/preview/*` gets a
   `403`, regardless of the target resource or the visitor's would-be permissions. This is enforced
   by the middleware alone, ahead of any policy/Action, so it also automatically covers future
   publish-adjacent routes (Phase 1) once they're added under this prefix — no extra guard needed.
 - The `preview` shared Inertia prop (see `App\Http\Middleware\HandleInertiaRequests::share()`) is
   derived from the request path (`$request->is('preview', 'preview/*')`) rather than a request
-  attribute, because Inertia's own middleware resolves shared props *before* route middleware runs.
+  attribute, because Inertia's own middleware resolves shared props _before_ route middleware runs.
 - `resources/js/components/preview-banner.tsx` renders a persistent banner (wired into
   `app-sidebar-layout.tsx`) whenever `preview` is `true`, so visitors always know the data is frozen
   fixture data.
@@ -53,6 +58,7 @@ acceptance test can assert they're rejected, not just omitted from the route lis
   visibility.
 
 ## Frontend
+
 - **Preview guard (Step I-1.1):** `resources/js/hooks/use-preview-guard.ts` (`usePreviewGuard`,
   installed by `app-sidebar-layout.tsx`) registers an Inertia `router.on('before')` listener while
   `preview` is true. `resources/js/lib/preview.ts` (`decidePreviewVisit`) rewrites any GET visit to
@@ -74,6 +80,7 @@ acceptance test can assert they're rejected, not just omitted from the route lis
   `posts/edit.tsx`.
 
 ## Known Gaps / Open Questions
+
 - Write controls in the reused pages are still rendered in preview; the router guard cancels them
   with a toast (and the backend 403s them), but they aren't visually hidden yet. Use
   `useIsPreview()` per component when a page is next touched.
@@ -83,6 +90,7 @@ acceptance test can assert they're rejected, not just omitted from the route lis
 - No dedicated `/preview` landing page yet — `/preview/dashboard` is the entry point.
 
 ## Tests
+
 - `tests/Feature/PreviewModeTest.php`: preview dashboard is reachable without logging in and shares
   `preview: true`; POST/PUT/DELETE against a preview-scoped client all return 403 and leave the
   fixture untouched; non-preview routes share `preview: false`. Step I-1.1 regressions: a preview visit leaves the
@@ -91,6 +99,7 @@ acceptance test can assert they're rejected, not just omitted from the route lis
   writes to the fixture org after a preview visit redirect to login.
 
 ## Changelog
+
 - 2026-10-20: Phase 18 (grid planner) — GET mirrors for the client Grid tab, the planner and its schedule preview (plus writes kept to assert the 403); `lib/preview.ts` mirrors `/clients/{id}/grids` and `/grids/{id}/edit|schedule`. `PreviewSeeder` seeds an approved nine-tile grid (a 1×3 split, a carousel, a Reel, six linked posts) via `SeedsGridShowcase`; `DemoContentSeeder` adds a draft grid per demo client.
 - 2026-10-18: Campaigns enhancement — GET mirrors for the campaigns hub, client campaigns tab and every workspace tab; `PreviewSeeder` seeds the campaign showcase (`SeedsCampaignShowcase`).
 - 2026-10-18: Step I-2.4 — `MIRRORED_PATHS` and the `preview.*` routes include the client tab pages

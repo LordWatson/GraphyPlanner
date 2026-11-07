@@ -76,8 +76,8 @@ class AiDraftReplyTest extends TestCase
 
         AiUsageLog::query()->create([
             'org_id' => $org->id,
-            'provider' => 'deepseek',
-            'model' => 'deepseek-flash',
+            'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5-5',
             'method' => 'inbox_reply',
             'succeeded' => true,
             'prompt_tokens' => 200,

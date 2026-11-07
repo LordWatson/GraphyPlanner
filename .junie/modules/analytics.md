@@ -1,6 +1,7 @@
 # Analytics & Reporting (organization)
 
 ## Purpose
+
 Chapter **07 Analytics**: every agency gets the same quality of analytics and saved reporting the
 super admin console got in Phase 15, scoped to its own organization — how clients are tracking, what
 is going out, where approvals stall, who is carrying the load, what has been billed and what AI is
@@ -11,6 +12,7 @@ costing — and, from Phase M-3, how people responded (engagement, followers, be
 M-3.3).
 
 ## Models / Tables
+
 - `OrganizationReport` (`organization_reports`, migration `2026_10_17_130100`): `org_id` (FK,
   `cascadeOnDelete`), `name`, `description`, `filters` (JSON, the
   `OrganizationAnalyticsFilters::toStoredArray()` shape — never an org id), `created_by` (FK → `users`,
@@ -18,21 +20,23 @@ M-3.3).
   `weekly|monthly`, nullable), `recipient_ids` (JSON list of same-org staff ids), `last_sent_at`.
   Visible to the whole org. Factory `OrganizationReportFactory` (`scheduled()` state).
 - Migration `2026_10_17_130000_add_analytics_indexes`: `post_activity_logs (post_id, to_status,
-  created_at)` and `(to_status, created_at)`, `posts (org_id, status)` and `(org_id, created_at)`,
+created_at)` and `(to_status, created_at)`, `posts (org_id, status)` and `(org_id, created_at)`,
   `invoices (org_id, status, issue_date)`. (`ai_usage_logs (org_id, created_at)` already existed.)
 
 ## Shared analytics core (Step 17.1)
+
 Used by both the platform console (`GetPlatformAnalyticsSummaryAction`) and organization analytics,
 so the two can't drift:
+
 - `App\Support\Analytics\AnalyticsRange` — preset/custom range resolution (`7d|30d|90d|12m|ytd|custom`,
   bad input → `30d`) **in a timezone**; `from`/`to` stay local, `fromUtc()`/`toUtc()`/`utcBounds()`
   for timestamp columns, `dateBounds()` (local dates) for `date` columns (`issue_date`),
   `granularity()` (day ≤ ~2 months, else month), `toStoredArray()` (presets relative, custom pinned),
   `toArray()`.
 - `App\Support\Analytics\SeriesBuckets` — the bucket list and `countByBucket()` / `sumByBucket()`;
-  converts every instant into the range's timezone *before* formatting the key (calendar dates are
+  converts every instant into the range's timezone _before_ formatting the key (calendar dates are
   bucketed as-is with `calendarDates: true`).
-- `App\Support\Analytics\AnalyticsScope` — *which* rows: org ids, optionally narrowed by client ids
+- `App\Support\Analytics\AnalyticsScope` — _which_ rows: org ids, optionally narrowed by client ids
   (posts, invoices, AI usage, clients), campaign ids and platforms (posts only). `posts()` builder +
   `applyToClientOwned()`.
 - `App\Services\Analytics\PostActivityMetrics` (transitions into a status, publish outcomes, success
@@ -48,6 +52,7 @@ so the two can't drift:
   artwork/fonts now shared by the invoice PDF and the analytics report PDF.
 
 ## Actions / Services / Contracts
+
 - `App\Support\Analytics\OrganizationAnalyticsFilters` (Step 17.2): `AnalyticsRange` in the org's
   `default_timezone` + `clientIds`, `campaignIds`, `platforms`, `metrics`
   (`METRICS = clients, posts, approvals, team, revenue, ai`). `fromArray($input, $organization)` takes
@@ -83,23 +88,26 @@ so the two can't drift:
   creator (Owner/Strategist) or an Owner. Super admins pass all (`Gate::before`).
 
 ### Role / section matrix
-| Section | Owner | Strategist | Designer | Viewer |
-|---|---|---|---|---|
-| `clients`, `posts`, `approvals`, `team` | ✓ | ✓ | ✓ | ✓ |
-| `revenue` | ✓ | ✓ | – | – |
-| `ai` (counts) | ✓ | ✓ | ✓ | ✓ |
-| `ai.cost_estimate` | ✓ | – | – | – |
+
+| Section                                 | Owner | Strategist | Designer | Viewer |
+| --------------------------------------- | ----- | ---------- | -------- | ------ |
+| `clients`, `posts`, `approvals`, `team` | ✓     | ✓          | ✓        | ✓      |
+| `revenue`                               | ✓     | ✓          | –        | –      |
+| `ai` (counts)                           | ✓     | ✓          | ✓        | ✓      |
+| `ai.cost_estimate`                      | ✓     | –          | –        | –      |
 
 `ClientReviewer` gets a 403 on every Phase 17 route. Sections a role can't see are `null` (dropped,
 never refused) in props, saved-report runs, CSV, PDF and emails.
 
 ## Routes / Controllers
+
 Staff group (`auth`, `verified`, `org.member`):
+
 - `GET /analytics` → `Analytics\AnalyticsController@index` (`analytics.index`) — props `summary`,
   `filters`, `filterOptions`, `can` (`viewRevenue`, `viewAiCost`, `saveReport`, `export`).
 - `GET /analytics/export` (CSV) and `GET /analytics/pdf` — the current view.
 - `GET /clients/{client}/analytics` → `@client` (`clients.analytics`, Step 17.5) — `ClientPolicy::view`
-  + `viewAnalytics`; another org's client → 403.
+    - `viewAnalytics`; another org's client → 403.
 - `Route::resource('analytics/reports')` → `Analytics\ReportController` (`analytics.reports.*`,
   parameter `{report}`), plus `GET analytics/reports/{report}/export` and `/pdf`.
 - `/preview` mirror: `analytics`, `analytics/export`, `analytics/pdf`, `clients/{client}/analytics`,
@@ -114,6 +122,7 @@ Staff group (`auth`, `verified`, `org.member`):
   super admin as viewer (every section, org timezone) — Step 17.9.
 
 ## Frontend
+
 - `resources/js/components/analytics/`: `format.ts` (range labels, `describeRange`, `formatHours`,
   `formatPercent`, `pad`, `primaryTotal`, `tickInterval`), `chart-theme.ts`, `series-charts.tsx`
   (`PublishingChart`, `CountBarChart`, `PairedBarChart`, `AmountAreaChart`), `figures.tsx` (`MoneyRow`,
@@ -123,12 +132,13 @@ Staff group (`auth`, `verified`, `org.member`):
   visual language.
 - Pages: `analytics/index` (ChapterHero with the published count as the Lime hero numeral, "Save as
   report" (spark), Export CSV/PDF, filter bar, view), `analytics/client`, `analytics/reports/{index,
-  edit,show}`; `super-admin/organizations/analytics` renders the org view (`links={false}`).
+edit,show}`; `super-admin/organizations/analytics` renders the org view (`links={false}`).
 - `lib/chapters.ts`: **07 Analytics** (`LineChart`, electric swatch, `/analytics`); Staff → 08,
   Settings → 09. Overview's publish-attempts and revenue panels link to `/analytics` with that section
   pre-selected; the client page's "More" section box has an "Analytics" entry.
 
 ## Phase M-1 additions
+
 - `analytics/export` and `analytics/reports/{report}/export` (CSV) are behind `password.confirm`;
   the PDFs aren't.
 - Saved reports list on the shared `DataTable`; the custom range uses the shared `DatePicker`.
@@ -136,6 +146,7 @@ Staff group (`auth`, `verified`, `org.member`):
 ## Phase M-3 — Prove results (Steps M-3.1 to M-3.3, `mvp.md`)
 
 ### Engagement metrics (M-3.1 / I-10.1 / Phase 12)
+
 - **Tables** (migration `2026_10_23_100000`): `post_target_metrics` (append-only: `org_id`,
   `post_target_id`, `impressions`, `reach`, `views`, `likes`, `comments`, `shares`, `saves`,
   `clicks`, `engagement` = likes+comments+shares+saves over the reported ones, `source`,
@@ -182,6 +193,7 @@ Staff group (`auth`, `verified`, `org.member`):
   `series-charts.tsx`, the "Interactions" figure in the spec row.
 
 ### Best time to post (M-3.2 / I-10.2)
+
 - `App\Services\Analytics\BestTimeService::forAccounts(list<int>)` — per account, measured channels
   published in the last `analytics.best_time.lookback_days`, slotted by ISO weekday + a
   `block_hours` window **on the account's clock**, ranked by average engagement rate (or average
@@ -193,7 +205,7 @@ Staff group (`auth`, `verified`, `org.member`):
   and both consumers rendered that as `learning` — which told a 7-post account "best times appear
   after 6 measured posts (7 so far)". A low-volume account spread over 84 possible slots hits this
   routinely; it is the normal case for one-brand workspaces, not an edge case. `App\Services\
-  Business\BestTimeService` was always correct here (it checks `status === 'ready' && slots !== []`
+Business\BestTimeService` was always correct here (it checks `status === 'ready' && slots !== []`
   and falls back to `best_time.defaults`), so only the agency path misreported it.
 - Shown on the client drill-down (`engagement.best_times`, null on org-wide views) and in the post
   editor's channel rows (`targetAccounts.*.best_time`; a chip picks the next such slot via
@@ -235,9 +247,10 @@ buying a real listening vendor. Revisit only if a platform ships a mentions endp
 band mark, the accent word and the footer line are the agency's, and the "Prepared with Alima"
 credit comes off. **The paper, the type and the layout never change**: it is a white label, not a
 theme. Without the gate the report is Alima's, whatever is stored on the organization. The portal's
-report *page* is branded by the portal shell (`client-portal.md`).
+report _page_ is branded by the portal shell (`client-portal.md`).
 
 ### Client monthly reports (M-3.3 / I-10.3 / Phase 8)
+
 - **Table** `client_reports` (migration `2026_10_23_100200`; model `ClientReport`, org-scoped):
   `client_id`, `period_start/end`, `status` (`ClientReportStatus`: draft | published),
   `commentary`, `snapshot` (json), `snapshot_at`, `published_at`, `published_by`, `sent_at`,
@@ -270,6 +283,7 @@ report *page* is branded by the portal shell (`client-portal.md`).
   portal nav. Status kind `clientReport`.
 
 ## Business Rules
+
 - **Timezone:** ranges and daily buckets follow `organizations.default_timezone` (a post published at
   23:30 UTC lands on the next local day in Dubai or London-in-BST). The platform console stays UTC.
 - **Tenant safety:** the org id is never read from input; foreign client/campaign ids are validation
@@ -300,9 +314,10 @@ report *page* is branded by the portal shell (`client-portal.md`).
   per period (`last_sent_at`); suspended orgs skipped; recipients who left the org or became client
   reviewers are skipped; no current recipients → nothing sent, no stamp.
 - **Filenames:** `Str::slug(name)-Y-m-d` (org-local date); the current view uses `{org|client}
-  analytics`.
+analytics`.
 
 ## Tests
+
 - Phase M-3: `EngagementSyncTest` (append-only readings + pointer, null source no-op, failures
   recorded, daily account rows in the account's timezone, org sweep window/interval/force/guards,
   command, webhook keeps request id / post id / URL, bad URL dropped), `UploadPostEngagementSourceTest`
@@ -338,6 +353,7 @@ report *page* is branded by the portal shell (`client-portal.md`).
 - `tests/Feature/SuperAdmin/PlatformAnalyticsTest` drill-down test updated for Step 17.9.
 
 ## Known Gaps / Open Questions
+
 - Engagement field names are mapped from Upload-Post's **docs** (read 21 Oct 2026); the live sandbox
   check M-0.2 asked for is still due — if a network names a metric differently, extend
   `PostMetricsReading::fromVendor()`. A scheduled upload's `request_id` only arrives with the
@@ -367,6 +383,7 @@ report *page* is branded by the portal shell (`client-portal.md`).
   throttled) — check manually.
 
 ## Changelog
+
 - 2026-11-07: **The engagement sweep is spread across its window and reports how long it took.**
   `analytics:sync-engagement` runs every 30 minutes and queued one job per organization all at
   once; each is now delayed by `id % analytics.sync_spread_minutes` minutes (20 by default, 0 to

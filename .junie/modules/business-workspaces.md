@@ -1,6 +1,7 @@
 # Business & Creator Workspaces
 
 ## Purpose
+
 A second kind of workspace for **one business or creator managing their own social media**, with no
 agency in between (full scope in `.junie/plans/business-workspaces.md`). The same engine
 (publishing, the dual-timezone `PostTarget` model, AI providers, Image Studio, analytics core, asset
@@ -17,6 +18,7 @@ Actions, share preview) live in `.junie/modules/posts.md`; this file records the
 pieces, the review setting and the shell.
 
 ## The "primary brand" model (architecture decision — §2 of the plan)
+
 - `client_id` is non-nullable on posts, social accounts, assets, campaigns, daily briefs, brand
   brains, AI rows and image generations, and is the scoping key for analytics, calendar and
   policies. Making it nullable would double every query/policy path (~60 FKs) — rejected.
@@ -28,7 +30,7 @@ pieces, the review setting and the shell.
   column `clients.primary_org_id` (= `org_id` only for the primary row, else NULL; NULLs don't
   collide in a unique index — MySQL's substitute for a partial index). The column is **VIRTUAL** on
   both MySQL 8 and the SQLite test run: `clients.org_id` has an ON DELETE CASCADE foreign key, and
-  MySQL forbids a cascading-FK column as the base of a *stored* generated column (it throws the
+  MySQL forbids a cascading-FK column as the base of a _stored_ generated column (it throws the
   misleading error 1215). A virtual column has no such restriction and the unique index gives the
   identical guarantee (verified on MySQL: a second primary row is rejected).
 - A request-scoped `App\Services\Workspace\CurrentWorkspace` resolves the org, its type and its
@@ -40,6 +42,7 @@ pieces, the review setting and the shell.
 - The `Client` model keeps its name in code; only the business UI will call it "your brand".
 
 ## Resolved open questions (§5 — the two that block Phase B-1)
+
 1. **Naming.** One product ("Alima"), two signups: the agency flow at `/register-organization` and
    the business/creator flow at `/start` (Phase B-2) are two entry points into the same product. No
    separate sub-brand. The internal enum stays `OrganizationType::Business`.
@@ -52,6 +55,7 @@ The other §5 questions (Upload-Post managed mode, vision provider, holiday data
 agency→business downgrade = out of scope, inactive-data retention) are resolved in their own phases.
 
 ## Models / Tables
+
 - `Organization` (`organizations`): `type` column (`OrganizationType`, string, not null, default
   `agency`, indexed). Helpers `isBusiness()`/`isAgency()`, scope `ofType()`, relation
   `primaryBrand()` (`HasOne<Client>` filtered on `is_primary`). Default attribute `type = agency` so
@@ -89,6 +93,7 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   stamp for the "goes out soon" push, mirroring `reminder_sent_at` (the 3-day email reminder).
 
 ## Enums
+
 - `App\Enums\OrganizationType` — `Agency` | `Business`, with `label()`.
 - `App\Contracts\PushDeliveryResult` — **B-7.4:** `Delivered` | `Failed` | `Gone` | `Skipped`, the
   outcome of one push send (a `Gone` subscription is pruned).
@@ -104,6 +109,7 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   `SuperAdmin`; agency unchanged = every role except `ClientReviewer`).
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Workspace\CreatePrimaryBrandAction` — creates the primary `Client` (active,
   `is_primary`, optional `brand_kind`) and an empty `BrandBrain` in one transaction; the only
   supported way to create a primary brand. Logs `org_id`/`client_id`/`brand_kind`.
@@ -130,48 +136,48 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   resolves to a private/loopback/link-local/reserved IP (and a host that resolves to nothing), does
   not follow redirects, time- and size-capped, HTML/text only; never throws.
 - `App\Contracts\AiProvider::draftBrandProfile(BrandProfileInput): AiBrandProfileDraft` — **B-2.4:**
-  added to the contract; implemented by `DeepSeekProvider` (strict-JSON prompt, no `Client` context)
+  added to the contract; implemented by `AnthropicProvider` (strict-JSON prompt, no `Client` context)
   and `NullAiProvider` (empty draft). `App\Support\AI\BrandProfileInput` / `AiBrandProfileDraft` are
   the DTOs; the draft carries `succeeded`/`provider`/`model` for metering and the wizard fallback.
 - `App\Exceptions\Workspace\WorkspaceMisconfiguredException` — business-org invariant violation.
 - `App\Actions\Workspace\UpdateWorkspaceSettingsAction` — **B-3.3:** writes the workspace's own
   settings (currently `require_post_review`), logging the change. Owner-only via the request/policy.
 - **Phase B-4 shell:**
-  - `App\Actions\Business\GetBusinessDashboardAction` — the "Today" dashboard data, counted/bounded
-    SQL-side (I-2.2), scoped to the primary brand: **upNext** (next 5 scheduled targets),
-    **gaps** (via `PostingGoalGapService`), **needsYou** (reuses `GetNeedsAttentionItemsAction` +
-    stale drafts; **CG-1.1** adds unanswered-comment rows and **CG-1.4** grid-order-at-risk rows,
-    the latter re-verified through `GridOrderRiskService`), **thisWeek** (publishing consistency).
-    `ideaOfTheDay` is null until B-6.1.
-  - `App\Actions\Business\GetBusinessInsightsAction` — single-brand publishing consistency (weekly
-    posted counts, streak, by-platform); reach/engagement land with B-8 (`hasMetrics: false`).
-  - `App\Services\Business\PostingGoalGapService` — pure, timezone-aware "which goal days in the
-    window have nothing scheduled". Unit-tested across a week boundary and a DST change.
-  - `App\Support\Workspace\PostingGoal` — the `clients.posting_goal` value object.
-  - `App\Support\Workspace\WorkspaceCopy` — PHP agency→business term translation for mails/
-    notifications (counterpart of `resources/js/lib/workspace-copy.ts`).
-  - `App\Http\Requests\Concerns\ResolvesWorkspaceBrand` — a trait giving shared Form Requests a
-    `brand()` that is the route `{client}` when present, else the current workspace's primary brand,
-    so one request serves both shells (`StorePostRequest`, `StoreAssetRequest`, `SearchAssetsRequest`,
-    `StoreSocialAccountRequest`, `UpdateBrandBrainRequest`, `UpdateBrandReferencesRequest`,
-    `ClientPostsTabRequest`, `Campaigns\StoreCampaignRequest`).
+    - `App\Actions\Business\GetBusinessDashboardAction` — the "Today" dashboard data, counted/bounded
+      SQL-side (I-2.2), scoped to the primary brand: **upNext** (next 5 scheduled targets),
+      **gaps** (via `PostingGoalGapService`), **needsYou** (reuses `GetNeedsAttentionItemsAction` +
+      stale drafts; **CG-1.1** adds unanswered-comment rows and **CG-1.4** grid-order-at-risk rows,
+      the latter re-verified through `GridOrderRiskService`), **thisWeek** (publishing consistency).
+      `ideaOfTheDay` is null until B-6.1.
+    - `App\Actions\Business\GetBusinessInsightsAction` — single-brand publishing consistency (weekly
+      posted counts, streak, by-platform); reach/engagement land with B-8 (`hasMetrics: false`).
+    - `App\Services\Business\PostingGoalGapService` — pure, timezone-aware "which goal days in the
+      window have nothing scheduled". Unit-tested across a week boundary and a DST change.
+    - `App\Support\Workspace\PostingGoal` — the `clients.posting_goal` value object.
+    - `App\Support\Workspace\WorkspaceCopy` — PHP agency→business term translation for mails/
+      notifications (counterpart of `resources/js/lib/workspace-copy.ts`).
+    - `App\Http\Requests\Concerns\ResolvesWorkspaceBrand` — a trait giving shared Form Requests a
+      `brand()` that is the route `{client}` when present, else the current workspace's primary brand,
+      so one request serves both shells (`StorePostRequest`, `StoreAssetRequest`, `SearchAssetsRequest`,
+      `StoreSocialAccountRequest`, `UpdateBrandBrainRequest`, `UpdateBrandReferencesRequest`,
+      `ClientPostsTabRequest`, `Campaigns\StoreCampaignRequest`).
 - **Phase B-5 publishing without vendor keys:**
-  - `App\Contracts\PublishCredentials` + `App\Services\Publishing\OrganizationOrPlatformCredentials`
-    (B-5.1) — the single seam for Upload-Post keys/secrets and the publish profile; byo (agency key)
-    vs managed (Alima platform key). The publish profile is per client in both modes. Full detail in
-    `.junie/modules/publishing.md`.
-  - `App\Actions\SocialAccounts\EnsurePublishProfileAction` — mints + persists the brand's
-    `social_accounts.upload_post_profile` (DB only; the vendor profile is created by the adapter on
-    first connect). Replaced `EnsureManagedPublishProfileAction` on 2026-11-07.
-  - `App\Actions\SocialAccounts\ConnectManagedAccountAction` (B-5.2) — one-tap connect: find-or-create
-    the brand's account for a platform with defaults from the brand/org, then return the hosted
-    connect URL via `ConnectSocialAccountAction`. The find-or-create is transactional; the vendor
-    call runs after it.
-  - `PublishFailureReason` + the `PostPublishFailed` email variant + per-channel retry (B-5.3) — see
-    `.junie/modules/publishing.md`.
+    - `App\Contracts\PublishCredentials` + `App\Services\Publishing\OrganizationOrPlatformCredentials`
+      (B-5.1) — the single seam for Upload-Post keys/secrets and the publish profile; byo (agency key)
+      vs managed (Alima platform key). The publish profile is per client in both modes. Full detail in
+      `.junie/modules/publishing.md`.
+    - `App\Actions\SocialAccounts\EnsurePublishProfileAction` — mints + persists the brand's
+      `social_accounts.upload_post_profile` (DB only; the vendor profile is created by the adapter on
+      first connect). Replaced `EnsureManagedPublishProfileAction` on 2026-11-07.
+    - `App\Actions\SocialAccounts\ConnectManagedAccountAction` (B-5.2) — one-tap connect: find-or-create
+      the brand's account for a platform with defaults from the brand/org, then return the hosted
+      connect URL via `ConnectSocialAccountAction`. The find-or-create is transactional; the vendor
+      call runs after it.
+    - `PublishFailureReason` + the `PostPublishFailed` email variant + per-channel retry (B-5.3) — see
+      `.junie/modules/publishing.md`.
 - **Phase B-6 AI (local/seasonal idea engine, B-6.1):** `App\Contracts\EventCalendar` +
   `App\Services\Events\StaticEventCalendar`, `App\Services\AI\IdeaContextBuilder` +
-  `App\Support\AI\IdeaContext`, the `App\Contracts\LocalIdeaProvider` contract (DeepSeek/Null),
+  `App\Support\AI\IdeaContext`, the `App\Contracts\LocalIdeaProvider` contract (Anthropic/Null),
   `App\Actions\AI\GenerateBrandIdeasAction` (the `/ideas` "More ideas" generator), and
   `App\Actions\AI\GenerateDailyIdeaAction` + the `business:generate-daily-ideas` command (the Today
   "Idea of the day", cached per brand/local day). Usage is logged via `App\Services\AI\AiTextUsage`.
@@ -195,7 +201,7 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   best-time slots and local/seasonal content; idempotent, guardrailed, metered), with
   `AcceptWeeklyPlanItemsAction` / `DiscardWeeklyPlanItemsAction` for bulk accept (→ draft `Idea`
   posts) / discard. Surfaced on `/ideas` via `Business\IdeaController::{generatePlan,acceptPlan,
-  discardPlan}` (`business.plan.*`). Internals in `.junie/modules/ai.md` ("Plan my week").
+discardPlan}` (`business.plan.*`). Internals in `.junie/modules/ai.md` ("Plan my week").
 - **Phase B-6 AI (caption from a photo, B-6.2):** `App\Contracts\VisionProvider` +
   `App\Services\AI\GeminiVisionProvider`/`NullVisionProvider`, and
   `App\Actions\AI\SuggestCaptionsFromMediaAction` (brand image asset → on-brand captions, guardrailed,
@@ -203,64 +209,66 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   (`business.media.captions`, `throttle:ai`, Owner/Manager/Creator). Internals in
   `.junie/modules/ai.md` ("Caption from a photo").
 - **Phase B-7 phone-first creation:**
-  - `App\Http\Controllers\Business\QuickPostController` (B-7.2/B-7.3) — `create`/`store`/`share`. Thin:
-    resolves the brand from `CurrentWorkspace` and composes `CreateQuickPostAction` +
-    `QuickSchedulePostAction` + `NextSlotService`.
-  - `App\Actions\Posts\CreateQuickPostAction` (B-7.2) — assembles the draft (one asset, caption,
-    pre-timed targets) in one transaction by composing the shared `CreatePostAction` and attaching
-    the asset; scheduling stays a separate hop (`QuickSchedulePostAction`), as the editor does.
-  - `App\Services\Business\NextSlotService` (B-7.2) — pure, timezone-aware "Next free slot" from the
-    posting goal (reuses `PostingGoalGapService::effectiveDays`) + the `ai.plan.default_hour`,
-    skipping days that already have a post and today once the hour has passed.
-  - `App\Contracts\PushNotifier` + `App\Contracts\PushDeliveryResult` + `App\Services\Push\WebPushNotifier`
-    (B-7.4, bound in `AppServiceProvider`) — the single seam for web-push delivery. `isConfigured()`
-    = push enabled + a VAPID key pair; the default logs (and returns `Failed`) until a VAPID
-    transport is bound, so the feature ships dark. `App\Support\Push\PushMessage` is the payload DTO
-    (title/body/url/tag/icon → the SW's `push` handler).
-  - `App\Actions\Push\SavePushSubscriptionAction` / `DeletePushSubscriptionAction` (B-7.4) — store
-    (upsert on `endpoint_hash`, re-asserting ownership) and opt-out (delete the caller's own row).
-  - `App\Actions\Push\SendPostPushRemindersAction` (B-7.4) + the `push:send-post-reminders` command
-    (every 5 min, `SchedulerHeartbeat`) — pushes "your post goes out at …" to a business org's
-    subscriptions when a scheduled target enters the lead window (`config('push.reminder_lead_minutes')`),
-    idempotent via `post_targets.push_reminder_sent_at`, pruning `Gone` subscriptions. Never throws
-    for one dead endpoint.
-  - The `pwa` shared Inertia prop (`HandleInertiaRequests::sharedPwa`, business-only) carries
-    `{pushEnabled, pushPublicKey}`; the frontend `PwaProvider` (manifest+SW+install card, business
-    shell only), `use-push.ts` hook and `PushRemindersCard` (Profile settings) consume it. Static
-    assets: `public/manifest.webmanifest`, `public/sw.js`, `public/offline.html`, `public/icons/*`.
-    Config in `config/push.php`.
+    - `App\Http\Controllers\Business\QuickPostController` (B-7.2/B-7.3) — `create`/`store`/`share`. Thin:
+      resolves the brand from `CurrentWorkspace` and composes `CreateQuickPostAction` +
+      `QuickSchedulePostAction` + `NextSlotService`.
+    - `App\Actions\Posts\CreateQuickPostAction` (B-7.2) — assembles the draft (one asset, caption,
+      pre-timed targets) in one transaction by composing the shared `CreatePostAction` and attaching
+      the asset; scheduling stays a separate hop (`QuickSchedulePostAction`), as the editor does.
+    - `App\Services\Business\NextSlotService` (B-7.2) — pure, timezone-aware "Next free slot" from the
+      posting goal (reuses `PostingGoalGapService::effectiveDays`) + the `ai.plan.default_hour`,
+      skipping days that already have a post and today once the hour has passed.
+    - `App\Contracts\PushNotifier` + `App\Contracts\PushDeliveryResult` + `App\Services\Push\WebPushNotifier`
+      (B-7.4, bound in `AppServiceProvider`) — the single seam for web-push delivery. `isConfigured()`
+      = push enabled + a VAPID key pair; the default logs (and returns `Failed`) until a VAPID
+      transport is bound, so the feature ships dark. `App\Support\Push\PushMessage` is the payload DTO
+      (title/body/url/tag/icon → the SW's `push` handler).
+    - `App\Actions\Push\SavePushSubscriptionAction` / `DeletePushSubscriptionAction` (B-7.4) — store
+      (upsert on `endpoint_hash`, re-asserting ownership) and opt-out (delete the caller's own row).
+    - `App\Actions\Push\SendPostPushRemindersAction` (B-7.4) + the `push:send-post-reminders` command
+      (every 5 min, `SchedulerHeartbeat`) — pushes "your post goes out at …" to a business org's
+      subscriptions when a scheduled target enters the lead window (`config('push.reminder_lead_minutes')`),
+      idempotent via `post_targets.push_reminder_sent_at`, pruning `Gone` subscriptions. Never throws
+      for one dead endpoint.
+    - The `pwa` shared Inertia prop (`HandleInertiaRequests::sharedPwa`, business-only) carries
+      `{pushEnabled, pushPublicKey}`; the frontend `PwaProvider` (manifest+SW+install card, business
+      shell only), `use-push.ts` hook and `PushRemindersCard` (Profile settings) consume it. Static
+      assets: `public/manifest.webmanifest`, `public/sw.js`, `public/offline.html`, `public/icons/*`.
+      Config in `config/push.php`.
 - **Phase B-8 insights for one brand:**
-  - `App\Actions\Business\GetBusinessInsightsAction` (B-8.1) — now also reads the shared
-    `App\Services\Analytics\EngagementMetrics` scoped to the primary brand (reach/engagement by
-    platform, top posts, follower growth) on top of the consistency slice, plus `BestTimeService`
-    for best times. `hasMetrics` flips once a channel has a reading. No revenue/client/staff sections.
-  - `App\Services\Business\BestTimeService` (B-8.3) — per connected account, the account's learned
-    slot (shared analytics `BestTimeService`) when there's enough history, else a platform default
-    (`config('analytics.best_time.defaults')`), each in the account's timezone. `forBrand()`,
-    `suggestForAccount()`, `defaultSlotFor()`.
-  - `App\Contracts\InsightsSummarizer` (bound DeepSeek/Null like `LocalIdeaProvider`) +
-    `App\Actions\AI\SummarizeInsightsAction` (B-8.2) — up to three PII-scrubbed plain-language
-    takeaways from compact facts, cached once per brand per ISO week, metered in `ai_usage_logs`,
-    empty when AI is off. `summarizeInsights()` added to both AI providers.
-  - `App\Mail\WeeklyInsightsDigestMail` + `App\Actions\Business\SendWeeklyInsightsDigestAction` +
-    `business:send-insights-digest` command (B-8.2) — the weekly Monday digest to Owners/Managers of
-    active (published, not opted-out) business orgs; hourly sweep acts at the local send hour,
-    idempotent per org and ISO week (`SchedulerHeartbeat`).
-  - `App\Actions\Business\BuildMediaKitAction` (+ `kitFor()` / `newToken()`),
-    `UpdateMediaKitAction` / `ShareMediaKitAction` / `RevokeMediaKitAction`, and
-    `GenerateMediaKitPdfAction` (B-8.4) — the media kit assembled only from already-public data
-    (published posts, public follower counts), its opt-in revocable public link, and the branded PDF
-    (`pdf.media-kit`). `Business\MediaKitController` (owner editor at `/media-kit`) and the public
-    `MediaKitShareController` (`/kit/{token}`) share `resources/js/components/media-kit/media-kit-view.tsx`.
+    - `App\Actions\Business\GetBusinessInsightsAction` (B-8.1) — now also reads the shared
+      `App\Services\Analytics\EngagementMetrics` scoped to the primary brand (reach/engagement by
+      platform, top posts, follower growth) on top of the consistency slice, plus `BestTimeService`
+      for best times. `hasMetrics` flips once a channel has a reading. No revenue/client/staff sections.
+    - `App\Services\Business\BestTimeService` (B-8.3) — per connected account, the account's learned
+      slot (shared analytics `BestTimeService`) when there's enough history, else a platform default
+      (`config('analytics.best_time.defaults')`), each in the account's timezone. `forBrand()`,
+      `suggestForAccount()`, `defaultSlotFor()`.
+    - `App\Contracts\InsightsSummarizer` (bound Anthropic/Null like `LocalIdeaProvider`) +
+      `App\Actions\AI\SummarizeInsightsAction` (B-8.2) — up to three PII-scrubbed plain-language
+      takeaways from compact facts, cached once per brand per ISO week, metered in `ai_usage_logs`,
+      empty when AI is off. `summarizeInsights()` added to both AI providers.
+    - `App\Mail\WeeklyInsightsDigestMail` + `App\Actions\Business\SendWeeklyInsightsDigestAction` +
+      `business:send-insights-digest` command (B-8.2) — the weekly Monday digest to Owners/Managers of
+      active (published, not opted-out) business orgs; hourly sweep acts at the local send hour,
+      idempotent per org and ISO week (`SchedulerHeartbeat`).
+    - `App\Actions\Business\BuildMediaKitAction` (+ `kitFor()` / `newToken()`),
+      `UpdateMediaKitAction` / `ShareMediaKitAction` / `RevokeMediaKitAction`, and
+      `GenerateMediaKitPdfAction` (B-8.4) — the media kit assembled only from already-public data
+      (published posts, public follower counts), its opt-in revocable public link, and the branded PDF
+      (`pdf.media-kit`). `Business\MediaKitController` (owner editor at `/media-kit`) and the public
+      `MediaKitShareController` (`/kit/{token}`) share `resources/js/components/media-kit/media-kit-view.tsx`.
 - **Phase B-3 post workflow** (the solo-owner / small-team lifecycle) lives in
   `.junie/modules/posts.md`: `App\Contracts\PostWorkflow` + `AgencyPostWorkflow`/`BusinessPostWorkflow`
-  + `PostWorkflowResolver` (B-3.1), `QuickSchedulePostAction` (B-3.2), the Owner-only review setting
-  wiring (B-3.3), and `CreateSharePreviewAction`/`RecordPreviewFeedbackAction` for the read-only
-  partner/sponsor "Share preview" link (B-3.4). `CreatePrimaryBrandAction` now sets the primary
-  brand's `default_approval_mode = internal_only` so business posts never carry `client_required`.
+    - `PostWorkflowResolver` (B-3.1), `QuickSchedulePostAction` (B-3.2), the Owner-only review setting
+      wiring (B-3.3), and `CreateSharePreviewAction`/`RecordPreviewFeedbackAction` for the read-only
+      partner/sponsor "Share preview" link (B-3.4). `CreatePrimaryBrandAction` now sets the primary
+      brand's `default_approval_mode = internal_only` so business posts never carry `client_required`.
 
 ## Routes / Controllers
+
 **Phase B-2 routes:**
+
 - Public (guest, `throttle:6,1`): `GET/POST /start` → `Organizations\BusinessRegistrationController`
   (`organizations.start` / `organizations.start.store`), validated by
   `StoreBusinessRegistrationRequest` (brand name, `brand_kind`, timezone, currency, owner name/email/
@@ -285,6 +293,7 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   `/welcome-setup` after login, otherwise `/dashboard`.
 
 **Phase B-3 routes:**
+
 - `GET/PUT /settings/workspace` (`workspace-settings.edit`/`.update`, group
   `auth`/`verified`/`org.member`/`workspace:business`) → `Settings\WorkspaceController`, the
   Owner-only business settings page (`resources/js/pages/settings/workspace.tsx`, with a "Workspace"
@@ -305,6 +314,7 @@ social-account connect endpoints and `clients.posts.store` → editor, brand id 
 **Phase B-4 routes (the business shell):** a route group (`auth`/`verified`/`org.member`/
 `workspace:business`, name prefix `business.`) with brand-implicit URLs, each thin controller in
 `App\Http\Controllers\Business\*` resolving the brand from `CurrentWorkspace`:
+
 - `GET /today` → `DashboardController` (B-4.3 dashboard, `business/today`).
 - `GET /posts` → `PostController@index` (`business/posts/index`); `POST /posts/new` →
   `create` (empty draft → shared `posts.edit`); `POST /posts` → `store` (`CreatePostAction`).
@@ -326,7 +336,7 @@ social-account connect endpoints and `clients.posts.store` → editor, brand id 
   platform, each opening the one-tap hosted connect via `POST /accounts/connect/{platform}`
   (`business.accounts.connect-platform` → `connectPlatform`, managed credentials, no API keys). Also
   `POST /accounts` (`CreateSocialAccountAction`), `PUT/DELETE /accounts/{socialAccount}`, `POST
-  /accounts/{socialAccount}/connect` (reconnect an existing account). The shared
+/accounts/{socialAccount}/connect` (reconnect an existing account). The shared
   `social-accounts.callback` routes a business org back to `business.accounts.index`.
 - `GET /insights` → `InsightController` (`business/insights`, `GetBusinessInsightsAction` +
   deferred `SummarizeInsightsAction` takeaways, B-8.1/B-8.2).
@@ -361,20 +371,23 @@ social-account connect endpoints and `clients.posts.store` → editor, brand id 
   `useWorkspace()` hook.
 
 **Phase B-1 — guarding the agency-only surface:**
+
 - `App\Http\Middleware\EnsureWorkspaceType` (aliases `workspace:agency` / `workspace:business`,
   registered in `bootstrap/app.php`). Wrong-type orgs are redirected to the equivalent surface when
   one exists (the map fills in Phase B-4) or 404 otherwise — never 403, so the feature isn't
   advertised.
 - Inertia shares a `workspace` prop (`HandleInertiaRequests`): `{ type, brand: {id,name}|null,
-  roleLabels }`, resolved defensively so a misconfigured org reports `brand: null` rather than
+roleLabels }`, resolved defensively so a misconfigured org reports `brand: null` rather than
   500-ing every page.
 
 ### B-0.2 — inventory of client-scoped surfaces (classification of `route:list`)
+
 Every org-workspace route is **agency-only**, **shared**, or **business-only** (none yet). Guards
 enforce the agency-only set below; policies back them up.
 
 **Agency-only — guarded with `workspace:agency` now** (pure CRM / billing / client-portal /
 client-reporting, no business equivalent):
+
 - Clients CRM: `clients.*` resource (index, create, store, show, edit, update, destroy),
   `clients.restore`, `clients.purge`; CRM tabs `clients.billing`, `clients.portal-access`,
   `clients.briefs`, `clients.daily-briefs.index`.
@@ -388,7 +401,7 @@ client-reporting, no business equivalent):
 - The whole `portal.*` group (also already behind `portal` middleware; a business org never has a
   `ClientReviewer`).
 
-**Agency-only — deferred to Phase B-4 (redirect map)**: the `clients/{client}/*` *engine* routes
+**Agency-only — deferred to Phase B-4 (redirect map)**: the `clients/{client}/*` _engine_ routes
 that will get a brand-implicit business equivalent — `clients.brand-brain.*`, `clients.posts.*`,
 `clients.assets.*`, `clients.media`, `clients.campaigns.*`, `clients.social-accounts.store` +
 `social-accounts.facebook.*`, `clients.grids.*`, `clients.ai.*` (trends/ideas/images),
@@ -415,6 +428,7 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
 (`StoreStaffInvitationRequest` + `CreateStaffInvitationAction`).
 
 ## Business Rules
+
 - Exactly one primary brand per business org, enforced by the DB (unique index on the generated
   column) **and** `CreatePrimaryBrandAction`.
 - A primary brand can never be deleted (it's the whole workspace; removed only by deleting the
@@ -424,6 +438,7 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   behaviour is byte-for-byte unchanged (existing suite stays green).
 
 ## Tests
+
 - `tests/Unit/Enums/OrganizationTypeTest.php` — labels.
 - `tests/Unit/Enums/RoleWorkspaceLabelTest.php` — `labelFor()` / `assignableFor()` per type.
 - `tests/Unit/Models/OrganizationTypeHelpersTest.php` — `isBusiness`/`isAgency`/`ofType`.
@@ -508,6 +523,7 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   owner page loads (agency 404), bio save, and the PDF download.
 
 ## Known Gaps / Open Questions
+
 - **Phase B-8 (insights for one brand) is done**: `/insights` now shows reach/engagement, top posts,
   follower growth and best times (B-8.1/B-8.3), plain-language AI takeaways + the weekly email digest
   (B-8.2), and there's a public, revocable creator media kit at `/media-kit` → `/kit/{token}`
@@ -527,16 +543,16 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   other countries fall back to the global set (and, when unresolved, the `ai.ideas.default_country`
   home market). A paid holiday API can replace `StaticEventCalendar` behind the same contract.
 - B-6.1 records idea generation in `ai_usage_logs` (`AiTextUsage`) but, like the rest of the AI
-  surface, there is no allowance *enforcement* until B-9.2.
+  surface, there is no allowance _enforcement_ until B-9.2.
 - **B-5 managed publishing** requires `UPLOAD_POST_PLATFORM_KEY` (and, for signed webhooks,
   `UPLOAD_POST_PLATFORM_WEBHOOK_SECRET`) in the environment; until set, a managed org's publish calls
   go out with an empty key and the vendor rejects them (surfaced as a plain-language failure).
   One Upload-Post profile per org holds every network, so all of a brand's connected accounts share
   the brand's `social_accounts.upload_post_profile` (per client since the 2026-11-07 bugfix — see
   `publishing.md`; `organizations.upload_post_profile` is legacy).
-- `DraftBrandProfileAction` records usage in `ai_usage_logs` but there is no allowance *enforcement*
+- `DraftBrandProfileAction` records usage in `ai_usage_logs` but there is no allowance _enforcement_
   yet — that lands with the `Entitlements` metering in B-9.2.
-- The agency campaign *workspace* (`campaigns.show` and its tabs) remains a shared, unguarded
+- The agency campaign _workspace_ (`campaigns.show` and its tabs) remains a shared, unguarded
   org-scoped surface; the business shell simply never links to it (Collections links to the filtered
   posts list instead). Fully business-ifying or guarding that surface is out of B-4. **Step CG-1.2
   closed the grids half of this gap:** the agency `/grids` hub is now `workspace:agency`-guarded and
@@ -548,6 +564,7 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   is intentionally not exposed in the business studio (presets keep it one-tap).
 
 ## Changelog
+
 - 2026-10-27: Step CG-1.4 (competitor-gap Phase CG-1) — tied the switched-on surfaces into Today.
   `GetBusinessDashboardAction::needsYou()` now surfaces grid-order-at-risk rows (`type: grid_risk`,
   re-verified via `GridOrderRiskService`, linking to the planner) alongside the CG-1.1 comment rows;
@@ -591,15 +608,15 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
 - 2026-10-23: Phase B-8 (insights for one brand) implemented — single-brand Insights (consistency +
   reach/engagement/top-posts/followers via the shared `EngagementMetrics`, plus best times) in
   `GetBusinessInsightsAction` and the rebuilt `business/insights` page (B-8.1); `App\Services\Business\
-  BestTimeService` (learned-or-default, per account, in the account timezone) (B-8.3); the
+BestTimeService` (learned-or-default, per account, in the account timezone) (B-8.3); the
   `InsightsSummarizer` contract + `SummarizeInsightsAction` (weekly-cached, metered takeaways) with a
   deferred `/insights` panel and the weekly `WeeklyInsightsDigestMail` + `SendWeeklyInsightsDigestAction`
-  + `business:send-insights-digest` command, opt-out via `organizations.insights_digest_opt_out`
-  (B-8.2); and the creator media kit — `media_kits` table + `MediaKit`, `BuildMediaKitAction` +
-  update/share/revoke + `GenerateMediaKitPdfAction`, `Business\MediaKitController` (`/media-kit`),
-  public `MediaKitShareController` (`/kit/{token}`), the `share/media-kit` page and shared
-  `media-kit-view` component (B-8.4). New columns: `organizations.insights_digest_opt_out`; new table:
-  `media_kits`. New config: `analytics.best_time.defaults`, `analytics.insights_digest.send_hour`.
+    - `business:send-insights-digest` command, opt-out via `organizations.insights_digest_opt_out`
+      (B-8.2); and the creator media kit — `media_kits` table + `MediaKit`, `BuildMediaKitAction` +
+      update/share/revoke + `GenerateMediaKitPdfAction`, `Business\MediaKitController` (`/media-kit`),
+      public `MediaKitShareController` (`/kit/{token}`), the `share/media-kit` page and shared
+      `media-kit-view` component (B-8.4). New columns: `organizations.insights_digest_opt_out`; new table:
+      `media_kits`. New config: `analytics.best_time.defaults`, `analytics.insights_digest.send_hour`.
 - 2026-10-23: Phase B-7 (phone-first creation) implemented — the installable PWA (manifest +
   `public/sw.js` offline shell + `public/icons/*` + the business-only `PwaProvider`; agency pages
   untouched) (B-7.1); the quick post flow (`QuickPostController`, `business/posts/quick` page,
@@ -623,21 +640,21 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   through the local engine. `GetBusinessDashboardAction.ideaOfTheDay` now reads the cached idea. New
   config: `ai.ideas.*`. Internals in `.junie/modules/ai.md`.
 - 2026-10-23: Step B-6.4 ("Repurpose across platforms") implemented — the `CaptionRepurposer`
-  contract + DeepSeek/Null, `RepurposeCaptionsForPostAction` (guardrailed, per-platform limit clamp),
+  contract + Anthropic/Null, `RepurposeCaptionsForPostAction` (guardrailed, per-platform limit clamp),
   the `posts.ai.repurpose` endpoint, and the editor "Repurpose per platform" button. Internals in
   `.junie/modules/ai.md`.
 - 2026-10-23: Step B-6.3 ("Plan my week") implemented — `GenerateWeeklyPlanAction` +
   `AcceptWeeklyPlanItemsAction`/`DiscardWeeklyPlanItemsAction`, the `/ideas` "This week's plan" panel
-  + `business.plan.*` endpoints, and the `ai_post_ideas.planned_for` column. New config:
-  `ai.plan.default_hour`. Internals in `.junie/modules/ai.md`.
+    - `business.plan.*` endpoints, and the `ai_post_ideas.planned_for` column. New config:
+      `ai.plan.default_hour`. Internals in `.junie/modules/ai.md`.
 - 2026-10-23: Step B-6.2 (caption from a photo) implemented — the `VisionProvider` contract +
   `GeminiVisionProvider`/`NullVisionProvider`, `SuggestCaptionsFromMediaAction`, the `/media`
   "Caption from photo" dialog + `business.media.captions` endpoint (Owner/Manager/Creator,
-  `throttle:ai`), and `AiTextUsage` generalised for Gemini/DeepSeek. New config: `ai.vision.*`.
+  `throttle:ai`), and `AiTextUsage` generalised for Gemini/Anthropic. New config: `ai.vision.*`.
   Internals in `.junie/modules/ai.md`.
 - 2026-10-22: Phase B-5 (publishing without vendor keys) implemented — the `PublishCredentials`
   contract + `OrganizationOrPlatformCredentials` + `PublishMode` enum + `EnsureManagedPublishProfile
-  Action`, routing the adapter/webhook/music/engagement credential reads through the seam (B-5.1);
+Action`, routing the adapter/webhook/music/engagement credential reads through the seam (B-5.1);
   the one-tap platform-card `/accounts` page + `accounts.connect-platform` route +
   `ConnectManagedAccountAction` (B-5.2); and `PublishFailureReason` + per-channel retry +
   `PostPublishFailed` business email (B-5.3). New columns: `organizations.publish_mode`,
@@ -646,7 +663,7 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
 - 2026-10-22: Phase B-4 (the business app shell) implemented — the `business.*` brand-implicit route
   group + thin `Business\*` controllers reusing the engine Actions (B-4.1); `businessChapters` + the
   business sidebar/command-palette + the `/today` login redirect (B-4.2); the `GetBusinessDashboard
-  Action` "Today" page (B-4.3); the `workspace-copy.ts` / `WorkspaceCopy` term pass (B-4.4); and the
+Action` "Today" page (B-4.3); the `workspace-copy.ts` / `WorkspaceCopy` term pass (B-4.4); and the
   `clients.posting_goal` column + `PostingGoal` value object + `PostingGoalGapService` + `/brand`
   posting-goal editor (B-4.5). The deferred `clients/{client}/*` engine routes are now
   `workspace:agency`-guarded and `EnsureWorkspaceType::equivalents()` redirects a business org from
@@ -672,10 +689,10 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
 - 2026-10-28: Phase CG-2 (plans & payments) delivered B-9.1–B-9.4 and B-12.2 for business/creator
   workspaces. Decisions (CG-0.1/0.2): positioning "the AI marketing partner for one brand"; plans
   Free £0 / Pro £15/$19 / Creator Pro £29/$37, annual = two months free; the Stripe switch is global
-  + per-org override; grid planner and comment inbox are Pro features (inbox surface-gating deferred,
-  open question §6). A free business workspace is capped at 3 accounts / 30 posts a month / 1 seat;
-  `BusinessGridTest` and `BusinessStaffRoleTest` now put their workspace on a paid plan to exercise
-  those gated features. New module doc: `plans.md`.
+    - per-org override; grid planner and comment inbox are Pro features (inbox surface-gating deferred,
+      open question §6). A free business workspace is capped at 3 accounts / 30 posts a month / 1 seat;
+      `BusinessGridTest` and `BusinessStaffRoleTest` now put their workspace on a paid plan to exercise
+      those gated features. New module doc: `plans.md`.
 - 2026-11-06: Phase CG-3 (link in bio) delivered B-11.3, promoted to V1. New shell routes
   `GET/PUT /bio` (`Business\BioPageController`) and the public `GET /@{handle}` +
   `GET /@{handle}/go/{block}`. The bio page and the media kit are now sub-items of the **Brand**

@@ -67,16 +67,17 @@ class AiControlPlaneTest extends TestCase
 
     public function test_a_caption_call_is_metered_with_real_tokens(): void
     {
-        Config::set('ai.deepseek.api_key', 'sk-test');
-        Config::set('ai.deepseek.base_url', 'https://api.deepseek.test');
+        Config::set('ai.anthropic.api_key', 'sk-test');
+        Config::set('ai.anthropic.base_url', 'https://api.anthropic.test');
 
         Http::fake([
-            '*/chat/completions' => Http::response([
-                'choices' => [[
-                    'finish_reason' => 'stop',
-                    'message' => ['content' => json_encode(['suggestions' => [['caption' => 'Hello', 'hashtags' => []]]])],
+            '*/v1/messages' => Http::response([
+                'stop_reason' => 'end_turn',
+                'content' => [[
+                    'type' => 'text',
+                    'text' => json_encode(['suggestions' => [['caption' => 'Hello', 'hashtags' => []]]]),
                 ]],
-                'usage' => ['prompt_tokens' => 120, 'completion_tokens' => 80, 'total_tokens' => 200],
+                'usage' => ['input_tokens' => 120, 'output_tokens' => 80],
             ], 200),
         ]);
 
@@ -92,7 +93,7 @@ class AiControlPlaneTest extends TestCase
             'org_id' => $org->id,
             'client_id' => $client->id,
             'method' => 'suggestCaptions',
-            'provider' => 'deepseek',
+            'provider' => 'anthropic',
             'succeeded' => true,
             'prompt_tokens' => 120,
             'completion_tokens' => 80,
@@ -107,7 +108,7 @@ class AiControlPlaneTest extends TestCase
         $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
 
         AiUsageLog::create([
-            'org_id' => $org->id, 'provider' => 'deepseek', 'model' => 'deepseek-flash',
+            'org_id' => $org->id, 'provider' => 'anthropic', 'model' => 'claude-sonnet-5-5',
             'method' => 'suggestCaptions', 'succeeded' => true, 'prompt_tokens' => 80, 'completion_tokens' => 40,
         ]);
 

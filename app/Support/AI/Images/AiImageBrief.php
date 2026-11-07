@@ -6,7 +6,7 @@ use JsonSerializable;
 
 /**
  * The structured art direction for one image set (Step 16.1): written once per set by the
- * AiProvider "art director" (DeepSeek, Step 16.5) and reused by every variant ("brief once,
+ * AiProvider "art director" (Anthropic, Step 16.5) and reused by every variant ("brief once,
  * render many"). Stored on `ai_image_generations.brief` via toArray()/fromArray().
  */
 final readonly class AiImageBrief implements JsonSerializable

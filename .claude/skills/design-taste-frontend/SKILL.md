@@ -1,16 +1,16 @@
 ---
 name: design-taste-frontend
 description: >-
-  tasteskill v2, the anti-slop frontend skill. Art direction for websites, distilled from a study of
-  247 curated gallery sites (One Page Love, Awwwards Sites of the Day). Deals researched directions
-  (idea, composition, type, palette, photographs, section blueprints) from a library, enforces a strict
-  no-slop house style with a real-browser inspector, and runs a look-and-fix loop on screenshots. Use
-  this whenever you build, design, redesign, restyle, polish or review a landing page, marketing site,
-  portfolio, product page, one-pager, hero or any public-facing web page, in any stack (HTML/CSS, React,
-  Next.js, Vue, Svelte, Astro, Tailwind) — also when the user says a page looks generic, templated,
-  "AI-made", sloppy, or asks to make it look designed, premium, award-level or less like every other
-  site. Also for app screens: dashboards, admin and analytics views, settings, inboxes and other screens
-  people work in, with their own run and rules.
+    tasteskill v2, the anti-slop frontend skill. Art direction for websites, distilled from a study of
+    247 curated gallery sites (One Page Love, Awwwards Sites of the Day). Deals researched directions
+    (idea, composition, type, palette, photographs, section blueprints) from a library, enforces a strict
+    no-slop house style with a real-browser inspector, and runs a look-and-fix loop on screenshots. Use
+    this whenever you build, design, redesign, restyle, polish or review a landing page, marketing site,
+    portfolio, product page, one-pager, hero or any public-facing web page, in any stack (HTML/CSS, React,
+    Next.js, Vue, Svelte, Astro, Tailwind) — also when the user says a page looks generic, templated,
+    "AI-made", sloppy, or asks to make it look designed, premium, award-level or less like every other
+    site. Also for app screens: dashboards, admin and analytics views, settings, inboxes and other screens
+    people work in, with their own run and rules.
 ---
 
 # tasteskill v2
@@ -237,41 +237,42 @@ not finished. Order of work:
    pricing, FAQ and footer included: the commonest failure in the study, even among good sites, is a
    distinctive first screen followed by stock blocks.
 4. **Imagery,** in this order of preference:
-   1. the project's own;
-   2. generated, if you have an image tool;
-   3. **real pictures of the subject's world from the open collections,** whenever an honest one
-      exists. Search them with `node <skill>/scripts/assets.mjs "<query>"` (Openverse, Wikimedia
-      Commons, the Art Institute of Chicago and the Met; only licences that allow commercial use, by
-      default). Search the inventory, not the category: its street in old postcards, an old map of the
-      neighbourhood, its material up close, its trade in engravings, a museum object of its kind, a
-      botanical plate, a star chart. Use them large and with intent: one archival photograph as the
-      hero, an engraving enlarged into the page's motif, the real map of the street as the contact
-      section. Look at each before choosing; `--get <ref>` downloads it into `assets/` and records
-      its source and licence, and `--credits` prints the credit line for the footer. A found picture
-      shows the world around the client and is never presented as the client's own product, room,
-      dish, person or team;
-   4. **drawn in code from the subject itself,** for what no honest picture exists of (its objects,
-      its tiles, its windows, its product's interface, made as one consistent flat graphic language in
-      the palette's real colours);
-   5. the photographs dealt on the sheet, only where an honestly generic picture fits (the sea for a
-      sea house), never as a stand-in for the subject;
-   6. type and colour alone.
+    1. the project's own;
+    2. generated, if you have an image tool;
+    3. **real pictures of the subject's world from the open collections,** whenever an honest one
+       exists. Search them with `node <skill>/scripts/assets.mjs "<query>"` (Openverse, Wikimedia
+       Commons, the Art Institute of Chicago and the Met; only licences that allow commercial use, by
+       default). Search the inventory, not the category: its street in old postcards, an old map of the
+       neighbourhood, its material up close, its trade in engravings, a museum object of its kind, a
+       botanical plate, a star chart. Use them large and with intent: one archival photograph as the
+       hero, an engraving enlarged into the page's motif, the real map of the street as the contact
+       section. Look at each before choosing; `--get <ref>` downloads it into `assets/` and records
+       its source and licence, and `--credits` prints the credit line for the footer. A found picture
+       shows the world around the client and is never presented as the client's own product, room,
+       dish, person or team;
+    4. **drawn in code from the subject itself,** for what no honest picture exists of (its objects,
+       its tiles, its windows, its product's interface, made as one consistent flat graphic language in
+       the palette's real colours);
+    5. the photographs dealt on the sheet, only where an honestly generic picture fits (the sea for a
+       sea house), never as a stand-in for the subject;
+    6. type and colour alone.
 
-   When the project has footage or a real picture of its own process or product, the first screen
-   shows it, large (about 40% of the screen or more). Never write a sentence on the page about where
-   the pictures come from or what they are not ("none of these shows our bar"): a caption says what
-   the picture is, and the credit line sits small in the footer. A portfolio whose work is invented
-   for the brief draws each piece as a finished still of that work (its title card with its own type,
-   an end frame, a poster), with real detail, never as a pictogram of the client's product.
+    When the project has footage or a real picture of its own process or product, the first screen
+    shows it, large (about 40% of the screen or more). Never write a sentence on the page about where
+    the pictures come from or what they are not ("none of these shows our bar"): a caption says what
+    the picture is, and the credit line sits small in the footer. A portfolio whose work is invented
+    for the brief draws each piece as a finished still of that work (its title card with its own type,
+    an end frame, a poster), with real detail, never as a pictogram of the client's product.
 
-   **The floor, which the inspector checks:** at least four real pictures on the page, usually six to
-   twelve (photographs, archival images, maps, engravings, footage, raster artwork; for software, its
-   cropped interface fragments count too). SVG drawings do not count toward the floor: draw what no
-   picture exists of, and still carry real pictures. Add one moving picture wherever an honest clip
-   exists: search it with `assets.mjs --video "<query>"` and use it as a muted loop with a poster
-   frame. Models skip pictures and footage because finding them is work; the page fails without them.
+    **The floor, which the inspector checks:** at least four real pictures on the page, usually six to
+    twelve (photographs, archival images, maps, engravings, footage, raster artwork; for software, its
+    cropped interface fragments count too). SVG drawings do not count toward the floor: draw what no
+    picture exists of, and still carry real pictures. Add one moving picture wherever an honest clip
+    exists: search it with `assets.mjs --video "<query>"` and use it as a muted loop with a poster
+    frame. Models skip pictures and footage because finding them is work; the page fails without them.
 
-   `references/imagery.md` covers searching, licences and credits, video, drawing, crops and treatments.
+    `references/imagery.md` covers searching, licences and credits, video, drawing, crops and treatments.
+
 5. **The live thing** from step 4, built into the section where it proves the claim (often the hero
    or the booking), with real content, a thumb-sized phone version and a plain fallback.
 6. **The scroll scenes,** when the sheet deals them (section 9), each with the section it carries: the page's big
@@ -375,26 +376,26 @@ Do not claim a check you did not run.
 
 These hold on every build, whatever the direction. `inspect.mjs` measures them.
 
-| Rule | Instead |
-| --- | --- |
-| **Headlines: two lines or fewer, at every width.** Every `h1`–`h6`, and the main line of the first screen whatever its tag. | Cut words. Then widen the measure. Size last. |
-| **A clear title on the first screen**, in the page's one `h1`, and a heading on every section. | Say what this is: the name with what it does, the product with what it is for, the event with its date and place. |
-| **Equal outer margins; no section huddled on one side** with the other half of the screen empty. | Close every void with something on its far side: the section's picture, a second column, a list, a figure. |
-| **No blank stretches** taller than about half a screen. | The normal section gap. A deliberate rest is a placed picture or a field of colour, once per page. |
+| Rule                                                                                                                                                                                                                           | Instead                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Headlines: two lines or fewer, at every width.** Every `h1`–`h6`, and the main line of the first screen whatever its tag.                                                                                                    | Cut words. Then widen the measure. Size last.                                                                                                        |
+| **A clear title on the first screen**, in the page's one `h1`, and a heading on every section.                                                                                                                                 | Say what this is: the name with what it does, the product with what it is for, the event with its date and place.                                    |
+| **Equal outer margins; no section huddled on one side** with the other half of the screen empty.                                                                                                                               | Close every void with something on its far side: the section's picture, a second column, a list, a figure.                                           |
+| **No blank stretches** taller than about half a screen.                                                                                                                                                                        | The normal section gap. A deliberate rest is a placed picture or a field of colour, once per page.                                                   |
 | **Statements are paragraphs.** An intro sentence or a quotation set large is marked up as `<p>` or `<blockquote>`, stays at statement size (36px or less on desktop, 24px on a phone) and runs to about 25 words, three lines. | Larger than that it is a headline and the two-line rule applies. In blind tests jurors read a 42px sentence over four lines as a four-line headline. |
-| **No eyebrows.** No small label above a heading, no pill badge above the headline, no "New ·" chip. | Put the information in the heading or the first sentence, or drop it. |
-| **No monospace** outside real code blocks. | The text face. Tabular figures where numbers align. |
-| **No index numbering.** No 01 / 02 / 03, no (001), no "Step 2". | Order shown by position, size, or the words. A real `<ol>` if order matters. |
-| **No thin rules.** No hairline dividers, no 1px outlined boxes, no grid lines, crosshairs or crop marks. | Space. A step in background tone. A change of scale. A filled shape. |
-| **No gradients.** Not as backgrounds, not on buttons, not in text. | Flat colour, or a real photograph. A neutral scrim under text on a photo is the one exception. |
-| **No shadows on things at rest.** No glows. | A tone step between surfaces. Shadows only on what truly floats: a menu, a dialog. |
-| **No assistant palette.** No yellow-cream ground with terracotta or rust; no violet or indigo. | The dealt palette. |
-| **No tiny uppercase letter-spaced labels.** | Sentence case at a readable size. |
-| **No icon-topped feature cards, no rows of identical cards.** | The dealt section blueprint. |
-| **No glass.** No backdrop blur panels, no floating pill navigation. | A plain bar: wordmark, a few links, one action. |
-| **No emoji, no gradient blobs, no decorative shapes, no fake dashboards of grey bars.** | A real picture, a real interface fragment, or nothing. |
-| **No styled accent word** in a headline (italic, serif, coloured, underlined). | One face, one colour. The words carry the emphasis. |
-| **Two typefaces at most,** usually one. | The dealt type system. |
+| **No eyebrows.** No small label above a heading, no pill badge above the headline, no "New ·" chip.                                                                                                                            | Put the information in the heading or the first sentence, or drop it.                                                                                |
+| **No monospace** outside real code blocks.                                                                                                                                                                                     | The text face. Tabular figures where numbers align.                                                                                                  |
+| **No index numbering.** No 01 / 02 / 03, no (001), no "Step 2".                                                                                                                                                                | Order shown by position, size, or the words. A real `<ol>` if order matters.                                                                         |
+| **No thin rules.** No hairline dividers, no 1px outlined boxes, no grid lines, crosshairs or crop marks.                                                                                                                       | Space. A step in background tone. A change of scale. A filled shape.                                                                                 |
+| **No gradients.** Not as backgrounds, not on buttons, not in text.                                                                                                                                                             | Flat colour, or a real photograph. A neutral scrim under text on a photo is the one exception.                                                       |
+| **No shadows on things at rest.** No glows.                                                                                                                                                                                    | A tone step between surfaces. Shadows only on what truly floats: a menu, a dialog.                                                                   |
+| **No assistant palette.** No yellow-cream ground with terracotta or rust; no violet or indigo.                                                                                                                                 | The dealt palette.                                                                                                                                   |
+| **No tiny uppercase letter-spaced labels.**                                                                                                                                                                                    | Sentence case at a readable size.                                                                                                                    |
+| **No icon-topped feature cards, no rows of identical cards.**                                                                                                                                                                  | The dealt section blueprint.                                                                                                                         |
+| **No glass.** No backdrop blur panels, no floating pill navigation.                                                                                                                                                            | A plain bar: wordmark, a few links, one action.                                                                                                      |
+| **No emoji, no gradient blobs, no decorative shapes, no fake dashboards of grey bars.**                                                                                                                                        | A real picture, a real interface fragment, or nothing.                                                                                               |
+| **No styled accent word** in a headline (italic, serif, coloured, underlined).                                                                                                                                                 | One face, one colour. The words carry the emphasis.                                                                                                  |
+| **Two typefaces at most,** usually one.                                                                                                                                                                                        | The dealt type system.                                                                                                                               |
 
 Three places keep their own conventions and are left alone by the inspector: real code in
 `<pre>`/`<code>` (monospace is correct there), real tables and form fields (they may have lines), and
@@ -405,7 +406,7 @@ Why these, honestly. Some are what the study measured: among the 247 sites, thos
 7.5 or higher used icon feature cards 1% of the time against 28% for sites under 6.5, pill badges 14%
 against 34%, gradients 22% against 52%, shadows 24% against 48%, tiny tracked caps 16% against 57%.
 Others are the owner's taste and go against current gallery fashion: monospace labels, index numbers
-and hairline grids are actually *more* common on award sites than on weak ones, which is exactly why
+and hairline grids are actually _more_ common on award sites than on weak ones, which is exactly why
 generators imitate them and why they now read as costume. They are banned here without exception.
 `references/tells.md` keeps the dated registry.
 
@@ -418,6 +419,7 @@ colour. Leave it empty on purpose once per page at most.
 Short form. Numbers are from the study unless marked as house style.
 
 **Type**
+
 - Two or three sizes do the visible work: one very large, one small, nothing in between. Median
   headline-to-body ratio on the studied sites is 4.3; the best go far beyond (largest type: median
   8.4vw on the top sites against 5.0vw on the weak ones).
@@ -428,6 +430,7 @@ Short form. Numbers are from the study unless marked as house style.
 - Left-aligned by default. Centre at most one moment.
 
 **Space**
+
 - One grid, one pair of tight margins (16–32px), used everywhere; large things run to the edges. Text
   blocks share two or three left edges on the whole page.
 - Asymmetry inside the grid, never in the frame: the two outer margins are equal, and an off-centre
@@ -436,12 +439,14 @@ Short form. Numbers are from the study unless marked as house style.
 - Each section has a different composition from its neighbours; none is a card grid.
 
 **Colour**
+
 - One ground, one ink, one accent. The accent appears on the action and perhaps one other thing.
 - Running text in the full ink. A page set in soft grey reads unfinished.
 - Surfaces are separated by a small step in tone, never by a line or a shadow.
 - A section may change the whole field colour. Nothing fades into anything.
 
 **Imagery**
+
 - One dominant image beats six small ones. On the top-scored sites the hero media covers at least half
   the first screen 68% of the time.
 - Same crop ratios, same treatment, square corners unless the direction says otherwise (73% of the
@@ -454,6 +459,7 @@ Short form. Numbers are from the study unless marked as house style.
 - Nothing ever lies on top of a headline or a statement (the inspector fails it).
 
 **Components**
+
 - Buttons: flat, one fill colour, either square-cornered or fully round, decided once (top sites: 52%
   square, 23% pill; the 9–16px "soft" radius is the weak-site default). Most strong heroes have no
   button at all, or one.
@@ -506,24 +512,24 @@ open collections could not be searched.
 
 ## Files
 
-| File | Read it when |
-| --- | --- |
-| `references/app-screens.md` | Any dashboard, admin, settings or other app screen: its own run, rules, tokens and checks. |
-| `references/copy.md` | Writing the argument and the copy deck (steps 2 and 5). The two-line arithmetic. |
-| `references/type.md` | Setting type: scales, tracking, measure, loading fonts, pairing. |
-| `references/colour.md` | Applying the palette: roles, proportions, tone steps, dark pages, contrast. |
-| `references/layout.md` | Grid, margins, rhythm, section variety, navigation, footer, the phone composition. |
-| `references/imagery.md` | Choosing, finding, crediting, cropping and treating pictures; what to do with none. |
-| `references/motion.md` | Step 9. Budget, tokens, recipes, reduced motion. |
-| `references/scenes.md` | Step 6, when the sheet deals scroll scenes: putting one on a page, filling, fitting, the phone, checking, the catalogue. |
-| `references/critique.md` | Step 8. How to look, how to score, what to fix first. |
-| `references/tells.md` | The dated registry of generated-page tells and what each is replaced by. |
-| `references/research.md` | The study: method, numbers, what the best and worst sites do. Cite it, do not guess. |
-| `scripts/draw.mjs` | Deals and reprints the direction; `--photos`, `--site <id>` for more references; `--app` deals an app style instead. |
-| `scripts/assets.mjs` | Step 6: searches open collections for real pictures of the subject's world; `--get` downloads with the credit, `--credits` prints them. |
-| `scripts/lint.mjs` · `scripts/inspect.mjs` | The gate. |
-| `scripts/scenes.mjs` | The gate for scroll scenes: each scene at 0-100% of its hold, desktop, phone, reduced motion. |
-| `assets/base.css` · `assets/base.js` | An optional neutral foundation to build on. |
-| `assets/scenes/` | The scroll scenes: the shared stage (`stage.js`, `stage.css`) and, for each scene in the library, its `.js`, `.css` and a working demo page in `demo/`. |
-| `assets/app.css` · `assets/charts.js` | For app screens: a neutral shell, panels, tables and controls, and small SVG charts drawn to the app rules. |
-| `library/` | The data the draw reads: directions, heroes, sections, type systems, palettes, photographs, studied sites, motions, scroll scenes (`scenes.json`), and the app styles, shells and screen patterns (`app.json`). Do not read it whole; use the script. |
+| File                                       | Read it when                                                                                                                                                                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `references/app-screens.md`                | Any dashboard, admin, settings or other app screen: its own run, rules, tokens and checks.                                                                                                                                                            |
+| `references/copy.md`                       | Writing the argument and the copy deck (steps 2 and 5). The two-line arithmetic.                                                                                                                                                                      |
+| `references/type.md`                       | Setting type: scales, tracking, measure, loading fonts, pairing.                                                                                                                                                                                      |
+| `references/colour.md`                     | Applying the palette: roles, proportions, tone steps, dark pages, contrast.                                                                                                                                                                           |
+| `references/layout.md`                     | Grid, margins, rhythm, section variety, navigation, footer, the phone composition.                                                                                                                                                                    |
+| `references/imagery.md`                    | Choosing, finding, crediting, cropping and treating pictures; what to do with none.                                                                                                                                                                   |
+| `references/motion.md`                     | Step 9. Budget, tokens, recipes, reduced motion.                                                                                                                                                                                                      |
+| `references/scenes.md`                     | Step 6, when the sheet deals scroll scenes: putting one on a page, filling, fitting, the phone, checking, the catalogue.                                                                                                                              |
+| `references/critique.md`                   | Step 8. How to look, how to score, what to fix first.                                                                                                                                                                                                 |
+| `references/tells.md`                      | The dated registry of generated-page tells and what each is replaced by.                                                                                                                                                                              |
+| `references/research.md`                   | The study: method, numbers, what the best and worst sites do. Cite it, do not guess.                                                                                                                                                                  |
+| `scripts/draw.mjs`                         | Deals and reprints the direction; `--photos`, `--site <id>` for more references; `--app` deals an app style instead.                                                                                                                                  |
+| `scripts/assets.mjs`                       | Step 6: searches open collections for real pictures of the subject's world; `--get` downloads with the credit, `--credits` prints them.                                                                                                               |
+| `scripts/lint.mjs` · `scripts/inspect.mjs` | The gate.                                                                                                                                                                                                                                             |
+| `scripts/scenes.mjs`                       | The gate for scroll scenes: each scene at 0-100% of its hold, desktop, phone, reduced motion.                                                                                                                                                         |
+| `assets/base.css` · `assets/base.js`       | An optional neutral foundation to build on.                                                                                                                                                                                                           |
+| `assets/scenes/`                           | The scroll scenes: the shared stage (`stage.js`, `stage.css`) and, for each scene in the library, its `.js`, `.css` and a working demo page in `demo/`.                                                                                               |
+| `assets/app.css` · `assets/charts.js`      | For app screens: a neutral shell, panels, tables and controls, and small SVG charts drawn to the app rules.                                                                                                                                           |
+| `library/`                                 | The data the draw reads: directions, heroes, sections, type systems, palettes, photographs, studied sites, motions, scroll scenes (`scenes.json`), and the app styles, shells and screen patterns (`app.json`). Do not read it whole; use the script. |

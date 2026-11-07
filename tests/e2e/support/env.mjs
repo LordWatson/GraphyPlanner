@@ -31,7 +31,7 @@ export const appEnv = {
     SENTRY_LARAVEL_DSN: '',
     OPS_ALERT_MAIL_TO: '',
     AI_ENABLED: 'false',
-    DEEPSEEK_API_KEY: '',
+    ANTHROPIC_API_KEY: '',
     AI_IMAGE_PROVIDER: 'null',
     UPLOAD_VIRUS_SCANNER: 'null',
 };

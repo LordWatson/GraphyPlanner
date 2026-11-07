@@ -1,11 +1,11 @@
 # Alima — Frontend Redesign Notes (session, Oct 2026)
 
 A working companion to `.junie/brand-guidelines.md` for the current full-frontend redesign. The
-brand book stays the source of truth and is **not** edited by this effort — its *fixed* items
+brand book stays the source of truth and is **not** edited by this effort — its _fixed_ items
 (logo, colour values, typeface, the Alima voice) are untouchable. This file records the redesign's
 art direction and the layout/interaction/component decisions made on top of that book, so the work
-stays coherent page to page. Where this file and the book ever conflict on a *fixed* brand item,
-the book wins; this file only ever refines the *flexible* layer (layout, interaction, component
+stays coherent page to page. Where this file and the book ever conflict on a _fixed_ brand item,
+the book wins; this file only ever refines the _flexible_ layer (layout, interaction, component
 composition, responsiveness).
 
 ## Brief
@@ -17,7 +17,7 @@ this is purely UI/UX.
 
 ## Art direction — "Alima, in motion"
 
-The existing app is a beautifully austere *printed brand book*: mono eyebrows everywhere, running
+The existing app is a beautifully austere _printed brand book_: mono eyebrows everywhere, running
 heads, hairline rules, flat spec-sheet density. The redesign keeps the Alima soul (cream canvas,
 teal frame, Ink emphasis, lime/lilac/orange accents, Poppins + DM Mono, the Ink `ChapterHero`) but
 shifts the feel toward a **warm, spatial, confident product**:
@@ -66,7 +66,7 @@ shifts the feel toward a **warm, spatial, confident product**:
 The guided stepper is strong; the fixes were everyday navigation friction, not a reskin:
 
 - **Step transitions now return you to the top of the step.** The action bar is sticky at the
-  *bottom*, so Back/Next previously switched the panel while leaving you scrolled past the new
+  _bottom_, so Back/Next previously switched the panel while leaving you scrolled past the new
   step's start. Added `goToStep` to `use-editor-navigation` (set the step + scroll the spine to the
   top of the viewport, reduced-motion aware) and wired it into the action bar (Back/Next), the step
   spine chips, the preview rail's "Review & send" nudge, and the post-save `ErrorStepSwitcher` (so a
@@ -131,5 +131,6 @@ overflow outside a scroll container. `tsc`, `vp check` (0 warnings), guards all 
   reserve the spec-row (`StatStrip`) look for genuine secondary KPI strips.
 
 ## Changelog
+
 - 2026-10-24: Created. Moved the shell/mobile-nav guidance out of `brand-guidelines.md` (reverted to
   original) into this session file, per the user's request to keep the brand book pristine.

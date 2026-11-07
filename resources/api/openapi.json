@@ -5,12 +5,8 @@
         "version": "1.0.0",
         "description": "Read access to an agency's clients, posts and connected channels, plus outgoing webhooks so another system can be told the moment something happens.\n\n**Authentication.** Every request needs `Authorization: Bearer <token>`. Tokens are created in Settings → Agent access and are the same tokens the MCP server uses. A token belongs to exactly one organization and that organization is never taken from request input, so there is no parameter that widens what a token can see.\n\n**Pagination.** Lists are cursor-paginated: read `meta.next_cursor` and pass it back as `?cursor=`. A null cursor means that was the last page. There is deliberately no total count — a reporting client walking the list while people are still creating posts would get rows skipped and repeated by offset paging, and could not tell.\n\n**Rate limit.** 300 requests a minute per token.\n\n**Errors.** Always `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`, except validation failures, which use Laravel's `{\"message\": ..., \"errors\": {...}}`.\n\n**Read-only in v1**, on purpose: reading is where the demand is and it cannot damage a customer's data while the shape of this API is still settling. Writes will come with idempotency keys designed in rather than bolted on."
     },
-    "servers": [
-        { "url": "/api/v1" }
-    ],
-    "security": [
-        { "bearerAuth": [] }
-    ],
+    "servers": [{ "url": "/api/v1" }],
+    "security": [{ "bearerAuth": [] }],
     "tags": [
         { "name": "Identity" },
         { "name": "Clients" },
@@ -26,7 +22,9 @@
                 "summary": "What this token is and what it may do",
                 "description": "The first call to make. Confirms the credentials work and names the organization they belong to, so a 403 elsewhere is something you can diagnose yourself.",
                 "responses": {
-                    "200": { "description": "The token's organization and granted scopes." },
+                    "200": {
+                        "description": "The token's organization and granted scopes."
+                    },
                     "401": { "$ref": "#/components/responses/Unauthenticated" }
                 }
             }
@@ -39,13 +37,25 @@
                 "parameters": [
                     { "$ref": "#/components/parameters/PerPage" },
                     { "$ref": "#/components/parameters/Cursor" },
-                    { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "Only clients with this status." },
-                    { "name": "archived", "in": "query", "schema": { "type": "boolean" }, "description": "Archived clients instead of active ones. They are kept, not deleted." }
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": { "type": "string" },
+                        "description": "Only clients with this status."
+                    },
+                    {
+                        "name": "archived",
+                        "in": "query",
+                        "schema": { "type": "boolean" },
+                        "description": "Archived clients instead of active ones. They are kept, not deleted."
+                    }
                 ],
                 "responses": {
                     "200": { "description": "A page of clients." },
                     "401": { "$ref": "#/components/responses/Unauthenticated" },
-                    "403": { "$ref": "#/components/responses/InsufficientScope" }
+                    "403": {
+                        "$ref": "#/components/responses/InsufficientScope"
+                    }
                 }
             }
         },
@@ -54,10 +64,12 @@
                 "operationId": "getClient",
                 "tags": ["Clients"],
                 "summary": "One client",
-                "parameters": [ { "$ref": "#/components/parameters/ClientId" } ],
+                "parameters": [{ "$ref": "#/components/parameters/ClientId" }],
                 "responses": {
                     "200": { "description": "The client." },
-                    "403": { "description": "The client belongs to another organization, or to a client this token's member is not assigned to." },
+                    "403": {
+                        "description": "The client belongs to another organization, or to a client this token's member is not assigned to."
+                    },
                     "404": { "description": "No such client." }
                 }
             }
@@ -71,13 +83,31 @@
                 "parameters": [
                     { "$ref": "#/components/parameters/PerPage" },
                     { "$ref": "#/components/parameters/Cursor" },
-                    { "name": "client_id", "in": "query", "schema": { "type": "integer" } },
-                    { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "Archived posts are excluded unless you ask for `status=archived` by name." },
-                    { "name": "updated_since", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "ISO 8601. Remember to URL-encode the `+` in an offset." }
+                    {
+                        "name": "client_id",
+                        "in": "query",
+                        "schema": { "type": "integer" }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": { "type": "string" },
+                        "description": "Archived posts are excluded unless you ask for `status=archived` by name."
+                    },
+                    {
+                        "name": "updated_since",
+                        "in": "query",
+                        "schema": { "type": "string", "format": "date-time" },
+                        "description": "ISO 8601. Remember to URL-encode the `+` in an offset."
+                    }
                 ],
                 "responses": {
-                    "200": { "description": "A page of posts, each with its channels." },
-                    "422": { "description": "A filter was malformed — the body names which one." }
+                    "200": {
+                        "description": "A page of posts, each with its channels."
+                    },
+                    "422": {
+                        "description": "A filter was malformed — the body names which one."
+                    }
                 }
             }
         },
@@ -86,7 +116,14 @@
                 "operationId": "getPost",
                 "tags": ["Posts"],
                 "summary": "One post with its channels",
-                "parameters": [ { "name": "post", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer" }
+                    }
+                ],
                 "responses": {
                     "200": { "description": "The post." },
                     "403": { "description": "Not this organization's post." }
@@ -102,10 +139,20 @@
                 "parameters": [
                     { "$ref": "#/components/parameters/PerPage" },
                     { "$ref": "#/components/parameters/Cursor" },
-                    { "name": "client_id", "in": "query", "schema": { "type": "integer" } },
-                    { "name": "platform", "in": "query", "schema": { "type": "string" } }
+                    {
+                        "name": "client_id",
+                        "in": "query",
+                        "schema": { "type": "integer" }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "schema": { "type": "string" }
+                    }
                 ],
-                "responses": { "200": { "description": "A page of connected channels." } }
+                "responses": {
+                    "200": { "description": "A page of connected channels." }
+                }
             }
         },
         "/webhooks": {
@@ -117,7 +164,11 @@
                     { "$ref": "#/components/parameters/PerPage" },
                     { "$ref": "#/components/parameters/Cursor" }
                 ],
-                "responses": { "200": { "description": "A page of endpoints. Secrets are never included." } }
+                "responses": {
+                    "200": {
+                        "description": "A page of endpoints. Secrets are never included."
+                    }
+                }
             },
             "post": {
                 "operationId": "createWebhook",
@@ -132,13 +183,23 @@
                                 "type": "object",
                                 "required": ["url", "events"],
                                 "properties": {
-                                    "url": { "type": "string", "format": "uri", "description": "Must be https." },
+                                    "url": {
+                                        "type": "string",
+                                        "format": "uri",
+                                        "description": "Must be https."
+                                    },
                                     "events": {
                                         "type": "array",
                                         "minItems": 1,
                                         "items": {
                                             "type": "string",
-                                            "enum": ["post.approved", "post.changes_requested", "post.published", "post.failed", "order.paid"]
+                                            "enum": [
+                                                "post.approved",
+                                                "post.changes_requested",
+                                                "post.published",
+                                                "post.failed",
+                                                "order.paid"
+                                            ]
                                         }
                                     },
                                     "description": { "type": "string" }
@@ -148,9 +209,15 @@
                     }
                 },
                 "responses": {
-                    "201": { "description": "Created. Contains the secret, once." },
-                    "403": { "$ref": "#/components/responses/InsufficientScope" },
-                    "422": { "description": "A plaintext URL or an unknown event name." }
+                    "201": {
+                        "description": "Created. Contains the secret, once."
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/InsufficientScope"
+                    },
+                    "422": {
+                        "description": "A plaintext URL or an unknown event name."
+                    }
                 }
             }
         },
@@ -159,10 +226,16 @@
                 "operationId": "getWebhook",
                 "tags": ["Webhooks"],
                 "summary": "One subscription",
-                "parameters": [ { "$ref": "#/components/parameters/EndpointId" } ],
+                "parameters": [
+                    { "$ref": "#/components/parameters/EndpointId" }
+                ],
                 "responses": {
-                    "200": { "description": "The endpoint. `active` is false, with a `disabled_reason`, once it has been switched off after repeated failures." },
-                    "404": { "description": "No such endpoint for this organization." }
+                    "200": {
+                        "description": "The endpoint. `active` is false, with a `disabled_reason`, once it has been switched off after repeated failures."
+                    },
+                    "404": {
+                        "description": "No such endpoint for this organization."
+                    }
                 }
             },
             "delete": {
@@ -170,11 +243,17 @@
                 "tags": ["Webhooks"],
                 "summary": "Unsubscribe",
                 "description": "Needs the `write:drafts` scope. Its delivery history goes with it.",
-                "parameters": [ { "$ref": "#/components/parameters/EndpointId" } ],
+                "parameters": [
+                    { "$ref": "#/components/parameters/EndpointId" }
+                ],
                 "responses": {
                     "204": { "description": "Gone." },
-                    "403": { "$ref": "#/components/responses/InsufficientScope" },
-                    "404": { "description": "No such endpoint for this organization." }
+                    "403": {
+                        "$ref": "#/components/responses/InsufficientScope"
+                    },
+                    "404": {
+                        "description": "No such endpoint for this organization."
+                    }
                 }
             }
         }
@@ -184,14 +263,42 @@
             "bearerAuth": { "type": "http", "scheme": "bearer" }
         },
         "parameters": {
-            "PerPage": { "name": "per_page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 } },
-            "Cursor": { "name": "cursor", "in": "query", "schema": { "type": "string" }, "description": "From the previous page's `meta.next_cursor`." },
-            "ClientId": { "name": "client", "in": "path", "required": true, "schema": { "type": "integer" } },
-            "EndpointId": { "name": "endpoint", "in": "path", "required": true, "schema": { "type": "integer" } }
+            "PerPage": {
+                "name": "per_page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "default": 50
+                }
+            },
+            "Cursor": {
+                "name": "cursor",
+                "in": "query",
+                "schema": { "type": "string" },
+                "description": "From the previous page's `meta.next_cursor`."
+            },
+            "ClientId": {
+                "name": "client",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" }
+            },
+            "EndpointId": {
+                "name": "endpoint",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" }
+            }
         },
         "responses": {
-            "Unauthenticated": { "description": "Missing, unknown or revoked token." },
-            "InsufficientScope": { "description": "The token does not carry the scope this endpoint needs. The message names it." }
+            "Unauthenticated": {
+                "description": "Missing, unknown or revoked token."
+            },
+            "InsufficientScope": {
+                "description": "The token does not carry the scope this endpoint needs. The message names it."
+            }
         }
     }
 }

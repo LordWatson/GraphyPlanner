@@ -10,7 +10,7 @@ use App\Support\AI\Campaigns\AiDeliverableSuggestion;
 /**
  * Campaigns enhancement (C-2.2, C-3.3, C-7.3) — the AI's campaign work: draft a brief, plan
  * deliverables, draft the wrap commentary. Kept apart from `AiProvider` (interface segregation)
- * so the many `AiProvider` test doubles don't all grow three methods; `DeepSeekProvider` and
+ * so the many `AiProvider` test doubles don't all grow three methods; `AnthropicProvider` and
  * `NullAiProvider` implement both, and the binding follows the same AI-enabled + key rule.
  *
  * Implementations never persist anything and never throw on a vendor failure: they return an

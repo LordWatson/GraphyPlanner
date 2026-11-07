@@ -45,24 +45,34 @@ its options; `assets/scenes/demo/<id>.html` is a complete working page to read b
 
 ```html
 <head>
-  <script>document.documentElement.classList.add('js')</script>
-  <link rel="stylesheet" href="scenes/stage.css">
-  <link rel="stylesheet" href="scenes/<id>.css">
+    <script>
+        document.documentElement.classList.add('js');
+    </script>
+    <link rel="stylesheet" href="scenes/stage.css" />
+    <link rel="stylesheet" href="scenes/<id>.css" />
 </head>
 <body>
-  …
-  <section class="scene" data-scene="<id>" data-options='{"hold": 3}' aria-label="…">
-    <div class="scene-stage">
-      <!-- the markup from the scene file's header, filled with this page's content -->
-    </div>
-  </section>
-  …
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
-  <script src="scenes/stage.js"></script>
-  <script src="scenes/<id>.js"></script>
-  <script>Stage.smooth(); Stage.init();</script>
+    …
+    <section
+        class="scene"
+        data-scene="<id>"
+        data-options='{"hold": 3}'
+        aria-label="…"
+    >
+        <div class="scene-stage">
+            <!-- the markup from the scene file's header, filled with this page's content -->
+        </div>
+    </section>
+    …
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
+    <script src="scenes/stage.js"></script>
+    <script src="scenes/<id>.js"></script>
+    <script>
+        Stage.smooth();
+        Stage.init();
+    </script>
 </body>
 ```
 
@@ -154,15 +164,25 @@ Redraw first (`--redraw scenes`). If the brief really needs a scene the library 
 on the same stage so it inherits the guards:
 
 ```js
-Scenes['my-scene'] = (root, opts = {}) => Stage.scene(root, {
-  hold: opts.hold ?? 2,          // screens the stage is held for
-  scrub: opts.scrub ?? true,     // true when Lenis runs; 0.4-0.8 without it reads as weight
-  phone: 'same',                 // or 'rest', or { hold, build } for a phone plan
-  build(tl, { q, phone }) {      // positions are fractions of the scene, 0-1
-    tl.fromTo(q('.picture'), { clipPath: 'inset(30% 30% 30% 30%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.6 }, 0)
-      .to(q('.title'), { yPercent: -40, autoAlpha: 0, duration: 0.25 }, 0.7);
-  },
-});
+Scenes['my-scene'] = (root, opts = {}) =>
+    Stage.scene(root, {
+        hold: opts.hold ?? 2, // screens the stage is held for
+        scrub: opts.scrub ?? true, // true when Lenis runs; 0.4-0.8 without it reads as weight
+        phone: 'same', // or 'rest', or { hold, build } for a phone plan
+        build(tl, { q, phone }) {
+            // positions are fractions of the scene, 0-1
+            tl.fromTo(
+                q('.picture'),
+                { clipPath: 'inset(30% 30% 30% 30%)' },
+                { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.6 },
+                0,
+            ).to(
+                q('.title'),
+                { yPercent: -40, autoAlpha: 0, duration: 0.25 },
+                0.7,
+            );
+        },
+    });
 ```
 
 and write its CSS finished composition first, then the live layout under `.scene.is-live`. Check it

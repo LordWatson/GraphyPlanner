@@ -1,6 +1,7 @@
 # Audience (Email List)
 
 ## Purpose
+
 Phase GTM-2 of `.junie/plans/go-to-market.md` (closes **CG-6.1–6.3**). The creator's own email
 list, on top of the surfaces that already collect addresses: the link in bio (CG-3) and the store
 (CG-4). Three things:
@@ -12,9 +13,10 @@ list, on top of the surfaces that already collect addresses: the link in bio (CG
 - **Broadcasts (GTM-2.3)** — one email to a segment, written by the owner (optionally drafted by
   AI), sent by the owner. **Nothing but a human request can send one.**
 
-The whole module is one rule: *consent is the person's, never ours*.
+The whole module is one rule: _consent is the person's, never ours_.
 
 ## Models / Tables
+
 `2026_12_05_100100_create_audience_tables.php`:
 
 - `AudienceContact` (`audience_contacts`): `org_id`, `client_id`, `email`, `name`,
@@ -32,15 +34,17 @@ The whole module is one rule: *consent is the person's, never ours*.
   both the record of the send and the proof it happened once.
 
 ## Enums
+
 - `App\Enums\AudienceSource`: `order`, `bio_capture`, `import`. Where they met the brand — never a
   licence to email them.
 - `App\Enums\AudienceTrigger`: `welcome`, `purchase`, `abandoned`, with `requiresConsent()`. See
   **Business Rules** for why only `welcome` needs consent.
 - `App\Enums\Feature::EmailAutomation` — the plan gate (Creator Pro; see `plans.md`). It gates
-  *sending*, not capturing.
+  _sending_, not capturing.
 - `App\Enums\BioBlockType::EmailCapture` — switched on in `live()` by this phase.
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Audience\CaptureAudienceContactAction` — **the only way a contact is created.**
   Never duplicates, never downgrades consent, never resurrects an unsubscribed contact, and only
   records consent the person gave themselves.
@@ -66,6 +70,7 @@ The whole module is one rule: *consent is the person's, never ours*.
   `WritingAssistant` seam (see **Gotchas**).
 
 ## Mail
+
 - `AudienceConfirmMail` → `emails/audience-confirm.blade.php`. The only email sent to an
   unconfirmed address, so it carries no marketing and **no unsubscribe link** — there is nothing to
   unsubscribe from yet, and ignoring it is the answer.
@@ -78,17 +83,21 @@ Both are sent **from the creator's brand**, like the store receipt: the person s
 from them, not from Alima.
 
 ## Routes / Controllers
+
 Public (inside `throttle:public-token`):
+
 - `POST /@{handle}/subscribe` → `BioPageController@subscribe` — an `email_capture` sign-up.
   Honeypot (`website`) plus its own `throttle:6,1` on top of the group's. **The response is
   identical** whether the address was new, already on the list, already unsubscribed or caught by
   the honeypot, so the form can't be used to find out who is on somebody's list.
 
 Public (inside `signed`):
+
 - `GET /audience/confirm/{contact}` → `AudienceLinkController@confirm`
 - `GET /audience/unsubscribe/{contact}` → `AudienceLinkController@unsubscribe`
 
 Business shell (`workspace:business`; writes need the brand-**update** ability):
+
 - `GET /audience` → `Business\AudienceController@index`
 - `POST /audience/import`, `DELETE /audience/contacts/{contact}`
 - `POST /audience/broadcasts` — **the only thing that sends a broadcast**
@@ -100,10 +109,11 @@ Frontend: `pages/business/audience.tsx`, `pages/public/audience.tsx`, the `Email
 (prefix `/audience`) — no new chapter number, as CG-3.2 and CG-5.2 did for bio, kit and deals.
 
 ## Business Rules
+
 - **Double opt-in, always.** A bio-page sign-up and an import both create a contact with
   `consent_at = null` and send a confirmation email. Following that link is the single moment
   consent exists. An import **never** marks consent, whatever the file claims.
-- **A purchase is not consent to marketing.** A buyer is captured at *checkout* (not at
+- **A purchase is not consent to marketing.** A buyer is captured at _checkout_ (not at
   fulfilment — an abandoned checkout needs a contact too) with `consent_at` set only if they ticked
   the marketing box on the form.
 - **Transactional vs marketing.** `welcome` is marketing and needs confirmed consent. `purchase`
@@ -119,7 +129,7 @@ Frontend: `pages/business/audience.tsx`, `pages/public/audience.tsx`, the `Email
   the creator real data over a plan they can still upgrade to, so `/audience` renders without
   `Feature::EmailAutomation` (like `/bio`, `/store` and `/deals`) and shows the list either way.
 - **Once, per contact per trigger per reference.** The `audience_sends` unique index is claimed
-  *before* the mailable reaches the queue, deliberately: a duplicate email can't be taken back, a
+  _before_ the mailable reaches the queue, deliberately: a duplicate email can't be taken back, a
   missing one can be re-sent.
 - **The owner sends; AI never does.** `SendAudienceBroadcastAction` takes a `User` and is only
   reachable from an authenticated request. No job, command or schedule can originate a broadcast.
@@ -129,6 +139,7 @@ Frontend: `pages/business/audience.tsx`, `pages/public/audience.tsx`, the `Email
 - **No visitor data beyond the address and name.** No IP, no user agent, no open or click tracking.
 
 ## Tests
+
 - `tests/Feature/Audience/AudienceTest.php` — a bio sign-up is unconfirmed and unmailable until the
   emailed link is followed, which sends the welcome exactly once; a sign-up with no visible block,
   or with the honeypot filled, records nothing and answers identically; unsubscribing is one click
@@ -143,6 +154,7 @@ Frontend: `pages/business/audience.tsx`, `pages/public/audience.tsx`, the `Email
   un-entitled; another brand's contact 404s and deleting a brand takes its list with it.
 
 ## Known Gaps / Open Questions
+
 - **No open or click tracking, and no bounce or complaint handling.** Resend reports both over
   webhooks; nothing consumes them, so a hard-bouncing address stays on the list and keeps being
   mailed. This is the first thing to add if deliverability matters.
@@ -166,22 +178,24 @@ Frontend: `pages/business/audience.tsx`, `pages/public/audience.tsx`, the `Email
   across a roster; revisit if agencies start using this.
 
 ## Gotchas
+
 - **The AI draft reuses the caption rewrite seam.** `AudienceController@draft` calls
   `RewriteCaptionAction` with `WritingTool::Expand` on the owner's rough notes, which is why it
   inherits the Brand Brain grounding, the banned-phrase guardrail and the AI credit metering for
   free (`shortcut: no email-specific provider method; upgrade to its own AiProvider method when
-  subject lines or longer-form structure are wanted`). It writes the body; the owner writes the
+subject lines or longer-form structure are wanted`). It writes the body; the owner writes the
   subject.
 - **Capture inside the checkout is wrapped in try/catch.** A failure to record a contact must never
   cost the creator a sale — the contact can be captured again next time, the sale cannot.
 - **`SendAudienceTriggerJob` exists for the delay, not for the queue.** The mailables are already
-  `ShouldQueue`; deferring one of *those* would have frozen the consent decision at dispatch time.
+  `ShouldQueue`; deferring one of _those_ would have frozen the consent decision at dispatch time.
 - **The abandoned-checkout email needs no cancellation logic.** It is sent when
   `ExpireStaleOrdersAction` cancels the order, and a completed order never reaches that sweep.
 - **The bio editor's preview renders the real form.** `BioPageView` takes `isPreview`, which
   disables submit — without it the owner would subscribe themselves while editing.
 
 ## Changelog
+
 - 2026-11-07: **A broadcast is handed to one job instead of sent in a loop.** Sending used to be a
   `foreach` in the web request pushing one queued mail per contact — a 5,000-contact list meant
   5,000 sequential writes before the response, and a bigger one hit `max_execution_time` with no

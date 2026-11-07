@@ -1,49 +1,54 @@
 # Ops (infrastructure, queues, database)
 
 ## Purpose
+
 How Graphy runs in production: the database (**MySQL 8** — the test suite uses in-memory SQLite),
 Redis for queues/cache/sessions/rate limits, Laravel Horizon for the workers, and the server limits
 the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drivers) of
 `.junie/plans/improvements.md`.
 
 ## Models / Tables
+
 - No models. Index work (Step I-2.1, `2026_10_18_120000_add_hot_path_indexes.php`):
-  - InnoDB already creates an index for every foreign-key column, so on MySQL the migration adds
-    the composite / non-FK hot filters: `posts (client_id, status)`; `post_targets
-    (scheduled_at_utc)`, `(scheduled_local_date)`, `(status, updated_at)`, `(external_post_id)`;
-    `social_accounts (org_id, connection_status)`; `assets (client_id, created_at)`; `clients
-    (org_id, name)`; `post_activity_logs (created_at, post_id)`.
-  - A composite that leads with an FK column replaces InnoDB's implicit FK index, so `down()`
-    re-adds a plain index before dropping one a constraint still needs (MySQL error 1553).
-  - A final pass indexes any FK column with no leading index (needed on SQLite only).
-  - `tests/Feature/Database/IndexCoverageTest.php` fails if any FK column lacks a leading index, or a
-    hot-filter index disappears — on SQLite in the normal run, and on MySQL when run with
-    `DB_CONNECTION=mysql`.
+    - InnoDB already creates an index for every foreign-key column, so on MySQL the migration adds
+      the composite / non-FK hot filters: `posts (client_id, status)`; `post_targets
+(scheduled_at_utc)`, `(scheduled_local_date)`, `(status, updated_at)`, `(external_post_id)`;
+      `social_accounts (org_id, connection_status)`; `assets (client_id, created_at)`; `clients
+(org_id, name)`; `post_activity_logs (created_at, post_id)`.
+    - A composite that leads with an FK column replaces InnoDB's implicit FK index, so `down()`
+      re-adds a plain index before dropping one a constraint still needs (MySQL error 1553).
+    - A final pass indexes any FK column with no leading index (needed on SQLite only).
+    - `tests/Feature/Database/IndexCoverageTest.php` fails if any FK column lacks a leading index, or a
+      hot-filter index disappears — on SQLite in the normal run, and on MySQL when run with
+      `DB_CONNECTION=mysql`.
 
 ## Actions / Services / Contracts
+
 - `App\Support\Queues`: the queue names — `publishing`, `webhooks` (reserved for Step I-16),
   `notifications`, `mail`, `ai`, `reports`, `default`. AI Image Studio jobs keep
   `config('ai.images.queue')` (`ai-images`). `Queues::all()` lists every one, highest priority
   first (`publishing` first, `default` last).
-  - `PublishPostJob`, `PublishPostTargetJob` → `publishing` (set in their constructors).
-  - Every mailable (they all implement `ShouldQueue`) → `mail`; every notification's
-    `viaQueues()` → `database: notifications`, `mail: mail`.
-  - `PurgeOrganizationJob` → `default`.
+    - `PublishPostJob`, `PublishPostTargetJob` → `publishing` (set in their constructors).
+    - Every mailable (they all implement `ShouldQueue`) → `mail`; every notification's
+      `viaQueues()` → `database: notifications`, `mail: mail`.
+    - `PurgeOrganizationJob` → `default`.
 - `App\Providers\HorizonServiceProvider`: `/horizon` is for super admins only, in every environment
   (Horizon's default lets anyone in on `local`).
 
 ## Configuration
+
 - `config/horizon.php` — one supervisor per workload, each with its own timeout and retries
   (a job's own `$tries`/`$timeout` win):
 
-  | Supervisor | Queues | timeout | tries | prod maxProcesses |
-  |---|---|---|---|---|
-  | `publishing` | `publishing` | 200 s | 3 | 8 |
-  | `messaging` | `webhooks`, `notifications`, `mail` | 90 s | 3 | 4 |
-  | `ai` | `ai`, `ai-images` | 150 s | 2 | 4 |
-  | `background` | `reports`, `default` | 620 s | 3 | 2 |
+    | Supervisor   | Queues                              | timeout | tries | prod maxProcesses |
+    | ------------ | ----------------------------------- | ------- | ----- | ----------------- |
+    | `publishing` | `publishing`                        | 200 s   | 3     | 8                 |
+    | `messaging`  | `webhooks`, `notifications`, `mail` | 90 s    | 3     | 4                 |
+    | `ai`         | `ai`, `ai-images`                   | 150 s   | 2     | 4                 |
+    | `background` | `reports`, `default`                | 620 s   | 3     | 2                 |
 
-  A long-wait alert fires when `redis:publishing` waits more than 30 s.
+    A long-wait alert fires when `redis:publishing` waits more than 30 s.
+
 - `config/queue.php`: default `redis`; `redis.retry_after` 660 s (must stay above the longest
   supervisor timeout, or a slow job runs twice).
 - `config/cache.php`: default `redis`; new `cache.limiter` (`CACHE_LIMITER`) picks the store rate
@@ -54,7 +59,7 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
   instead of Horizon. A worker without `--queue` only works `default`: scheduled posts never reach
   Upload-Post and mail/notifications never send, with nothing in the log.
 - `php artisan dev`: Horizon swaps the framework's `queue` dev command for `php artisan horizon`.
-  Unless the queue connection is `redis` *and* `ext-pcntl` is loaded,
+  Unless the queue connection is `redis` _and_ `ext-pcntl` is loaded,
   `AppServiceProvider::registerDevQueueWorker()` drops `horizon` again and runs
   `queue:listen` on `Queues::all()` instead (Horizon can't run on Windows or work the `database`
   connection, so before this nothing was processed locally).
@@ -62,9 +67,10 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
   `--ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix`; `php artisan horizon` itself
   can't run there.
 - Production runs: `php artisan horizon` (supervised, e.g. systemd/Supervisor), `php artisan
-  schedule:work` or a cron for `schedule:run`, and `php artisan horizon:terminate` on deploy.
+schedule:work` or a cron for `schedule:run`, and `php artisan horizon:terminate` on deploy.
 
 ## PHP limits (video uploads)
+
 - Uploads go through PHP today, so `upload_max_filesize` and `post_max_size` must be ≥
   `config('assets.max_video_upload_size_kb')` (500 MB by default) and `memory_limit` must cover
   the request; otherwise PHP drops the body before `StoreAssetRequest` runs. Example `php.ini`:
@@ -75,6 +81,7 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
 ## Phase M-1 additions (Steps M-1.1 / I-16.1, M-1.2 / I-16.2)
 
 ### Observability
+
 - **Correlation id.** `AssignCorrelationId` (global, first) reuses a well-formed incoming
   `X-Request-Id` (`config('observability.correlation_header')`) or mints a UUID, puts it in
   Laravel `Context` and echoes it on the response. `ShareRequestContext` (web) adds `user_id` and
@@ -103,6 +110,7 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
   `PULSE_ENABLED=false` in PHPUnit.
 
 ### Security hardening
+
 - `SecurityHeaders` (global): CSP with a per-request nonce for scripts (Vite tags and the inline
   theme script carry it), `'unsafe-inline'` styles (React `style`, Radix, Recharts),
   `frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN` (the app frames its own PDFs),
@@ -113,13 +121,14 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
   IPv6-literal CSP sources (regression-tested).
 - Session cookie is `secure` by default when `APP_ENV=production`.
 - CI fails on high/critical advisories: `composer audit … --ignore-severity=low
-  --ignore-severity=medium` and `npm audit --audit-level=high`.
+--ignore-severity=medium` and `npm audit --audit-level=high`.
 - Password confirmation (`password.confirm`, 3 h window): org settings (keys + webhook secret),
   invoice/analytics/report CSV exports. Irreversible deletes re-check `current_password` in the
   request: client purge (`PurgeClientRequest`), super-admin org delete.
 - Uploads: see `assets.md` (content sniffing, no SVG, virus-scan hook).
 
 ### CI (`.github/workflows/tests.yml`)
+
 - PHP **8.5** (the lock needs ≥ 8.4.1 via Symfony 8, so 8.3 couldn't install); SQLite + array
   drivers for the runner; audits; `composer ci:check`; `npm test` (Vitest); Playwright journeys
   (`npm run test:e2e`, see `frontend.md`).
@@ -175,19 +184,19 @@ This is the one step with real infrastructure surface, and **the app does not ow
   `bio-domains:reverify` (03:30, in `SchedulerHeartbeat::COMMANDS`) re-checks every domain so a
   repointed one stops serving and a newly propagated one starts.
 - **What the operator must do.**
-  1. Point `BIO_DOMAIN_TARGET` (`config/bio.php`) at the hostname creators should CNAME to. It
-     defaults to the `APP_URL` host, which is right for a single-server deploy and wrong behind a
-     proxy or CDN — set it explicitly there.
-  2. Accept traffic for **unknown** `Host` headers. Nothing else is needed in the app (routes are
-     not host-scoped), but the web server or load balancer has to stop rejecting hostnames it has
-     no vhost for.
-  3. **Issue the certificates.** Alima cannot: there is no ACME client here. Terminate TLS in
-     front of the app with on-demand/wildcard-capable TLS (Caddy's `on_demand_tls`, a Cloudflare
-     for SaaS custom-hostname setup, or an ALB with per-host certs). `bio_page_domains.ssl_status`
-     is a **record of what that layer reports**, not something the app drives, and nothing writes
-     anything but `pending` to it today.
-  4. If on-demand TLS is used, point its ask-endpoint at a check that the hostname exists and is
-     verified, or the server will try to get a certificate for every hostname aimed at it.
+    1. Point `BIO_DOMAIN_TARGET` (`config/bio.php`) at the hostname creators should CNAME to. It
+       defaults to the `APP_URL` host, which is right for a single-server deploy and wrong behind a
+       proxy or CDN — set it explicitly there.
+    2. Accept traffic for **unknown** `Host` headers. Nothing else is needed in the app (routes are
+       not host-scoped), but the web server or load balancer has to stop rejecting hostnames it has
+       no vhost for.
+    3. **Issue the certificates.** Alima cannot: there is no ACME client here. Terminate TLS in
+       front of the app with on-demand/wildcard-capable TLS (Caddy's `on_demand_tls`, a Cloudflare
+       for SaaS custom-hostname setup, or an ALB with per-host certs). `bio_page_domains.ssl_status`
+       is a **record of what that layer reports**, not something the app drives, and nothing writes
+       anything but `pending` to it today.
+    4. If on-demand TLS is used, point its ask-endpoint at a check that the hostname exists and is
+       verified, or the server will try to get a certificate for every hostname aimed at it.
 - **Why DNS is behind a contract.** `App\Contracts\DnsResolver` (`SystemDnsResolver` over
   `dns_get_record`) exists so verification can be tested without the network. Implementations
   **never throw**: a failed lookup is "not verified yet", which is also what it means to a creator
@@ -211,6 +220,7 @@ Everything else is kept until the customer deletes it, and an organisation delet
 hard-deletes the rows). That is the policy; if these numbers change, the policy changes.
 
 ## Business Rules
+
 - Publishing must never share workers with AI or report work (asserted in
   `tests/Feature/QueueInfrastructureTest.php`, which also checks every supervisor timeout is below
   `retry_after`).
@@ -224,30 +234,33 @@ hard-deletes the rows). That is the policy; if these numbers change, the policy 
   `ObservabilityServiceProvider::assetDiskMisconfiguration()`.
 - **A single app boot peaks at ~36 MB** with all providers and 627 routes. CI asserts a boot
   succeeds at PHP's 128 MB default, so a provider that starts loading the world fails the build
-  instead of quietly raising every worker's memory floor. The *test suite* needs more (512 MB, set
+  instead of quietly raising every worker's memory floor. The _test suite_ needs more (512 MB, set
   in `phpunit.xml`) because PHPUnit keeps every test's application alive — a different thing, and
   not a sign the app is heavy.
 
 ## Tests
+
 - `tests/Feature/Database/IndexCoverageTest.php`, `tests/Feature/QueueInfrastructureTest.php`.
 
 ## Benchmarks (local MySQL 8.0.40, Windows, 2026-10-18)
+
 One org, 50 clients, 50,000 posts / targets, 100,000 activity-log rows (`scratchpad` script, not
 committed):
 
-| Path | Time | Queries |
-|---|---|---|
-| Home needs-attention (realistic mix) | 139 ms | 14 |
-| Home needs-attention (stress: 20k active drafts, no media) | 457 ms | 20 |
-| Calendar month window (~3k targets in view) | 175 ms | 4 |
-| Org analytics summary, 90 days, cold | 1.3–1.6 s | 46 |
-| Org analytics summary, cached | 0.3 ms | 0 |
+| Path                                                       | Time      | Queries |
+| ---------------------------------------------------------- | --------- | ------- |
+| Home needs-attention (realistic mix)                       | 139 ms    | 14      |
+| Home needs-attention (stress: 20k active drafts, no media) | 457 ms    | 20      |
+| Calendar month window (~3k targets in view)                | 175 ms    | 4       |
+| Org analytics summary, 90 days, cold                       | 1.3–1.6 s | 46      |
+| Org analytics summary, cached                              | 0.3 ms    | 0       |
 
 `EXPLAIN`: calendar window → `range` on `post_targets_scheduled_local_date_index`; upcoming →
 `range` on `post_targets_scheduled_at_utc_index`; Home buckets → `ref` on
 `posts_client_id_status_index`; webhook lookup → `ref` on `post_targets_external_post_id_index`.
 
 ## Known Gaps / Open Questions
+
 - Sentry, the alert mailbox and Pulse's Redis ingest need production values (`SENTRY_LARAVEL_DSN`,
   `OPS_ALERT_MAIL_TO`, `PULSE_INGEST_DRIVER=redis` + `pulse:work`) before the M-8 release.
 - 41 PHPStan errors pre-date Phase M-1 (44 on `edbfebb`; three fixed here in the webhook
@@ -260,6 +273,7 @@ committed):
   engines, and the `mysql` CI job is blocking so the class cannot come back. See the changelog.
 
 ## Changelog
+
 - 2026-11-07: Added the data-export retention sweep (`exports:purge-expired`, daily 02:30) and the
   "Data retention" section above. See `settings.md` for the export feature itself.
 - 2026-11-07: **The dependency audit gate passes again, and email deliverability can be checked.**
@@ -277,24 +291,24 @@ committed):
   itself (PHPUnit holds every test's application alive; a single boot peaks at ~36 MB).
   `brianium/paratest` added so `artisan test --parallel` works.
   The failures it found, all previously invisible:
-  * **`PurgeOrganizationJob` threw `SQLSTATE 1451` on MySQL**, so a deleted organisation was never
-    actually purged. `invoices.client_id` was set to `NO ACTION` believing that is deferred to the
-    end of the statement; InnoDB treats it as `RESTRICT` and checks it immediately. The job now
-    deletes the org's invoices inside its transaction before `forceDelete()`, and the migration's
-    comment has been corrected. A *client* purge still refuses while invoices exist, by design.
-  * **`post_targets.scheduled_local_time` read back as `09:00:00`** — the schema's only `TIME`
-    column. It reached the frontend unchanged, so the calendar and post editor showed seconds in
-    production and never in a test. A `PostTarget` accessor now normalises reads to `H:i`, which
-    fixes every reader at once.
-  * **Stored JSON key order** differs by engine; five tests used order-sensitive `assertSame` on
-    JSON columns and now use `assertEquals` (order-insensitive on object keys, still ordered on
-    nested lists).
-  * **`Schema::getTables()` / `getTableListing()` are server-wide on MySQL** (388 tables across
-    eight databases on a dev machine). Both call sites are now scoped to the connection's own
-    database — which also means
-    `SecretsAndPrivateMediaTest::test_no_database_column_holds_a_raw_review_token` actually runs
-    there now instead of erroring on a table from another project.
-  See finding 29 in `.junie/plans/market-readiness-audit.md`.
+    - **`PurgeOrganizationJob` threw `SQLSTATE 1451` on MySQL**, so a deleted organisation was never
+      actually purged. `invoices.client_id` was set to `NO ACTION` believing that is deferred to the
+      end of the statement; InnoDB treats it as `RESTRICT` and checks it immediately. The job now
+      deletes the org's invoices inside its transaction before `forceDelete()`, and the migration's
+      comment has been corrected. A _client_ purge still refuses while invoices exist, by design.
+    - **`post_targets.scheduled_local_time` read back as `09:00:00`** — the schema's only `TIME`
+      column. It reached the frontend unchanged, so the calendar and post editor showed seconds in
+      production and never in a test. A `PostTarget` accessor now normalises reads to `H:i`, which
+      fixes every reader at once.
+    - **Stored JSON key order** differs by engine; five tests used order-sensitive `assertSame` on
+      JSON columns and now use `assertEquals` (order-insensitive on object keys, still ordered on
+      nested lists).
+    - **`Schema::getTables()` / `getTableListing()` are server-wide on MySQL** (388 tables across
+      eight databases on a dev machine). Both call sites are now scoped to the connection's own
+      database — which also means
+      `SecretsAndPrivateMediaTest::test_no_database_column_holds_a_raw_review_token` actually runs
+      there now instead of erroring on a table from another project.
+      See finding 29 in `.junie/plans/market-readiness-audit.md`.
 - 2026-10-21: Phase M-3 — scheduler: `analytics:sync-engagement` daily 04:00 (jobs on `reports`), `analytics:send-client-reports` hourly, `clients:recompute-health` now hourly; all registered in `SchedulerHeartbeat`. New config files `config/analytics.php`, `config/clients.php`.
 - 2026-10-18: Created. Steps I-2.1 (hot-path indexes + coverage test) and I-2.8 (Redis defaults,
   Horizon with per-workload supervisors, named queues, super-admin-only dashboard).

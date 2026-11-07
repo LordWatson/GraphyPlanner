@@ -6,7 +6,7 @@ use App\Models\GridPlan;
 
 /**
  * Step 18.12 — the grid planner's AI help, kept apart from `AiProvider` (interface segregation,
- * like `CampaignAiProvider`). `DeepSeekProvider` and `NullAiProvider` implement it; the binding
+ * like `CampaignAiProvider`). `AnthropicProvider` and `NullAiProvider` implement it; the binding
  * follows the same AI-enabled + key rule. Suggestions only: nothing here writes, arranges or
  * schedules anything, and implementations never throw on a vendor failure (they return nothing).
  */

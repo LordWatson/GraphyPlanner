@@ -204,7 +204,7 @@ class AiCreditClaimTest extends TestCase
             AiUsageLog::query()->create([
                 'org_id' => $org->id,
                 'client_id' => $client->id,
-                'provider' => 'deepseek',
+                'provider' => 'anthropic',
                 'model' => 'test',
                 'method' => 'captions',
                 'succeeded' => true,

@@ -2,7 +2,7 @@
 
 namespace App\Support\AI;
 
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\IdeaContextBuilder;
 use App\Support\Events\EventOccurrence;
 use Carbon\CarbonImmutable;
@@ -10,7 +10,7 @@ use Carbon\CarbonImmutable;
 /**
  * Step B-6.1 — the local/seasonal grounding for the idea engine, assembled by
  * {@see IdeaContextBuilder} and rendered into the prompt by
- * {@see DeepSeekProvider::recommendLocalPosts()}.
+ * {@see AnthropicProvider::recommendLocalPosts()}.
  *
  * It carries the facts that make an idea feel like *this* brand, *this* week: where they are, what
  * season it is, which local holidays/awareness days are coming up, what they post about, and what

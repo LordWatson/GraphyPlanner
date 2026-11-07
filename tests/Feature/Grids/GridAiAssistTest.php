@@ -26,8 +26,8 @@ class GridAiAssistTest extends TestCase
         parent::setUp();
         $this->setUpGridOrg();
         Config::set('ai.enabled', true);
-        Config::set('ai.deepseek.api_key', 'sk-grid-secret');
-        Config::set('ai.deepseek.base_url', 'https://api.deepseek.test');
+        Config::set('ai.anthropic.api_key', 'sk-grid-secret');
+        Config::set('ai.anthropic.base_url', 'https://api.anthropic.test');
         BrandBrain::factory()->for($this->client)->create([
             'voice' => ['tone' => 'Warm', 'personality' => 'Friendly', 'do_nots' => ['cheap']],
         ]);
@@ -39,7 +39,7 @@ class GridAiAssistTest extends TestCase
         [$first, $second] = $plan->tiles()->get()->all();
         $first->update(['caption_idea' => 'Original idea']);
 
-        Http::fake(['*/chat/completions' => Http::response($this->chat(['tiles' => [
+        Http::fake(['*/v1/messages' => Http::response($this->chat(['tiles' => [
             ['tile_id' => $first->id, 'captions' => ['Golden hour at the studio.', 'Slow mornings, made by hand.']],
             ['tile_id' => $second->id, 'captions' => ['So cheap you will cry.']],
             ['tile_id' => 999999, 'captions' => ['Not a tile here.']],
@@ -67,7 +67,7 @@ class GridAiAssistTest extends TestCase
         $this->addTile($plan, GridTileKind::Placeholder, attributes: ['placeholder_colour' => 'lilac', 'team_note' => 'Product shot']);
         $order = $plan->tiles()->pluck('id')->all();
 
-        Http::fake(['*/chat/completions' => Http::response($this->chat(['notes' => [
+        Http::fake(['*/v1/messages' => Http::response($this->chat(['notes' => [
             'Three product shots in a row on row 1. Try moving tile 2 down.',
             'The lilac placeholder sits well against the teal.',
         ]]))]);
@@ -83,7 +83,7 @@ class GridAiAssistTest extends TestCase
     public function test_a_vendor_failure_returns_nothing_and_logs_a_failed_call(): void
     {
         $plan = $this->planWithTiles(1);
-        Http::fake(['*/chat/completions' => Http::response(['error' => ['message' => 'down']], 500)]);
+        Http::fake(['*/v1/messages' => Http::response(['error' => ['message' => 'down']], 500)]);
 
         $this->actingAs($this->owner())->postJson(route('grids.ai.captions', $plan))->assertOk()->assertJson(['suggestions' => []]);
         $this->assertSame(1, AiUsageLog::query()->where('succeeded', false)->count());
@@ -110,6 +110,6 @@ class GridAiAssistTest extends TestCase
      */
     private function chat(array $json): array
     {
-        return ['choices' => [['finish_reason' => 'stop', 'message' => ['content' => json_encode($json)]]]];
+        return ['content' => [['type' => 'text', 'text' => json_encode($json)]], 'stop_reason' => 'end_turn'];
     }
 }

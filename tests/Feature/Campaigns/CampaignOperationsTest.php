@@ -118,7 +118,7 @@ class CampaignOperationsTest extends TestCase
 
     public function test_the_null_ai_provider_answers_with_an_empty_draft(): void
     {
-        config(['ai.enabled' => true, 'ai.deepseek.api_key' => '']);
+        config(['ai.enabled' => true, 'ai.anthropic.api_key' => '']);
         $campaign = $this->makeCampaign();
 
         $this->actingAs($this->strategist())->postJson(route('campaigns.ai.brief', $campaign))->assertOk()->assertJsonStructure(['draft']);

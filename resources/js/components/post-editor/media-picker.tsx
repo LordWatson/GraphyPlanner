@@ -1,120 +1,27 @@
-import { GripVertical, ImagePlus, LibraryBig, Loader2, X } from 'lucide-react';
-import type { KeyboardEvent } from 'react';
-import { useRef, useState } from 'react';
+import { GripVertical, X } from 'lucide-react';
+import { useState } from 'react';
 import { AssetLibraryDialog } from '@/components/post-editor/asset-library-dialog';
 import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
+import {
+    BrowseLibraryTile,
+    UploadTile,
+} from '@/components/post-editor/media-tiles';
 import type { AssetData } from '@/components/post-editor/types';
+import {
+    nameOf,
+    useMediaReorder,
+} from '@/components/post-editor/use-media-reorder';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-
-const tileClass =
-    'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground focus-visible:ring-ring/40 flex aspect-square flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-2 text-center text-xs transition-colors outline-none focus-visible:ring-[3px]';
-
-const acceptedFileTypes = 'image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.zip';
-
-/**
- * Dashed "Upload or drop a file" tile with its own hidden file input. Shared by the post
- * editor's `MediaPicker` and the client Assets tab.
- */
-export function UploadTile({
-    uploading,
-    onUpload,
-}: {
-    uploading: boolean;
-    onUpload: (file: File) => void;
-}) {
-    const inputRef = useRef<HTMLInputElement>(null);
-    const [dragging, setDragging] = useState(false);
-
-    return (
-        <>
-            <button
-                type="button"
-                disabled={uploading}
-                onClick={() => inputRef.current?.click()}
-                onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    const file = e.dataTransfer.files?.[0];
-
-                    if (file) {
-                        onUpload(file);
-                    }
-                }}
-                className={cn(
-                    tileClass,
-                    'w-full',
-                    dragging && 'border-primary text-primary bg-accent',
-                )}
-            >
-                {uploading ? (
-                    <Loader2 className="size-5 animate-spin" />
-                ) : (
-                    <ImagePlus className="size-5" />
-                )}
-                <span className="text-foreground font-medium">
-                    {uploading ? 'Uploading…' : 'Upload'}
-                </span>
-                {!uploading && <span>or drop a file</span>}
-            </button>
-            <input
-                ref={inputRef}
-                type="file"
-                className="hidden"
-                accept={acceptedFileTypes}
-                onChange={(e) => {
-                    const file = e.target.files?.[0];
-
-                    if (file) {
-                        onUpload(file);
-                    }
-
-                    e.target.value = '';
-                }}
-            />
-        </>
-    );
-}
-
-/** Dashed "Browse library" tile that opens the asset library dialog. */
-export function BrowseLibraryTile({ onClick }: { onClick: () => void }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(tileClass, 'w-full')}
-        >
-            <LibraryBig className="size-5" />
-            <span className="text-foreground font-medium">Browse library</span>
-            <span>Search existing assets</span>
-        </button>
-    );
-}
-
-function moveItem(list: AssetData[], from: number, to: number): AssetData[] {
-    const next = [...list];
-    const [moved] = next.splice(from, 1);
-    next.splice(Math.max(0, Math.min(next.length, to)), 0, moved);
-
-    return next;
-}
-
-const orderOf = (assets: AssetData[]) => assets.map((a) => a.id).join(',');
-const nameOf = (asset: AssetData) => asset.original_filename ?? 'this item';
 
 /**
  * The post's attached media, in publish order, plus two tiles: upload a new file (click or drop)
  * straight into the client's library, or browse the existing library in a searchable, paged
  * dialog. Only attached assets render here, so a large library never crowds the editor.
  *
- * The attached tiles reorder like the grid board: drag one onto another (mouse), or focus its grip
- * handle and press space to lift it, the arrow keys to move it, space to drop (escape cancels) —
- * announced to screen readers. The number badge is the publish order and updates live.
+ * The attached tiles reorder like the grid board, by mouse or by keyboard — see
+ * {@link useMediaReorder} for that interaction. The number badge is the publish order and
+ * updates live.
  */
 export function MediaPicker({
     clientId,
@@ -135,102 +42,19 @@ export function MediaPicker({
     onUpload: (file: File) => void;
 }) {
     const [browsing, setBrowsing] = useState(false);
-    const [dragIndex, setDragIndex] = useState<number | null>(null);
-    const [overIndex, setOverIndex] = useState<number | null>(null);
-    // A keyboard drag stages its order here until dropped, so Escape can cancel it cleanly.
-    const [lifted, setLifted] = useState<{
-        id: number;
-        order: AssetData[];
-    } | null>(null);
-    const [announcement, setAnnouncement] = useState('');
-    const handleRefs = useRef(new Map<number, HTMLButtonElement>());
-
-    // While a keyboard drag is in flight the staged order is shown; otherwise the saved order.
-    const order = lifted?.order ?? selected;
-
-    const commit = (next: AssetData[]) => {
-        if (orderOf(next) !== orderOf(selected)) {
-            onChange(next);
-        }
-    };
-
-    const onDrop = (to: number) => {
-        if (dragIndex === null) {
-            return;
-        }
-
-        if (dragIndex !== to) {
-            commit(moveItem(selected, dragIndex, to));
-            setAnnouncement(
-                `Moved to position ${to + 1} of ${selected.length}.`,
-            );
-        }
-
-        setDragIndex(null);
-        setOverIndex(null);
-    };
-
-    const handleKeyDown = (
-        event: KeyboardEvent<HTMLButtonElement>,
-        asset: AssetData,
-    ) => {
-        if (event.key === ' ' || event.key === 'Enter') {
-            event.preventDefault();
-
-            if (!lifted) {
-                setLifted({ id: asset.id, order: selected });
-                setAnnouncement(
-                    `${nameOf(asset)} lifted. Use the arrow keys to move it, space to drop, escape to cancel.`,
-                );
-
-                return;
-            }
-
-            const position =
-                lifted.order.findIndex((a) => a.id === lifted.id) + 1;
-            commit(lifted.order);
-            setLifted(null);
-            setAnnouncement(`Dropped at position ${position}.`);
-
-            return;
-        }
-
-        if (lifted && event.key === 'Escape') {
-            event.preventDefault();
-            setLifted(null);
-            setAnnouncement('Move cancelled.');
-
-            return;
-        }
-
-        if (
-            lifted &&
-            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(
-                event.key,
-            )
-        ) {
-            event.preventDefault();
-            const from = lifted.order.findIndex((a) => a.id === lifted.id);
-            const step =
-                event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
-            const to = from + step;
-
-            if (to < 0 || to >= lifted.order.length) {
-                return;
-            }
-
-            const nextOrder = moveItem(lifted.order, from, to);
-            setLifted({ id: lifted.id, order: nextOrder });
-            setAnnouncement(
-                `Moved to position ${to + 1} of ${nextOrder.length}.`,
-            );
-            requestAnimationFrame(() =>
-                handleRefs.current.get(asset.id)?.focus(),
-            );
-        }
-    };
-
-    const reorderable = selected.length > 1;
+    const {
+        order,
+        announcement,
+        reorderable,
+        dragIndex,
+        overIndex,
+        lifted,
+        setDragIndex,
+        setOverIndex,
+        onDrop,
+        handleKeyDown,
+        setHandleRef,
+    } = useMediaReorder(selected, onChange);
 
     return (
         <div className="grid gap-3">
@@ -307,16 +131,9 @@ export function MediaPicker({
                         {reorderable && (
                             <button
                                 type="button"
-                                ref={(element) => {
-                                    if (element) {
-                                        handleRefs.current.set(
-                                            asset.id,
-                                            element,
-                                        );
-                                    } else {
-                                        handleRefs.current.delete(asset.id);
-                                    }
-                                }}
+                                ref={(element) =>
+                                    setHandleRef(asset.id, element)
+                                }
                                 onKeyDown={(event) =>
                                     handleKeyDown(event, asset)
                                 }

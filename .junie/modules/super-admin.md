@@ -1,12 +1,14 @@
 # Super Admin (platform console)
 
 ## Purpose
+
 A platform-level area for Graphy/Alima staff who don't belong to any organization: onboard new
 organizations (the first real "create an organization" path — orgs used to exist only via seeders),
 manage any organization (view/update/suspend/reinstate/delete), and view, save, re-run and export
 cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
 
 ## Models / Tables
+
 - `App\Enums\Role::SuperAdmin` (`super_admin`): org-less platform staff — `users.org_id` and
   `client_id` stay `null`. `User::isSuperAdmin()`. Factory state: `User::factory()->superAdmin()`.
 - `organizations` (Step 15.3 migration `2026_10_17_120000`): `suspended_at` (nullable timestamp),
@@ -21,6 +23,7 @@ cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
   Rules → email verification).
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Organizations\RegisterOrganizationAction` (Step 15.2.1): creates an `Organization`
   (unique slug, never `preview-studio`) and its first `Role::Owner` user in one `DB::transaction()`.
   Self-serve (password given) → fires `Registered` (Fortify email verification). Onboarded by a
@@ -57,6 +60,7 @@ cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
   ability (they bypass per-org policies, but `org.member` keeps them out of org workspaces anyway).
 
 ## Middleware
+
 - `EnsureUserIsSuperAdmin` (alias `super_admin`): 403 unless `Role::SuperAdmin`.
 - `EnsureUserHasOrganization` (alias `org.member`): on the org workspace (main staff group, client
   portal, `settings/organization`, `settings/ai-usage`). Super admins → redirect to
@@ -67,6 +71,7 @@ cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
   `config('mail.support_address')` (`MAIL_SUPPORT_ADDRESS`), falling back to the from address.
 
 ## Phase M-1 additions
+
 - Deleting an organization also requires the super admin's current password
   (`DeleteOrganizationRequest`).
 - `reports/{report}/export` is behind `password.confirm`.
@@ -74,6 +79,7 @@ cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
 - `/pulse` (Laravel Pulse) is super-admin only, like `/horizon` (see `ops.md`).
 
 ## Phase M-8 — Design-partner release
+
 - **`organizations.is_design_partner`** (boolean, default false, indexed; migration
   `2026_11_11_100100`): set by a super admin on the (up to five) orgs on the design-partner offer.
   `Organization::isDesignPartner()`, scope `designPartners()`, factory state `designPartner()`,
@@ -111,12 +117,15 @@ cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
   `platformSettings` bumped to 06.
 
 ## Routes / Controllers
+
 Public (guest):
+
 - `GET|POST /register-organization` → `Organizations\RegistrationController@create/store`
   (`organizations.register[.store]`, POST throttled 6/min). `/register` (named `register`) redirects
   here — Fortify's own registration feature is disabled.
 
 Super admin (`auth`, `verified`, `super_admin`, prefix `super-admin`, names `super-admin.*`):
+
 - `GET /` → `SuperAdmin\DashboardController` (`dashboard`).
 - `GET organizations`, `GET organizations/create`, `POST organizations`,
   `GET|PUT|DELETE organizations/{organization}`, `POST organizations/{organization}/suspend`,
@@ -140,6 +149,7 @@ The studio shell is reused: `AppSidebar` and the ⌘K palette switch to the cons
 New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.ts`.
 
 ## Business Rules
+
 - **Login:** Fortify flow unchanged; `LoginResponse`/`TwoFactorLoginResponse` send super admins to
   `/super-admin` (an intended URL still wins, and `org.member` bounces any org URL to the console).
 - **Signup:** org + Owner are created together or not at all; email unique across `users`
@@ -161,6 +171,7 @@ New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.t
   the `ai_usage_logs.cost_estimate` sum (USD). Super admins are never counted as users.
 
 ## Tests
+
 - `tests/Feature/SuperAdmin/SuperAdminAccessTest.php`: every super-admin page reachable by a super
   admin, 403 for Owner/Strategist/Designer/Viewer (pages and write endpoints), guest redirect, login
   redirect (super admin → `/super-admin`, owner → `/dashboard`), the seeded super admin end-to-end,
@@ -185,6 +196,7 @@ New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.t
 - `tests/Unit/Support/AnalyticsFiltersTest.php`: range resolution, fallbacks, sanitising, storage.
 
 ## Known Gaps / Open Questions
+
 - Engagement metrics wait on Phase 12 (`PostTargetMetrics`); `engagement` is always `null`.
 - No impersonation ("sign in as this org") — deliberately left out pending an audit-trail design.
 - No general super-admin audit log beyond `suspended_by` and structured `Log::` entries.
@@ -223,11 +235,12 @@ price change needs.
 
 `/super-admin/referrals` (under the **partners** chapter, no new chapter number): add a partner, see
 who they sent and how many are paying, record a payout, end a partnership. A payout is a record of
-money already sent — there is no payment integration — and what is *owed* is derived when somebody
+money already sent — there is no payment integration — and what is _owed_ is derived when somebody
 settles up, so there is only ever one number that can be wrong. Ending a partnership keeps every
 attribution. See `marketing.md`.
 
 ## Changelog
+
 - 2026-11-07: **An organization purge no longer leaves its white-label logo in storage.**
   `StoredFileInventory::forClients()` could not see it (the logo belongs to no client), and the
   purge had no other sweep, so the file survived the organization and every row referencing it. New

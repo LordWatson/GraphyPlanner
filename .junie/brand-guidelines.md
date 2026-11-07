@@ -7,7 +7,7 @@ Inertia + React), the transactional emails and the invoice PDF. It is the produc
 masters). When this file and the book disagree on anything other than product-specific mechanics,
 the book wins; update this file.
 
-**The idea in one line:** *Marketing brighter together.* Lead with Cloud Cream; Deep Teal and
+**The idea in one line:** _Marketing brighter together._ Lead with Cloud Cream; Deep Teal and
 Midnight Ink carry structure; four accents (Signal Orange, Electric Blue, Soft Lilac, Acid Lime) are
 seasoning — one hero accent per layout. One geometric family (Poppins), used with conviction.
 
@@ -42,7 +42,7 @@ Read this file before building or restyling any page, component, email or PDF. P
    page's one graphic), with the tables, panels and filters below it kept flat as ever.
 6. **Status is always legible.** Every status renders through `<StatusPill>` — a tinted pill with a
    solid tone dot **and** a text label. Never colour alone.
-7. **One hero accent, one graphic** per layout (book §9.2 check 06): one pattern *or* one peek *or*
+7. **One hero accent, one graphic** per layout (book §9.2 check 06): one pattern _or_ one peek _or_
    the spectrum — never two, and never squiggle with confetti.
 8. **The app is the book.** The studio is laid out like the guidelines themselves: numbered
    chapters (`lib/chapters.ts`) in a Contents-style sidebar, a mono running head over an ink
@@ -54,25 +54,25 @@ Read this file before building or restyling any page, component, email or PDF. P
 - **Component library:** shadcn/ui (Radix) in `resources/js/components/ui`, restyled to Alima
   (§6). Compose these; don't hand-roll primitives.
 - **House components** (use these before writing layout markup):
-  | Component | File | Use |
-  |---|---|---|
-  | `Page` | `components/page.tsx` | Page container: 1400 max width, `gap-8`, responsive padding. `width="narrow"` for detail/form pages. |
-  | `PageHeader` | `components/page.tsx` | Every internal page's header. Opens with the chapter `RunningHead` (resolved from the URL); `eyebrow` sits on its right. `title` (ReactNode, `<em>` = accent word) at 52px, `description`, `meta`, `actions`. Outside a chapter (client portal) the eyebrow falls back to the orange-dash `Eyebrow`. |
-  | `ChapterHero` | `components/page.tsx` | The chapter opener: Ink block, inverse running head, giant headline with a Lime `<em>`, the one orange dash, `actions` (`spark` + `on-ink` only — never `default`/`outline` on Ink), an `aside` hero figure, and the lilac peek. One per page, in place of `PageHeader`; it is the page's one graphic. **It is the standard opener for every primary chapter/index page** — the studio's Overview, Calendar, Content, Clients, Invoices, Analytics and Staff, the super-admin console and the business workspace, plus the portal — each leading with a `HeroStat` figure. `PageHeader` stays for detail, form, sub- and archive pages. |
-  | `HeroStat` | `components/page.tsx` | The giant Acid Lime figure inside a `ChapterHero` `aside`: a mono `eyebrow`, one Poppins Bold `value` numeral, a `caption`, an optional `icon` and `href` (makes the whole figure a link with a trailing arrow). Every primary page leads with its single most telling number — open decisions, posts in the pipeline, brands on the books, invoices awaiting payment. Pad counts to two digits (`padStart(2, '0')`); omit the aside when a page has no stable count (deferred or client-loaded data). |
-  | `RunningHead` / `ChapterMark` | `components/page.tsx` | The book's page head (mono line over an ink hairline) and the chapter swatch + number (`■ 04 — Clients`). `useChapter()` returns the current chapter. |
-  | `StatStrip` | `components/page.tsx` | The book's numeral spec row (§2.5): figures between vertical hairlines under an ink rule — mono label, 64px Poppins Bold numeral, mono caption. `render` wraps a cell in a link/anchor. 2×2 on mobile. Prefer it to a row of `Stat` cards for secondary KPIs. |
-  | `Eyebrow` | `components/page.tsx` | DM Mono label. `dash` adds the rounded orange rule — once per layout. |
-  | `Panel` | `components/page.tsx` | Surface section (24px radius, `shadow-sm`) with optional `eyebrow`/`title`/`icon`/`actions` header. Icons sit in a solid tint circle. |
-  | `Stat` | `components/page.tsx` | KPI tile, Poppins Bold numeral. `tone="ink"` for the one hero stat per row; `tone="accent"` = teal block. |
-  | `EmptyState` | `components/page.tsx` | Every empty list: lilac icon circle, one short display line ending in a full stop, one sentence, one action. |
-  | `StatusPill` | `components/status-pill.tsx` | Every status/health/role badge. |
-  | `BrandMark` | `components/brand-mark.tsx` | The logo. `wordmark` = horizontal lock-up in `text-logo`; otherwise the app-icon tile (cream mark on teal). |
-  | `ArtworkSvg`, `Snout` | `components/brand-mark.tsx` | Render master artwork / the snout (list markers, seals, loaders, sign-offs). |
-  | `BrandPattern`, `Peek`, `BrandPoster` | `components/brand-poster.tsx` | Squiggle/confetti patterns in approved pairs; the peek; the auth/marketing poster. Expressive surfaces only. |
-  | `PublicShell` / `PublicTitle` | `components/public-shell.tsx` | Token-link pages (client review, invites). `width`: `md` (forms), `lg`, `xl` (two-column pages — the review). |
-  | `Heading` | `components/heading.tsx` | `variant="small"` = a section within a page (settings, staff): ruled spec header, ink hairline over a 17px title. Don't add your own border above it. |
-  | `CommandPaletteProvider` | `components/command-palette.tsx` | The studio's ⌘K / Ctrl+K palette (chapters, create, theme), mounted once by the sidebar layout; `useCommandPalette().open()` opens it. Add new destinations there, gated like the sidebar. |
+    | Component                             | File                             | Use                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+    | ------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `Page`                                | `components/page.tsx`            | Page container: 1400 max width, `gap-8`, responsive padding. `width="narrow"` for detail/form pages.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+    | `PageHeader`                          | `components/page.tsx`            | Every internal page's header. Opens with the chapter `RunningHead` (resolved from the URL); `eyebrow` sits on its right. `title` (ReactNode, `<em>` = accent word) at 52px, `description`, `meta`, `actions`. Outside a chapter (client portal) the eyebrow falls back to the orange-dash `Eyebrow`.                                                                                                                                                                                                                                                                                                                                    |
+    | `ChapterHero`                         | `components/page.tsx`            | The chapter opener: Ink block, inverse running head, giant headline with a Lime `<em>`, the one orange dash, `actions` (`spark` + `on-ink` only — never `default`/`outline` on Ink), an `aside` hero figure, and the lilac peek. One per page, in place of `PageHeader`; it is the page's one graphic. **It is the standard opener for every primary chapter/index page** — the studio's Overview, Calendar, Content, Clients, Invoices, Analytics and Staff, the super-admin console and the business workspace, plus the portal — each leading with a `HeroStat` figure. `PageHeader` stays for detail, form, sub- and archive pages. |
+    | `HeroStat`                            | `components/page.tsx`            | The giant Acid Lime figure inside a `ChapterHero` `aside`: a mono `eyebrow`, one Poppins Bold `value` numeral, a `caption`, an optional `icon` and `href` (makes the whole figure a link with a trailing arrow). Every primary page leads with its single most telling number — open decisions, posts in the pipeline, brands on the books, invoices awaiting payment. Pad counts to two digits (`padStart(2, '0')`); omit the aside when a page has no stable count (deferred or client-loaded data).                                                                                                                                  |
+    | `RunningHead` / `ChapterMark`         | `components/page.tsx`            | The book's page head (mono line over an ink hairline) and the chapter swatch + number (`■ 04 — Clients`). `useChapter()` returns the current chapter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+    | `StatStrip`                           | `components/page.tsx`            | The book's numeral spec row (§2.5): figures between vertical hairlines under an ink rule — mono label, 64px Poppins Bold numeral, mono caption. `render` wraps a cell in a link/anchor. 2×2 on mobile. Prefer it to a row of `Stat` cards for secondary KPIs.                                                                                                                                                                                                                                                                                                                                                                           |
+    | `Eyebrow`                             | `components/page.tsx`            | DM Mono label. `dash` adds the rounded orange rule — once per layout.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+    | `Panel`                               | `components/page.tsx`            | Surface section (24px radius, `shadow-sm`) with optional `eyebrow`/`title`/`icon`/`actions` header. Icons sit in a solid tint circle.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+    | `Stat`                                | `components/page.tsx`            | KPI tile, Poppins Bold numeral. `tone="ink"` for the one hero stat per row; `tone="accent"` = teal block.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+    | `EmptyState`                          | `components/page.tsx`            | Every empty list: lilac icon circle, one short display line ending in a full stop, one sentence, one action.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+    | `StatusPill`                          | `components/status-pill.tsx`     | Every status/health/role badge.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+    | `BrandMark`                           | `components/brand-mark.tsx`      | The logo. `wordmark` = horizontal lock-up in `text-logo`; otherwise the app-icon tile (cream mark on teal).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+    | `ArtworkSvg`, `Snout`                 | `components/brand-mark.tsx`      | Render master artwork / the snout (list markers, seals, loaders, sign-offs).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+    | `BrandPattern`, `Peek`, `BrandPoster` | `components/brand-poster.tsx`    | Squiggle/confetti patterns in approved pairs; the peek; the auth/marketing poster. Expressive surfaces only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+    | `PublicShell` / `PublicTitle`         | `components/public-shell.tsx`    | Token-link pages (client review, invites). `width`: `md` (forms), `lg`, `xl` (two-column pages — the review).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+    | `Heading`                             | `components/heading.tsx`         | `variant="small"` = a section within a page (settings, staff): ruled spec header, ink hairline over a 17px title. Don't add your own border above it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+    | `CommandPaletteProvider`              | `components/command-palette.tsx` | The studio's ⌘K / Ctrl+K palette (chapters, create, theme), mounted once by the sidebar layout; `useCommandPalette().open()` opens it. Add new destinations there, gated like the sidebar.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 - **Chapters:** `resources/js/lib/chapters.ts` is the single source of truth for module numbering
   (book §00 Contents): 01 Overview · 02 Needs attention · 03 My work · 04 Calendar · 05 Clients (incl.
   campaigns, posts, AI pages) · 06 Invoices · 07 Analytics · 08 Staff · 09 Settings, each with a swatch, icon, one-line summary
@@ -106,40 +106,40 @@ Read this file before building or restyling any page, component, email or PDF. P
 
 ### 3.1 Masters (book §3.1 — fixed values)
 
-| Name | Hex | Role |
-|---|---|---|
-| Deep Teal | `#205557` | Primary — structure, brand actions, links, the frame |
-| Midnight Ink | `#181723` | Primary — text, main buttons, emphasis blocks |
-| Cloud Cream | `#F5F2E8` | Primary — the canvas |
+| Name          | Hex       | Role                                                            |
+| ------------- | --------- | --------------------------------------------------------------- |
+| Deep Teal     | `#205557` | Primary — structure, brand actions, links, the frame            |
+| Midnight Ink  | `#181723` | Primary — text, main buttons, emphasis blocks                   |
+| Cloud Cream   | `#F5F2E8` | Primary — the canvas                                            |
 | Signal Orange | `#F03D2A` | Accent — decorative only (dash, hero full stop, patterns, peek) |
-| Electric Blue | `#4E91D4` | Accent — charts, focus (as `#2C6CAD`), tags |
-| Soft Lilac | `#C9A4D8` | Accent — empty states, peek, patterns, tags |
-| Acid Lime | `#D2E842` | Accent — active nav icon, CTA on Ink, dark-mode brand, tags |
+| Electric Blue | `#4E91D4` | Accent — charts, focus (as `#2C6CAD`), tags                     |
+| Soft Lilac    | `#C9A4D8` | Accent — empty states, peek, patterns, tags                     |
+| Acid Lime     | `#D2E842` | Accent — active nav icon, CTA on Ink, dark-mode brand, tags     |
 
 Tints (book §3.7) are mixed with **cream, not white**, so they stay warm. Never tint the logo.
 
 ### 3.2 Semantic tokens (book §7.1 → `app.css`)
 
-| Token | Light | Dark | Book token / note |
-|---|---|---|---|
-| `background` | `#F5F2E8` | `#181723` | bg.canvas |
-| `card` / `popover` | `#FBFAF6` | `#201F2C` / `#24232F` | bg.surface |
-| `foreground` | `#181723` | `#F5F2E8` | text.primary · 15.8:1 |
-| `muted-foreground` | `#5F5D6B` | `#AEACB5` | between text.secondary/muted, ≥4.8:1 on every surface |
-| `primary` | `#205557` | `#D2E842` | action.brand (Teal on Ink fails, so dark = Lime on Ink, 13:1) |
-| `primary-hover` | `#173F41` | `#E0EC84` | action.brand.hover |
-| `ink` | `#181723` | `#0F0E17` | bg.inverse |
-| `input` | `#8C8A8F` | `#6B6977` | border.control · 3.1:1 (2px borders) |
-| `ring` | `#2C6CAD` | `#6FA4D8` | focus.ring · 3px |
-| `destructive` | `#B52A1B` | `#F28576` | status.error · 5.7:1 |
-| `warning` | `#8A5A00` | `#E3B55C` | status.warning · 5.3:1 |
-| `success` | `#276B43` | `#7FC79A` | status.success · 5.7:1 |
-| `info` | `#2C6CAD` | `#91B8DC` | Electric Blue at text contrast |
-| `accent` | `#E4E9E1` | `#23393B` | Deep Teal 20 tint — menus, icon circles, soft highlights |
-| `logo` | `#205557` | `#F5F2E8` | Teal on Cream / Cream on Ink colourways |
-| `sidebar*` | teal frame, cream type, lime active icon | darker teal | colourway 03 / "Teal / Lime" 6.2:1 |
-| `signal` `lilac` `lime` `electric` `teal` `cream` | masters | masters | decorative palette utilities |
-| `chart-1…5` | teal, blue, lilac, orange, lime | lime, blue 80, lilac, orange 80, teal 40 | see §3.4 |
+| Token                                             | Light                                    | Dark                                     | Book token / note                                             |
+| ------------------------------------------------- | ---------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| `background`                                      | `#F5F2E8`                                | `#181723`                                | bg.canvas                                                     |
+| `card` / `popover`                                | `#FBFAF6`                                | `#201F2C` / `#24232F`                    | bg.surface                                                    |
+| `foreground`                                      | `#181723`                                | `#F5F2E8`                                | text.primary · 15.8:1                                         |
+| `muted-foreground`                                | `#5F5D6B`                                | `#AEACB5`                                | between text.secondary/muted, ≥4.8:1 on every surface         |
+| `primary`                                         | `#205557`                                | `#D2E842`                                | action.brand (Teal on Ink fails, so dark = Lime on Ink, 13:1) |
+| `primary-hover`                                   | `#173F41`                                | `#E0EC84`                                | action.brand.hover                                            |
+| `ink`                                             | `#181723`                                | `#0F0E17`                                | bg.inverse                                                    |
+| `input`                                           | `#8C8A8F`                                | `#6B6977`                                | border.control · 3.1:1 (2px borders)                          |
+| `ring`                                            | `#2C6CAD`                                | `#6FA4D8`                                | focus.ring · 3px                                              |
+| `destructive`                                     | `#B52A1B`                                | `#F28576`                                | status.error · 5.7:1                                          |
+| `warning`                                         | `#8A5A00`                                | `#E3B55C`                                | status.warning · 5.3:1                                        |
+| `success`                                         | `#276B43`                                | `#7FC79A`                                | status.success · 5.7:1                                        |
+| `info`                                            | `#2C6CAD`                                | `#91B8DC`                                | Electric Blue at text contrast                                |
+| `accent`                                          | `#E4E9E1`                                | `#23393B`                                | Deep Teal 20 tint — menus, icon circles, soft highlights      |
+| `logo`                                            | `#205557`                                | `#F5F2E8`                                | Teal on Cream / Cream on Ink colourways                       |
+| `sidebar*`                                        | teal frame, cream type, lime active icon | darker teal                              | colourway 03 / "Teal / Lime" 6.2:1                            |
+| `signal` `lilac` `lime` `electric` `teal` `cream` | masters                                  | masters                                  | decorative palette utilities                                  |
+| `chart-1…5`                                       | teal, blue, lilac, orange, lime          | lime, blue 80, lilac, orange 80, teal 40 | see §3.4                                                      |
 
 ### 3.3 Approved pairings (book §2.6, §3.6)
 
@@ -181,23 +181,23 @@ never inside the logo, never on data screens.
 
 ## 4. Typography
 
-| Family | Token | Job |
-|---|---|---|
+| Family                | Token                       | Job                                                                                  |
+| --------------------- | --------------------------- | ------------------------------------------------------------------------------------ |
 | **Poppins** (300–700) | `font-sans`, `font-display` | Everything. `font-display` = SemiBold 600, −2% tracking, for headlines and numerals. |
-| **DM Mono** (400/500) | `font-mono`, `.eyebrow` | Spec-sheet labels, times, IDs, counts, invoice numbers, breadcrumb separators. |
+| **DM Mono** (400/500) | `font-mono`, `.eyebrow`     | Spec-sheet labels, times, IDs, counts, invoice numbers, breadcrumb separators.       |
 
 - **Weights (book §4.2), two per layout at most — usually SemiBold over Regular:** 300 Light = large
   pull quotes only (studio notes to clients) · 400 Regular = body and captions · 500 Medium = UI
   labels, lead paragraphs · 600 SemiBold = headlines, buttons · 700 Bold = big numbers (`Stat`,
   money totals, calendar dates).
 - **Scale:**
-  - Marketing hero — `clamp(3.5rem, 8vw, 6rem)`, `leading-[1.02]` (book Display 96/56).
-  - Page title (`PageHeader`) — `text-[2.25rem] sm:text-[2.75rem]`, `leading-[1.05]`.
-  - Panel / section header — `text-[15px] font-semibold`.
-  - Body — `text-sm` (data) / `text-[15px]` (descriptions). Marketing body 18px.
-  - Eyebrow — `.eyebrow` (DM Mono 11px, `tracking-[0.1em]`, uppercase), `text-muted-foreground`
-    (or `text-primary` on marketing).
-  - Meta / helper — `text-xs text-muted-foreground`.
+    - Marketing hero — `clamp(3.5rem, 8vw, 6rem)`, `leading-[1.02]` (book Display 96/56).
+    - Page title (`PageHeader`) — `text-[2.25rem] sm:text-[2.75rem]`, `leading-[1.05]`.
+    - Panel / section header — `text-[15px] font-semibold`.
+    - Body — `text-sm` (data) / `text-[15px]` (descriptions). Marketing body 18px.
+    - Eyebrow — `.eyebrow` (DM Mono 11px, `tracking-[0.1em]`, uppercase), `text-muted-foreground`
+      (or `text-primary` on marketing).
+    - Meta / helper — `text-xs text-muted-foreground`.
 - **Setting type (book §4.4):** sentence case (caps only in eyebrows) · flush left · tight headlines ·
   statements end with a full stop, sometimes orange on marketing heroes · one rounded orange dash
   per layout · 45–75 characters per line, no widows (`text-balance` / `text-pretty`).
@@ -306,7 +306,7 @@ never inside the logo, never on data screens.
   studio's message as an Ink pull-quote (lime quote mark, Poppins Light), a ruled "Going out"
   schedule (`formatSchedule`), and exactly two decisions, 56px tall and thumb-friendly: **Approve**
   (solid `success`) and **Request changes** (outline, destructive-tinted), with the note field
-  *above* them. Mobile stacks note → post → schedule → decision.
+  _above_ them. Mobile stacks note → post → schedule → decision.
 - **Error pages (`resources/views/errors`):** Blade, not React — inline CSS and `public/brand`
   artwork so they render when the app has failed. An Ink spread: running head (cream lock-up +
   "Error 404"), the code as a giant Lime numeral, a voice-led headline ("This page wandered off.",
@@ -328,7 +328,7 @@ never inside the logo, never on data screens.
   an invoice) keep `PageHeader`. Pages supply padding via `ShellPaddedContext` and get no chapter running
   head — chapters belong to the studio.
 - **Portal voice:** speak to the client — "Your posts", "Welcome back, Rae.", post headlines by state
-  ("Ready for your *review*.", "Back with the *studio*.", "This one is *live*."). Approving always
+  ("Ready for your _review_.", "Back with the _studio_.", "This one is _live_."). Approving always
   leads: the overview's Ink `ChapterHero` carries the waiting count as its Lime `HeroStat` numeral and a
   `spark` "Start reviewing" CTA (the list sits below on paper), a "Needs your approval" group
   atop the posts list, and the decision card beside the post preview.

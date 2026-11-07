@@ -16,7 +16,7 @@ use App\Support\AI\Images\ImageBriefInput;
  * Contract for AI-assisted trend discovery and suggestions (Step 2.1), kept
  * swappable the same way App\Contracts\PublishAdapter and
  * App\Contracts\MusicProvider are — an interface first, bound in a Service
- * Provider — so the vendor (DeepSeek, Step 2.2) can be mocked in tests and,
+ * Provider — so the vendor (Anthropic, Step 2.2) can be mocked in tests and,
  * later, swapped without touching any Action/controller that depends on it.
  */
 interface AiProvider

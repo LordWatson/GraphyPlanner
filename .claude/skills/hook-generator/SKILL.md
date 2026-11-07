@@ -1,7 +1,7 @@
 ---
 name: hook-generator
 description: >
-  Generate 6 clickbait-style LinkedIn hook variations for any topic. Two-line hooks built on the formula: a 40-char opening line, a 40-char bold contrast line. Uses supplied numbers and genuine first-person experience when available. Use this skill whenever the user says "write me hooks", "hook ideas", "generate hooks", "I need a hook for a post about...", or pastes a topic and asks for openers. Fast output, no preamble.
+    Generate 6 clickbait-style LinkedIn hook variations for any topic. Two-line hooks built on the formula: a 40-char opening line, a 40-char bold contrast line. Uses supplied numbers and genuine first-person experience when available. Use this skill whenever the user says "write me hooks", "hook ideas", "generate hooks", "I need a hook for a post about...", or pastes a topic and asks for openers. Fast output, no preamble.
 ---
 
 # Hook Generator

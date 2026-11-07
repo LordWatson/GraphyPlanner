@@ -18,7 +18,7 @@ import { AssetThumbnail } from '@/components/post-editor/asset-thumbnail';
 import {
     BrowseLibraryTile,
     UploadTile,
-} from '@/components/post-editor/media-picker';
+} from '@/components/post-editor/media-tiles';
 import type { AssetData } from '@/components/post-editor/types';
 import { http } from '@/lib/http';
 import { index } from '@/routes/clients';

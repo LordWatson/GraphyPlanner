@@ -38,7 +38,7 @@ class AiUsageController extends Controller
             ],
             // The platform flag + a configured vendor key. When false, the per-org toggle has no
             // effect (no provider is bound), so the UI can explain that rather than imply AI works.
-            'aiConfigured' => (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== '',
+            'aiConfigured' => (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== '',
             'aiEnabled' => (bool) config('ai.enabled', false),
         ]);
     }

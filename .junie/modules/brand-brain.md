@@ -1,12 +1,14 @@
 # BrandBrain
 
 ## Purpose
+
 Covers Step 0.5: a 1:1 "brand brain" record per client capturing Voice, Audience, Offer, Visual,
 Music policy, Hashtag policy, Content pillars, and an optional Brand Persona PDF upload — the
 structured creative brief editors reference when drafting posts, and the future source of context for
 Grok (xAI) caption assistance in Phase 2.
 
 ## Models / Tables
+
 - `BrandBrain` (`brand_brains`): `client_id` (FK, unique — enforces 1:1 with `Client`), plus seven
   json columns: `voice`, `audience`, `offer`, `visual`, `music_policy`, `hashtag_policy`,
   `content_pillars`. Each of `voice`/`audience`/`offer`/`visual`/`music_policy`/`hashtag_policy` is a
@@ -28,6 +30,7 @@ Grok (xAI) caption assistance in Phase 2.
   `(brand_brain_id, asset_id)`. `BrandBrain::referenceAssets()` (ordered by position).
 
 ## Actions / Services / Contracts
+
 - `App\Actions\BrandBrains\SyncBrandReferenceAssetsAction` (Step 16.4): replaces a client's ordered,
   role-tagged references in one transaction (creating the `BrandBrain` row if missing). Rejects more
   than `ai.images.max_references`, duplicates, other clients' assets and anything that isn't a stored
@@ -45,15 +48,16 @@ Grok (xAI) caption assistance in Phase 2.
   `DB::transaction` and logged.
 - `App\Policies\BrandBrainPolicy`: not a standard Eloquent-model policy (it's authorized against the
   parent `Client`, since the `BrandBrain` row may not exist yet when the editor is first opened):
-  - `viewForClient(user, client)` — Owner/Strategist/Designer/Viewer in the client's org, or the
-    scoped Client reviewer.
-  - `update(user, client)` — Owner/Strategist in the client's org only.
-  - `view(user, brandBrain)` delegates to `viewForClient` once a row exists.
-  - Still registered via `Gate::policy(BrandBrain::class, BrandBrainPolicy::class)` in
-    `AppServiceProvider` for consistency, but the controller/request call the policy methods directly
-    since the abilities take a `Client`, not a `BrandBrain`.
+    - `viewForClient(user, client)` — Owner/Strategist/Designer/Viewer in the client's org, or the
+      scoped Client reviewer.
+    - `update(user, client)` — Owner/Strategist in the client's org only.
+    - `view(user, brandBrain)` delegates to `viewForClient` once a row exists.
+    - Still registered via `Gate::policy(BrandBrain::class, BrandBrainPolicy::class)` in
+      `AppServiceProvider` for consistency, but the controller/request call the policy methods directly
+      since the abilities take a `Client`, not a `BrandBrain`.
 
 ## Routes / Controllers
+
 - `PUT /clients/{client}/brand-brain/references` → `clients.brand-brain.references.update`
   (`BrandBrainController::updateReferences`, `UpdateBrandReferencesRequest`, Owner/Strategist via
   `BrandBrainPolicy::update`). `edit` also passes `references`, `referenceRoles`, `maxReferences`, and
@@ -85,6 +89,7 @@ Grok (xAI) caption assistance in Phase 2.
   next to Edit/Delete.
 
 ## Frontend
+
 - `resources/js/pages/brand-brain/edit.tsx` opens with the same gradient-brand hero banner ("Brand
   brain" headline with `text-gradient-brand` treatment + client-name subtitle) used on the dashboard,
   calendar, clients, and post editor pages, replacing the plain `Heading` component, per the
@@ -93,6 +98,7 @@ Grok (xAI) caption assistance in Phase 2.
   no longer looks half-width next to the other main sections.
 
 ## Business Rules
+
 - Exactly one `BrandBrain` per `Client` (`client_id` unique constraint); `updateOrCreate` keyed on
   `client_id` means the first save creates the row and every subsequent save updates it in place.
 - Only Owner/Strategist can save changes; Designer/Viewer/Client reviewer can open the editor
@@ -107,10 +113,12 @@ Grok (xAI) caption assistance in Phase 2.
   now so Phase 2 Grok integration has a stable contract to consume, per the Step 0.5 "Done when".
 
 ## Seeders
+
 - `Database\Seeders\BrandBrainSeeder`: seeds a full brand brain for "Acme Corp" (created by
   `ClientSeeder`). Called from `DatabaseSeeder` right after `ClientSeeder`.
 
 ## Tests
+
 - `tests/Feature/BrandBrainControllerTest.php`: edit/update access per role (Owner, Designer,
   Client reviewer), create-vs-update upsert behavior, cross-client reviewer denial, and Brand Persona
   upload coverage (Owner can upload, replacing a file deletes the old one from disk, Designer is
@@ -119,6 +127,7 @@ Grok (xAI) caption assistance in Phase 2.
   sections and JSON structure) and with an unsaved/empty brand brain (graceful "—" placeholders).
 
 ## Known Gaps / Open Questions
+
 - The exact §4.3 field list from the original spec wasn't available in this repo; the current json
   column shapes (a few string fields + string-list fields per category) are an interim definition
   covering the six named categories. Revisit if the original spec surfaces later.
@@ -129,6 +138,7 @@ Grok (xAI) caption assistance in Phase 2.
   by the AI (no PDF text extraction) — only the structured fields are.
 
 ## Changelog
+
 - 2026-09-08: Initial `BrandBrain` model/migration/policy/action/controller/requests, tabbed Inertia
   editor (new `tabs.tsx` UI component + `@radix-ui/react-tabs` dependency), `toGrokContext()`,
   `BrandBrainSeeder`, and feature/unit tests (Step 0.5).

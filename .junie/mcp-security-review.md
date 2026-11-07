@@ -27,7 +27,7 @@ it is enforced and the automated test that proves it.
 - A token carries a scope set; `Read` is the default (`McpScope::default()`), elevated scopes
   (`WriteDrafts`, `WriteSchedule`, `Ai`) are explicit opt‑ins. Every tool extends `McpTool`, declares
   `requiredScopes()`, and the gate rejects a missing scope **before any Action runs**.
-- A scope is *necessary, not sufficient*: the reused Action still enforces tenancy, policies and the
+- A scope is _necessary, not sufficient_: the reused Action still enforces tenancy, policies and the
   checklist on top.
 - **Evidence:** `McpScopeTest` (read‑only token rejected from a write tool; present vs absent);
   `McpWriteToolsTest::test_a_read_only_token_is_rejected_from_creating_a_draft`;
@@ -65,7 +65,7 @@ it is enforced and the automated test that proves it.
 - **No secret is ever returned.** Assets expose safe metadata only (never the signed `url`, storage
   `disk`/`path`, or thumbnail). Client/campaign billing fields are gated by `viewBilling`. The
   connect tool returns only a browser‑completable invite URL — never a vendor OAuth token.
-- **Media vision — a deliberate, scoped exception.** `get_media_upload` returns *image bytes* (a
+- **Media vision — a deliberate, scoped exception.** `get_media_upload` returns _image bytes_ (a
   downscaled preview via `McpImagePreview`) so the assistant can see the user's own just‑uploaded media
   and caption from it. This is bytes of the user's own upload, to the user's own AI client — never a
   signed URL or storage `disk`/`path`, and only for assets uploaded through that session. The

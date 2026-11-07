@@ -1,6 +1,7 @@
 # Client Portal
 
 ## Purpose
+
 Phase 6: lets an org (Owner/Strategist) invite a named contact at one of its clients to a real,
 authenticated portal — distinct from the token-based, single-post `/review/:token` link (Step
 0.13). Step 6.1 covers the invitation itself (model, send, revoke); Step 6.2 covers accepting the
@@ -11,6 +12,7 @@ list and approve/request-changes/comment flow. Step 6.6 adds the portal's read-o
 list/detail, completing Phase 6.
 
 ## Models / Tables
+
 - `ClientInvitation` (`client_invitations`): `client_id` (FK), `email`, `invited_by_user_id` (FK to
   `users`), `token_hash` (sha256 of the plain token — hashed at rest per spec §10, the plain value
   is only ever available via the signed accept-invite URL built in
@@ -25,6 +27,7 @@ list/detail, completing Phase 6.
   created fresh.
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Portal\GetPortalDashboardItemsAction` (Step 6.4): given the authenticated
   `Role::ClientReviewer`, returns `waitingApprovals`/`changesRequested`/`upcomingPosts` — mirrors
   the shape of `App\Actions\Home\GetNeedsAttentionItemsAction` but scoped to
@@ -42,7 +45,7 @@ list/detail, completing Phase 6.
   failure is caught and logged at `warning` rather than bubbling up, so a transient mail outage
   doesn't roll back the invitation record itself.
 - `App\Policies\ClientInvitationPolicy`: `viewAny`/`create(user, client)` and `delete(user,
-  invitation)` — Owner/Strategist only, scoped to the invitation's client's `org_id`. Registered
+invitation)` — Owner/Strategist only, scoped to the invitation's client's `org_id`. Registered
   via `Gate::policy` in `AppServiceProvider`.
 - `App\Actions\ClientInvitations\AcceptClientInvitationAction` (Step 6.2): wrapped in
   `DB::transaction()`, creates (or reuses, by email + `Role::ClientReviewer`) a `User` scoped to
@@ -50,6 +53,7 @@ list/detail, completing Phase 6.
   `accepted_at`, and logs the acceptance (`org_id`, `client_id`, `user_id`) at `info`.
 
 ## Middleware
+
 - `App\Http\Middleware\EnsureClientPortalAccess` (Step 6.3, aliased as `portal`): applied to every
   `/portal/*` route. Aborts 403 unless the authenticated user is a `Role::ClientReviewer` with a
   `client_id`. Generically inspects any `{post}`/`{invoice}`/`{campaign}` route-model binding and
@@ -58,6 +62,7 @@ list/detail, completing Phase 6.
   binding those parameters.
 
 ## Phase M-6 additions (Step M-6.6 — mobile-first PWA)
+
 - The portal is an installable PWA: `public/portal.webmanifest` (scope `/portal`, start_url
   `/portal`) + `<PwaProvider manifestHref="/portal.webmanifest">` mounted in
   `client-portal-layout.tsx` (the shared `PwaProvider` now takes `manifestHref`/`title`/`description`;
@@ -72,6 +77,7 @@ list/detail, completing Phase 6.
   M-6.2) and approves on a phone viewport. Runs in CI (the e2e server is CI-hosted).
 
 ## Phase M-6 additions (Step M-6.5 — overdue approvals)
+
 - The portal dashboard (`GetPortalDashboardItemsAction`) marks a reviewer's own approvals that are
   past the agency's `approval_sla_hours` with an `overdue` flag; `portal/dashboard.tsx` shows an
   "Overdue" badge. The daily `SendOverdueApprovalRemindersJob` emails the client's review-email
@@ -79,6 +85,7 @@ list/detail, completing Phase 6.
   / `notifications.md`.
 
 ## Phase M-6 additions (Step M-6.3 — multi-approver & staged approvals)
+
 - `clients.approval_policy` (`ApprovalPolicy`: `any` / `all` / `sequential`, default `any` =
   original single-approver behaviour; migration `2026_11_05_100100`, edit-form field). `approval_steps`
   (migration `2026_11_05_100200`): one required approval per post (`client_contact_id` nullable =
@@ -103,13 +110,14 @@ list/detail, completing Phase 6.
   rejection, non-approver rejection, generic/token path, certificate PDF + route, approve-all).
 
 ## Phase M-6 additions (Step M-6.2 — one passwordless client experience)
+
 - **Magic link.** `portal_login_tokens` (migration `2026_11_04_100300`): `user_id`, `token_hash`
   (SHA-256, unique), nullable `post_id` (landing target), `expires_at`, `used_at`. `PortalLoginToken`
-  + `CreatePortalLoginTokenAction` (hashed at rest, plain token returned once, 7-day TTL).
-  `GET /portal-login/{token}` → `Portal\MagicLinkController@login` (public, `throttle:public-token`):
-  a valid, unexpired, unused token signs the reviewer in (session regenerated against fixation),
-  consumes the token (single-use), and lands on the emailed post when it's still client-visible,
-  else the portal dashboard. An invalid/used/expired token falls back to `login` without leaking why.
+    - `CreatePortalLoginTokenAction` (hashed at rest, plain token returned once, 7-day TTL).
+      `GET /portal-login/{token}` → `Portal\MagicLinkController@login` (public, `throttle:public-token`):
+      a valid, unexpired, unused token signs the reviewer in (session regenerated against fixation),
+      consumes the token (single-use), and lands on the emailed post when it's still client-visible,
+      else the portal dashboard. An invalid/used/expired token falls back to `login` without leaking why.
 - **Review emails prefer the magic link.** `SendClientReviewRequestedEmailAction` now sends each
   review-email contact (Step M-6.1) a personal magic link when they already have a portal login
   (`Role::ClientReviewer` for that client), and the shared token-only `/review/:token` link otherwise.
@@ -127,6 +135,7 @@ list/detail, completing Phase 6.
   magic-vs-review-link selection) and the updated `ClientInvitationAcceptControllerTest`.
 
 ## Phase M-3 additions (Step M-3.3)
+
 - **Reports:** `GET /portal/reports` and `/portal/reports/{report}` (+ `/pdf`) →
   `Portal\PortalReportController` — the contact's own client's **published** monthly reports
   only; `EnsureClientPortalAccess` 404s another client's report or a draft. "Reports" sits in the
@@ -142,9 +151,10 @@ list/detail, completing Phase 6.
   published caption and first comment.
 
 ## Routes / Controllers
+
 - `POST /clients/{client}/invitations` → `ClientInvitationController::store` — validated via
   `StoreClientInvitationRequest` (email required + a custom `withValidator` rule rejecting a
-  duplicate *pending* invitation to the same email/client), delegates to
+  duplicate _pending_ invitation to the same email/client), delegates to
   `CreateClientInvitationAction`, redirects to `clients.show`.
 - `DELETE /invitations/{invitation}` → `ClientInvitationController::destroy` — sets `revoked_at`,
   redirects to `clients.show`. No dedicated list endpoint: pending/accepted invitations are loaded
@@ -170,7 +180,7 @@ list/detail, completing Phase 6.
   authenticated counterpart to `ReviewController::show`: full post detail (caption, hashtags,
   assets, targets, non-internal comments only) plus a `can.decide`/`can.comment` payload driving
   which forms render. **UX overhaul (review handoff):** also returns a `queue` payload
-  (`{remaining, next_id}`) — how many *other* posts still await this reviewer (same eligibility as
+  (`{remaining, next_id}`) — how many _other_ posts still await this reviewer (same eligibility as
   `decideAll`: waiting, their turn, a legal approve) and the next one to open — so the page shows a
   one-tap "Review the next" card ("approving always leads", brand §8). `decide` still redirects back
   to `portal.posts.show` (unchanged).
@@ -202,6 +212,7 @@ list/detail, completing Phase 6.
   primarily a Campaigns/Assets-module feature, cross-linked here since it lives under `/portal`).
 
 ## Frontend
+
 - `resources/js/layouts/client-portal/client-portal-layout.tsx` (Step 6.3): the portal's distinct
   shell — no internal-ops chrome (no "Needs attention"/Settings/other clients), just a branded
   header (client name + Graphy mark), a top nav (Posts & approvals, Invoices), and a log-out
@@ -285,6 +296,7 @@ the product chrome is rendered in. Without `Feature::WhiteLabel` the portal is A
 stored on the organization.
 
 ## Business Rules
+
 - Client reviewers never see internal UI: every internal route they could reach redirects into the
   portal (`RedirectClientReviewersToPortal`), and `AppLayout` renders the portal shell for them.
 - Every portal surface filters posts through `PostStatus::clientVisible()`; a bound internal-status
@@ -299,6 +311,7 @@ stored on the organization.
   id/email/timestamps/`is_pending`/`can`.
 
 ## Tests
+
 - `tests/Feature/PortalInvoiceControllerTest.php` (Step 6.6): a `Role::ClientReviewer` sees only
   their own client's invoices on `/portal/invoices` and never another client's; unpaid (draft/sent)
   invoices are flagged `is_unpaid: true` and paid ones aren't; the contact can view their own
@@ -337,6 +350,7 @@ stored on the organization.
   feature note.
 
 ## Step M-4.2 — "Mark Paid" payment handshake
+
 - On a read-only portal invoice that's still `sent`, a client reviewer gets a **"Mark Paid"** button
   (`portal/invoices/show.tsx`) opening a small dialog (optional method / reference / note) that posts
   to `portal.invoices.report-payment` (`PortalInvoiceController::reportPayment`, scoped to their own
@@ -346,6 +360,7 @@ stored on the organization.
   `billing.md` › Phase M-4 for the full state machine and actions.
 
 ## Changelog (attachment previews)
+
 - 2026-09-22: Replaced the plain caption/hashtags/asset-grid block on `/portal/posts/{post}` with
   the same live preview (`resources/js/components/social-post-preview.tsx`'s `SocialPostPreview`)
   used read-only in `posts/edit.tsx`'s "Live preview" card, so the client portal now shows the
@@ -369,6 +384,7 @@ stored on the organization.
   new tab when not directly embeddable.
 
 ## Known Gaps / Open Questions
+
 - No login redirect target exists yet beyond the generic `login` page; the post-accept redirect in
   `AcceptClientInvitationAction`/`ClientInvitationAcceptController` could now point straight at
   `/portal` since the shell exists, but this hasn't been changed.
@@ -379,9 +395,10 @@ stored on the organization.
   app's read-only bits.
 
 ## Changelog
+
 - 2026-10-24: UX overhaul (review handoff, `.junie/plans/ux-overhaul.md`) — the portal post page
   now carries a one-tap review queue. `PortalPostController::show` returns `queue {remaining,
-  next_id}` (other posts still awaiting this reviewer); `portal/posts/show.tsx` shows a "Review the
+next_id}` (other posts still awaiting this reviewer); `portal/posts/show.tsx` shows a "Review the
   next" card so "approving always leads" (brand §8). Tests in `PortalPostControllerTest` (queue
   counts/excludes correctly; empty when nothing else waits). Pairs with the studio-side copyable
   review link (`posts.md`).
@@ -391,7 +408,7 @@ stored on the organization.
 - 2026-10-18: Fixed a second "Attempted to lazy load [client] on model [ClientInvitation]" spot:
   `ClientInvitationPolicy::delete` read `$invitation->client->org_id` directly, which throws
   whenever the invitation wasn't eager-loaded with `client` — notably on `GET
-  clients/{client}/portal-access` (`ClientTabController::portalAccess`), where
+clients/{client}/portal-access` (`ClientTabController::portalAccess`), where
   `ClientTabPresenter::invitation()` calls `$user->can('delete', $invitation)` for every row in
   the paginated list. The policy now calls `$invitation->loadMissing('client')->client->org_id`
   (an explicit load, not a bare lazy access), so it's safe regardless of what the caller
@@ -467,7 +484,7 @@ stored on the organization.
   "Company" nav item in `client-portal-layout.tsx` and a globally-shared `client` Inertia prop via
   `HandleInertiaRequests`; (3) `posts/edit.tsx`'s "Editor" tab now renders a read-only view of the
   caption/hashtags/targets/media instead of nothing when `can.update` is false; (4) `calendar/
-  index.tsx` now links a `client_reviewer` viewer to `portal.posts.show` (which already has the
+index.tsx` now links a `client_reviewer` viewer to `portal.posts.show` (which already has the
   approve/request-changes UI) instead of the internal editor; (5) the "missing invoices" symptom
   was the same root cause as (1) — `PortalInvoiceController` itself was already correct and fully
   tested, the client simply had no way to reach `/portal` in the first place. Added
@@ -483,8 +500,8 @@ stored on the organization.
 - 2026-09-18: `App\Http\Controllers\Portal\PortalPostController::index`/`decide`/`comment`,
   `App\Http\Requests\Portal\PortalPostDecisionRequest`, the `portal.posts.index`/`decide`/
   `comments.store` routes, the `portal/posts/index.tsx` list page, a fully-built `portal/posts/
-  show.tsx` (approve/request-changes + comment forms), and `tests/Feature/
-  PortalPostControllerTest.php` (Step 6.5). Reuses `TransitionPostStatusAction`/
+show.tsx` (approve/request-changes + comment forms), and `tests/Feature/
+PortalPostControllerTest.php` (Step 6.5). Reuses `TransitionPostStatusAction`/
   `CreatePostCommentAction`/`PostPolicy` as-is — no new transition/comment logic.
 - 2026-09-18: `App\Actions\Portal\GetPortalDashboardItemsAction`, updated
   `PortalDashboardController` and `portal/dashboard.tsx` to render real waiting-approval/

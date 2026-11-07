@@ -2,7 +2,7 @@
 name: video
 description: "When the user wants to create, generate, or produce video content using AI tools or programmatic frameworks. Also use when the user mentions 'video production,' 'AI video,' 'Remotion,' 'Hyperframes,' 'HeyGen,' 'Synthesia,' 'Veo,' 'Sora,' 'Runway,' 'Kling,' 'Seedance,' 'Hailuo,' 'MiniMax,' 'Pika,' 'Hunyuan,' 'Wan,' 'video generation,' 'AI avatar,' 'talking head video,' 'programmatic video,' 'video template,' 'explainer video,' 'product demo video,' 'record a product demo,' 'feature demo video,' 'in-app demo,' 'video pipeline,' 'copy this edit,' 'match this video style,' 'reverse-engineer this video,' 'edit like this reference,' or 'make me a video.' Use this for video creation, generation, and production workflows. For video content strategy and what to post, see social. For paid video ad creative, see ad-creative."
 metadata:
-  version: 2.2.1
+    version: 2.2.1
 ---
 
 # Video
@@ -17,17 +17,20 @@ If `.agents/product-marketing.md` exists (or `.claude/product-marketing.md`, or 
 Gather this context (ask if not provided):
 
 ### 1. Video Goal
+
 - What type of video? (Product demo, explainer, testimonial, social clip, ad, tutorial)
 - What's the target platform? (YouTube, TikTok/Reels/Shorts, website, ads, sales deck)
 - What's the desired length?
 
 ### 2. Production Approach
+
 - Do you need a human presenter? (AI avatar vs. voiceover vs. screen recording)
 - Do you have existing footage or assets? (Screenshots, logos, product UI)
 - Do you need generated footage? (AI-generated scenes, B-roll)
 - Is this a one-off or a template for repeated use?
 
 ### 3. Technical Context
+
 - What's your tech stack? (Node.js, Python, etc.)
 - Do you have API keys for any video tools?
 - Budget constraints? (Some tools charge per minute of video)
@@ -38,12 +41,12 @@ Gather this context (ask if not provided):
 
 Pick the right tool for the job:
 
-| Approach | Best For | Tools | When to Use |
-|----------|----------|-------|-------------|
-| **Programmatic** | Templated, data-driven, batch video | Remotion, Hyperframes | Product updates, personalized videos, recurring content |
-| **AI Generation** | Original footage from text/image prompts | Veo 3, Runway, Kling, Seedance | B-roll, hero shots, creative visuals you can't film |
-| **AI Avatars** | Talking-head presenter without filming | HeyGen, Synthesia | Explainers, tutorials, multilingual content |
-| **Editing/Repurposing** | Cutting long-form into short clips | Descript, Opus Clip, CapCut | Podcast/webinar → social clips |
+| Approach                | Best For                                 | Tools                          | When to Use                                             |
+| ----------------------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------------- |
+| **Programmatic**        | Templated, data-driven, batch video      | Remotion, Hyperframes          | Product updates, personalized videos, recurring content |
+| **AI Generation**       | Original footage from text/image prompts | Veo 3, Runway, Kling, Seedance | B-roll, hero shots, creative visuals you can't film     |
+| **AI Avatars**          | Talking-head presenter without filming   | HeyGen, Synthesia              | Explainers, tutorials, multilingual content             |
+| **Editing/Repurposing** | Cutting long-form into short clips       | Descript, Opus Clip, CapCut    | Podcast/webinar → social clips                          |
 
 ---
 
@@ -79,19 +82,20 @@ npx create-video@latest
 
 ```tsx
 export const ProductDemo: React.FC<{ title: string; features: string[] }> = ({
-  title, features
+    title,
+    features,
 }) => {
-  const frame = useCurrentFrame();
-  return (
-    <AbsoluteFill style={{ background: "#000", color: "#fff" }}>
-      <h1>{title}</h1>
-      {features.map((f, i) => (
-        <Sequence from={i * 30} key={i}>
-          <p>{f}</p>
-        </Sequence>
-      ))}
-    </AbsoluteFill>
-  );
+    const frame = useCurrentFrame();
+    return (
+        <AbsoluteFill style={{ background: '#000', color: '#fff' }}>
+            <h1>{title}</h1>
+            {features.map((f, i) => (
+                <Sequence from={i * 30} key={i}>
+                    <p>{f}</p>
+                </Sequence>
+            ))}
+        </AbsoluteFill>
+    );
 };
 ```
 
@@ -99,13 +103,13 @@ export const ProductDemo: React.FC<{ title: string; features: string[] }> = ({
 
 ### When to Pick Which
 
-| Factor | Hyperframes | Remotion |
-|--------|-------------|----------|
-| Agent compatibility | Better (plain HTML) | Good (React) |
-| Animation complexity | GSAP timelines (plus CSS) | Advanced (Spring, interpolate) |
-| Batch rendering | Local | Lambda (AWS) for scale |
-| Learning curve | Minimal | Moderate (React + Remotion API) |
-| License | Apache 2.0 | Company license for commercial use |
+| Factor               | Hyperframes               | Remotion                           |
+| -------------------- | ------------------------- | ---------------------------------- |
+| Agent compatibility  | Better (plain HTML)       | Good (React)                       |
+| Animation complexity | GSAP timelines (plus CSS) | Advanced (Spring, interpolate)     |
+| Batch rendering      | Local                     | Lambda (AWS) for scale             |
+| Learning curve       | Minimal                   | Moderate (React + Remotion API)    |
+| License              | Apache 2.0                | Company license for commercial use |
 
 ---
 
@@ -115,17 +119,18 @@ Generate original footage from text or image prompts. Use for B-roll, hero visua
 
 ### Model Comparison
 
-| Model | Resolution | Max Duration | Best For | Cost |
-|-------|-----------|-------------|----------|------|
-| **Veo 3** (Google) | Up to 1080p (4K varies) | Variable | Top overall quality, synced audio | API-based |
-| **Runway Gen-4** | Up to 4K | ~10 sec/gen | Motion control, temporal consistency, edit-style workflows | $12-76/mo |
-| **Kling 2.5/3.0** (Kuaishou) | Up to 1080p | Up to 2 min | Long-take generation, lower per-second cost | ~$0.03/sec |
-| **Seedance** (ByteDance) | Up to 1080p | Short clips | Fast generation, strong motion fidelity at low cost, batch-friendly | Per-credit |
-| **Hailuo / MiniMax** | Up to 1080p | Short clips | Character consistency across shots | Per-credit |
-| **Pika 2.x** | 1080p | Short clips | Quick effects, image-to-video, lower bar to entry | Per-credit |
-| **Hunyuan Video / Wan 2** | 720p–1080p | Variable | Open-source self-hosted; full control, no API fees | Free (GPU) |
+| Model                        | Resolution              | Max Duration | Best For                                                            | Cost       |
+| ---------------------------- | ----------------------- | ------------ | ------------------------------------------------------------------- | ---------- |
+| **Veo 3** (Google)           | Up to 1080p (4K varies) | Variable     | Top overall quality, synced audio                                   | API-based  |
+| **Runway Gen-4**             | Up to 4K                | ~10 sec/gen  | Motion control, temporal consistency, edit-style workflows          | $12-76/mo  |
+| **Kling 2.5/3.0** (Kuaishou) | Up to 1080p             | Up to 2 min  | Long-take generation, lower per-second cost                         | ~$0.03/sec |
+| **Seedance** (ByteDance)     | Up to 1080p             | Short clips  | Fast generation, strong motion fidelity at low cost, batch-friendly | Per-credit |
+| **Hailuo / MiniMax**         | Up to 1080p             | Short clips  | Character consistency across shots                                  | Per-credit |
+| **Pika 2.x**                 | 1080p                   | Short clips  | Quick effects, image-to-video, lower bar to entry                   | Per-credit |
+| **Hunyuan Video / Wan 2**    | 720p–1080p              | Variable     | Open-source self-hosted; full control, no API fees                  | Free (GPU) |
 
 **Quick picks**:
+
 - **Highest quality + audio**: Veo 3
 - **Batch / volume / cost**: Kling, Seedance
 - **Character consistency across multiple shots**: Hailuo
@@ -145,6 +150,7 @@ cinematic color grading, 4K
 ```
 
 **Common mistakes:**
+
 - Too vague ("a person working") — add specifics
 - Ignoring camera movement — specify dolly, pan, static
 - Forgetting style — "cinematic," "documentary," "commercial"
@@ -154,13 +160,13 @@ cinematic color grading, 4K
 
 ### When to Use AI Generation vs. Stock
 
-| Use Case | AI Generation | Stock Footage |
-|----------|:---:|:---:|
-| Exact scene you imagined | Yes | Rarely matches |
-| Consistent style across clips | Yes | Hard to match |
-| Recognizable real locations | No (hallucinations) | Yes |
-| Specific products/brands | No (use programmatic) | No |
-| Quick B-roll | Either works | Faster |
+| Use Case                      |     AI Generation     | Stock Footage  |
+| ----------------------------- | :-------------------: | :------------: |
+| Exact scene you imagined      |          Yes          | Rarely matches |
+| Consistent style across clips |          Yes          | Hard to match  |
+| Recognizable real locations   |  No (hallucinations)  |      Yes       |
+| Specific products/brands      | No (use programmatic) |       No       |
+| Quick B-roll                  |     Either works      |     Faster     |
 
 ---
 
@@ -174,11 +180,11 @@ Best lip-sync and micro-expressions. 230+ avatars, 140+ languages.
 
 **Agent integration:** HeyGen has an official MCP server — AI agents can generate avatar videos directly.
 
-| Plan | Videos | Duration |
-|------|--------|----------|
-| Free | 3/mo | 3 min max |
-| Creator | Unlimited | 5 min |
-| Business | Unlimited | 20 min |
+| Plan     | Videos    | Duration  |
+| -------- | --------- | --------- |
+| Free     | 3/mo      | 3 min max |
+| Creator  | Unlimited | 5 min     |
+| Business | Unlimited | 20 min    |
 
 Check [heygen.com/pricing](https://www.heygen.com/pricing) for current prices.
 
@@ -194,14 +200,14 @@ Full-body avatars with expressive body language. Built-in script generation from
 
 ### When to Use Avatars vs. Other Approaches
 
-| Scenario | Use Avatar | Use Instead |
-|----------|:---:|-------------|
-| Recurring content (weekly updates) | Yes | — |
-| Multilingual versions | Yes | — |
-| Personalized outreach at scale | Yes | — |
-| Authentic founder content | No | Film yourself |
-| Product UI walkthrough | No | Screen recording |
-| Creative/artistic video | No | AI generation |
+| Scenario                           | Use Avatar | Use Instead      |
+| ---------------------------------- | :--------: | ---------------- |
+| Recurring content (weekly updates) |    Yes     | —                |
+| Multilingual versions              |    Yes     | —                |
+| Personalized outreach at scale     |    Yes     | —                |
+| Authentic founder content          |     No     | Film yourself    |
+| Product UI walkthrough             |     No     | Screen recording |
+| Creative/artistic video            |     No     | AI generation    |
 
 ---
 
@@ -209,12 +215,12 @@ Full-body avatars with expressive body language. Built-in script generation from
 
 Turn existing content into multiple video formats.
 
-| Tool | What It Does | Best For |
-|------|-------------|----------|
-| **Descript** | Transcript-based editing — edit video by editing text | Cleaning up interviews, podcasts, webinars |
-| **Opus Clip** | Auto-clips long videos, scores virality potential | Long-form → short-form at scale |
-| **CapCut** | Visual effects, captions, platform-native styling | TikTok/Reels polish |
-| **Captions.ai** | Auto-captions, eye contact correction, AI dubbing | Solo talking-head content |
+| Tool            | What It Does                                          | Best For                                   |
+| --------------- | ----------------------------------------------------- | ------------------------------------------ |
+| **Descript**    | Transcript-based editing — edit video by editing text | Cleaning up interviews, podcasts, webinars |
+| **Opus Clip**   | Auto-clips long videos, scores virality potential     | Long-form → short-form at scale            |
+| **CapCut**      | Visual effects, captions, platform-native styling     | TikTok/Reels polish                        |
+| **Captions.ai** | Auto-captions, eye contact correction, AI dubbing     | Solo talking-head content                  |
 
 ### Repurposing Workflow
 
@@ -232,7 +238,7 @@ Distribute: TikTok, Reels, Shorts, LinkedIn
 
 ### Reverse-Engineer a Viral Edit
 
-To replicate the *style* of a video edit you admire — the cut rhythm, caption treatment, punch-ins, on-screen text, sound design — decompose it into a reusable **edit spec** (a beat sheet) and apply it to your own footage. Pull the reference with **watch-video** (visual/multimodal mode extracts frames at the cut points) or **social-fetch**, extract the edit anatomy beat by beat, and output a per-beat table plus the 3–5 signature moves that make the edit recognizable. Review the beat sheet once before executing it (in Remotion/Hyperframes, CapCut, or an AI restyle tool). Copies the editing grammar, never the reference's footage/script/music. Full method: [references/edit-anatomy.md](references/edit-anatomy.md).
+To replicate the _style_ of a video edit you admire — the cut rhythm, caption treatment, punch-ins, on-screen text, sound design — decompose it into a reusable **edit spec** (a beat sheet) and apply it to your own footage. Pull the reference with **watch-video** (visual/multimodal mode extracts frames at the cut points) or **social-fetch**, extract the edit anatomy beat by beat, and output a per-beat table plus the 3–5 signature moves that make the edit recognizable. Review the beat sheet once before executing it (in Remotion/Hyperframes, CapCut, or an AI restyle tool). Copies the editing grammar, never the reference's footage/script/music. Full method: [references/edit-anatomy.md](references/edit-anatomy.md).
 
 ---
 
@@ -286,6 +292,7 @@ Output: Ready-to-publish video
 ```
 
 **What makes this agent-native:**
+
 - Hyperframes uses HTML — any coding agent can generate it
 - HeyGen MCP server — agents call it directly
 - Video model APIs — standard HTTP requests
@@ -317,12 +324,12 @@ Output: Ready-to-publish video
 
 ## Tool Integrations
 
-| Tool | Type | MCP | Guide |
-|------|------|:---:|-------|
-| **HeyGen** | AI avatars | Yes | [heygen.md](https://github.com/coreyhaines31/marketingskills/blob/main/tools/integrations/heygen.md) |
-| **Hyperframes** | Programmatic video | - | [hyperframes.md](https://github.com/coreyhaines31/marketingskills/blob/main/tools/integrations/hyperframes.md) |
-| **Remotion** | Programmatic video | - | [remotion.dev](https://www.remotion.dev/docs) |
-| **Runway** | AI generation | - | [runwayml.com/docs](https://docs.dev.runwayml.com) |
+| Tool            | Type               | MCP | Guide                                                                                                          |
+| --------------- | ------------------ | :-: | -------------------------------------------------------------------------------------------------------------- |
+| **HeyGen**      | AI avatars         | Yes | [heygen.md](https://github.com/coreyhaines31/marketingskills/blob/main/tools/integrations/heygen.md)           |
+| **Hyperframes** | Programmatic video |  -  | [hyperframes.md](https://github.com/coreyhaines31/marketingskills/blob/main/tools/integrations/hyperframes.md) |
+| **Remotion**    | Programmatic video |  -  | [remotion.dev](https://www.remotion.dev/docs)                                                                  |
+| **Runway**      | AI generation      |  -  | [runwayml.com/docs](https://docs.dev.runwayml.com)                                                             |
 
 ---
 

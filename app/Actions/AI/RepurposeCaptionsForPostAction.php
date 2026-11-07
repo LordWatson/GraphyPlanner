@@ -7,7 +7,7 @@ use App\Enums\Platform;
 use App\Models\Post;
 use App\Services\AI\AiGuardrailService;
 use App\Services\AI\AiTextUsage;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Support\AI\AiCaptionSuggestion;
 use App\Support\AI\AiCaptionSuggestions;
 use Illuminate\Support\Facades\Log;
@@ -51,15 +51,15 @@ class RepurposeCaptionsForPostAction
         $startedAt = microtime(true);
         $raw = $this->repurposer->repurpose($post, $platforms);
 
-        $deepSeek = $this->repurposer instanceof DeepSeekProvider;
+        $anthropic = $this->repurposer instanceof AnthropicProvider;
         $this->usage->record(
             $client,
             'repurpose',
             $raw !== [],
             $startedAt,
-            $deepSeek ? 'deepseek' : 'null',
-            $deepSeek ? (string) config('ai.deepseek.model', 'deepseek-flash') : 'none',
-            $deepSeek ? (float) config('ai.deepseek.estimated_cost_per_call', 0) : 0.0,
+            $anthropic ? 'anthropic' : 'null',
+            $anthropic ? (string) config('ai.anthropic.model', 'claude-sonnet-5-5') : 'none',
+            $anthropic ? (float) config('ai.anthropic.estimated_cost_per_call', 0) : 0.0,
         );
 
         $context = ['org_id' => $post->org_id, 'client_id' => $post->client_id, 'post_id' => $post->id];

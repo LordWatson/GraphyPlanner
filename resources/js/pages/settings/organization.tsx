@@ -2,11 +2,7 @@ import { Form, Head } from '@inertiajs/react';
 import OrganizationController from '@/actions/App/Http/Controllers/Settings/OrganizationController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
-import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-} from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';

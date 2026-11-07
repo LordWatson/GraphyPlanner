@@ -42,14 +42,14 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * DeepSeek-backed implementation of App\Contracts\AiProvider (Step 2.2). Builds a system
+ * Anthropic-backed implementation of App\Contracts\AiProvider (Step 2.2). Builds a system
  * prompt from the client's company context (profile, full Brand Brain, current campaigns — see
- * ClientContextBuilder) plus platform caption-length constraints, and asks DeepSeek's chat
- * completions endpoint for strict JSON matching each method's DTO shape. Not bound by default — provider selection (Step 2.7)
+ * ClientContextBuilder) plus platform caption-length constraints, and asks the Anthropic
+ * Messages API for strict JSON matching each method's DTO shape. Not bound by default — provider selection (Step 2.7)
  * decides when this (vs. App\Services\AI\NullAiProvider) is actually resolved against the
  * AiProvider contract.
  */
-class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, ReplyAssistant, WritingAssistant
+class AnthropicProvider implements AiProvider, CampaignAiProvider, CaptionRepurposer, GridAiProvider, InsightsSummarizer, LocalIdeaProvider, ReplyAssistant, WritingAssistant
 {
     /**
      * Schema is invalid/unparsable this many times before giving up and logging a failure.
@@ -57,7 +57,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     private const MAX_ATTEMPTS = 2;
 
     /**
-     * Upper bound when a truncated (`finish_reason = length`) attempt doubles max_tokens for its retry.
+     * Upper bound when a truncated (`stop_reason = max_tokens`) attempt doubles max_tokens for its retry.
      */
     private const MAX_TOKENS_CEILING = 16000;
 
@@ -212,7 +212,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildRepurposeUserPrompt($post, $platforms),
             validator: fn (array $data): ?string => $this->shapeError($data, 'variants', ['platform', 'caption']),
             context: ['org_id' => $post->org_id, 'client_id' => $post->client_id, 'post_id' => $post->id],
-            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(2000, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         if ($payload === null) {
@@ -244,7 +244,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
 
     /**
      * Step M-7.3: rewrite a caption with one editor writing tool, in the brand voice. Returns the
-     * rewritten text, or the original unchanged if DeepSeek fails (the editor stays usable). The
+     * rewritten text, or the original unchanged if Anthropic fails (the editor stays usable). The
      * Action guardrails and length-clamps the result, so this just asks for the rewrite.
      */
     public function rewrite(Client $client, string $text, WritingTool $tool, ?Platform $platform = null, ?string $tone = null): string
@@ -261,7 +261,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildRewriteUserPrompt($trimmed, $tool, $platform, $tone),
             validator: fn (array $data): ?string => is_string($data['text'] ?? null) ? null : 'text must be a string',
             context: ['org_id' => $client->org_id, 'client_id' => $client->id, 'tool' => $tool->value],
-            maxTokens: max(1500, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(1500, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         if ($payload === null || trim((string) $payload['text']) === '') {
@@ -279,7 +279,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildReplyUserPrompt($conversation, $instruction),
             validator: fn (array $data): ?string => is_string($data['text'] ?? null) ? null : 'text must be a string',
             context: ['org_id' => $client->org_id, 'client_id' => $client->id, 'inbox_conversation_id' => $conversation->id],
-            maxTokens: max(600, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(600, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         return $payload === null ? '' : trim((string) $payload['text']);
@@ -403,11 +403,11 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     }
 
     /**
-     * Step 16.5: DeepSeek as art director. Writes the creative fields of an image brief
+     * Step 16.5: Anthropic as art director. Writes the creative fields of an image brief
      * (subject, composition, mood, style) in strict JSON; the palette, references, headline and
      * do-nots are then applied deterministically by BrandImageBriefFactory::finalize(), never left
      * to the model. Uses the (fast) `ai.images.brief_model` when configured. Falls back to the
-     * brand-derived brief if DeepSeek fails, so "Generate" never dead-ends on the text model.
+     * brand-derived brief if Anthropic fails, so "Generate" never dead-ends on the text model.
      */
     public function draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief
     {
@@ -439,12 +439,12 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     /**
      * Step B-2.4: draft a business/creator's Brand Brain from the plain facts they gave onboarding.
      * No `Client` exists yet, so the system prompt carries no company context; everything the model
-     * grounds on is in the user prompt. Falls back to an empty draft if DeepSeek fails, so the
+     * grounds on is in the user prompt. Falls back to an empty draft if Anthropic fails, so the
      * wizard never dead-ends.
      */
     public function draftBrandProfile(BrandProfileInput $input): AiBrandProfileDraft
     {
-        $model = (string) config('ai.deepseek.model', 'deepseek-flash');
+        $model = (string) config('ai.anthropic.model', 'claude-sonnet-5-5');
 
         $payload = $this->requestStructured(
             method: 'draftBrandProfile',
@@ -452,14 +452,14 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildBrandProfileUserPrompt($input),
             validator: fn (array $data): ?string => is_array($data['voice'] ?? null) ? null : 'voice must be an object',
             context: ['brand_name' => $input->name],
-            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(2000, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         if ($payload === null) {
             return AiBrandProfileDraft::empty();
         }
 
-        return AiBrandProfileDraft::fromArray($payload, succeeded: true, provider: 'deepseek', model: $model);
+        return AiBrandProfileDraft::fromArray($payload, succeeded: true, provider: 'anthropic', model: $model);
     }
 
     /**
@@ -474,7 +474,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildCampaignBriefUserPrompt($campaign),
             validator: fn (array $data): ?string => is_string($data['background'] ?? null) ? null : 'background must be a string',
             context: ['org_id' => $campaign->org_id, 'client_id' => $campaign->client_id, 'campaign_id' => $campaign->id],
-            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(2000, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         return $payload === null ? new AiCampaignBriefDraft : AiCampaignBriefDraft::fromArray($payload);
@@ -492,7 +492,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildPlanCampaignUserPrompt($campaign, $input),
             validator: fn (array $data): ?string => $this->shapeError($data, 'deliverables', ['title', 'platform', 'date']),
             context: ['org_id' => $campaign->org_id, 'client_id' => $campaign->client_id, 'campaign_id' => $campaign->id],
-            maxTokens: max(4000, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(4000, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         if ($payload === null) {
@@ -525,7 +525,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: $this->buildCampaignWrapUserPrompt($campaign, $facts),
             validator: fn (array $data): ?string => is_string($data['summary'] ?? null) ? null : 'summary must be a string',
             context: ['org_id' => $campaign->org_id, 'client_id' => $campaign->client_id, 'campaign_id' => $campaign->id],
-            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(2000, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         return $payload === null ? new AiCampaignWrapDraft : AiCampaignWrapDraft::fromArray($payload);
@@ -557,7 +557,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             userPrompt: implode("\n", $lines),
             validator: fn (array $data): ?string => is_array($data['tiles'] ?? null) ? null : 'tiles must be an array',
             context: ['org_id' => $plan->org_id, 'client_id' => $plan->client_id, 'grid_plan_id' => $plan->id],
-            maxTokens: max(2000, (int) config('ai.deepseek.max_tokens', 1024)),
+            maxTokens: max(2000, (int) config('ai.anthropic.max_tokens', 1024)),
         );
 
         if ($payload === null) {
@@ -970,7 +970,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     }
 
     /**
-     * Call DeepSeek's chat completions endpoint and parse/validate the structured JSON
+     * Call Anthropic's chat completions endpoint and parse/validate the structured JSON
      * response, retrying once (per Step 2.2: "Reject and retry up to 1 time if schema invalid")
      * when the response is missing, unparsable, or doesn't match the expected shape. Every
      * failure path logs *why* it failed (HTTP status + vendor error, empty/truncated content,
@@ -983,12 +983,12 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
      */
     private function requestStructured(string $method, string $systemPrompt, string $userPrompt, callable $validator, array $context, ?string $model = null, ?int $maxTokens = null): ?array
     {
-        $model ??= (string) config('ai.deepseek.model', 'deepseek-flash');
+        $model ??= (string) config('ai.anthropic.model', 'claude-sonnet-5-5');
         $context = [...$context, 'method' => $method, 'model' => $model];
 
-        $maxTokens ??= (int) config('ai.deepseek.max_tokens', 1024);
+        $maxTokens ??= (int) config('ai.anthropic.max_tokens', 1024);
 
-        Log::info('DeepSeek request started', [
+        Log::info('Anthropic request started', [
             ...$context,
             'max_tokens' => $maxTokens,
             'prompt_chars' => mb_strlen($systemPrompt) + mb_strlen($userPrompt),
@@ -997,7 +997,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         $failure = null;
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
-            $result = $this->callChatCompletions($systemPrompt, $userPrompt, [...$context, 'attempt' => $attempt, 'max_tokens' => $maxTokens], $model, $maxTokens);
+            $result = $this->callMessages($systemPrompt, $userPrompt, [...$context, 'attempt' => $attempt, 'max_tokens' => $maxTokens], $model, $maxTokens);
 
             // Capture the most recent round trip's tokens/latency for metering (Step M-7.1).
             $this->lastUsage = [
@@ -1010,12 +1010,12 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
                 $failure = $validator($result['payload']);
 
                 if ($failure === null) {
-                    Log::info('DeepSeek request completed', [...$context, ...$result['meta'], 'attempt' => $attempt]);
+                    Log::info('Anthropic request completed', [...$context, ...$result['meta'], 'attempt' => $attempt]);
 
                     return $result['payload'];
                 }
 
-                Log::warning('DeepSeek response failed schema validation', [
+                Log::warning('Anthropic response failed schema validation', [
                     ...$context,
                     ...$result['meta'],
                     'attempt' => $attempt,
@@ -1032,11 +1032,11 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
                 // same way (reasoning models spend it all thinking), so give the retry more room.
                 $previousMaxTokens = $maxTokens;
 
-                if (($result['meta']['finish_reason'] ?? null) === 'length') {
+                if (($result['meta']['finish_reason'] ?? null) === 'max_tokens') {
                     $maxTokens = min($maxTokens * 2, self::MAX_TOKENS_CEILING);
                 }
 
-                Log::warning('DeepSeek request retrying', [
+                Log::warning('Anthropic request retrying', [
                     ...$context,
                     'attempt' => $attempt,
                     'reason' => $failure,
@@ -1046,7 +1046,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             }
         }
 
-        Log::error('DeepSeek request failed after retries', [...$context, 'attempts' => self::MAX_ATTEMPTS, 'last_reason' => $failure]);
+        Log::error('Anthropic request failed after retries', [...$context, 'attempts' => self::MAX_ATTEMPTS, 'last_reason' => $failure]);
 
         return null;
     }
@@ -1059,17 +1059,19 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
      * @param  array<string, mixed>  $context
      * @return array{payload: array<string, mixed>|null, failure: string|null, meta: array<string, mixed>}
      */
-    private function callChatCompletions(string $systemPrompt, string $userPrompt, array $context, string $model, int $maxTokens): array
+    private function callMessages(string $systemPrompt, string $userPrompt, array $context, string $model, int $maxTokens): array
     {
         $startedAt = microtime(true);
 
         try {
-            $response = $this->client()->post('/chat/completions', [
+            $response = $this->client()->post('/v1/messages', [
                 'model' => $model,
                 'max_tokens' => $maxTokens,
-                'response_format' => ['type' => 'json_object'],
+                'system' => $systemPrompt,
+                // Thinking is on by default on current models and is billed out of max_tokens, so
+                // keep the effort low for these short, fully-specified JSON jobs.
+                'output_config' => ['effort' => (string) config('ai.anthropic.effort', 'low')],
                 'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
             ]);
@@ -1080,7 +1082,7 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             $status = $e instanceof RequestException ? $e->response->status() : null;
             $vendorError = $e instanceof RequestException ? $this->vendorError($e->response->json()) : null;
 
-            Log::error('DeepSeek HTTP request threw an exception', [
+            Log::error('Anthropic HTTP request threw an exception', [
                 ...$context,
                 ...$meta,
                 'exception' => $e::class,
@@ -1095,19 +1097,20 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         $meta = [
             'duration_ms' => $this->elapsedMs($startedAt),
             'status' => $response->status(),
-            'finish_reason' => $response->json('choices.0.finish_reason'),
+            // Anthropic calls it stop_reason; kept under the old key so the metering/logging shape
+            // (and AiCallMeter's `lastUsage()` contract) stays unchanged.
+            'finish_reason' => $response->json('stop_reason'),
             'usage' => array_filter([
-                'prompt_tokens' => $response->json('usage.prompt_tokens'),
-                'completion_tokens' => $response->json('usage.completion_tokens'),
-                'reasoning_tokens' => $response->json('usage.completion_tokens_details.reasoning_tokens'),
-                'total_tokens' => $response->json('usage.total_tokens'),
+                'prompt_tokens' => $response->json('usage.input_tokens'),
+                'completion_tokens' => $response->json('usage.output_tokens'),
+                'cache_read_tokens' => $response->json('usage.cache_read_input_tokens'),
             ], fn ($value) => $value !== null),
         ];
 
         if (! $response->successful()) {
             $vendorError = $this->vendorError($response->json());
 
-            Log::warning('DeepSeek request rejected', [
+            Log::warning('Anthropic request rejected', [
                 ...$context,
                 ...$meta,
                 'vendor_error' => $vendorError,
@@ -1117,17 +1120,28 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
             return ['payload' => null, 'failure' => "http {$response->status()}: ".($vendorError ?? 'no error message'), 'meta' => $meta];
         }
 
-        $truncated = $meta['finish_reason'] === 'length';
-        $content = $response->json('choices.0.message.content');
+        $truncated = $meta['finish_reason'] === 'max_tokens';
+        $blocks = $response->json('content');
+        $blockTypes = $this->blockTypes($blocks);
 
-        if (! is_string($content) || trim($content) === '') {
-            $reasoning = $response->json('choices.0.message.reasoning_content');
+        // A safety classifier declined the request: HTTP 200, no usable content.
+        if ($meta['finish_reason'] === 'refusal') {
+            $category = $response->json('stop_details.category');
 
-            Log::warning('DeepSeek returned empty content', [
+            Log::warning('Anthropic declined the request', [...$context, ...$meta, 'refusal_category' => $category]);
+
+            return ['payload' => null, 'failure' => 'refused: '.(is_string($category) ? $category : 'unknown'), 'meta' => $meta];
+        }
+
+        $content = $this->textContent($blocks);
+
+        if ($content === null) {
+            Log::warning('Anthropic returned empty content', [
                 ...$context,
                 ...$meta,
-                'has_reasoning_content' => is_string($reasoning) && $reasoning !== '',
-                'hint' => $truncated ? 'max_tokens was exhausted before any answer was written — raise DEEPSEEK_MAX_TOKENS' : null,
+                'content_block_types' => $blockTypes,
+                'has_reasoning_content' => in_array('thinking', $blockTypes, true),
+                'hint' => $truncated ? 'max_tokens was exhausted before any answer was written — raise ANTHROPIC_MAX_TOKENS' : null,
             ]);
 
             return ['payload' => null, 'failure' => $truncated ? 'empty content (truncated at max_tokens)' : 'empty content', 'meta' => $meta];
@@ -1136,20 +1150,20 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
         try {
             $decoded = json_decode($content, true, flags: JSON_THROW_ON_ERROR);
         } catch (Throwable $e) {
-            Log::warning('DeepSeek returned unparsable JSON', [
+            Log::warning('Anthropic returned unparsable JSON', [
                 ...$context,
                 ...$meta,
                 'json_error' => $e->getMessage(),
                 'content_chars' => mb_strlen($content),
                 'response_excerpt' => $this->excerpt($content),
-                'hint' => $truncated ? 'response was cut off at max_tokens — raise DEEPSEEK_MAX_TOKENS' : null,
+                'hint' => $truncated ? 'response was cut off at max_tokens — raise ANTHROPIC_MAX_TOKENS' : null,
             ]);
 
             return ['payload' => null, 'failure' => $truncated ? 'invalid JSON (truncated at max_tokens)' : 'invalid JSON: '.$e->getMessage(), 'meta' => $meta];
         }
 
         if (! is_array($decoded)) {
-            Log::warning('DeepSeek returned JSON that is not an object', [
+            Log::warning('Anthropic returned JSON that is not an object', [
                 ...$context,
                 ...$meta,
                 'response_excerpt' => $this->excerpt($content),
@@ -1163,12 +1177,15 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
 
     private function client(): PendingRequest
     {
-        $apiKey = (string) config('ai.deepseek.api_key', '');
-        $timeout = (int) config('ai.deepseek.timeout', 30);
-        $baseUrl = (string) config('ai.deepseek.base_url', 'https://api.deepseek.com');
+        $apiKey = (string) config('ai.anthropic.api_key', '');
+        $timeout = (int) config('ai.anthropic.timeout', 30);
+        $baseUrl = (string) config('ai.anthropic.base_url', 'https://api.anthropic.com');
 
         return Http::baseUrl($baseUrl)
-            ->withToken($apiKey)
+            ->withHeaders([
+                'x-api-key' => $apiKey,
+                'anthropic-version' => (string) config('ai.anthropic.version', '2023-06-01'),
+            ])
             ->acceptJson()
             ->timeout($timeout)
             // Trivial exponential backoff with jitter on 429/5xx, per Step 2.2.
@@ -1194,7 +1211,57 @@ class DeepSeekProvider implements AiProvider, CampaignAiProvider, CaptionRepurpo
     }
 
     /**
-     * Pull the human-readable message out of a DeepSeek/OpenAI-style error body, if any.
+     * The `type` of every block in a Messages API response, for log context.
+     *
+     * @return array<int, string>
+     */
+    private function blockTypes(mixed $blocks): array
+    {
+        if (! is_array($blocks)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn (mixed $block): ?string => is_array($block) && is_string($block['type'] ?? null) ? $block['type'] : null,
+            $blocks
+        )));
+    }
+
+    /**
+     * The first non-empty text block of a Messages API response. The Messages API has no JSON
+     * response mode, so the prompts ask for JSON and the model occasionally wraps it in prose or
+     * a markdown fence — keep the outermost object when it does. Null when no block carries text
+     * (a thinking-only or truncated response).
+     */
+    private function textContent(mixed $blocks): ?string
+    {
+        if (! is_array($blocks)) {
+            return null;
+        }
+
+        foreach ($blocks as $block) {
+            if (! is_array($block) || ($block['type'] ?? null) !== 'text' || ! is_string($block['text'] ?? null)) {
+                continue;
+            }
+
+            $text = trim($block['text']);
+
+            if ($text === '') {
+                continue;
+            }
+
+            if (! str_starts_with($text, '{') && preg_match('/\{.*\}/s', $text, $matches) === 1) {
+                return $matches[0];
+            }
+
+            return $text;
+        }
+
+        return null;
+    }
+
+    /**
+     * Pull the human-readable message out of an Anthropic error body, if any.
      */
     private function vendorError(mixed $body): ?string
     {

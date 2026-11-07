@@ -18,12 +18,12 @@
 
 ## Purpose
 
-Graphy *is* an MCP server: it exposes Graphy's data and actions so AI assistants (Claude Desktop/web,
+Graphy _is_ an MCP server: it exposes Graphy's data and actions so AI assistants (Claude Desktop/web,
 ChatGPT, Cursor, anything that speaks MCP) can drive the agency on the user's behalf — "run your
 entire social-media agency from inside your AI assistant."
 
-The guiding idea (CLAUDE.md principle #3): an MCP tool is *just another thin entry point into the
-same business logic the web UI already uses.* A tool handler validates input, binds the token's
+The guiding idea (CLAUDE.md principle #3): an MCP tool is _just another thin entry point into the
+same business logic the web UI already uses._ A tool handler validates input, binds the token's
 acting member onto the auth guard (so `OrganizationScope`, policies and the checklist all apply),
 calls the same `App\Actions\*`, and maps the result to safe MCP output via `McpPresenters` — it never
 reimplements business rules.
@@ -34,34 +34,34 @@ All tools extend `App\Mcp\Tools\McpTool` (scope gate + rate limit + audit + `act
 declare their required scope(s), and are org-scoped. Read tools are `#[IsReadOnly]`; the irreversible
 MCP-4 tools are `#[IsDestructive]`.
 
-| Primitive | Name | Scope | Backing Action/query | Phase |
-|---|---|---|---|---|
-| Tool | `list_clients` | `Read` | org-scoped `Client` query + `McpPresenters::clientRow` | MCP-2.1 |
-| Tool | `get_client` | `Read` | `Client::healthFor()` + `ClientHealthService` | MCP-2.1 |
-| Tool | `get_brand_brain` | `Read` | `BrandBrain::toGrokContext()` | MCP-2.1 |
-| Tool | `list_posts` | `Read` | `ListPostsAction::query()` (pinned to org) | MCP-2.2 |
-| Tool | `get_post` | `Read` | `EvaluatePostChecklistAction` + per-target local/org times + **attached images as vision previews** (`McpImagePreview`, default on, `include_media`) | MCP-2.2 |
-| Tool | `get_calendar` | `Read` | `GetCalendarPostsAction` + `BuildCalendarOccurrencesAction` | MCP-2.3 |
-| Tool | `list_campaigns` | `Read` | org-scoped `Campaign` query | MCP-2.4 |
-| Tool | `get_campaign` | `Read` | `GetCampaignOverviewAction` | MCP-2.4 |
-| Tool | `list_assets` | `Read` | `SearchClientAssetsAction` (metadata only — no signed URLs) | MCP-2.4 |
-| Tool | `get_analytics_summary` | `Read` | `GetOrganizationAnalyticsSummaryAction` (viewer role scoping) | MCP-2.4 |
-| Tool | `create_draft_post` | `WriteDrafts` | `CreatePostAction` (+ `asset_ids` attached via `UpdatePostAction`) | MCP-3.1 |
-| Tool | `update_post` | `WriteDrafts` | `UpdatePostAction` (returns the diff) | MCP-3.2 |
-| Tool | `upload_media` | `WriteDrafts` | `CreateAssetFromBase64Action` → `SafeUpload` → `CreateAssetAction` | Media |
-| Tool | `set_post_media` | `WriteDrafts` | `UpdatePostAction` (`asset_ids` sync; replace/add/remove) | Media |
-| Tool | `request_media_upload` | `WriteDrafts` | `CreateMcpUploadSessionAction` (one browser link for a client + its posts; returns the URL, never the token) | Media (link) |
-| Tool | `get_media_upload` | `WriteDrafts` | `McpUploadSession` status → per-post + library asset ids + **the uploaded images as vision previews** (`McpImagePreview`) | Media (link) |
-| Tool | `transition_post_status` | `WriteDrafts` | `TransitionPostStatusAction` + `PostStatusTransitionMap` (capped ≤ approved) | MCP-3.3 |
-| Tool | `schedule_post` | `WriteSchedule` | re-runs checklist, then `TransitionPostStatusAction` → `PublishPostJob` `#[IsDestructive]` | MCP-4.1 |
-| Tool | `start_account_connection` | `WriteSchedule` | `CreateConnectInviteAction` (returns a connect URL, never a token) | MCP-4.2 |
-| Tool | `cancel_scheduled_post` | `WriteSchedule` | `TransitionPostStatusAction` (scheduled→approved, recalls vendor) `#[IsDestructive]` | MCP-4.3 |
-| Tool | `discover_trends` | `Ai` | `DiscoverTrendsAction` (budget + guardrails) | MCP-5.1 |
-| Tool | `recommend_posts` | `Ai` | `RecommendPostsAction` | MCP-5.1 |
-| Tool | `suggest_captions` | `Ai` | `SuggestCaptionsForPostAction` | MCP-5.1 |
-| Resource | `brand_brain` | (read) | the org's first client's Brand Brain markdown (`graphy://brand-brain`) | MCP-0.3 |
-| Prompt | `plan_week` | — | orchestrates get_brand_brain → get_calendar → trends/ideas → create_draft_post | MCP-5.2 |
-| Prompt | `fill_calendar_gaps` | — | orchestrates get_calendar → recommend_posts → create_draft_post | MCP-5.2 |
+| Primitive | Name                       | Scope           | Backing Action/query                                                                                                                                 | Phase        |
+| --------- | -------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Tool      | `list_clients`             | `Read`          | org-scoped `Client` query + `McpPresenters::clientRow`                                                                                               | MCP-2.1      |
+| Tool      | `get_client`               | `Read`          | `Client::healthFor()` + `ClientHealthService`                                                                                                        | MCP-2.1      |
+| Tool      | `get_brand_brain`          | `Read`          | `BrandBrain::toGrokContext()`                                                                                                                        | MCP-2.1      |
+| Tool      | `list_posts`               | `Read`          | `ListPostsAction::query()` (pinned to org)                                                                                                           | MCP-2.2      |
+| Tool      | `get_post`                 | `Read`          | `EvaluatePostChecklistAction` + per-target local/org times + **attached images as vision previews** (`McpImagePreview`, default on, `include_media`) | MCP-2.2      |
+| Tool      | `get_calendar`             | `Read`          | `GetCalendarPostsAction` + `BuildCalendarOccurrencesAction`                                                                                          | MCP-2.3      |
+| Tool      | `list_campaigns`           | `Read`          | org-scoped `Campaign` query                                                                                                                          | MCP-2.4      |
+| Tool      | `get_campaign`             | `Read`          | `GetCampaignOverviewAction`                                                                                                                          | MCP-2.4      |
+| Tool      | `list_assets`              | `Read`          | `SearchClientAssetsAction` (metadata only — no signed URLs)                                                                                          | MCP-2.4      |
+| Tool      | `get_analytics_summary`    | `Read`          | `GetOrganizationAnalyticsSummaryAction` (viewer role scoping)                                                                                        | MCP-2.4      |
+| Tool      | `create_draft_post`        | `WriteDrafts`   | `CreatePostAction` (+ `asset_ids` attached via `UpdatePostAction`)                                                                                   | MCP-3.1      |
+| Tool      | `update_post`              | `WriteDrafts`   | `UpdatePostAction` (returns the diff)                                                                                                                | MCP-3.2      |
+| Tool      | `upload_media`             | `WriteDrafts`   | `CreateAssetFromBase64Action` → `SafeUpload` → `CreateAssetAction`                                                                                   | Media        |
+| Tool      | `set_post_media`           | `WriteDrafts`   | `UpdatePostAction` (`asset_ids` sync; replace/add/remove)                                                                                            | Media        |
+| Tool      | `request_media_upload`     | `WriteDrafts`   | `CreateMcpUploadSessionAction` (one browser link for a client + its posts; returns the URL, never the token)                                         | Media (link) |
+| Tool      | `get_media_upload`         | `WriteDrafts`   | `McpUploadSession` status → per-post + library asset ids + **the uploaded images as vision previews** (`McpImagePreview`)                            | Media (link) |
+| Tool      | `transition_post_status`   | `WriteDrafts`   | `TransitionPostStatusAction` + `PostStatusTransitionMap` (capped ≤ approved)                                                                         | MCP-3.3      |
+| Tool      | `schedule_post`            | `WriteSchedule` | re-runs checklist, then `TransitionPostStatusAction` → `PublishPostJob` `#[IsDestructive]`                                                           | MCP-4.1      |
+| Tool      | `start_account_connection` | `WriteSchedule` | `CreateConnectInviteAction` (returns a connect URL, never a token)                                                                                   | MCP-4.2      |
+| Tool      | `cancel_scheduled_post`    | `WriteSchedule` | `TransitionPostStatusAction` (scheduled→approved, recalls vendor) `#[IsDestructive]`                                                                 | MCP-4.3      |
+| Tool      | `discover_trends`          | `Ai`            | `DiscoverTrendsAction` (budget + guardrails)                                                                                                         | MCP-5.1      |
+| Tool      | `recommend_posts`          | `Ai`            | `RecommendPostsAction`                                                                                                                               | MCP-5.1      |
+| Tool      | `suggest_captions`         | `Ai`            | `SuggestCaptionsForPostAction`                                                                                                                       | MCP-5.1      |
+| Resource  | `brand_brain`              | (read)          | the org's first client's Brand Brain markdown (`graphy://brand-brain`)                                                                               | MCP-0.3      |
+| Prompt    | `plan_week`                | —               | orchestrates get_brand_brain → get_calendar → trends/ideas → create_draft_post                                                                       | MCP-5.2      |
+| Prompt    | `fill_calendar_gaps`       | —               | orchestrates get_calendar → recommend_posts → create_draft_post                                                                                      | MCP-5.2      |
 
 `App\Support\Mcp\McpPresenters` is the single place that maps models to safe read shapes (gates
 billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-only health reasons).
@@ -77,7 +77,7 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   `ReviewToken`). `token_hash` is `#[Hidden]`.
 - **`McpCallLog` (`mcp_call_logs`)** — MCP-1.5. One audit row per executed MCP tool call. Columns:
   `org_id` (FK), `mcp_token_id` (nullable FK, `nullOnDelete` so history survives a token delete),
-  `tool` (name), `argument_keys` (json — the argument *names* only, never values), `outcome`
+  `tool` (name), `argument_keys` (json — the argument _names_ only, never values), `outcome`
   (`success`|`error`), `duration_ms`, timestamps. Uses `BelongsToOrganization` for parity with
   `AiUsageLog`; on the MCP transport there is no signed-in member so `OrganizationScope` is a no-op
   and the explicit `org_id` on write scopes it. **No column can carry a secret, token or argument
@@ -91,7 +91,7 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   the session, for the poll tool + library reporting), `expires_at`, `created_by` (nullable FK),
   timestamps. Uses `BelongsToOrganization`; `hashToken()` / `findActive()` (unscoped pre-auth lookup) /
   `isActive()` (`expires_at->isFuture()`) / `allowsPost()` mirror `ConnectInvite`. `const
-  DEFAULT_TTL_MINUTES = 60`. Not single-use — a `config('mcp.upload.max_files')` cap bounds abuse.
+DEFAULT_TTL_MINUTES = 60`. Not single-use — a `config('mcp.upload.max_files')` cap bounds abuse.
 
 ## Actions / Services / Contracts
 
@@ -111,10 +111,10 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   `McpContext::hasScope()`. `McpScope::default()`/`defaultValues()` is the single source of truth for
   a new token's read-only default. `label()` gives the owner-facing description for the MCP-6.1 page.
 - `App\Support\Mcp\Concerns\AuthorizesScope` (MCP-1.3): the scope gate. `denyUnlessScoped(McpScope
-  ...$required)` returns an MCP error `Response` (naming the missing scope) or `null`. All listed
+...$required)` returns an MCP error `Response` (naming the missing scope) or `null`. All listed
   scopes are required (AND). No `McpContext` (local/stdio + in-process tests) = trusted transport =
   `null` (no-op), mirroring `McpTenant`'s dev-org fallback. Rejections log at `warning` with
-  org/token/tool context, never the secret. A scope is *necessary, not sufficient* — the tool's
+  org/token/tool context, never the secret. A scope is _necessary, not sufficient_ — the tool's
   Action still enforces tenancy/policy/checklist on top.
 - `App\Mcp\Tools\McpTool` (MCP-1.3 → MCP-1.5): the base class every Graphy MCP tool extends (uses
   `AuthorizesScope` + `RateLimitsCalls`). A tool declares `requiredScopes(): list<McpScope>` and puts
@@ -123,7 +123,7 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   refused before anything, an under-scoped token never reaches any Action, and every executed call
   writes one audit row. The populated `Request` is forwarded unchanged; Actions/Services are
   constructor-injected (tools resolve from the container). With no `McpContext` (trusted local/stdio
-  + tests) it goes straight to `handleAuthorized()` — no limiting/audit.
+    - tests) it goes straight to `handleAuthorized()` — no limiting/audit.
 - `App\Support\Mcp\Concerns\RateLimitsCalls` (MCP-1.4): `enforceRateLimit(McpContext)` counts the
   call against a one-minute `RateLimiter` window keyed per token (falling back to org), returning a
   clean MCP error `Response` ("Rate limit reached…") when the budget is spent, else `null` (and one
@@ -131,7 +131,7 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   is neither counted again nor audited — it is already being throttled. Rejections log at `warning`.
 - `App\Actions\Mcp\RecordMcpCallAction` (MCP-1.5): the single write path for an `mcp_call_logs` row.
   Mirrors `RecordAiUsageAction`: wrapped in `DB::transaction()` and **never throws** (log-and-continue
-  on its own failure). Records `org_id`, token id, `tool`, argument *keys*, outcome and duration; logs
+  on its own failure). Records `org_id`, token id, `tool`, argument _keys_, outcome and duration; logs
   the call at `info` (success) / `warning` (failed call), and at `error` only if the insert itself
   fails. Never logs or stores the token or any argument value.
 - `App\Support\Mcp\McpContext` (MCP-1.2): readonly DTO — the resolved identity of an authenticated
@@ -150,22 +150,22 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
 ## Routes / Controllers
 
 - `routes/ai.php` registers **two transports**:
-  - **Local (stdio):** `Mcp::local('graphy', GraphyServer::class)` — an Artisan command
-    (`php artisan mcp:start graphy`) the MCP Inspector / Claude Desktop launches. Kept for local
-    dev and tests.
-  - **Remote (Streamable HTTP, MCP-1.1):** `Mcp::web(config('mcp.http.path', 'mcp'), GraphyServer::class)`
-    wrapped in a `Route::middleware(EnsureMcpHttpEnabled::class)->group(...)` so the gate covers all
-    verbs (`GET`/`DELETE` → 405 Allow: POST per the Streamable HTTP spec; `POST` → the JSON-RPC
-    handler). The package adds its own `ReorderJsonAccept`, `ValidateMcpHeaders` and
-    `AddWwwAuthenticateHeader` middleware to the POST route; MCP-1.2 appends `AuthenticateMcp` to the
-    POST route only (via `->middleware(AuthenticateMcp::class)` on the `Mcp::web(...)` return).
+    - **Local (stdio):** `Mcp::local('graphy', GraphyServer::class)` — an Artisan command
+      (`php artisan mcp:start graphy`) the MCP Inspector / Claude Desktop launches. Kept for local
+      dev and tests.
+    - **Remote (Streamable HTTP, MCP-1.1):** `Mcp::web(config('mcp.http.path', 'mcp'), GraphyServer::class)`
+      wrapped in a `Route::middleware(EnsureMcpHttpEnabled::class)->group(...)` so the gate covers all
+      verbs (`GET`/`DELETE` → 405 Allow: POST per the Streamable HTTP spec; `POST` → the JSON-RPC
+      handler). The package adds its own `ReorderJsonAccept`, `ValidateMcpHeaders` and
+      `AddWwwAuthenticateHeader` middleware to the POST route; MCP-1.2 appends `AuthenticateMcp` to the
+      POST route only (via `->middleware(AuthenticateMcp::class)` on the `Mcp::web(...)` return).
 - `App\Http\Middleware\EnsureMcpHttpEnabled`: `abort_unless(config('mcp.http.enabled'), 404)`. The
   HTTP route is always registered (so it is testable) but 404s for everyone while the flag is off —
   the default, including production. This is the per-env master switch (and the MCP-7.2 kill-switch
   surface); it runs outermost, before auth.
 - `App\Http\Middleware\AuthenticateMcp` (MCP-1.2): reads the `Authorization: Bearer` token, rejects
   a missing/unknown/revoked token with a bare HTTP **401** (the package's `AddWwwAuthenticateHeader`,
-  which wraps it on the route, then attaches the `WWW-Authenticate: Bearer` challenge) *before* the
+  which wraps it on the route, then attaches the `WWW-Authenticate: Bearer` challenge) _before_ the
   JSON-RPC dispatcher runs, so no tool/resource ever executes unauthenticated. On success it stamps
   `last_used_at` (quietly) and binds the per-request `McpContext` (org + scopes + optional user). It
   is on the **POST route only**, so the GET/DELETE 405 stubs stay unauthenticated (they carry no
@@ -174,16 +174,16 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   `php artisan route:clear` (a stale `bootstrap/cache/routes-v7.php` will otherwise hide `/mcp`).
 - **Public media-upload page (MCP media).** `routes/web.php`, in the `throttle:public-token` group
   beside `connect/{token}` (unauthenticated — the token is the capability):
-  - `GET mcp-upload/{token}` → `McpUploadController@show` — renders Inertia `mcp-upload/show` with the
-    session's client + target posts; an unknown/expired session → the same page null props at **410**.
-  - `POST mcp-upload/{token}` → `McpUploadController@store` — re-resolves the active session (410 if
-    not), enforces the `max_files` cap, validates `file` with the **same rules as `StoreAssetRequest`**
-    (`mimes:` + per-type size + `SafeUpload`) and `post_id` (must be one the session allows, else 403),
-    creates the asset via `CreateAssetAction`, appends it to the post via `UpdatePostAction`, and
-    records it on the session. JSON `{ asset }` on success; the session stays open for more files.
-  - Named `mcp-upload.show` / `mcp-upload.store`. Frontend `resources/js/pages/mcp-upload/show.tsx`
-    (`PublicShell`/`PublicTitle` + a local multi-file dropzone per post, posting via the `http`
-    helper). After adding the routes run `php artisan route:clear` then `wayfinder:generate --with-form`.
+    - `GET mcp-upload/{token}` → `McpUploadController@show` — renders Inertia `mcp-upload/show` with the
+      session's client + target posts; an unknown/expired session → the same page null props at **410**.
+    - `POST mcp-upload/{token}` → `McpUploadController@store` — re-resolves the active session (410 if
+      not), enforces the `max_files` cap, validates `file` with the **same rules as `StoreAssetRequest`**
+      (`mimes:` + per-type size + `SafeUpload`) and `post_id` (must be one the session allows, else 403),
+      creates the asset via `CreateAssetAction`, appends it to the post via `UpdatePostAction`, and
+      records it on the session. JSON `{ asset }` on success; the session stays open for more files.
+    - Named `mcp-upload.show` / `mcp-upload.store`. Frontend `resources/js/pages/mcp-upload/show.tsx`
+      (`PublicShell`/`PublicTitle` + a local multi-file dropzone per post, posting via the `http`
+      helper). After adding the routes run `php artisan route:clear` then `wayfinder:generate --with-form`.
 
 ## Business Rules
 
@@ -198,7 +198,7 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   `McpDevOrg` — dev-only, never reached over HTTP (the 401 fires first).
 - **Capability scopes are enforced per tool (MCP-1.3).** A token carries a `scopes` set (default
   `read`). Each tool extends `McpTool` and declares `requiredScopes()`; the gate rejects a token
-  missing any required scope with a clear MCP error *before* the tool's Action runs. The scope is
+  missing any required scope with a clear MCP error _before_ the tool's Action runs. The scope is
   necessary but not sufficient — the Action still enforces org tenancy, policies and the checklist.
   Resources are not yet scope-gated (they are read-only and every issued token holds `Read` by
   default); a resource base class can follow when a write/elevated resource appears.
@@ -206,8 +206,8 @@ billing fields, never emits an asset's signed `url`/`disk`/`path`, drops owner-o
   window keyed per token (falling back to org); over budget → a clean MCP error, never a 500. The
   trusted local/stdio transport is never throttled.
 - **Every executed call is audited (MCP-1.5).** `McpTool` writes exactly one `mcp_call_logs` row per
-  executed HTTP call (success *or* scope-denied error), via `RecordMcpCallAction`, recording only the
-  argument *keys*. Audit failure never breaks the call. Rate-limited calls are not audited (already
+  executed HTTP call (success _or_ scope-denied error), via `RecordMcpCallAction`, recording only the
+  argument _keys_. Audit failure never breaks the call. Rate-limited calls are not audited (already
   throttled).
 - **No secret ever leaves the server (MCP-1.6).** Only safe fields are returned; the `mcp_call_logs`
   row stores no value/secret/token; `token_hash` is `#[Hidden]` and the plain token is never
@@ -246,7 +246,7 @@ bytes** in a tool argument. There is deliberately **no server-side URL fetch** (
 base64 only works for small images: a model can't reliably transcribe a real photo (~90K base64 chars)
 into a tool argument without corrupting it, and it isn't a cap we can raise. **Verified:** MCP
 `tools/call` carries only JSON (no client→server binary channel), Claude Desktop doesn't hand chat
-attachments to tools, and the model only *sees* the image as pixels — so a pasted image can't be pulled
+attachments to tools, and the model only _sees_ the image as pixels — so a pasted image can't be pulled
 through MCP. (The MCP spec's own emerging direction, SEP-2631 `files/authorizeUpload`, is this same
 one-time-upload-URL pattern.) The robust path hands the **human** the bytes via a browser link, reusing
 the connect-invite pattern end to end, and is a **batch session** so one link covers many files and
@@ -265,7 +265,7 @@ many posts ("create 3 posts, I'll upload media for each"):
   open (not single-use) until it expires; a `max_files` cap bounds abuse.
 - **`get_media_upload`** (`WriteDrafts`, `#[IsReadOnly]`) polls by `session_id` and returns **both** a
   text summary (per-post attached asset ids + any library uploads, safe `McpPresenters::asset()`
-  metadata) **and the uploaded images themselves as vision previews**, so the assistant can *see* the
+  metadata) **and the uploaded images themselves as vision previews**, so the assistant can _see_ the
   media and write captions from it, then chain the ids into `create_draft_post` / `set_post_media`. It
   returns `Response::make([...])` — a text block (the JSON summary), then, newest-first and capped at
   24, a `"Asset {id}:"` text block + a `Response::image()` preview per uploaded image, built by
@@ -281,17 +281,17 @@ flow and sidesteps a real client-side failure mode observed in the wild: Claude 
 schema and both int/string values are proven correct by `McpUploadSessionTest` (incl. an HTTP-transport
 test), so the fix is to not depend on that call for post-attached media.
 
-**Media-FIRST ordering (as built):** when content should be shaped *by* media the user provides, the
+**Media-FIRST ordering (as built):** when content should be shaped _by_ media the user provides, the
 instructions tell the model to get the media before finalising captions — either library-first
 (`request_media_upload` with no posts → view → `create_draft_post(asset_ids, caption)`) or placeholder-
 posts-first (`create_draft_post` ×N empty → `request_media_upload(post_ids)` → view each post's media →
 `update_post` to write each caption from it).
 
 **Vision = a deliberate, scoped exception to "no media reaches the AI".** `get_media_upload` sends image
-*bytes* (a downscaled preview of the user's own just-uploaded media) to the user's own AI client —
+_bytes_ (a downscaled preview of the user's own just-uploaded media) to the user's own AI client —
 never a signed URL or storage path, never to a third party. "No signed URL / storage path leaves the
 server" still holds (proven by `McpUploadSessionTest`, which asserts the image is present yet the path
-and `/files/` signed-URL prefix are not). The model still never carries bytes *into* Graphy; this is
+and `/files/` signed-URL prefix are not). The model still never carries bytes _into_ Graphy; this is
 the reverse direction, and only for session uploads.
 
 ## How to run it (manual round-trip)
@@ -303,31 +303,31 @@ the reverse direction, and only for session uploads.
 ## Tests
 
 - `tests/Feature/Mcp/GraphyMcpSpikeTest.php`:
-  - the server advertises `ListClientsTool` and `BrandBrainResource` (`tools()/resources()
-    ->assertRegistered`);
-  - `list-clients` returns the dev org's clients and **does not** include another org's client
-    (documents single-org reads — not a tenancy proof, which is MCP-1);
-  - the brand-brain resource returns the `toGrokContext()` markdown;
-  - `list-clients` reports an empty structured list when the dev org has no clients.
+    - the server advertises `ListClientsTool` and `BrandBrainResource` (`tools()/resources()
+->assertRegistered`);
+    - `list-clients` returns the dev org's clients and **does not** include another org's client
+      (documents single-org reads — not a tenancy proof, which is MCP-1);
+    - the brand-brain resource returns the `toGrokContext()` markdown;
+    - `list-clients` reports an empty structured list when the dev org has no clients.
 - `tests/Feature/Mcp/McpHttpTransportTest.php` (MCP-1.1):
-  - every verb on `/mcp` 404s while `mcp.http.enabled` is false (the production default);
-  - with the flag on, `GET /mcp` returns 405 + `Allow: POST` (proving the transport is mounted);
-  - with the flag on, a `POST /mcp` `tools/list` JSON-RPC call (now with a bearer token, MCP-1.2)
-    returns 200 and lists `list_clients` over HTTP (a real round-trip; a legacy request with no
-    `_meta` reaches the dispatcher without an initialize handshake).
+    - every verb on `/mcp` 404s while `mcp.http.enabled` is false (the production default);
+    - with the flag on, `GET /mcp` returns 405 + `Allow: POST` (proving the transport is mounted);
+    - with the flag on, a `POST /mcp` `tools/list` JSON-RPC call (now with a bearer token, MCP-1.2)
+      returns 200 and lists `list_clients` over HTTP (a real round-trip; a legacy request with no
+      `_meta` reaches the dispatcher without an initialize handshake).
 - `tests/Feature/Mcp/McpAuthTest.php` (MCP-1.2) — the auth + tenancy proof:
-  - an unauthenticated `POST /mcp` is rejected 401 with a `WWW-Authenticate: Bearer` challenge;
-  - an unknown bearer token and a revoked token are both rejected 401;
-  - **two-org isolation:** org A's token sees only org A's client (never org B's) and vice versa;
-  - an authenticated call stamps `last_used_at`;
-  - `CreateMcpTokenAction` stores only the SHA-256, never the plain token.
+    - an unauthenticated `POST /mcp` is rejected 401 with a `WWW-Authenticate: Bearer` challenge;
+    - an unknown bearer token and a revoked token are both rejected 401;
+    - **two-org isolation:** org A's token sees only org A's client (never org B's) and vice versa;
+    - an authenticated call stamps `last_used_at`;
+    - `CreateMcpTokenAction` stores only the SHA-256, never the plain token.
 - `tests/Feature/Mcp/McpScopeTest.php` (MCP-1.3) — the capability-gating proof (via the test-only
   `Tests\Fixtures\Mcp\ScopeTestServer` registering `list_clients` + `Tests\Fixtures\Mcp\SampleWriteTool`):
-  - a `read`-only token calling the `write:drafts` tool is rejected with a scope error (and the tool's
-    work never runs);
-  - a token with `write:drafts` runs the write tool;
-  - with no `McpContext` (trusted local/stdio) the gate is a no-op and the tool runs;
-  - `list_clients` is rejected for a token lacking `read`, and runs for one holding it.
+    - a `read`-only token calling the `write:drafts` tool is rejected with a scope error (and the tool's
+      work never runs);
+    - a token with `write:drafts` runs the write tool;
+    - with no `McpContext` (trusted local/stdio) the gate is a no-op and the tool runs;
+    - `list_clients` is rejected for a token lacking `read`, and runs for one holding it.
 - `tests/Feature/Mcp/McpRateLimitTest.php` (MCP-1.4): over-budget HTTP calls return a clean
   `isError` "Rate limit reached" result (HTTP 200, not a 500); `per_minute = 0` disables it; the
   per-token key means one connection can't throttle another.
@@ -384,14 +384,15 @@ the reverse direction, and only for session uploads.
 the token's user, else the org's Owner) onto the auth guard for the request, so every reused query/
 policy runs org-scoped exactly as the web UI. `McpTool::actAsOrganizationMember()` does the same on
 the trusted local transport (binds the dev org's Owner) and fails closed (null) when no member
-resolves. Tools *also* pin queries with an explicit `org_id` filter (belt-and-suspenders).
+resolves. Tools _also_ pin queries with an explicit `org_id` filter (belt-and-suspenders).
 
 **Models / columns.** `organizations.mcp_enabled` (MCP-7.2, boolean, default off; `OrganizationFactory`
 defaults it on for tests, `mcpDisabled()` for the off path) — the per-org master switch checked in
-`AuthenticateMcp` (403 when off, *after* the 401 auth check). No other new tables (MCP-2–5 are all
+`AuthenticateMcp` (403 when off, _after_ the 401 auth check). No other new tables (MCP-2–5 are all
 reuse; `mcp_tokens`/`mcp_call_logs` are unchanged from MCP-1).
 
 **New Actions / support.**
+
 - `App\Actions\Mcp\CreateMcpUploadSessionAction` (MCP media): mints an `McpUploadSession` and returns
   `['session', 'token', 'url']` where `url = route('mcp-upload.show', $token)`. `Str::random(64)` →
   stores only the SHA-256 → raw token returned once (in the URL), never logged. Single insert (no
@@ -405,6 +406,7 @@ reuse; `mcp_tokens`/`mcp_call_logs` are unchanged from MCP-1).
 - `App\Mcp\Prompts\PlanWeekPrompt` / `FillCalendarGapsPrompt`: orchestration-only prompts.
 
 **Routes / controllers.**
+
 - `App\Http\Controllers\Settings\McpConnectionController` (Owner-only via `OrganizationPolicy::update`)
   renders `settings/ai-connections` and handles `store` (create token via `CreateMcpTokenAction`,
   flashes the plain token once), `destroy` (revoke, org-guarded binding), `updateSettings` (toggle
@@ -431,7 +433,7 @@ is enforced and the test that proves it.
   needs an elevated scope (and extend rate limiting/audit to resources then).
 - **Off by default is a deployment choice, not a missing guardrail.** Phase MCP-1 is complete, so the
   endpoint is safe to enable; it stays off (`MCP_HTTP_ENABLED`) until there is a settings surface to
-  issue tokens (MCP-6.1) and a per-org master switch (MCP-7.2). No audit *UI* yet — `mcp_call_logs` is
+  issue tokens (MCP-6.1) and a per-org master switch (MCP-7.2). No audit _UI_ yet — `mcp_call_logs` is
   written but only surfaced in Settings in MCP-7.1.
 - **Phase 13 convergence** (`.junie/plans/mcp-server.md` §Prerequisites): Phase 13 (Public API /
   `ApiToken` / Sanctum) is **not built** as of MCP-1.2, so this plan stood up its own token/org/scope
@@ -486,9 +488,9 @@ they have an MCP server at all — that question is settled.
   images as `Response::image()` previews (new `App\Support\Mcp\McpImagePreview` — bounded ~768px JPEG via
   `AssetStorage::contents()` + GD, thumbnail-or-original, best-effort). Reworked the `GraphyServer`
   instructions + `request_media_upload`/`get_media_upload` descriptions so the model gets media FIRST and
-  writes captions *from* it (fixes a run where it created posts but never issued the link and captioned
+  writes captions _from_ it (fixes a run where it created posts but never issued the link and captioned
   before any media existed). This is a deliberate, scoped reversal of "no media reaches the AI": image
-  *bytes* of the user's own uploads go to the user's own AI client, never a signed URL/path (asserted in
+  _bytes_ of the user's own uploads go to the user's own AI client, never a signed URL/path (asserted in
   `McpUploadSessionTest`). Code + instructions only — **no migration, no `npm build`**; deploy = pull +
   fpm reload + reconnect Claude. Pint + PHPStan L7 clean; tests green.
 - 2026-10-26: Media over MCP — out-of-band upload link as a **batch session**. base64 can't carry real
@@ -542,7 +544,7 @@ they have an MCP server at all — that question is settled.
   `config('mcp.rate_limit.per_minute')`; `McpTool` now rate-limits every HTTP call per token/org and
   refuses cleanly over budget (`McpRateLimitTest`). MCP-1.5: `McpCallLog` + `mcp_call_logs` migration +
   `RecordMcpCallAction` (DB::transaction, log-and-continue); `McpTool` writes one audit row per
-  executed call with argument *keys* only (`McpAuditTest`). MCP-1.6: `McpSecretsGuardTest` enumerates
+  executed call with argument _keys_ only (`McpAuditTest`). MCP-1.6: `McpSecretsGuardTest` enumerates
   every registered primitive and asserts no secret leaks (schema + real output, with an adversarial
   sentinel token) and forces coverage of new primitives. Pint + PHPStan L7 clean; 27 MCP tests green.
   Endpoint stays off by default as a deployment choice; next is Phase MCP-2 (read tools/resources).
@@ -555,6 +557,6 @@ they have an MCP server at all — that question is settled.
   destructive). MCP-5: `discover_trends`/`recommend_posts`/`suggest_captions` + `plan_week`/
   `fill_calendar_gaps` prompts. MCP-6.1: `McpConnectionController` + `settings/ai-connections` page +
   `RevokeMcpTokenAction`. MCP-6.2: `docs/connecting-your-ai-assistant.md`. MCP-7.1: `GetMcpUsageAction`
-  + usage/audit panel. MCP-7.2: `organizations.mcp_enabled` per-org master switch (403 after auth) +
-  immediate token revoke. MCP-7.3: `.junie/mcp-security-review.md`. Secrets guard extended to cover
-  every new primitive (incl. prompts); 58 MCP feature tests green; Pint + PHPStan L7 clean; tsc green.
+    - usage/audit panel. MCP-7.2: `organizations.mcp_enabled` per-org master switch (403 after auth) +
+      immediate token revoke. MCP-7.3: `.junie/mcp-security-review.md`. Secrets guard extended to cover
+      every new primitive (incl. prompts); 58 MCP feature tests green; Pint + PHPStan L7 clean; tsc green.

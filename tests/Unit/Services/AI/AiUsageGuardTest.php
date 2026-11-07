@@ -30,8 +30,8 @@ class AiUsageGuardTest extends TestCase
     {
         $log = AiUsageLog::create([
             'org_id' => $org->id,
-            'provider' => 'deepseek',
-            'model' => 'deepseek-flash',
+            'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5-5',
             'method' => 'suggestCaptions',
             'succeeded' => true,
             'cost_estimate' => 0.002,

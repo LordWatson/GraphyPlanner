@@ -43,7 +43,7 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="AI_ENABLED" value="false"/>
-        <env name="DEEPSEEK_API_KEY" value=""/>
+        <env name="ANTHROPIC_API_KEY" value=""/>
         <env name="AI_IMAGE_PROVIDER" value="null"/>
         <env name="GEMINI_API_KEY" value=""/>
         <env name="OPENAI_API_KEY" value=""/>

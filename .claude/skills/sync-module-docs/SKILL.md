@@ -12,10 +12,10 @@ description: Update .junie/modules/*.md (and the README status table / plan step
 3. For each affected module file, edit only the relevant sections of the template:
    Purpose · Models / Tables · Actions / Services / Contracts · Routes / Controllers · Business Rules ·
    Tests · Known Gaps / Open Questions · Changelog.
-   - Name real classes, routes (`METHOD /path → Controller@method`) and test files — verify each
-     exists; never document something that isn't in the code.
-   - Append a Changelog line: `- YYYY-MM-DD: <what changed and why>` (use today's date).
-   - Remove gaps that the change closed; add new ones that it deferred.
+    - Name real classes, routes (`METHOD /path → Controller@method`) and test files — verify each
+      exists; never document something that isn't in the code.
+    - Append a Changelog line: `- YYYY-MM-DD: <what changed and why>` (use today's date).
+    - Remove gaps that the change closed; add new ones that it deferred.
 4. New module with no file → create it from the template in `.junie/modules/README.md` and add a row
    to the README table.
 5. If a plan step was completed, update its status in the README table and add ` ✅ Done` to the

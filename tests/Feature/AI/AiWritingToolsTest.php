@@ -34,14 +34,15 @@ class AiWritingToolsTest extends TestCase
         Config::set('ai.enabled', true);
     }
 
-    private function fakeDeepSeek(string $text): void
+    private function fakeAnthropic(string $text): void
     {
-        Config::set('ai.deepseek.api_key', 'sk-test');
-        Config::set('ai.deepseek.base_url', 'https://api.deepseek.test');
+        Config::set('ai.anthropic.api_key', 'sk-test');
+        Config::set('ai.anthropic.base_url', 'https://api.anthropic.test');
 
         Http::fake([
-            '*/chat/completions' => Http::response([
-                'choices' => [['finish_reason' => 'stop', 'message' => ['content' => json_encode(['text' => $text])]]],
+            '*/v1/messages' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode(['text' => $text])]],
+                'stop_reason' => 'end_turn',
                 'usage' => ['prompt_tokens' => 60, 'completion_tokens' => 40],
             ], 200),
         ]);
@@ -49,7 +50,7 @@ class AiWritingToolsTest extends TestCase
 
     public function test_rewrite_returns_and_meters_a_shortened_caption(): void
     {
-        $this->fakeDeepSeek('Short and punchy.');
+        $this->fakeAnthropic('Short and punchy.');
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -65,14 +66,14 @@ class AiWritingToolsTest extends TestCase
         $this->assertDatabaseHas('ai_usage_logs', [
             'org_id' => $org->id,
             'method' => 'rewrite',
-            'provider' => 'deepseek',
+            'provider' => 'anthropic',
             'succeeded' => true,
         ]);
     }
 
     public function test_adapt_clamps_to_the_platform_caption_limit(): void
     {
-        $this->fakeDeepSeek(str_repeat('x', 5000));
+        $this->fakeAnthropic(str_repeat('x', 5000));
 
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
@@ -97,7 +98,7 @@ class AiWritingToolsTest extends TestCase
         $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
 
         AiUsageLog::create([
-            'org_id' => $org->id, 'provider' => 'deepseek', 'model' => 'deepseek-flash',
+            'org_id' => $org->id, 'provider' => 'anthropic', 'model' => 'claude-sonnet-5-5',
             'method' => 'rewrite', 'succeeded' => true, 'prompt_tokens' => 120, 'completion_tokens' => 0,
         ]);
 

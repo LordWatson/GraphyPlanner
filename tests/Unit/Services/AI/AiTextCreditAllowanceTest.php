@@ -30,8 +30,8 @@ class AiTextCreditAllowanceTest extends TestCase
         for ($i = 0; $i < $count; $i++) {
             AiUsageLog::create([
                 'org_id' => $org->id,
-                'provider' => 'deepseek',
-                'model' => 'deepseek-chat',
+                'provider' => 'anthropic',
+                'model' => 'claude-sonnet-5-5',
                 'method' => 'suggest_captions',
                 'succeeded' => true,
                 'prompt_tokens' => 100,

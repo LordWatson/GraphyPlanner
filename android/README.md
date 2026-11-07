@@ -11,12 +11,12 @@ generator.
 
 ## What is in the repo
 
-| Thing | Where |
-|---|---|
-| The wrapper's configuration | `android/twa-manifest.json` |
-| The Digital Asset Links file | served at `/.well-known/assetlinks.json` from `config/twa.php` |
-| The web manifest it wraps | `public/manifest.webmanifest` |
-| Store listing copy and the data-safety answers | `android/play-listing.md` |
+| Thing                                          | Where                                                          |
+| ---------------------------------------------- | -------------------------------------------------------------- |
+| The wrapper's configuration                    | `android/twa-manifest.json`                                    |
+| The Digital Asset Links file                   | served at `/.well-known/assetlinks.json` from `config/twa.php` |
+| The web manifest it wraps                      | `public/manifest.webmanifest`                                  |
+| Store listing copy and the data-safety answers | `android/play-listing.md`                                      |
 
 ## Building it
 

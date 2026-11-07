@@ -5,7 +5,7 @@ namespace App\Actions\AI;
 use App\Contracts\LocalIdeaProvider;
 use App\Models\Client;
 use App\Services\AI\AiTextUsage;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\IdeaContextBuilder;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\IdeaContext;
@@ -41,15 +41,15 @@ class GenerateBrandIdeasAction
         $startedAt = microtime(true);
         $ideas = $this->provider->recommendLocalPosts($brand, $context);
 
-        $deepSeek = $this->provider instanceof DeepSeekProvider;
+        $anthropic = $this->provider instanceof AnthropicProvider;
         $this->usage->record(
             $brand,
             'recommendLocalPosts',
             $ideas->ideas !== [],
             $startedAt,
-            $deepSeek ? 'deepseek' : 'null',
-            $deepSeek ? (string) config('ai.deepseek.model', 'deepseek-flash') : 'none',
-            $deepSeek ? (float) config('ai.deepseek.estimated_cost_per_call', 0) : 0.0,
+            $anthropic ? 'anthropic' : 'null',
+            $anthropic ? (string) config('ai.anthropic.model', 'claude-sonnet-5-5') : 'none',
+            $anthropic ? (float) config('ai.anthropic.estimated_cost_per_call', 0) : 0.0,
         );
 
         return $this->recommendPosts->filterAndPersist($brand, $ideas);

@@ -8,16 +8,16 @@ Adapted from the original developer specification with three corrections:
 
 Suggested stack to match this, for consistency with your other Laravel/React/Inertia projects:
 
-| Layer | Choice                                                          |
-|---|-----------------------------------------------------------------|
-| Framework | Laravel 13                                                      |
-| Frontend | Inertia.js + React                                              |
-| Database | MySQL 8 (tests on in-memory SQLite)                              |
-| Auth | Laravel Fortify or Breeze (email/password) + Socialite (Google) |
-| Media | S3-compatible storage via Laravel's filesystem disk             |
+| Layer      | Choice                                                          |
+| ---------- | --------------------------------------------------------------- |
+| Framework  | Laravel 13                                                      |
+| Frontend   | Inertia.js + React                                              |
+| Database   | MySQL 8 (tests on in-memory SQLite)                             |
+| Auth       | Laravel Fortify or Breeze (email/password) + Socialite (Google) |
+| Media      | S3-compatible storage via Laravel's filesystem disk             |
 | Jobs/Queue | Laravel Queues (database or Redis driver)                       |
-| Testing | PHPUnit (class-based, `Tests\TestCase`)                         |
-| Secrets | `.env`, never exposed to the frontend bundle                    |
+| Testing    | PHPUnit (class-based, `Tests\TestCase`)                         |
+| Secrets    | `.env`, never exposed to the frontend bundle                    |
 
 Each step below is scoped to be handed to an AI coding agent (Junie) as a single unit of work — a clear goal, the files/models it touches, and a definition of done. Steps within a phase are ordered; phases are meant to be completed and demoable in sequence, matching the original spec's phased delivery (Section 11).
 
@@ -28,12 +28,14 @@ Each step below is scoped to be handed to an AI coding agent (Junie) as a single
 Goal: real clients, brand brains, assets, dual-timezone editor, review link, and health scoring — all working with no vendor publish integration yet.
 
 ### Step 0.1 — Project scaffold
+
 - New Laravel 13 project with Inertia + React + Breeze/Fortify auth scaffolding.
 - Configure the MySQL connection, `.env.example` with placeholders for `UPLOAD_POST_API_KEY` and `XAI_API_KEY` (unused until later phases, but reserved now).
 - Set up PHPUnit.
 - **Done when**: fresh install boots, migrates, and a logged-in user sees an empty dashboard shell.
 
 ### Step 0.2 — Organizations, users, roles ✅ Done
+
 - Migrations/models: `organizations`, `users` (with `org_id`, `role`).
 - Roles: Owner, Strategist, Designer, Client reviewer, Viewer (spec §3).
 - Laravel policies/gates enforcing the access table in §3 (e.g. Designer restricted to assets/Figma links; Client reviewer scoped to one client with no billing visibility).
@@ -43,6 +45,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   See `.junie/modules/organizations-users.md`.
 
 ### Step 0.3 — Client (CRM) model ✅ Done
+
 - Migration/model per spec §4.2: name, legalName, website, industry, countries[], status enum, ownerUserId, startDate, retainerAmount, billingCycle, tags[], defaultLanguage, notesInternal, approvalEmail.
 - CRUD controllers + Inertia pages (list, create, edit, show).
 - **Done when**: an Owner can create/edit/list clients through the UI.
@@ -51,6 +54,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   `resources/js/pages/clients/`. See `.junie/modules/clients.md`.
 
 ### Step 0.4 — Client health computation ✅ Done
+
 - Computed (not stored) health status: Red / Amber / Green per the rules in §4.2.
 - A `healthReason` string accompanying the pill on every client row.
 - Cover as a service class / accessor, not inline controller logic, so Home (Step 0.9) can reuse it.
@@ -63,6 +67,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   on revisiting once those models land. See `.junie/modules/clients.md`.
 
 ### Step 0.5 — BrandBrain ✅ Done
+
 - 1:1 model with Client, structured fields per §4.3 (Voice, Audience, Offer, Visual, Music policy, Hashtag policy, Content pillars).
 - Editor UI as tabs (ties into UI contract §9 "Brand brain editor tabs").
 - `toGrokContext()` method returning markdown + JSON — implement now even though Grok isn't wired up until Phase 2, so the contract is fixed early.
@@ -76,6 +81,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   `.junie/modules/brand-brain.md` for details and open questions.
 
 ### Step 0.6 — SocialAccount ✅ Done
+
 - Model per §4.4: platform enum, handle, displayName, **timezone (IANA, required)**, language, country, default location, postingWindows[], personaOverride.
 - `connectionStatus` enum: not_connected | connected | token_expired.
 - `publisher` fields present in schema now (`provider`, `externalProfileId`, `externalAccountId`, `connectedAt`) but unused until Phase 1 — do not wire to any vendor yet.
@@ -92,6 +98,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   for details and open questions.
 
 ### Step 0.7 — Campaigns and Assets ✅ Done
+
 - Campaign model (§4.5).
 - Asset model with `source` (upload | figma | url), type, dimensions, rights, `variantGroupId`.
 - Upload flow to S3-compatible storage via signed URLs (spec §10 — no direct public writes).
@@ -109,6 +116,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   `.junie/modules/campaigns.md` / `assets.md` for details and open questions.
 
 ### Step 0.8 — Post and PostTarget ✅ Done
+
 - This is the core data model — implement carefully per §4.6.
 - `Post`: status enum (`idea → draft → internal_review → waiting_client → changes_requested → approved → scheduled → publishing → published → failed → archived`), approvalMode, masterCaption, hashtags[], music object, location object, checklist snapshot, etc.
 - `PostTarget`: one row per selected social account, with **independent** `scheduledLocalDate`/`scheduledLocalTime`/`scheduledAtUtc` per target.
@@ -126,6 +134,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   two-value enum — see `.junie/modules/posts.md` for details and open questions.
 
 ### Step 0.9 — Post status transitions ✅ Done
+
 - `POST /posts/:id/transition { to: status }` with guardrails (no illegal transitions — enumerate the state machine explicitly as a first-class map, not scattered if/else).
 - Approval records, Activity log, Comments (with `internalOnly` flag).
 - `ReviewToken` model: token, postId or clientId, expiresAt, revoked.
@@ -144,6 +153,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   yet branch on `approval_mode`).
 
 ### Step 0.10 — Editor UI ✅ Done
+
 - Per §9: choose client first → accounts filtered to that client → one schedule row per target → character counts → location → music (with `apiAttachable` badge, publish adapter stubbed as unavailable in this phase) → checklist panel.
 - Checklist logic per §6, run client-side and re-validated server-side before any transition to `scheduled`.
 - **Done when**: a post can move from draft through to "approved" via the UI with the checklist enforced.
@@ -163,6 +173,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   and open questions.
 
 ### Step 0.11 — Calendar UI ✅ Done
+
 - Month / week / day / list views.
 - Toggle between "each account local" and "my timezone" display modes.
 - Filters (client, campaign, status, platform).
@@ -179,6 +190,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   `.junie/modules/calendar.md` for details and open questions.
 
 ### Step 0.12 — Home (needs-attention) ✅ Done
+
 - `GET /home` payload: failed publishes (unused until Phase 1, but structure it), waiting approvals, missing media, disconnected accounts.
 - UI rows open the relevant post.
 - **Done when**: seeded fixtures for each health/attention trigger produce a Home row.
@@ -194,6 +206,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   status/trigger definitions and open questions.
 
 ### Step 0.13 — Client review portal (`/review/:token`) ✅ Done
+
 - Light theme, no money fields, Approve / Request changes actions only.
 - Token hashed at rest (§10); queries scoped strictly by `token.clientId`.
 - **Done when**: the acceptance test from §12 passes — a reviewer token cannot see retainer amount or any other client's data.
@@ -212,6 +225,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   See `.junie/modules/posts.md` for details and open questions.
 
 ### Step 0.14 — Preview mode ✅ Done
+
 - `/preview/*` — frozen fixture/seed data, visible banner, **no writes to production data**.
 - All publish-adjacent routes return 403 in preview context (relevant once Phase 1 lands, but the guard should exist now).
 - **Done when**: the §12 acceptance test passes — preview cannot trigger a write, confirmed by attempting a mutating request against a preview-scoped resource and asserting rejection.
@@ -226,6 +240,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   forms in reused pages still pointing at non-`preview.` routes.
 
 ### Step 0.15 — Settings ✅ Done
+
 - Owner-only: Upload-Post key field (stored server-side only), xAI key field, default org timezone.
 - Confirm no secret ever appears in an Inertia page prop or client-visible payload — add an automated check (e.g. a PHPUnit test asserting the props payload excludes key fields) rather than relying on manual review.
 - **Done when**: keys save server-side and are never present in a rendered page's JSON props.
@@ -239,6 +254,7 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
   `resources/js/pages/settings/organization.tsx`. See `.junie/modules/settings.md` for details.
 
 ### Phase 0 exit criteria (from spec §12)
+
 - Dual-timezone editor test passes.
 - Reviewer isolation test passes.
 - Preview cannot write/publish.
@@ -251,12 +267,13 @@ Goal: real clients, brand brains, assets, dual-timezone editor, review link, and
 Goal: real scheduled posts actually publish, via Upload-Post, starting with one test brand then one paying client.
 
 ### Step 1.1 — PublishAdapter interface ✅ Done
+
 - Define the adapter contract in PHP (interface), mirroring spec §7:
-  - `connectAccount(account)`
-  - `handleCallback(query)`
-  - `publish(post, targets)`
-  - `cancel(externalPostId)` (optional)
-  - `health(account)`
+    - `connectAccount(account)`
+    - `handleCallback(query)`
+    - `publish(post, targets)`
+    - `cancel(externalPostId)` (optional)
+    - `health(account)`
 - **Done when**: the interface exists with no implementation yet, and a null/no-op adapter satisfies it for tests.
 - Implemented via `App\Contracts\PublishAdapter` (methods above, `publish()` taking a
   `Collection<SocialAccount>` of targets and returning a `Collection<App\Support\Publishing\TargetResult>`
@@ -266,12 +283,13 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   `.junie/modules/publishing.md`.
 
 ### Step 1.2 — Upload-Post adapter implementation ✅ Done
+
 - Implement the interface against Upload-Post's API per §7.1 field mapping:
-  - `scheduledDate` from `scheduledAtUtc`.
-  - Caption, first comment, media URL.
-  - Instagram: `location_id`, `media_type` (REELS/IMAGE/STORIES), `audio_name` fallback only when no real audio id.
-  - TikTok: `tiktokMusicId`, location, `tiktokIsAiGenerated` from the post flag.
-  - LinkedIn/Facebook: caption + media + schedule only.
+    - `scheduledDate` from `scheduledAtUtc`.
+    - Caption, first comment, media URL.
+    - Instagram: `location_id`, `media_type` (REELS/IMAGE/STORIES), `audio_name` fallback only when no real audio id.
+    - TikTok: `tiktokMusicId`, location, `tiktokIsAiGenerated` from the post flag.
+    - LinkedIn/Facebook: caption + media + schedule only.
 - Return `TargetResult { accountId, ok, externalPostId, error, sentFields[], skippedFields[] }`.
 - **Done when**: a mocked Upload-Post client (HTTP fake) round-trips a publish call for each platform's field mapping.
 - Implemented via `App\Services\Publishing\UploadPostAdapter` (`publish()` posts to
@@ -289,13 +307,14 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   request/response shape wasn't available in this repo).
 
 ### Step 1.3 — Account connect flow ✅ Done
+
 - `POST /accounts/:id/connect` → Upload-Post OAuth/connect URL.
 - `handleCallback` persists `externalProfileId`, sets `connectionStatus = connected`.
 - **Done when**: connect flow works end-to-end against Upload-Post sandbox/test credentials.
 - Implemented via `App\Services\Publishing\UploadPostAdapter::connectAccount()` (calls Upload-Post's
   `POST /uploadposts/users/generate-jwt` with a `redirect_url` back to the app, returning the vendor's
   `access_url`) and `handleCallback()` (persists `external_profile_id`/`connection_status =
-  connected`/`connected_at` on the `SocialAccount` identified by the `social_account_id` carried in
+connected`/`connected_at` on the `SocialAccount` identified by the `social_account_id` carried in
   the callback query string). Wired up via `App\Actions\SocialAccounts\ConnectSocialAccountAction`,
   `SocialAccountController::connect` (`POST /social-accounts/{socialAccount}/connect`, authed,
   redirects to the vendor URL via `Inertia::location()`) and `::callback`
@@ -308,6 +327,7 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   verification. See `.junie/modules/publishing.md` and `.junie/modules/social-accounts.md`.
 
 ### Step 1.4 — Schedule endpoint ✅ Done
+
 - `POST /posts/:id/schedule` — re-run the full checklist (§6) server-side, then enqueue a publish job. Nothing calls the vendor until the checklist passes.
 - Publish job dispatched via Laravel queue, calling the adapter's `publish()`.
 - On success: target/post status → `scheduled` (pre-publish-time) or `published`; store external ids per target.
@@ -328,6 +348,7 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   See `.junie/modules/publishing.md` and `.junie/modules/posts.md`.
 
 ### Step 1.5 — Webhook / poll sync ✅ Done
+
 - `POST /webhooks/upload-post` with signature verification.
 - Fallback poll job if webhooks are unreliable in testing.
 - Syncs published/failed status back onto posts/targets.
@@ -342,10 +363,10 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   minutes) as the fallback poll. Confirmed against Upload-Post's real docs
   (https://docs.upload-post.com/api/webhooks, https://docs.upload-post.com/api/upload-status):
   the webhook verifies `X-Upload-Post-Signature: sha256=<hex>` = `HMAC_SHA256(webhook_secret,
-  "{timestamp}.{raw body}")` (with replay protection via `X-Upload-Post-Timestamp`), where
+"{timestamp}.{raw body}")` (with replay protection via `X-Upload-Post-Timestamp`), where
   `webhook_secret` is a new per-org `organizations.upload_post_webhook_secret` column (Upload-Post
   issues one secret per account, not a global one) alongside `upload_post_key` on the Organization
-  settings page; the `upload_completed` payload is matched to a `PostTarget` by `job_id` *and*
+  settings page; the `upload_completed` payload is matched to a `PostTarget` by `job_id` _and_
   `platform` (one job fans out to one event per platform); and `checkStatus()` polls the real
   `GET /uploadposts/status?request_id=&job_id=` endpoint. `PublishPostJob`'s existing synchronous
   published/failed marking from Step 1.4 was deliberately left unchanged; the webhook/poll finalize
@@ -358,6 +379,7 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   `.junie/modules/publishing.md`.
 
 ### Step 1.6 — Token expiry / health integration ✅ Done
+
 - `health(account)` check feeding `connectionStatus`.
 - Confirms the §12 acceptance test: a disconnected token flips the account to `token_expired`, client health to Red, and produces a Home row.
 - **Done when**: that test passes end-to-end.
@@ -378,6 +400,7 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   `.junie/modules/publishing.md`, and `.junie/modules/clients.md`.
 
 ### Step 1.7 — Platform rollout order ✅ Done
+
 - Enable in this order, each gated behind its own flag until confirmed working: Instagram feed → Reels → TikTok → Facebook → LinkedIn.
 - **Done when**: each platform has a passing publish test against sandbox data before the next is enabled.
 - Implemented via `App\Enums\PlatformRolloutStage` (the five milestones — Instagram feed/Reels
@@ -397,77 +420,79 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   `.junie/modules/publishing.md`.
 
 ### Step 1.8 — Music/sound API integration (Instagram + TikTok) ✅ Done
+
 - `Post::music` is already read by `UploadPostAdapter` (`audio_id`/`audio_name` for Instagram,
   `tiktok_music_id` for TikTok, per Step 1.2), but today it's only ever populated by hand — there's
   no way to search or browse a real sound/track catalog. This step adds that lookup so editors can
   pick a real track and have its vendor-specific id land in `Post::music` unchanged, ready for the
   existing adapter mapping to carry it through to Upload-Post.
 - Break down into:
-  - **1.8.1 — `MusicProvider` contract** ✅ Done: `App\Contracts\MusicProvider` with
-    `search(string $query, Platform $platform): Collection<MusicTrack>` and
-    `find(string $id, Platform $platform): ?MusicTrack`, mirroring the `PublishAdapter` pattern
-    (interface first, bound in a Service Provider) so the vendor is swappable/mockable in tests.
-    `App\Support\Publishing\MusicTrack`: readonly DTO (`id`, `name`, `artist`, `previewUrl`,
-    `platform`). No default binding registered yet — that lands with 1.8.2's
-    `UploadPostMusicProvider`, the first (and currently only) concrete implementation. Covered by
-    `tests/Unit/Contracts/MusicProviderTest.php` and `tests/Unit/Support/Publishing/MusicTrackTest.php`.
-    See `.junie/modules/publishing.md`.
-  - **1.8.2 — Upload-Post sound-library adapter** ✅ Done: `App\Services\Publishing\UploadPostMusicProvider`
-    implements `MusicProvider` against Upload-Post's real music-search endpoint, bound as the
-    default `MusicProvider` in `AppServiceProvider`. Confirmed against Upload-Post's live API
-    reference that only TikTok has a real vendor endpoint (`GET /uploadposts/tiktok/music/search`,
-    scoped to a connected TikTok profile) — Upload-Post has no Instagram audio-search endpoint at
-    all, so Instagram always returns an empty/`null` result without a vendor call. Since the
-    contract carries no org/account parameter, the org is resolved from the authenticated user
-    (mirroring how every controller resolves it) and the vendor's required `profile` param from
-    that org's first connected TikTok `SocialAccount`; `find()` re-uses the search endpoint and
-    matches the vendor's `id` locally (no get-by-id endpoint exists). Logs every request/failure
-    the same way `UploadPostAdapter` does; no raw API key in logs. Covered by
-    `tests/Unit/Services/Publishing/UploadPostMusicProviderTest.php`. See
-    `.junie/modules/publishing.md`.
-  - **1.8.3 — `SearchMusicAction`** ✅ Done: `App\Actions\Publishing\SearchMusicAction` — a thin Action
-    constructor-injected with `App\Contracts\MusicProvider` (never the concrete
-    `UploadPostMusicProvider`), invoked as `(string $query, Platform $platform)` and delegating
-    entirely to `MusicProvider::search()`. A single read call against the provider, so no
-    `DB::transaction()` is needed; logs the search start and result count (platform + count only,
-    no query text) the same way other publishing Actions/Services do. No controller/route wired up
-    yet — that lands with 1.8.4's editor music picker, which is the first caller. Covered by
-    `tests/Unit/Actions/Publishing/SearchMusicActionTest.php` (delegates to a mocked
-    `MusicProvider`, returns an empty collection when nothing matches). See
-    `.junie/modules/publishing.md`.
-  - **1.8.4 — Editor music picker (UI)** ✅ Done: `PostController::musicSearch` (`GET
-    posts/{post}/music-search`, `view` authorization) validates `query`/`platform`, short-circuits
-    to an empty result for any platform other than Instagram/TikTok (matching Step 1.8.2's real
-    vendor coverage), and otherwise delegates to `SearchMusicAction`, returning each `MusicTrack` as
-    `{ id, name, artist, preview_url }` JSON. The `posts/edit` editor's Music field (previously a
-    "Not available yet" locked text input) is now a live search box shown only while at least one
-    selected target account is Instagram/TikTok — with a platform toggle when both are selected —
-    that calls the endpoint via `fetch()` (mirroring the `clients/show` connect-flow pattern), lists
-    matches, and on selection writes the track's `{ id, name }` into hidden `music[id]`/`music[name]`
-    inputs, unchanged from the shape `UploadPostAdapter` already expects. No target account on
-    Instagram/TikTok keeps the field collapsed to a hint instead of a picker. Covered by two new
-    `PostEditorControllerTest` cases (returns the mocked `MusicProvider`'s tracks for TikTok;
-    short-circuits without calling the provider for a platform like Facebook). See
-    `.junie/modules/publishing.md`.
-  - **1.8.5 — End-to-end verification** ✅ Done: confirmed a real music selection flows unchanged
-    through to the existing `audio_id`/`tiktok_music_id` mapping in
-    `UploadPostAdapter::publish()` — no adapter changes were required, since `applyInstagramFields()`/
-    `applyTikTokFields()` already read `Post::music['id']` verbatim (Step 1.2). Added
-    `tests/Feature/MusicSelectionAcceptanceTest.php`: two §12-style acceptance scenarios that call
-    `PostController::musicSearch` against a mocked `MusicProvider` track, save the returned `id`/`name`
-    onto the post via `PostController::update` exactly as the editor UI does (Step 1.8.4), then run
-    the real `UploadPostAdapter::publish()` against a faked Upload-Post response and assert the
-    selected track's id lands on `audio_id` (Instagram) / `tiktok_music_id` (TikTok) in the request
-    actually sent to the vendor.
+    - **1.8.1 — `MusicProvider` contract** ✅ Done: `App\Contracts\MusicProvider` with
+      `search(string $query, Platform $platform): Collection<MusicTrack>` and
+      `find(string $id, Platform $platform): ?MusicTrack`, mirroring the `PublishAdapter` pattern
+      (interface first, bound in a Service Provider) so the vendor is swappable/mockable in tests.
+      `App\Support\Publishing\MusicTrack`: readonly DTO (`id`, `name`, `artist`, `previewUrl`,
+      `platform`). No default binding registered yet — that lands with 1.8.2's
+      `UploadPostMusicProvider`, the first (and currently only) concrete implementation. Covered by
+      `tests/Unit/Contracts/MusicProviderTest.php` and `tests/Unit/Support/Publishing/MusicTrackTest.php`.
+      See `.junie/modules/publishing.md`.
+    - **1.8.2 — Upload-Post sound-library adapter** ✅ Done: `App\Services\Publishing\UploadPostMusicProvider`
+      implements `MusicProvider` against Upload-Post's real music-search endpoint, bound as the
+      default `MusicProvider` in `AppServiceProvider`. Confirmed against Upload-Post's live API
+      reference that only TikTok has a real vendor endpoint (`GET /uploadposts/tiktok/music/search`,
+      scoped to a connected TikTok profile) — Upload-Post has no Instagram audio-search endpoint at
+      all, so Instagram always returns an empty/`null` result without a vendor call. Since the
+      contract carries no org/account parameter, the org is resolved from the authenticated user
+      (mirroring how every controller resolves it) and the vendor's required `profile` param from
+      that org's first connected TikTok `SocialAccount`; `find()` re-uses the search endpoint and
+      matches the vendor's `id` locally (no get-by-id endpoint exists). Logs every request/failure
+      the same way `UploadPostAdapter` does; no raw API key in logs. Covered by
+      `tests/Unit/Services/Publishing/UploadPostMusicProviderTest.php`. See
+      `.junie/modules/publishing.md`.
+    - **1.8.3 — `SearchMusicAction`** ✅ Done: `App\Actions\Publishing\SearchMusicAction` — a thin Action
+      constructor-injected with `App\Contracts\MusicProvider` (never the concrete
+      `UploadPostMusicProvider`), invoked as `(string $query, Platform $platform)` and delegating
+      entirely to `MusicProvider::search()`. A single read call against the provider, so no
+      `DB::transaction()` is needed; logs the search start and result count (platform + count only,
+      no query text) the same way other publishing Actions/Services do. No controller/route wired up
+      yet — that lands with 1.8.4's editor music picker, which is the first caller. Covered by
+      `tests/Unit/Actions/Publishing/SearchMusicActionTest.php` (delegates to a mocked
+      `MusicProvider`, returns an empty collection when nothing matches). See
+      `.junie/modules/publishing.md`.
+    - **1.8.4 — Editor music picker (UI)** ✅ Done: `PostController::musicSearch` (`GET
+posts/{post}/music-search`, `view` authorization) validates `query`/`platform`, short-circuits
+      to an empty result for any platform other than Instagram/TikTok (matching Step 1.8.2's real
+      vendor coverage), and otherwise delegates to `SearchMusicAction`, returning each `MusicTrack` as
+      `{ id, name, artist, preview_url }` JSON. The `posts/edit` editor's Music field (previously a
+      "Not available yet" locked text input) is now a live search box shown only while at least one
+      selected target account is Instagram/TikTok — with a platform toggle when both are selected —
+      that calls the endpoint via `fetch()` (mirroring the `clients/show` connect-flow pattern), lists
+      matches, and on selection writes the track's `{ id, name }` into hidden `music[id]`/`music[name]`
+      inputs, unchanged from the shape `UploadPostAdapter` already expects. No target account on
+      Instagram/TikTok keeps the field collapsed to a hint instead of a picker. Covered by two new
+      `PostEditorControllerTest` cases (returns the mocked `MusicProvider`'s tracks for TikTok;
+      short-circuits without calling the provider for a platform like Facebook). See
+      `.junie/modules/publishing.md`.
+    - **1.8.5 — End-to-end verification** ✅ Done: confirmed a real music selection flows unchanged
+      through to the existing `audio_id`/`tiktok_music_id` mapping in
+      `UploadPostAdapter::publish()` — no adapter changes were required, since `applyInstagramFields()`/
+      `applyTikTokFields()` already read `Post::music['id']` verbatim (Step 1.2). Added
+      `tests/Feature/MusicSelectionAcceptanceTest.php`: two §12-style acceptance scenarios that call
+      `PostController::musicSearch` against a mocked `MusicProvider` track, save the returned `id`/`name`
+      onto the post via `PostController::update` exactly as the editor UI does (Step 1.8.4), then run
+      the real `UploadPostAdapter::publish()` against a faked Upload-Post response and assert the
+      selected track's id lands on `audio_id` (Instagram) / `tiktok_music_id` (TikTok) in the request
+      actually sent to the vendor.
 - **Done when**: searching returns real Upload-Post sound results for both Instagram and TikTok, a
   selected track's id round-trips into `Post::music`, and a §12-style acceptance test confirms it
   reaches `audio_id`/`tiktok_music_id` in the vendor payload built by `UploadPostAdapter`. ✅ See
   `tests/Feature/MusicSelectionAcceptanceTest.php` and `.junie/modules/publishing.md`.
 
 ### Step 1.9 — Real Instagram audio search (Meta Graph API direct integration) ✅ Done
+
 - Root cause of the empty-array Instagram music search reported against Step 1.8: Upload-Post
   (the only vendor `UploadPostMusicProvider` talks to) has **no Instagram audio-search endpoint at
-  all** — confirmed again against Upload-Post's live API reference. Meta *does* expose a real
+  all** — confirmed again against Upload-Post's live API reference. Meta _does_ expose a real
   search API for this
   (https://developers.facebook.com/documentation/instagram-platform/content-publishing/audio-api —
   `GET /ig_audio?audio_type={original_sound|music}&user_id={ig-user-id}&search_query={query}&access_token={token}`),
@@ -479,60 +504,60 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   credential/connect layer and a second, direct-to-Meta `MusicProvider` implementation for
   Instagram, leaving TikTok's existing Upload-Post-backed path (Step 1.8.2) untouched.
 - Break down into:
-  - **1.9.1 — Facebook App + config scaffolding** ✅ Done: register a Facebook App (Facebook Login for
-    Business product) with `instagram_basic` + `instagram_content_publish` permissions submitted
-    for review; add `services.facebook.{client_id,client_secret,redirect_uri}` to
-    `config/services.php`, backed by new `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET`/
-    `FACEBOOK_REDIRECT_URI` env vars (never logged, mirroring the `upload_post_key` handling
-    convention). **Done when**: config resolves in a `config:show services.facebook`-style test and
-    the app boots with the new env vars unset (falls back to `null`, no crash).
-  - **1.9.2 — Migration: store a Meta user access token per `SocialAccount`** ✅ Done: add
-    `meta_access_token` (encrypted cast), `meta_access_token_expires_at`, and
-    `meta_instagram_user_id` nullable columns to `social_accounts` (only ever populated for
-    Instagram accounts). Add the three fields to the model's `casts()`/PHPDoc/`Fillable` list,
-    following the existing `external_account_id` pattern. **Done when**: a migration + factory
-    state exist and a model test confirms the token round-trips through Laravel's `encrypted`
-    cast (never stored/logged in plaintext).
-  - **1.9.3 — Facebook Login connect flow for Instagram accounts** ✅ Done: new
-    `App\Http\Controllers\Auth\FacebookInstagramConnectController` with `redirect()`/`callback()`
-    actions (`GET clients/{client}/social-accounts/{socialAccount}/facebook/connect` and
-    `/facebook/callback`), using Laravel Socialite's Facebook driver (or a thin
-    `Http`-based OAuth exchange if Socialite is undesired) to obtain a long-lived User access
-    token and the connected Instagram Business user id, then persist them via a new
-    `App\Actions\SocialAccounts\ConnectMetaAudioAccessAction` (wrapped in `DB::transaction()`,
-    logs success/failure with the social account id, never the token). This is **additive** —
-    it does not replace or change how Instagram accounts are connected for publishing via
-    Upload-Post; it only adds the extra Graph API grant needed for audio search. **Done when**: a
-    feature test drives the callback with a faked token exchange and asserts the three columns
-    from 1.9.2 are populated on the right `SocialAccount`.
-  - **1.9.4 — `MetaGraphMusicProvider`** ✅ Done: new `App\Services\Publishing\MetaGraphMusicProvider`
-    implementing `App\Contracts\MusicProvider` (Step 1.8.1), calling `GET /{version}/ig_audio`
-    directly against `graph.facebook.com` for `Platform::Instagram` only (delegates every other
-    platform to the existing `UploadPostMusicProvider` via composition, so TikTok behavior from
-    Step 1.8.2 is unchanged). Resolves the connected Instagram `SocialAccount`'s
-    `meta_access_token`/`meta_instagram_user_id` from 1.9.2 (via the authenticated user's
-    organization, same resolution pattern as `UploadPostMusicProvider::connectedTikTokAccount()`);
-    throws `MusicProviderUnavailableException` with an actionable message
-    ("Connect Instagram via Facebook Login before searching for music.") when those fields are
-    empty, instead of silently returning an empty collection. Maps `audio_id` → `MusicTrack::id`,
-    `title` → `name`, `display_artist` → `artist`, `download_url`/`on_platform_audio_preview_link`
-    → `previewUrl`. Logs every request/failure the same way `UploadPostMusicProvider` does; the
-    access token is never logged. `find()` uses `GET /{version}/{ig-audio-id}` (Get Audio
-    Metadata). **Done when**: `AppServiceProvider`'s `MusicProvider` binding is swapped to this
-    combinator class and `tests/Unit/Services/Publishing/MetaGraphMusicProviderTest.php` covers:
-    real search results for Instagram (faked Graph HTTP response), TikTok still delegating to
-    `UploadPostMusicProvider` unchanged, and the "not connected" error path.
-  - **1.9.5 — Editor UI: connect prompt** ✅ Done: extend the `posts/edit` Music field (Step 1.8.4) so
-    that when Instagram search throws the "not connected" error from 1.9.4, the picker shows an
-    inline "Connect Instagram for music search" link to the 1.9.3 connect route for that account,
-    instead of a bare empty list. **Done when**: a `PostEditorControllerTest` case asserts the
-    controller surfaces a distinguishable `error_code` (e.g. `meta_not_connected`) the frontend can
-    key off, and a component-level check confirms the link renders.
-  - **1.9.6 — End-to-end verification** ✅ Done: repeat the Step 1.8.5 acceptance pattern for Instagram
-    specifically — search via `MetaGraphMusicProvider` against a faked Graph response, save the
-    returned track onto `Post::music`, then run `UploadPostAdapter::publish()` and assert the same
-    `audio_id` lands in the Upload-Post payload sent for the Instagram target, proving the new
-    search path still feeds the unchanged publish path from Step 1.2.
+    - **1.9.1 — Facebook App + config scaffolding** ✅ Done: register a Facebook App (Facebook Login for
+      Business product) with `instagram_basic` + `instagram_content_publish` permissions submitted
+      for review; add `services.facebook.{client_id,client_secret,redirect_uri}` to
+      `config/services.php`, backed by new `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET`/
+      `FACEBOOK_REDIRECT_URI` env vars (never logged, mirroring the `upload_post_key` handling
+      convention). **Done when**: config resolves in a `config:show services.facebook`-style test and
+      the app boots with the new env vars unset (falls back to `null`, no crash).
+    - **1.9.2 — Migration: store a Meta user access token per `SocialAccount`** ✅ Done: add
+      `meta_access_token` (encrypted cast), `meta_access_token_expires_at`, and
+      `meta_instagram_user_id` nullable columns to `social_accounts` (only ever populated for
+      Instagram accounts). Add the three fields to the model's `casts()`/PHPDoc/`Fillable` list,
+      following the existing `external_account_id` pattern. **Done when**: a migration + factory
+      state exist and a model test confirms the token round-trips through Laravel's `encrypted`
+      cast (never stored/logged in plaintext).
+    - **1.9.3 — Facebook Login connect flow for Instagram accounts** ✅ Done: new
+      `App\Http\Controllers\Auth\FacebookInstagramConnectController` with `redirect()`/`callback()`
+      actions (`GET clients/{client}/social-accounts/{socialAccount}/facebook/connect` and
+      `/facebook/callback`), using Laravel Socialite's Facebook driver (or a thin
+      `Http`-based OAuth exchange if Socialite is undesired) to obtain a long-lived User access
+      token and the connected Instagram Business user id, then persist them via a new
+      `App\Actions\SocialAccounts\ConnectMetaAudioAccessAction` (wrapped in `DB::transaction()`,
+      logs success/failure with the social account id, never the token). This is **additive** —
+      it does not replace or change how Instagram accounts are connected for publishing via
+      Upload-Post; it only adds the extra Graph API grant needed for audio search. **Done when**: a
+      feature test drives the callback with a faked token exchange and asserts the three columns
+      from 1.9.2 are populated on the right `SocialAccount`.
+    - **1.9.4 — `MetaGraphMusicProvider`** ✅ Done: new `App\Services\Publishing\MetaGraphMusicProvider`
+      implementing `App\Contracts\MusicProvider` (Step 1.8.1), calling `GET /{version}/ig_audio`
+      directly against `graph.facebook.com` for `Platform::Instagram` only (delegates every other
+      platform to the existing `UploadPostMusicProvider` via composition, so TikTok behavior from
+      Step 1.8.2 is unchanged). Resolves the connected Instagram `SocialAccount`'s
+      `meta_access_token`/`meta_instagram_user_id` from 1.9.2 (via the authenticated user's
+      organization, same resolution pattern as `UploadPostMusicProvider::connectedTikTokAccount()`);
+      throws `MusicProviderUnavailableException` with an actionable message
+      ("Connect Instagram via Facebook Login before searching for music.") when those fields are
+      empty, instead of silently returning an empty collection. Maps `audio_id` → `MusicTrack::id`,
+      `title` → `name`, `display_artist` → `artist`, `download_url`/`on_platform_audio_preview_link`
+      → `previewUrl`. Logs every request/failure the same way `UploadPostMusicProvider` does; the
+      access token is never logged. `find()` uses `GET /{version}/{ig-audio-id}` (Get Audio
+      Metadata). **Done when**: `AppServiceProvider`'s `MusicProvider` binding is swapped to this
+      combinator class and `tests/Unit/Services/Publishing/MetaGraphMusicProviderTest.php` covers:
+      real search results for Instagram (faked Graph HTTP response), TikTok still delegating to
+      `UploadPostMusicProvider` unchanged, and the "not connected" error path.
+    - **1.9.5 — Editor UI: connect prompt** ✅ Done: extend the `posts/edit` Music field (Step 1.8.4) so
+      that when Instagram search throws the "not connected" error from 1.9.4, the picker shows an
+      inline "Connect Instagram for music search" link to the 1.9.3 connect route for that account,
+      instead of a bare empty list. **Done when**: a `PostEditorControllerTest` case asserts the
+      controller surfaces a distinguishable `error_code` (e.g. `meta_not_connected`) the frontend can
+      key off, and a component-level check confirms the link renders.
+    - **1.9.6 — End-to-end verification** ✅ Done: repeat the Step 1.8.5 acceptance pattern for Instagram
+      specifically — search via `MetaGraphMusicProvider` against a faked Graph response, save the
+      returned track onto `Post::music`, then run `UploadPostAdapter::publish()` and assert the same
+      `audio_id` lands in the Upload-Post payload sent for the Instagram target, proving the new
+      search path still feeds the unchanged publish path from Step 1.2.
 - **Done when**: searching for a song name while targeting Instagram in the editor returns real
   results from Meta's `ig_audio` endpoint (not an empty array) once an account has completed the
   1.9.3 connect flow, a clear "connect Instagram" prompt is shown when it hasn't, TikTok search
@@ -542,6 +567,7 @@ Goal: real scheduled posts actually publish, via Upload-Post, starting with one 
   `.junie/modules/social-accounts.md`.
 
 ### Phase 1 exit criteria
+
 - One test brand fully publishing on LinkedIn/Facebook/IG feed.
 - One real paying client live on the same set.
 - Token-expiry and failure-surfacing acceptance tests passing.
@@ -559,27 +585,30 @@ as-built record); Steps 2.7 onward (including the standout features called out i
 remaining/expanded work for this pass.
 
 ### Step 2.1 — AI provider contract ✅ Done
+
 - Introduce `App\Contracts\AiProvider` with methods shaped for our use cases (final signatures may adjust during implementation):
-  - `suggestCaptions(Post $post): AiCaptionSuggestions`
-  - `recommendPosts(Client $client): AiPostIdeas`
-  - `discoverTrends(Client $client, array $platforms): AiTrends`
+    - `suggestCaptions(Post $post): AiCaptionSuggestions`
+    - `recommendPosts(Client $client): AiPostIdeas`
+    - `discoverTrends(Client $client, array $platforms): AiTrends`
 - Add lightweight DTOs under `App\Support\AI\` for strong typing: `AiCaptionSuggestion`, `AiCaptionSuggestions`, `AiPostIdea`, `AiPostIdeas`, `AiTrend`, `AiTrends` (readonly properties; JSON-serializable for API/UI).
 - Bind via a Service Provider so the implementation is swappable/mockable in tests.
 - Tests: unit test the interface contracts and DTO shape construction with simple factories.
 
 ### Step 2.2 — DeepSeek implementation ✅ Done
+
 - Implement `App\Services\AI\DeepSeekProvider` against DeepSeek's API.
 - Configuration: `config('ai.deepseek')` with `api_key` (env `DEEPSEEK_API_KEY`), `model` (env `DEEPSEEK_MODEL`, default a stable general model), `base_url`, `timeout`, `max_tokens`.
 - Prompting:
-  - Build a system prompt from brand context: brand voice, pillars, do/don'ts (`weNeverSay[]`), audience, and platform constraints (character limits, line breaks, link policy, emoji usage).
-  - Include client industry, current campaigns, and any provided asset metadata (e.g., music selection, media type) as user/context messages.
-  - For trends, request use of DeepSeek's browsing/search capability if available; otherwise instruct the model to propose trend hypotheses with clear confidence markers.
+    - Build a system prompt from brand context: brand voice, pillars, do/don'ts (`weNeverSay[]`), audience, and platform constraints (character limits, line breaks, link policy, emoji usage).
+    - Include client industry, current campaigns, and any provided asset metadata (e.g., music selection, media type) as user/context messages.
+    - For trends, request use of DeepSeek's browsing/search capability if available; otherwise instruct the model to propose trend hypotheses with clear confidence markers.
 - Enforce structured JSON outputs with strict schemas for each method. Reject and retry up to 1 time if schema invalid; log and return a safe failure otherwise.
 - Logging: `info` on request start/end (org/client/post ids, method, model), `warning` on retries, `error` on failures; never log secrets or raw prompts.
 - Rate limiting/backoff: trivial exponential backoff on HTTP 429/5xx with jitter.
 - Tests: unit tests with HTTP fakes verifying schema enforcement, retries, logging, and that secrets aren’t logged.
 
 ### Step 2.3 — Actions wrapping AI calls ✅ Done
+
 - `App\Actions\AI\DiscoverTrendsAction` — inputs: client, platforms[]; returns `AiTrends`. Caches per client/platform set for a short TTL (e.g., 2h) to avoid spam.
 - `App\Actions\AI\RecommendPostsAction` — inputs: client; returns `AiPostIdeas`. Optionally persists selected ideas as draft `Post` rows inside a `DB::transaction()` when explicitly requested by a user action.
 - `App\Actions\AI\SuggestCaptionsForPostAction` — inputs: post; returns `AiCaptionSuggestions`. May write chosen suggestion into the post when confirmed by user. Never auto-schedules.
@@ -587,26 +616,30 @@ remaining/expanded work for this pass.
 - Tests: unit tests for each Action (mocks `AiProvider`) + a feature test per Action path.
 
 ### Step 2.4 — Editor UI: "Suggest with AI" ✅ Done
+
 - In the post editor (§9), add an AI panel:
-  - "Suggest captions" button populates a side list; selecting one fills the caption field and alt text; hashtags as a separate selectable list; first comment optional output.
-  - Show token/spinner states; handle retries gracefully; never overwrite user text without confirmation.
+    - "Suggest captions" button populates a side list; selecting one fills the caption field and alt text; hashtags as a separate selectable list; first comment optional output.
+    - Show token/spinner states; handle retries gracefully; never overwrite user text without confirmation.
 - On the client dashboard, add a "Trends & Ideas" tab/panel showing recent `AiTrend` items and `AiPostIdea`s for selected platforms with filters by pillar/campaign.
 - Access control: Owner/Strategist only by default; gated by `config('features.ai')` flag and per-org enable switch.
 - Tests: feature tests asserting endpoints are authz-protected and UI receives structured props without secrets.
 
 ### Step 2.5 — Scheduled daily brief ✅ Done
+
 - Nightly job per client calls `DiscoverTrendsAction` and stores a "Daily Brief" note (internal-only) summarizing top trends and 3–5 fresh post ideas tied to active campaigns.
 - Client module UI: in Clients, add a "Daily Briefs" tab/module where users can view each day's brief and drill into the trends it discovered (with basic filters by date range, pillar, and campaign).
 - Notifications: send a summary email to Owners/Strategists when new ideas are available (respecting quiet hours window in config).
 - Tests: job fakes verifying scheduling, idempotency, and that notes are client-scoped.
 
 ### Step 2.6 — Guardrails and safety ✅ Done
+
 - Strict filtering against `BrandBrain::weNeverSay[]` and prohibited topics before surfacing suggestions.
 - Platform policy checks (e.g., link/hashtag rules per platform) applied post-generation with clear warnings instead of silent edits.
 - PII/secrets scrubbed from prompts and logs; redact any incidentally returned secrets.
 - Tests: regression test ensuring banned phrases never pass through suggestions (mirrors §12 acceptance style).
 
 ### Step 2.7 — Configuration, provider selection and ops ✅ Done
+
 - **Implemented via (2026-11-10, MVP Step M-7.1):** per-org `organizations.ai_enabled` toggle +
   Owner-only Settings switch; effective flag = `config('ai.enabled') && $organization->ai_enabled`,
   centralized in `App\Services\AI\AiAccess` (no controller gates inline). Provider selection
@@ -619,18 +652,20 @@ remaining/expanded work for this pass.
 - Tests: feature test asserting the binding switches correctly across the four combinations of (`AI_ENABLED`, `DEEPSEEK_API_KEY` present) × (`organizations.ai_enabled`), and that the Settings toggle persists/authorizes correctly.
 
 ### Step 2.8 — Cost & usage controls ✅ Done
+
 - **Implemented via (2026-11-10, MVP Step M-7.1):** `ai_usage_logs` existed (Phase 16); added
   `prompt_tokens`/`completion_tokens`, token-accurate recording on the agency text path via
   `RecordAiUsageAction` (DB transaction, never blocks the request), `organizations.ai_monthly_token_budget`
-  + `AiUsageGuard`/`AiBudgetExceededException` (clean 422 "Monthly AI limit reached — contact your
-  admin."), and the Owner-only Settings → AI usage panel (tokens/requests/cost vs budget). See
-  `ai.md` › "AI control plane".
+    - `AiUsageGuard`/`AiBudgetExceededException` (clean 422 "Monthly AI limit reached — contact your
+      admin."), and the Owner-only Settings → AI usage panel (tokens/requests/cost vs budget). See
+      `ai.md` › "AI control plane".
 - New `ai_usage_logs` table (`org_id`, `client_id` nullable, `method`, `model`, `prompt_tokens`, `completion_tokens`, `cost_estimate`, `status`, `created_at`) populated by `App\Services\AI\DeepSeekProvider` after every call (success or failure) via a small `App\Actions\AI\RecordAiUsageAction` wrapped in `DB::transaction()` — never block/fail the user-facing request if usage logging itself errors (log a `warning` and continue).
 - Per-org monthly budget: `organizations.ai_monthly_token_budget` (nullable int). `App\Services\AI\AiUsageGuard` checks remaining budget before dispatching a request; when exceeded, Actions return a typed `AiBudgetExceededException` surfaced to the UI as a clear, non-technical message ("Monthly AI limit reached — contact your admin") instead of a generic error.
 - Settings UI: Owner-only "AI Usage" panel showing current-month tokens/requests/estimated cost and the configured budget, mirroring the existing Settings page layout/brand guidelines.
 - Tests: unit tests for budget enforcement (under/at/over budget), usage recording on both success and failure paths, and a feature test for the Settings usage panel (authz + numbers rendered).
 
 ### Step 2.9 — Feedback loop & quality tracking ✅ Done
+
 - **Implemented via (2026-11-10, MVP Step M-7.1):** polymorphic `ai_feedback` + `AiRating`,
   `RecordAiFeedbackAction` (idempotent per user/subject), `AiFeedbackController` thumbs up/down on
   trends/ideas/caption-sets, the implicit `Applied` signal when an idea becomes a draft, and
@@ -643,18 +678,21 @@ remaining/expanded work for this pass.
 - Tests: unit tests for feedback recording and acceptance-rate aggregation; feature test for the thumbs up/down endpoint (authz-protected, idempotent per user/subject).
 
 ### Step 2.10 — Deeper context: performance-aware recommendations
+
 - Extend `RecommendPostsAction`/`DiscoverTrendsAction` prompt context with lightweight historical signal already available in the app (no new vendor integration required): best-performing past `Post`s for the client (by whatever engagement/status data already exists), most-used pillars/campaigns, and posting cadence gaps in the upcoming calendar window.
 - Add a `App\Support\AI\ClientContextBuilder` service responsible for assembling this context payload once per request (brand brain + recent posts + campaigns + calendar gaps), so prompt-building logic isn't duplicated across the three provider methods — bind/test it in isolation.
 - "Best time to post" hint: derive a simple heuristic (e.g., platform-standard windows adjusted by the client's timezone from `TimezoneOptions`) rather than requiring real analytics data; clearly label it as a heuristic, not a guarantee, in the UI.
 - Tests: unit tests for `ClientContextBuilder` assembling the right shape from factories, including the empty-history edge case (new client with no posts yet).
 
 ### Step 2.11 — Editor & dashboard polish
+
 - Caption suggestions: show each option with a short "why this works" rationale tag (e.g., "Matches pillar: Education", "Trending hook format") derived from fields already present in `AiCaptionSuggestion`/`AiTrend` DTOs — reinforces trust without extra calls.
 - Trends & Ideas panel: add a "Turn into post" quick action per idea that pre-fills a new draft `Post` via `RecommendPostsAction`'s persistence path, so a strategist can go from idea to scheduled draft in one click.
 - Empty/error states: distinct, on-brand (per `.junie/brand-guidelines.md`) empty states for "AI disabled for this org", "budget exceeded" (Step 2.8), and "provider error — try again", instead of a blank panel.
 - Tests: component/feature tests covering each distinct empty/error state and the "Turn into post" flow end-to-end.
 
 ### Step 2.12 — Standout differentiators (stretch, prioritize by client value)
+
 - **Tone & brand-fit score**: before showing suggestions, run a second cheap/structured DeepSeek call (or a deterministic heuristic as a cheaper first pass) that scores each caption option 0–100 against the brand voice/pillars, surfaced as a small badge — makes "on-brand" tangible instead of just trusted.
 - **Multi-variant A/B captions**: `SuggestCaptionsForPostAction` can tag two suggestions as an explicit "A/B pair" (same idea, different hook/CTA) when the post targets a platform that supports first-comment/alt variants, so strategists can test messaging.
 - **Cross-client trend radar**: an org-level (not client-level) "Trend Radar" view aggregating `AiTrend` results across all of an org's clients in the same industry, so agencies spot patterns once and apply them everywhere — strictly scoped to the org's own clients, never cross-org.
@@ -664,6 +702,7 @@ remaining/expanded work for this pass.
 - Treat each bullet as independently shippable; do not block the Step 2.13 exit criteria on all of them — ship the ones with clearest client value first and record decisions/deferrals in `ai.md`'s Known Gaps section.
 
 ### Step 2.13 — "Done when"
+
 - Editors can fetch trends and see 5–10 relevant ideas per client with platform tags, each with a plain-language rationale.
 - From a post editor, clicking "Suggest captions" yields 3–5 on-brand caption options with hashtags/alt text, brand-fit badges, and never any `weNeverSay[]` phrases.
 - Per-org AI is enabled only when both the platform flag and the org's own Settings toggle are on; disabling either immediately hides all AI UI/endpoints for that org.
@@ -678,6 +717,7 @@ remaining/expanded work for this pass.
 Goal: read comments via the adapter where available; AI drafts replies; a human sends. No auto-reply.
 
 ### Step 3.1 — Comment ingestion ✅ Done
+
 - **Implemented via MVP M-9.1:** a dedicated `App\Contracts\CommentSource` seam (not the publish adapter)
   with `UploadPostCommentSource` for the seven comment-supporting networks + `NullCommentSource`; inbound
   comments stored against the post target as threaded `inbox_conversations` / `inbox_messages`. See
@@ -686,6 +726,7 @@ Goal: read comments via the adapter where available; AI drafts replies; a human 
 - Store inbound comments against the relevant post/account.
 
 ### Step 3.2 — AI draft replies ✅ Done
+
 - **Implemented via MVP M-9.3:** DeepSeek (not Grok) behind `App\Contracts\ReplyAssistant`; drafts are
   budgeted/metered/guardrailed and returned as text only. Sending is the separate, human-only
   `SendInboxReplyAction` — a test proves drafting never calls the vendor reply path.
@@ -715,6 +756,7 @@ introducing a new role, but extends what that role is allowed to see/do now that
 instead of only a one-off review link.
 
 ### Step 6.1 — Client contact invitations ✅ Done
+
 - New `ClientInvitation` model/migration: `client_id`, `email`, `invited_by_user_id`, hashed token,
   `expires_at`, `accepted_at`, `revoked_at`.
 - `App\Actions\ClientInvitations\CreateClientInvitationAction` — wrapped in `DB::transaction()`,
@@ -734,6 +776,7 @@ instead of only a one-off review link.
   `tests/Feature/ClientInvitationControllerTest.php` and `.junie/modules/client-portal.md`.
 
 ### Step 6.2 — Invitation acceptance and account creation ✅ Done
+
 - `GET /client-invite/{token}` (public, outside `auth`/`verified` — mirrors the `review/{token}` route)
   shows an accept-invitation page; validates the token the same way `ReviewToken` does (hash lookup +
   expiry/revoked check, 404 on any mismatch).
@@ -756,6 +799,7 @@ instead of only a one-off review link.
   `.junie/modules/client-portal.md`.
 
 ### Step 6.3 — Client portal shell and navigation ✅ Done
+
 - A distinct, client-facing layout (`resources/js/layouts/client-portal/`) per the brand guidelines —
   no internal-ops chrome (no "Needs attention"/Settings/other clients), just this client's identity and
   a nav for Posts, Approvals, and Invoices.
@@ -774,6 +818,7 @@ instead of only a one-off review link.
   (full content lands in Steps 6.4-6.6). See `.junie/modules/client-portal.md`.
 
 ### Step 6.4 — Portal dashboard (needs-attention, client view) ✅ Done
+
 - `GET /portal` — reuses `App\Actions\Home\GetNeedsAttentionItemsAction`'s shape but scoped to the
   logged-in contact's own `client_id`: posts `waiting_client` (outstanding approvals), recently
   `changes_requested`, and upcoming scheduled posts for their brand — deliberately no failed-publish or
@@ -788,7 +833,9 @@ instead of only a one-off review link.
   `PortalDashboardController::index`, and rendered by `portal/dashboard.tsx` (same
   card/badge pattern as `pages/home.tsx`), with each row linking to `portal.posts.show`. See
   `.junie/modules/client-portal.md`.
+
 ### Step 6.5 — Portal posts and approvals ✅ Done
+
 - `GET /portal/posts` (list, filterable by status) and `GET /portal/posts/{post}` (detail) — reuse the
   same policy scoping approach as `PostPolicy::viewCalendar`'s `ClientReviewer` branch, but now backed
   by a real session instead of a one-off `ReviewToken`.
@@ -807,6 +854,7 @@ instead of only a one-off review link.
   `.junie/modules/client-portal.md`.
 
 ### Step 6.6 — Portal invoices ✅ Done
+
 - `GET /portal/invoices` — reuses `InvoicePolicy`'s scoping pattern, listing this client's invoices
   (status, amount, due date, a link/download for the invoice document) with no ability to create/edit
   — read-only, per §3's "no billing visibility beyond their own invoices" boundary for this role.
@@ -820,6 +868,7 @@ instead of only a one-off review link.
   mismatched `client_id`). See `.junie/modules/client-portal.md`.
 
 ### Phase 6 exit criteria
+
 - An Owner/Strategist can invite a named contact at a client to the portal, and that contact can log
   in with their own credentials (no shared/token link).
 - That contact's `/portal/*` session shows only their own client's posts, outstanding approvals, and
@@ -840,6 +889,7 @@ uploaded file — while leaving every line item queryable later by a future clie
 what happens inside `draft`.
 
 ### Step 7.1 — `InvoiceItem` model and migration ✅ Done
+
 - New `invoice_items` table/model: `invoice_id` (FK, cascade delete), `org_id` (denormalized, mirrors
   `Invoice::org_id`, for simple org-scoped reporting queries later), `description` (text),
   `is_billable` (bool, default `true`), `price` (decimal 10,2, nullable — `null`/`0` when not
@@ -855,6 +905,7 @@ what happens inside `draft`.
   non-billable item (always 0 regardless of price).
 
 ### Step 7.2 — Line item CRUD (restricted to `draft` invoices) ✅ Done
+
 - `App\Actions\InvoiceItems\AddInvoiceItemAction` / `UpdateInvoiceItemAction` /
   `DeleteInvoiceItemAction` — each wrapped in `DB::transaction()`, each rejecting the operation with a
   `ValidationException` if the parent invoice's `status` is not `draft` (line items are frozen once an
@@ -869,6 +920,7 @@ what happens inside `draft`.
   allowed, Designer forbidden), and rejection (`422`) when attempted on a `sent`/`paid` invoice.
 
 ### Step 7.3 — Finalize action: compute and lock the total ✅ Done
+
 - `App\Actions\Invoices\FinalizeInvoiceAction`: wrapped in `DB::transaction()`, callable only on a
   `draft` invoice with at least one item (reject otherwise via `ValidationException`). Sums every
   item's `lineTotal()`, adds the client's current `retainer_amount` (0 if null), writes the result
@@ -891,6 +943,7 @@ what happens inside `draft`.
   `422`.
 
 ### Step 7.4 — Line-item UI on the invoice detail page ✅ Done
+
 - Extend `resources/js/pages/invoices/show.tsx`: an "Items" section (visible once the invoice exists,
   i.e. always — items can be added before or after the PDF/send flow, as long as the invoice is
   `draft` and not yet finalized) with an inline add-item form (description, billable toggle, price
@@ -904,6 +957,7 @@ what happens inside `draft`.
   computed subtotal) rather than a manual check.
 
 ### Step 7.5 — Branded, auto-generated invoice PDF ✅ Done
+
 - Add `barryvdh/laravel-dompdf` (or equivalent) and a new Blade view,
   `resources/views/pdf/invoice.blade.php`, styled per `.junie/brand-guidelines.md` (logo, color
   palette, typography) rather than the attached example's layout — the example is reference content
@@ -926,12 +980,14 @@ what happens inside `draft`.
   typography rather than the attached example's styling.
 
 ### Step 7.6 — Module docs ✅ Done
+
 - Update `.junie/modules/billing.md`: new `InvoiceItem` model/table, the `is_finalized`/
   `retainer_amount_snapshot` columns, the finalize action and its lock-out rules, the new
   item/finalize/generate-pdf routes, and a changelog entry. This keeps the module doc in sync per
   AGENTS.md's documentation workflow.
 
 ### Phase 7 exit criteria
+
 - An Owner can build a draft invoice entirely from line items (mixing billable/non-billable), see a
   live subtotal, finalize it (locking in subtotal + retainer snapshot into `amount`), and generate a
   PDF styled with Graphy's own branding — with the full item history still queryable per-invoice for
@@ -947,12 +1003,13 @@ client — separate from the invoice/PDF itself. Deliberately not scoped in deta
 Phase 7 has shipped and there's real item data to design the report against.
 
 ### Step 8.1 — Report data query (not yet scoped) ✅ Done
+
 - **Implemented via (21 Oct 2026, MVP Step M-3.3 / I-10.3):** `BuildClientReportSnapshotAction` on Phase 17's services (no second aggregation layer); the line-item work summary was left out (billing data).
 - Likely an Action that queries `InvoiceItem` across a client's invoices within a date range,
   grouped by billable/non-billable and optionally by linked `post_id`. Exact shape, UI, and
   export format (PDF? on-screen? emailed?) to be defined when this phase starts.
 - **Note (Phase 17):** Phase 17's per-client analytics drill-down (Step 17.5) and report exports
-  (Step 17.7) are the internal foundation for this. Phase 8 then becomes the *client-facing* version
+  (Step 17.7) are the internal foundation for this. Phase 8 then becomes the _client-facing_ version
   (portal page + emailed PDF, scoped for `ClientReviewer`: own client only, no billing data, posts
   from "Waiting on client" onwards), adding the line-item work summary on top. Don't build a second
   aggregation layer.
@@ -970,6 +1027,7 @@ nudging the relevant party — built entirely on the existing `Post`/`PostActivi
 infrastructure, no new domain model required beyond a couple of config values.
 
 ### Step 9.1 — SLA threshold config
+
 - Add `approval_sla_hours` (nullable int, default e.g. 48) to `organizations` (migration +
   `UpdateOrganizationSettingsAction`/`OrganizationSettingsUpdateRequest` extension, same Owner-only
   settings page from Step 0.15).
@@ -977,14 +1035,16 @@ infrastructure, no new domain model required beyond a couple of config values.
   test confirms it persists and defaults sensibly when unset.
 
 ### Step 9.2 — Overdue computation
+
 - `App\Services\PostApprovalSlaService::isOverdue(Post $post): bool` — true when the post's current
   status is `waiting_client` or `changes_requested` and `now() - lastTransitionAt() >
-  org.approval_sla_hours`, using the existing `PostActivityLog` timestamps (no new column needed) as
+org.approval_sla_hours`, using the existing `PostActivityLog` timestamps (no new column needed) as
   the "entered this status at" source.
 - **Done when**: a unit test covers a post just inside the threshold, just past it, and with no SLA
   configured (never overdue).
 
 ### Step 9.3 — Home + portal surfacing
+
 - Extend `App\Actions\Home\GetNeedsAttentionItemsAction` with an `overdueApprovals` bucket (reusing
   `PostApprovalSlaService`) and add a matching "Overdue" badge on `resources/js/pages/home.tsx`'s
   waiting-approvals card.
@@ -994,6 +1054,7 @@ infrastructure, no new domain model required beyond a couple of config values.
   Home and the portal dashboard.
 
 ### Step 9.4 — Reminder notifications/job
+
 - `App\Jobs\SendOverdueApprovalRemindersJob`, scheduled daily (mirrors Step 1.5's
   `publishing:poll-pending-statuses` scheduling pattern): for every overdue post, sends one
   in-app `Illuminate\Notifications\Notification` to the relevant internal owner (Strategist/Owner)
@@ -1005,11 +1066,13 @@ infrastructure, no new domain model required beyond a couple of config values.
   per day, none for posts within the SLA, and none when the org has no SLA configured.
 
 ### Step 9.5 — Module docs
+
 - Update `.junie/modules/home.md`, `.junie/modules/client-portal.md`, `.junie/modules/notifications.md`,
   and `.junie/modules/settings.md` with the new SLA config, overdue computation, and reminder job —
   plus a changelog entry in each, per AGENTS.md's documentation workflow.
 
 ### Phase 9 exit criteria
+
 - A post left in `waiting_client` past the org's configured SLA shows as "Overdue" on both Home and
   the client portal, and triggers exactly one reminder per day to the right party until it moves.
 
@@ -1021,12 +1084,12 @@ _Implemented via MVP Step M-5.8: `ParseBulkPostImportAction` + `CreatePostsInBul
 `BulkPostImportController` + `BulkPostRow`/`BulkImportParseResult`, client-scoped CSV, all-or-nothing
 drafts, template download. Tests `tests/Feature/Posts/BulkPostImportTest.php`. See `posts.md`._
 
-
 Goal: let a Strategist create many posts (with per-target schedules) in one pass instead of one at a
 time through the single-post editor from Step 0.10 — built as an additive wrapper around the existing
 `CreatePostAction`/checklist, not a replacement for it.
 
 ### Step 10.1 — `BulkPostRow` DTO and parser
+
 - `App\Support\Posts\BulkPostRow`: readonly DTO (`captions`, `hashtags`, `targets[]` — each with
   `socialAccountId`/`scheduledLocalDate`/`scheduledLocalTime`, `assetIds[]`, `campaignId`).
 - `App\Actions\Posts\ParseBulkPostImportAction`: parses an uploaded CSV (columns: client, campaign,
@@ -1037,6 +1100,7 @@ time through the single-post editor from Step 0.10 — built as an additive wrap
   handle, and asserts one parsed `BulkPostRow` plus one reported row error.
 
 ### Step 10.2 — `CreatePostsInBulkAction`
+
 - `App\Actions\Posts\CreatePostsInBulkAction`: wrapped in a single `DB::transaction()` for the whole
   batch (all-or-nothing, matching principle #5 — a half-imported batch is worse than none), calls the
   existing `CreatePostAction` per row so every post still gets independently-computed per-target
@@ -1049,6 +1113,7 @@ time through the single-post editor from Step 0.10 — built as an additive wrap
   row asserts the whole batch rolls back with a reported error.
 
 ### Step 10.3 — Import UI
+
 - New `resources/js/pages/posts/bulk-import.tsx` (reachable from the client show page, mirrors the
   "Social accounts"/"Campaigns" inline-section entry points): file upload, a preview table showing
   parsed rows with inline per-row error highlighting from Step 10.1 before confirming, and a
@@ -1059,10 +1124,12 @@ time through the single-post editor from Step 0.10 — built as an additive wrap
   resulting posts appear on the client's post list/calendar.
 
 ### Step 10.4 — Module docs
+
 - Update `.junie/modules/posts.md` with the bulk import flow, the CSV column contract, and a
   changelog entry.
 
 ### Phase 10 exit criteria
+
 - A Strategist can upload a CSV of post rows for a client and get back a correctly-scheduled batch of
   draft posts (or a clear per-row error report with nothing partially created).
 
@@ -1076,12 +1143,12 @@ MVP copies the target accounts + overrides too, per I-4.7, rather than dropping 
 posts added on top (`recurrence`, `GenerateRecurringPostDraftsAction`). Tests
 `tests/Feature/Posts/RecyclePostTest.php`. See `posts.md`._
 
-
 Goal: let an Owner/Strategist flag a published post as reusable and get a low-friction path to
 reschedule it later, without inventing a new content type — a recycled post is just a new `Post`
 seeded from an old one's fields.
 
 ### Step 11.1 — `is_recyclable` flag + `RecyclePostAction`
+
 - Add `is_recyclable` (bool, default `false`) and `recycle_after_days` (nullable int) to `posts`
   (migration), settable from the editor (Step 0.10's `posts/edit.tsx`) via a new checkbox + optional
   day count, persisted through the existing `UpdatePostAction`/`UpdatePostRequest`.
@@ -1093,6 +1160,7 @@ seeded from an old one's fields.
   copied caption/hashtags/assets and zero targets, and that a non-recyclable post is rejected.
 
 ### Step 11.2 — Recycle suggestions on Home
+
 - Extend `App\Actions\Home\GetNeedsAttentionItemsAction` with a `recyclingSuggestions` bucket: every
   `is_recyclable` published post where `published_at + recycle_after_days <= now()` and no later post
   has already been recycled from it (new nullable `recycled_from_post_id` FK on `posts`, set by Step
@@ -1104,10 +1172,12 @@ seeded from an old one's fields.
   lands on the new draft's editor page with fields pre-filled.
 
 ### Step 11.3 — Module docs
+
 - Update `.junie/modules/posts.md` and `.junie/modules/home.md` with the recycling fields, action, and
   Home bucket, plus a changelog entry.
 
 ### Phase 11 exit criteria
+
 - A published post flagged recyclable produces a Home suggestion once its recycle window has passed,
   and recycling it one-clicks into a pre-filled new draft awaiting fresh scheduling.
 
@@ -1120,6 +1190,7 @@ engagement metrics (where Upload-Post/platform APIs expose them) into a per-clie
 view — read-only reporting, no new publish/schedule logic.
 
 ### Step 12.1 — `PostTargetMetrics` model + sync ✅ Done
+
 - **Implemented via (21 Oct 2026, MVP Step M-3.1):** `PostTargetMetric` + `SyncPostTargetMetricsAction` behind a separate `EngagementSource` contract.
 - New `post_target_metrics` table/model: `post_target_id` (FK), `impressions`, `likes`, `comments`,
   `shares`, `fetched_at`, nullable (vendor may not return all fields per platform).
@@ -1135,6 +1206,7 @@ view — read-only reporting, no new publish/schedule logic.
   synced target, and the `NullPublishAdapter`/unavailable-vendor path is a safe no-op.
 
 ### Step 12.2 — Analytics dashboard ✅ Done
+
 - **Implemented via (21 Oct 2026, MVP Step M-3.1):** the `engagement` section of `GetOrganizationAnalyticsSummaryAction` (`EngagementMetrics`).
 - `App\Actions\Analytics\GetClientAnalyticsSummaryAction`: aggregates the latest `PostTargetMetrics`
   per post within a date range for one client, grouped by platform and by campaign, plus simple
@@ -1152,11 +1224,13 @@ view — read-only reporting, no new publish/schedule logic.
   `engagement` section reads from the same shared metric service.
 
 ### Step 12.3 — Module docs ✅ Done
+
 - New `.junie/modules/analytics.md` following the standard template (purpose, models, actions,
   routes, business rules, tests, known gaps — explicitly noting whichever vendor metrics endpoint
   turned out to be unavailable), and add its row to `.junie/modules/README.md`'s module table.
 
 ### Phase 12 exit criteria
+
 - A client's analytics page shows aggregated engagement by platform/campaign over a selectable date
   range, built entirely from metrics synced from the existing publish adapter — no manual data entry.
 
@@ -1168,6 +1242,7 @@ Goal: let an agency's own tools (CRM, project management, Zapier/Make) react to 
 the same adapter-style "swappable, testable boundary" pattern already established by `PublishAdapter`.
 
 ### Step 13.1 — API token model
+
 - New `App\Models\ApiToken` (or Laravel Sanctum personal access tokens, if already a dependency):
   `org_id`, `name`, hashed token, `last_used_at`, `revoked_at`. Owner-only CRUD on a new
   "API access" settings tab (mirrors Step 0.15's organization settings page).
@@ -1175,6 +1250,7 @@ the same adapter-style "swappable, testable boundary" pattern already establishe
   once (never persisted/logged in plaintext) — a PHPUnit test asserts this.
 
 ### Step 13.2 — `WebhookSubscription` model + dispatcher
+
 - New `webhook_subscriptions` table/model: `org_id`, `url`, `event` (enum:
   `post.status_changed`, `invoice.sent`, `invoice.paid`), `secret` (for HMAC signing, mirrors Step
   1.5's inbound signature pattern but outbound), `is_active`.
@@ -1188,6 +1264,7 @@ the same adapter-style "swappable, testable boundary" pattern already establishe
   receives it.
 
 ### Step 13.3 — Minimal public read API
+
 - `GET /api/v1/posts`, `GET /api/v1/clients` (Sanctum/token-authenticated, scoped to the token's
   `org_id`, read-only, paginated) — thin `Api\*Controller` classes delegating to existing Eloquent
   queries/policies, no new business logic.
@@ -1195,10 +1272,12 @@ the same adapter-style "swappable, testable boundary" pattern already establishe
   revoked token gets a 401.
 
 ### Step 13.4 — Module docs
+
 - New `.junie/modules/api.md` (token model, webhook subscriptions/events, endpoints, signing scheme,
   known gaps) and its row in `.junie/modules/README.md`.
 
 ### Phase 13 exit criteria
+
 - An Owner can issue an API token and register a webhook URL for `post.status_changed`, and a real
   status transition delivers a correctly-signed payload to that URL, confirmed against a test
   receiver.
@@ -1212,6 +1291,7 @@ under its own brand, without duplicating the org/workspace schema (per the spec 
 billing/org schema flexible for this).
 
 ### Step 14.1 — `OrganizationBranding` fields
+
 - Add nullable `logo_path`, `primary_color`, `accent_color` to `organizations` (migration), uploaded
   via the existing `App\Contracts\AssetStorage` (same storage abstraction as Step 0.7's assets — no
   new storage code). Owner-only, on the organization settings page (Step 0.15).
@@ -1219,6 +1299,7 @@ billing/org schema flexible for this).
   colors round-trip and the logo is served from the configured `AssetStorage` disk.
 
 ### Step 14.2 — Apply branding to client portal and PDFs
+
 - `resources/js/layouts/client-portal/*` reads the org's branding (passed as an Inertia shared prop,
   same mechanism as the preview banner from Step 0.14) to swap the logo and CSS custom properties for
   `primary_color`/`accent_color`, falling back to Graphy's own brand (`.junie/brand-guidelines.md`)
@@ -1231,10 +1312,12 @@ billing/org schema flexible for this).
   branding set renders identically to today's defaults.
 
 ### Step 14.3 — Module docs
+
 - Update `.junie/modules/settings.md`, `.junie/modules/client-portal.md`, and `.junie/modules/billing.md`
   with the new branding fields and fallback rule, plus a changelog entry in each.
 
 ### Phase 14 exit criteria
+
 - An org with custom branding set sees its own logo/colors throughout the client portal and on every
   generated invoice PDF; an org without branding set is visually unchanged from today.
 
@@ -1252,6 +1335,7 @@ A standalone seeder for the first super admin account already exists:
 `alexander.watson.dev@gmail.com` / `password` with `role = Role::SuperAdmin` and `org_id = null`.
 
 ### Step 15.1 — Super admin identity, guard & access control ✅ Done
+
 - `App\Enums\Role::SuperAdmin` already added (org-less — `org_id` stays `null` for these users, since
   a super admin is platform staff, not a member of any single organization's workspace).
 - `App\Models\User::isSuperAdmin(): bool` already added. Add
@@ -1270,27 +1354,29 @@ A standalone seeder for the first super admin account already exists:
   `/super-admin` instead of `/home`.
 
 ### Step 15.2 — Organization onboarding / signup (the missing piece) ✅ Done
+
 - New public-facing signup flow — today organizations are only ever created by a seeder, so this adds
   the first real "create an organization" path in the app.
-  - **15.2.1 — `RegisterOrganizationAction`** ✅ style: `App\Actions\Organizations\RegisterOrganizationAction`,
-    wrapped in `DB::transaction()` (principle #5 — creates an `Organization` row **and** its first
-    `User` with `role = Owner` together, so a half-created org/owner pair can never exist), taking
-    org name/timezone/currency (reusing `TimezoneOptions`/`CurrencyOptions` from Step 0.x) plus the
-    first user's name/email/password. Logs the new org id + owner email at `info` (never the password).
-  - **15.2.2 — Public signup controller/pages**: `App\Http\Controllers\Organizations\RegistrationController`
-    (`GET`/`POST /register-organization`, outside any auth middleware, mirrors Fortify's own
-    registration controller pattern) with `OrganizationRegistrationRequest` validating a unique email
-    across `users` and reasonable org name length. `resources/js/pages/organizations/register.tsx`
-    (branded per `.junie/brand-guidelines.md`) — on success, logs the new user in and redirects to
-    `/home` as a normal Owner, so day-to-day use of the app is completely unchanged after signup.
-  - **15.2.3 — Email verification / welcome email**: reuse Fortify's existing email verification
-    flow for the new owner account, plus a new `App\Mail\OrganizationWelcomeMail` (Resend, mirrors
-    `ClientReviewRequestedMail`'s pattern) sent once the org is created.
-  - **Done when**: a PHPUnit feature test posts valid signup data and asserts an `Organization` + Owner
-    `User` are created together, the user is logged in and redirected to `/home`, a duplicate email is
-    rejected with a validation error and no partial org is created, and the welcome email is queued.
+    - **15.2.1 — `RegisterOrganizationAction`** ✅ style: `App\Actions\Organizations\RegisterOrganizationAction`,
+      wrapped in `DB::transaction()` (principle #5 — creates an `Organization` row **and** its first
+      `User` with `role = Owner` together, so a half-created org/owner pair can never exist), taking
+      org name/timezone/currency (reusing `TimezoneOptions`/`CurrencyOptions` from Step 0.x) plus the
+      first user's name/email/password. Logs the new org id + owner email at `info` (never the password).
+    - **15.2.2 — Public signup controller/pages**: `App\Http\Controllers\Organizations\RegistrationController`
+      (`GET`/`POST /register-organization`, outside any auth middleware, mirrors Fortify's own
+      registration controller pattern) with `OrganizationRegistrationRequest` validating a unique email
+      across `users` and reasonable org name length. `resources/js/pages/organizations/register.tsx`
+      (branded per `.junie/brand-guidelines.md`) — on success, logs the new user in and redirects to
+      `/home` as a normal Owner, so day-to-day use of the app is completely unchanged after signup.
+    - **15.2.3 — Email verification / welcome email**: reuse Fortify's existing email verification
+      flow for the new owner account, plus a new `App\Mail\OrganizationWelcomeMail` (Resend, mirrors
+      `ClientReviewRequestedMail`'s pattern) sent once the org is created.
+    - **Done when**: a PHPUnit feature test posts valid signup data and asserts an `Organization` + Owner
+      `User` are created together, the user is logged in and redirected to `/home`, a duplicate email is
+      rejected with a validation error and no partial org is created, and the welcome email is queued.
 
 ### Step 15.3 — Super admin organization CRUD ✅ Done
+
 - `App\Actions\SuperAdmin\{ListOrganizationsAction,UpdateOrganizationAction,SuspendOrganizationAction,DeleteOrganizationAction}`
   — read/update/suspend/delete any organization. Suspend adds a nullable `suspended_at` on
   `organizations` (migration) and a new `App\Http\Middleware\EnsureOrganizationNotSuspended` applied
@@ -1298,13 +1384,14 @@ A standalone seeder for the first super admin account already exists:
   distinct from hard delete.
 - `App\Http\Controllers\SuperAdmin\OrganizationController` (`index`/`show`/`update`/`suspend`/
   `destroy` under the `super-admin` route group from Step 15.1) + `resources/js/pages/super-admin/
-  organizations/{index,show}.tsx` — a searchable/paginated table (org name, owner, plan/health
+organizations/{index,show}.tsx` — a searchable/paginated table (org name, owner, plan/health
   summary, created date, status) and a detail page.
 - **Done when**: PHPUnit tests cover listing/searching, updating an org's details, suspending (locked-out
   org users get the support page, super admin unaffected), and deleting (cascades per existing FK
   `cascadeOnDelete()` rules already on every org-scoped table).
 
 ### Step 15.4 — Cross-org analytics & reporting dashboard ✅ Done
+
 - `App\Actions\SuperAdmin\GetPlatformAnalyticsSummaryAction`: platform-wide figures — total orgs,
   active vs. suspended, total posts published (all-time and last 30 days), total clients, MRR-style
   total from `invoices`/`invoice_items` (reusing the Step 7 billing data, not duplicating it),
@@ -1324,6 +1411,7 @@ A standalone seeder for the first super admin account already exists:
   shape.
 
 ### Step 15.5 — Reporting CRUD (saved/custom reports) ✅ Done
+
 - New `super_admin_reports` table/model (`name`, `filters` JSON — date range, org ids, metric
   selection —, `created_by` FK to `users`): lets the super admin save a named report configuration
   (built from Step 15.4's filters) and re-run it later rather than re-selecting filters every time.
@@ -1337,6 +1425,7 @@ A standalone seeder for the first super admin account already exists:
   the same totals `GetPlatformAnalyticsSummaryAction` would produce directly for the same filters.
 
 ### Step 15.6 — Module docs ✅ Done
+
 - New `.junie/modules/super-admin.md` following the standard template (purpose, models — `Role::SuperAdmin`,
   `organizations.suspended_at`, `super_admin_reports` —, Actions/Controllers, routes, the org
   onboarding/signup flow, business rules, known gaps) and its row in `.junie/modules/README.md`'s
@@ -1344,6 +1433,7 @@ A standalone seeder for the first super admin account already exists:
   the new signup flow and the `SuperAdmin` role respectively.
 
 ### Phase 15 exit criteria
+
 - `alexander.watson.dev@gmail.com` (seeded via `SuperAdminUserSeeder`) can log in, land on a
   super-admin dashboard, onboard a brand-new organization through the new public signup flow (the
   first time this has ever been possible without a seeder), manage (view/update/suspend/delete) any
@@ -1376,6 +1466,7 @@ brief; it never generates pixels. Verify exact model IDs/pricing against the ven
 and record them in `ai.md`.
 
 Optimisation principles for this phase (apply to every step):
+
 - **Brief once, render many.** One DeepSeek call per set produces a structured `AiImageBrief`; every
   variant reuses it. Cached by `brief_hash` (idea + brand fingerprint + art-direction overrides).
 - **Draft cheap, finalise once.** Sets render at the draft tier (1K). Only the variant a human picks
@@ -1388,10 +1479,11 @@ Optimisation principles for this phase (apply to every step):
   reused; we never send originals or re-encode on every call.
 
 ### Step 16.1 — `ImageProvider` contract, DTOs, Null provider, config ✅ Done
+
 - `App\Contracts\ImageProvider`:
-  - `generate(AiImageBrief $brief, ImageRenderOptions $options): GeneratedImage`
-  - `edit(GeneratedImage|ReferenceImage $source, string $instruction, ImageRenderOptions $options): GeneratedImage`
-  - `supports(ImageCapability $capability): bool` (e.g. `MultiReference`, `TextRendering`, `Edit`)
+    - `generate(AiImageBrief $brief, ImageRenderOptions $options): GeneratedImage`
+    - `edit(GeneratedImage|ReferenceImage $source, string $instruction, ImageRenderOptions $options): GeneratedImage`
+    - `supports(ImageCapability $capability): bool` (e.g. `MultiReference`, `TextRendering`, `Edit`)
 - DTOs under `App\Support\AI\Images\` (readonly, PHPStan-typed): `AiImageBrief` (subject,
   composition, mood, `palette` as named colours + tokens, style, `textOverlay` nullable string,
   `avoid[]`, `referenceAssetIds[]`), `ImageRenderOptions` (`ImageQualityTier` enum `Draft|Final`,
@@ -1412,6 +1504,7 @@ Optimisation principles for this phase (apply to every step):
   returning an image with the requested dimensions.
 
 ### Step 16.2 — Storage for generated bytes + asset provenance ✅ Done
+
 - `AssetStorage` only accepts `UploadedFile` today. Add
   `storeContents(string $contents, string $mimeType, string $directory, string $extension): array`
   (same return shape as `store()`), implemented in `LocalAssetStorage` (and the future S3 driver).
@@ -1425,6 +1518,7 @@ Optimisation principles for this phase (apply to every step):
   shape), normaliser output dimensions/mime, and that `AssetSource::Ai` renders its label.
 
 ### Step 16.3 — Data model: generation sets and variants ✅ Done
+
 - `ai_image_generations` (one per "Generate" click): `org_id`, `client_id`, `ai_post_idea_id`
   nullable, `post_id` nullable, `requested_by`, `brief` (json, the serialized `AiImageBrief`),
   `brief_hash`, `provider`, `model`, `quality_tier`, `aspect_ratio`, `variant_count`, `status`
@@ -1444,6 +1538,7 @@ Optimisation principles for this phase (apply to every step):
   every endpoint), and the unique `idempotency_key` constraint asserted.
 
 ### Step 16.4 — Brand Brain: visual references ✅ Done
+
 - Brand Brain gets a "Visual references" tab: pick up to `max_references` existing client `Asset`s
   (images only) and tag each as **Logo**, **Style** (past approved posts/mood) or **Product**.
   Pivot `brand_brain_reference_assets` (`brand_brain_id`, `asset_id`, `role`, `position`).
@@ -1458,6 +1553,7 @@ Optimisation principles for this phase (apply to every step):
   rejected), fingerprint changing on reference change, and the tab's authz.
 
 ### Step 16.5 — Image brief: DeepSeek as art director ✅ Done
+
 - Add `draftImageBrief(Client $client, ImageBriefInput $input): AiImageBrief` to `AiProvider`
   (`ImageBriefInput` = idea title/description/suggested caption, campaign, target platforms,
   optional user art-direction overrides). Implement in `DeepSeekProvider` with strict JSON schema +
@@ -1475,6 +1571,7 @@ Optimisation principles for this phase (apply to every step):
   phrase never reaches the brief), hashtags absent from the brief, and cache hit on identical input.
 
 ### Step 16.6 — Gemini adapter ✅ Done
+
 - `App\Services\AI\Images\GeminiImageProvider` implements `ImageProvider` over the Gemini API:
   maps `ImageQualityTier` → draft/final model, `ImageAspectRatio` → the API's ratio parameter,
   `ReferenceImage[]` → inline image parts (role-labelled in the prompt: "Image 1 is the logo…"),
@@ -1489,6 +1586,7 @@ Optimisation principles for this phase (apply to every step):
   count), each error mapping, retry/backoff, and a log-assertion test proving no prompt/key leaks.
 
 ### Step 16.7 — Orchestration: generate a set ✅ Done
+
 - `GenerateImageSetAction` (controller → Form Request → this Action): checks quota (Step 16.11) and
   the per-org rate limiter (`RateLimiter::for('ai-images')`, e.g. 10 sets/min), drafts/fetches the
   brief, then in one `DB::transaction()` creates the `AiImageGeneration` + N `AiImageVariant` rows
@@ -1508,6 +1606,7 @@ Optimisation principles for this phase (apply to every step):
   second asset, rate-limit and quota rejections, and jobs landing on the `ai-images` queue.
 
 ### Step 16.8 — Iterate: refine, regenerate, make final ✅ Done
+
 - `RefineImageVariantAction`: short instruction ("warmer light", "remove the cup") → `edit()` using
   the variant as source; new child variant (`parent_variant_id`) in the same set.
 - `RegenerateImageVariantAction`: same brief, new seed, replaces a failed or unloved tile.
@@ -1517,6 +1616,7 @@ Optimisation principles for this phase (apply to every step):
 - **Done when**: tests for lineage, final tier/model used only on finalise, and quota counted per call.
 
 ### Step 16.9 — Image Studio UI ✅ Done (browser visual check pending)
+
 Lives on the idea detail page (`resources/js/pages/clients/ai-post-idea.tsx`) and as a tab in the
 post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange anywhere in the studio
 (data screen), no patterns or peeks.
@@ -1560,6 +1660,7 @@ post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange a
   403; the TSX passes `tsc`/`vp check`; visual check in light and dark mode on mobile and desktop.
 
 ### Step 16.10 — Use in post, approvals and portal ✅ Done
+
 - `AttachGeneratedImagesToPostAction`: attaches selected variants' assets to the post (`post_assets`)
   in a transaction, re-runs `EvaluatePostChecklistAction`, writes a `PostActivityLog` entry ("Added
   2 AI images"). Never changes post status.
@@ -1570,6 +1671,7 @@ post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange a
   portal/review scoping regressions.
 
 ### Step 16.11 — Quota, usage and settings ✅ Done
+
 - `organizations.ai_monthly_image_quota` (nullable int, null = unlimited) and an `ImageQuotaGuard`
   counting variants (draft + final, refine counts as one) for the calendar month; throws
   `AiImageQuotaExceededException` mapped to the friendly UI message.
@@ -1581,6 +1683,7 @@ post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange a
   Settings authz and rendered figures.
 
 ### Step 16.12 — Second adapter: GPT Image 2 for text-heavy designs (stretch) ✅ Done (HTTP-faked only; not verified live)
+
 - `OpenAiImageProvider` implementing the same contract (`OPENAI_API_KEY`, model config).
 - `ImageProviderRouter` (in `App\Services\AI\Images`) picks per request: if `textOverlay` is set and
   `config('ai.images.text_provider') = openai` is configured → OpenAI; otherwise the default provider.
@@ -1588,6 +1691,7 @@ post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange a
 - **Done when**: router tests for each branch and an HTTP-faked adapter test mirroring Step 16.6.
 
 ### Step 16.13 — Housekeeping and compliance ✅ Done
+
 - `ai-images:prune` scheduled command: deletes files for variants discarded or never selected after
   30 days (configurable), keeping any asset attached to a post. Logs counts only.
 - AI disclosure: persist `is_ai_generated` through to publishing; extend `PublishAdapter` targets
@@ -1597,6 +1701,7 @@ post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange a
 - **Done when**: prune tests (attached assets untouched), and an adapter test that the flag is passed.
 
 ### Step 16.14 — Module docs ✅ Done
+
 - Update `.junie/modules/ai.md` (Image Studio section: contract, providers, brief flow, queue,
   logging/diagnostics, quota, known gaps, changelog), `brand-brain.md` (visual references),
   `assets.md` (`AssetSource::Ai`, `storeContents()`, `variant_group_id` now used),
@@ -1604,6 +1709,7 @@ post editor's AI panel. Follows `.junie/brand-guidelines.md`; no Signal Orange a
   `modules/README.md` status table.
 
 ### Phase 16 exit criteria
+
 - From an AI post idea, a Strategist can generate 4 on-brand draft images in the right format for the
   target platform in under ~30 seconds, see them fill in live, refine one in plain words, make it
   final and attach it to a draft post — all without leaving the page.
@@ -1626,6 +1732,7 @@ costing. Like 15.4, this is a read/reporting layer over tables the app already w
 No stored aggregates and no new domain model beyond saved reports.
 
 Design decisions (apply to every step):
+
 - **Share the core, don't fork it.** `GetPlatformAnalyticsSummaryAction` already does most of this
   maths across a list of org ids. Step 17.1 extracts the reusable parts (range resolution,
   bucketing, metric queries) so the platform and org surfaces can't drift. The platform console's
@@ -1640,16 +1747,17 @@ Design decisions (apply to every step):
   role can't see come back `null` in props and are absent from exports (same pattern as the platform
   summary's unselected sections):
 
-  | Section | Owner | Strategist | Designer | Viewer |
-  |---|---|---|---|---|
-  | `clients`, `posts`, `approvals`, `team` | ✓ | ✓ | ✓ | ✓ |
-  | `revenue` (incl. retainers) | ✓ | ✓ | – | – |
-  | `ai` (counts) | ✓ | ✓ | ✓ | ✓ |
-  | `ai.cost_estimate` | ✓ | – | – | – |
+    | Section                                 | Owner | Strategist | Designer | Viewer |
+    | --------------------------------------- | ----- | ---------- | -------- | ------ |
+    | `clients`, `posts`, `approvals`, `team` | ✓     | ✓          | ✓        | ✓      |
+    | `revenue` (incl. retainers)             | ✓     | ✓          | –        | –      |
+    | `ai` (counts)                           | ✓     | ✓          | ✓        | ✓      |
+    | `ai.cost_estimate`                      | ✓     | –          | –        | –      |
 
-  `revenue` mirrors `InvoicePolicy::viewLedger` and AI cost mirrors the Owner-only AI Usage settings
-  page. `ClientReviewer` gets a 403 on every Phase 17 route: client-facing reporting is Phase 8.
-  Org-less super admins are already bounced by `org.member`. Their view is Step 17.9.
+    `revenue` mirrors `InvoicePolicy::viewLedger` and AI cost mirrors the Owner-only AI Usage settings
+    page. `ClientReviewer` gets a 403 on every Phase 17 route: client-facing reporting is Phase 8.
+    Org-less super admins are already bounced by `org.member`. Their view is Step 17.9.
+
 - **Money is never summed across currencies.** Same rule as 15.4: per-currency lists. The series
   is drawn in the org's `default_currency`, falling back to the most-invoiced currency in the range
   when the org invoiced nothing in its default.
@@ -1660,6 +1768,7 @@ Design decisions (apply to every step):
   copy. That keeps it useful for planning without turning into surveillance.
 
 ### Step 17.1 — Extract the shared analytics core (refactor, no behaviour change) ✅ Done
+
 - `App\Support\Analytics\AnalyticsRange` (final readonly): the preset/custom range resolution,
   fallbacks and `granularity()` lifted out of `App\Support\SuperAdmin\AnalyticsFilters`, plus a
   `timezone` property. Presets resolve against "now" in that timezone; `from`/`to` are stored as
@@ -1670,14 +1779,15 @@ Design decisions (apply to every step):
   so no caller changes.
 - `App\Support\Analytics\SeriesBuckets`: builds the bucket list (key + label per day/month) and
   `countByBucket()` / `sumByBucket()`. It converts every timestamp into the range's timezone
-  *before* formatting the key. That's the one line that makes per-org daily charts correct.
+  _before_ formatting the key. That's the one line that makes per-org daily charts correct.
 - Lift the private query methods of `GetPlatformAnalyticsSummaryAction` into small services in
   `App\Services\Analytics`, each taking `list<int> $orgIds` and an `AnalyticsRange`:
-  - `PostActivityMetrics`: transitions to a status in a window, published/failed counts, success rate.
-  - `RevenueMetrics`: `totalsByCurrency()`, invoiced/collected/outstanding/run rate, primary currency.
-  - `AiUsageMetrics`: generated/failed/cost from `ai_usage_logs`.
+    - `PostActivityMetrics`: transitions to a status in a window, published/failed counts, success rate.
+    - `RevenueMetrics`: `totalsByCurrency()`, invoiced/collected/outstanding/run rate, primary currency.
+    - `AiUsageMetrics`: generated/failed/cost from `ai_usage_logs`.
 
-  `GetPlatformAnalyticsSummaryAction` becomes a thin composition of these. Its output is unchanged.
+    `GetPlatformAnalyticsSummaryAction` becomes a thin composition of these. Its output is unchanged.
+
 - **Done when**: `PlatformAnalyticsTest`, `ReportControllerTest` and `AnalyticsFiltersTest` pass
   untouched, plus new class-based unit tests: `AnalyticsRangeTest` (each preset in `Europe/London`
   across the October DST change and in `Asia/Dubai`, custom ranges, bad input → `30d` fallback) and
@@ -1686,6 +1796,7 @@ Design decisions (apply to every step):
   with no new ignores.
 
 ### Step 17.2 — Org analytics filters, abilities and validation ✅ Done
+
 - `App\Support\Analytics\OrganizationAnalyticsFilters` (final readonly): an `AnalyticsRange` in the
   org's timezone, plus `clientIds`, `campaignIds`, `platforms` (`App\Enums\Platform` values) and
   `metrics` (`METRICS = ['clients', 'posts', 'approvals', 'team', 'revenue', 'ai']`). Same
@@ -1696,7 +1807,7 @@ Design decisions (apply to every step):
 - `OrganizationPolicy` gains `viewAnalytics` (same-org Owner/Strategist/Designer/Viewer),
   `viewRevenueAnalytics` (Owner/Strategist) and `viewAiCost` (Owner).
 - `App\Support\Analytics\AnalyticsAccess::visibleMetrics(User $user, OrganizationAnalyticsFilters
-  $filters): list<string>`: intersects the requested metrics with what the user may see. A Designer
+$filters): list<string>`: intersects the requested metrics with what the user may see. A Designer
   asking for `revenue` gets it silently dropped (section `null`), not a 403. That keeps saved
   reports runnable by everyone in the org (see 17.6).
 - `App\Http\Requests\Analytics\OrganizationAnalyticsFilterRequest` with static
@@ -1709,37 +1820,38 @@ Design decisions (apply to every step):
   that `visibleMetrics()` strips `revenue` for a Designer and `ai.cost_estimate` for a Strategist.
 
 ### Step 17.3 — `GetOrganizationAnalyticsSummaryAction` ✅ Done
+
 - `App\Actions\Analytics\GetOrganizationAnalyticsSummaryAction(Organization $organization,
-  OrganizationAnalyticsFilters $filters, User $viewer): array`. Built on the 17.1 services with
+OrganizationAnalyticsFilters $filters, User $viewer): array`. Built on the 17.1 services with
   `[$organization->id]` as the scope, plus org-only sections. Returns `filters`, `metrics` (the
   visible ones), each section below (or `null`), `engagement` (`null`), `primary_currency`,
   `series` and `top_clients`. Client/campaign/platform filters narrow every section that has a
   client/post dimension.
 - Sections:
-  - **`clients`**: total, active, paused, offboarding, new in range, and a health split
-    (`green`/`amber`/`red` counts plus the red clients with their reasons) from
-    `ClientHealthService`. Health is a "right now" snapshot, not range-bound, and the UI labels it
-    that way.
-  - **`posts`**: created, published, failed, success rate (from `PostActivityMetrics`), scheduled
-    now, pipeline counts per `PostStatus` right now, published targets by platform
-    (`post_targets` → `social_accounts.platform`) and the top 5 campaigns by published.
-  - **`approvals`**: from `post_activity_logs` transitions. Sent to client (→ `waiting_client`),
-    approved, changes requested, first-time approval rate (approved with no `changes_requested` in
-    between), median and p90 hours from `waiting_client` to the client's next decision, the same
-    for `internal_review` → next step, posts waiting on the client now, and the oldest one (post
-    id, client, hours waiting). Phase 9's SLA can later mark these overdue without changing the
-    shape.
-  - **`team`**: per staff member (excluding `ClientReviewer`), posts created (`posts.created_by`),
-    transitions made (`post_activity_logs.user_id`), sent to client and scheduled, sorted by name.
-    Transitions with a null `user_id` (token review) or a `ClientReviewer` actor count as
-    client-side decisions, reported as one separate figure.
-  - **`revenue`** (gated): invoiced/collected/outstanding/30-day run rate per currency (from
-    `RevenueMetrics`), overdue per currency using the same overdue rule `InvoiceLedgerService`
-    already applies (reuse it, don't re-derive it), invoices issued/paid, average days to pay, and
-    active retainer total per currency (`clients.retainer_amount` for active clients).
-  - **`ai`**: successful/failed generations by method (captions, trends, ideas, daily brief,
-    images), images this month vs `ai_monthly_image_quota`, and `cost_estimate` only when the
-    viewer has `viewAiCost` (otherwise the key is `null`).
+    - **`clients`**: total, active, paused, offboarding, new in range, and a health split
+      (`green`/`amber`/`red` counts plus the red clients with their reasons) from
+      `ClientHealthService`. Health is a "right now" snapshot, not range-bound, and the UI labels it
+      that way.
+    - **`posts`**: created, published, failed, success rate (from `PostActivityMetrics`), scheduled
+      now, pipeline counts per `PostStatus` right now, published targets by platform
+      (`post_targets` → `social_accounts.platform`) and the top 5 campaigns by published.
+    - **`approvals`**: from `post_activity_logs` transitions. Sent to client (→ `waiting_client`),
+      approved, changes requested, first-time approval rate (approved with no `changes_requested` in
+      between), median and p90 hours from `waiting_client` to the client's next decision, the same
+      for `internal_review` → next step, posts waiting on the client now, and the oldest one (post
+      id, client, hours waiting). Phase 9's SLA can later mark these overdue without changing the
+      shape.
+    - **`team`**: per staff member (excluding `ClientReviewer`), posts created (`posts.created_by`),
+      transitions made (`post_activity_logs.user_id`), sent to client and scheduled, sorted by name.
+      Transitions with a null `user_id` (token review) or a `ClientReviewer` actor count as
+      client-side decisions, reported as one separate figure.
+    - **`revenue`** (gated): invoiced/collected/outstanding/30-day run rate per currency (from
+      `RevenueMetrics`), overdue per currency using the same overdue rule `InvoiceLedgerService`
+      already applies (reuse it, don't re-derive it), invoices issued/paid, average days to pay, and
+      active retainer total per currency (`clients.retainer_amount` for active clients).
+    - **`ai`**: successful/failed generations by method (captions, trends, ideas, daily brief,
+      images), images this month vs `ai_monthly_image_quota`, and `cost_estimate` only when the
+      viewer has `viewAiCost` (otherwise the key is `null`).
 - `series`: one bucket per day (≤ ~2 months) or month in the org's timezone: `created`,
   `published`, `failed`, `sent_for_approval`, `approved`, and `invoiced` (only when revenue is
   visible, otherwise omitted).
@@ -1761,28 +1873,29 @@ Design decisions (apply to every step):
   correctly; and a brand-new org with no data returns zeros and empty lists, not errors.
 
 ### Step 17.4 — Analytics page (new chapter 06 in the studio book) ✅ Done
+
 - Route `GET /analytics` → `App\Http\Controllers\Analytics\AnalyticsController@index` inside the
   `org.member` staff group (thin: Form Request → action → `Inertia::render('analytics/index')`),
   plus the `/preview` mirror per `.junie/modules/preview-mode.md`. Props: `summary`, `filters`,
   `filterOptions` (clients, campaigns, connected platforms) and `can` (`viewRevenue`, `viewAiCost`,
   `saveReport`).
 - Frontend:
-  - Move the reusable pieces out of `components/super-admin/` into `components/analytics/`
-    (filter bar, series chart, per-currency money list, section `StatStrip`s) and re-import them in
-    the super admin pages, so both surfaces share one visual language. The super admin pages
-    must look the same afterwards.
-  - `resources/js/pages/analytics/index.tsx`: `ChapterHero` + `PageHeader`, the filter bar (range,
-    clients, campaigns, platforms, sections), then one `Panel` per visible section with a
-    `StatStrip` and its chart/table. Client health uses `StatusPill` (colour + label). Failed posts
-    use the destructive token + label, never Signal Orange. One hero accent per layout. Each
-    section has an `EmptyState` in the Alima voice (e.g. "Nothing to chart yet. Publish your first
-    post and we'll start counting.").
-  - `lib/chapters.ts`: add `analytics` as **06 Analytics** ("How the studio is tracking — output,
-    approvals, billing and AI.", `LineChart`, prefixes `['/analytics']`), renumber Staff to 07 and
-    Settings to 08. Sidebar and ⌘K palette entries are gated on `can.viewAnalytics` from the shared
-    Inertia props.
-  - Dashboard (Overview): a "See full analytics" link from the publish reliability and invoice
-    totals panels to `/analytics` with the matching section pre-selected.
+    - Move the reusable pieces out of `components/super-admin/` into `components/analytics/`
+      (filter bar, series chart, per-currency money list, section `StatStrip`s) and re-import them in
+      the super admin pages, so both surfaces share one visual language. The super admin pages
+      must look the same afterwards.
+    - `resources/js/pages/analytics/index.tsx`: `ChapterHero` + `PageHeader`, the filter bar (range,
+      clients, campaigns, platforms, sections), then one `Panel` per visible section with a
+      `StatStrip` and its chart/table. Client health uses `StatusPill` (colour + label). Failed posts
+      use the destructive token + label, never Signal Orange. One hero accent per layout. Each
+      section has an `EmptyState` in the Alima voice (e.g. "Nothing to chart yet. Publish your first
+      post and we'll start counting.").
+    - `lib/chapters.ts`: add `analytics` as **06 Analytics** ("How the studio is tracking — output,
+      approvals, billing and AI.", `LineChart`, prefixes `['/analytics']`), renumber Staff to 07 and
+      Settings to 08. Sidebar and ⌘K palette entries are gated on `can.viewAnalytics` from the shared
+      Inertia props.
+    - Dashboard (Overview): a "See full analytics" link from the publish reliability and invoice
+      totals panels to `/analytics` with the matching section pre-selected.
 - **Done when**: feature tests assert the Inertia props shape for Owner, Strategist, Designer and
   Viewer (Designer: `revenue` `null` and `can.viewRevenue` false), `ClientReviewer` gets 403, the
   preview mirror renders, and query-string filters round-trip into `filters`. `tsc --noEmit` and
@@ -1790,6 +1903,7 @@ Design decisions (apply to every step):
   desktop and phone width.
 
 ### Step 17.5 — Client analytics drill-down ✅ Done
+
 - `GET /clients/{client}/analytics` → `AnalyticsController@client`: the same action with
   `$filters->forClient($client->id)`, authorised by `ClientPolicy::view` **and**
   `OrganizationPolicy::viewAnalytics`. The `clients` section switches to that one client's health
@@ -1803,12 +1917,13 @@ Design decisions (apply to every step):
   summary filtered to that client id.
 
 ### Step 17.6 — Saved organization reports (CRUD) ✅ Done
+
 - `organization_reports` table/model: `org_id` (FK, `cascadeOnDelete`), `name`, `description`,
   `filters` (JSON in the `OrganizationAnalyticsFilters::toStoredArray()` shape), `created_by` (FK →
   `users`, `nullOnDelete`), `last_run_at`. Every report is visible to the whole org (small teams,
   shared views). Factory included.
 - `App\Actions\Analytics\{CreateOrganizationReportAction, UpdateOrganizationReportAction,
-  DeleteOrganizationReportAction, RunOrganizationReportAction}`. `RunOrganizationReportAction` just
+DeleteOrganizationReportAction, RunOrganizationReportAction}`. `RunOrganizationReportAction` just
   rebuilds the filters and calls `GetOrganizationAnalyticsSummaryAction` with the **current
   viewer**, then stamps `last_run_at`. So a report an Owner saved with revenue, run by a Viewer,
   shows revenue as `null`. Permissions are applied when the report runs, not when it's saved.
@@ -1826,6 +1941,7 @@ Design decisions (apply to every step):
   later deleted is dropped quietly, not a crash.
 
 ### Step 17.7 — Exports: CSV and branded PDF ✅ Done
+
 - Extract the row-flattening in `App\Support\SuperAdmin\PlatformAnalyticsCsv` into a shared
   `App\Support\Analytics\AnalyticsCsv` (sections → rows, per-currency money rows, series, top
   list). `PlatformAnalyticsCsv` and a new `OrganizationAnalyticsCsv` become thin mappers.
@@ -1834,7 +1950,7 @@ Design decisions (apply to every step):
 - `App\Actions\Analytics\GenerateOrganizationReportPdfAction`: DomPDF, reusing the Alima branding
   partials from the invoice PDF (Step 7.5). Cover with org name, report name and range, one page
   per visible section, footer "Marketing brighter together.". `GET
-  /analytics/reports/{report}/pdf`. This is an internal studio review document. The client-facing
+/analytics/reports/{report}/pdf`. This is an internal studio review document. The client-facing
   version is Phase 8.
 - Exports only ever contain the sections the requesting user can see (they go through the same
   action with the same viewer), and the filename is `Str::slug(name)-Y-m-d`.
@@ -1843,6 +1959,7 @@ Design decisions (apply to every step):
   export output byte-for-byte unchanged after the extraction.
 
 ### Step 17.8 — Scheduled report emails (stretch) ✅ Done
+
 - `organization_reports` gains `schedule` (`null|weekly|monthly`), `recipient_ids` (JSON list of
   same-org staff user ids) and `last_sent_at`. Set from the report builder (Owner/Strategist only).
 - `analytics:send-scheduled-reports` command, scheduled daily (same pattern as
@@ -1856,6 +1973,7 @@ Design decisions (apply to every step):
   no revenue in the email body or attachment.
 
 ### Step 17.9 — Super admin alignment ✅ Done
+
 - `GET /super-admin/organizations/{organization}/analytics` switches from the platform action scoped
   to one org to `GetOrganizationAnalyticsSummaryAction` with every section visible. Super admins
   then see exactly what the customer sees (in the org's own timezone), which is what support and
@@ -1865,6 +1983,7 @@ Design decisions (apply to every step):
   `/analytics` figures for the same range, and the existing super admin access tests still pass.
 
 ### Step 17.10 — Module docs ✅ Done
+
 - New `.junie/modules/analytics.md` following the standard template (purpose, models —
   `organization_reports` —, the shared `App\Support\Analytics` / `App\Services\Analytics` core,
   actions, policies and the role/section matrix, routes, business rules — timezone, per-currency
@@ -1878,6 +1997,7 @@ Design decisions (apply to every step):
   context doc if they list chapters.
 
 ### Phase 17 exit criteria
+
 - An Owner opens **06 Analytics**, picks "Last 90 days" and sees client health, output, approval
   turnaround, team workload, billing per currency and AI usage, all in the org's own timezone.
   They can narrow it to one client, save it as a report, re-run it next month and export it as CSV
@@ -1909,6 +2029,7 @@ thing being edited is the grid (tiles, order, media, framing), not captions and 
 
 Platform facts this phase is built on (checked 2026-10-20 — re-verify at build time and record in
 `grid-planner.md`):
+
 - The profile grid shows **3:4 portrait tiles** (since early 2025), three per row. A 3:4 upload
   (1080×1440) shows in full; a 4:5 feed post is centre-cropped top and bottom on the grid; a Reel shows
   its cover cropped from 9:16 to 3:4.
@@ -1919,6 +2040,7 @@ Platform facts this phase is built on (checked 2026-10-20 — re-verify at build
   reordering is only the manual fix when something goes out of order. Say that in the UI copy.
 
 Design decisions (apply to every step):
+
 - **The grid approves the look; the post approves the words.** A grid plan's own approval covers
   tiles, media, framing and order. Each tile becomes an ordinary `Post` and goes through the normal
   post workflow for its caption, hashtags and schedule. No second state machine in posts, and no
@@ -1939,6 +2061,7 @@ Design decisions (apply to every step):
   suggestions a human applies.
 
 ### Step 18.1 — Data model, enums and policy ✅ Done
+
 - `App\Enums\GridPlanStatus`: `draft`, `internal_review`, `waiting_client`, `changes_requested`,
   `approved`, `archived`, with `label()` and `clientVisible()` (`waiting_client` onwards, mirroring
   `PostStatus::clientVisible()`). `App\Enums\GridTileKind`: `image`, `carousel`, `reel`, `placeholder`
@@ -1980,6 +2103,7 @@ Design decisions (apply to every step):
   `post_id`/`grid_plan_id` exclusivity, and PHPStan level 7 with no ignores.
 
 ### Step 18.2 — Grid layout core (ordering, rows, splits, framing, checklist) ✅ Done
+
 - `App\Services\Grids\GridLayoutService` (pure, no I/O): given a plan's tiles, `pinned_count` and
   the "newer than this plan" posts (Step 18.11), returns each tile's display slot, row and column,
   its publish sequence number (reverse of position), and which row each split group lands on.
@@ -1989,7 +2113,7 @@ Design decisions (apply to every step):
   `resources/js/lib/grid-layout.ts` (`gridSlots()`, `gridTileFrame()`), with a shared fixture JSON
   both test suites read so PHP and TS can't drift.
 - `App\Actions\Grids\EvaluateGridChecklistAction` → `{items: [{key, label, passed, severity,
-  detail, tile_ids}], passed}`. Hard items: `tiles` (at least one), `media` (no placeholders left,
+detail, tile_ids}], passed}`. Hard items: `tiles` (at least one), `media` (no placeholders left,
   carousels within item bounds, every Reel has a video), `formats` (each tile's format is one
   Instagram offers), `split_alignment` (every split group fills whole rows once pinned posts and
   newer tiles are counted — "This split won't line up. Add or remove one tile above it."),
@@ -2006,8 +2130,9 @@ Design decisions (apply to every step):
   but changing when one crop moves.
 
 ### Step 18.3 — Live profile feed source ✅ Done
+
 - `App\Contracts\ProfileFeedSource`: `recent(SocialAccount $account, int $limit = 30):
-  ProfileFeed` (readonly DTO: `username`, `profilePictureUrl` nullable, `items` — `id`, `mediaType`,
+ProfileFeed` (readonly DTO: `username`, `profilePictureUrl` nullable, `items` — `id`, `mediaType`,
   `thumbnailUrl`, `permalink`, `publishedAt` — and `source`: `meta|app|none`).
 - `MetaGraphProfileFeedSource`: `GET /{ig-user-id}?fields=username,profile_picture_url` and
   `GET /{ig-user-id}/media?fields=id,media_type,media_url,thumbnail_url,permalink,timestamp` using
@@ -2027,6 +2152,7 @@ Design decisions (apply to every step):
   log-assertion test that no token is ever logged, and a props test that no token reaches the page.
 
 ### Step 18.4 — Plan and tile actions, routes ✅ Done
+
 - Actions in `App\Actions\Grids` (each in `DB::transaction()`, each bumps `version`, re-runs the
   checklist and logs `grid_plan_id`/`org_id`/`user_id`):
   `CreateGridPlanAction`, `UpdateGridPlanAction` (name, campaign, pinned count, review message),
@@ -2052,6 +2178,7 @@ Design decisions (apply to every step):
   can edit, a Viewer can't, and preview mode can't write.
 
 ### Step 18.5 — Grid planner page (the editor) ✅ Done
+
 Lives at `GET /grids/{grid}/edit`, reached from a new **Grid** tab on the client page (shown when
 the client has an Instagram account) and from the campaign workspace when the plan has a campaign.
 Follows `.junie/brand-guidelines.md` and the post editor's layout so the two feel like siblings.
@@ -2088,6 +2215,7 @@ Follows `.junie/brand-guidelines.md` and the post editor's layout so the two fee
   a browser check in light and dark mode at desktop and phone width.
 
 ### Step 18.6 — Preview functions ✅ Done
+
 One `GridPreview` component (`components/grids/grid-preview.tsx`), reused by the planner, the
 review link and the portal, so everyone sees the same thing.
 
@@ -2116,6 +2244,7 @@ review link and the portal, so everyone sees the same thing.
   focus management in the lightbox, and `prefers-reduced-motion` respected.
 
 ### Step 18.7 — Workflow and internal review ✅ Done
+
 - `App\Actions\Grids\GridPlanStatusTransitionMap` (one explicit `MAP`, like posts):
   `draft → {internal_review, archived}`, `internal_review → {draft, waiting_client, approved}`,
   `waiting_client → {approved, changes_requested}`, `changes_requested → {draft, internal_review}`,
@@ -2136,6 +2265,7 @@ review link and the portal, so everyone sees the same thing.
   stored for a reviewer.
 
 ### Step 18.8 — Client approval (review link and portal) ✅ Done
+
 - On `waiting_client`, `SendClientGridReviewRequestedEmailAction` mints a grid-scoped `ReviewToken`
   and sends `ClientGridReviewRequestedMail` (Resend, Alima voice: "Your new grid is ready to look
   at.") to `Client::approval_email`. If it's missing, the send is skipped with a warning, as for
@@ -2158,6 +2288,7 @@ review link and the portal, so everyone sees the same thing.
   comments, no billing fields in props), and the stale-decision check.
 
 ### Step 18.9 — Turn tiles into posts ✅ Done
+
 - `CreatePostsFromGridTilesAction` (approved plans only; all tiles or a selection): for each tile
   without a post, `CreatePostAction` with the plan's client and campaign, one Instagram `PostTarget`
   on the plan's account (local date/time from the tile's planned date, UTC derived from the
@@ -2181,6 +2312,7 @@ review link and the portal, so everyone sees the same thing.
   portal props carrying the grid chip.
 
 ### Step 18.10 — Schedule the sequence ✅ Done
+
 - `PlanGridScheduleAction` (preview + apply, like `ShiftCampaignAction`): pick a start date, a
   cadence (every day / chosen weekdays / every N days) and a time. It assigns planned dates to tiles
   in **publish order** (last position first) and writes them to each linked post's Instagram
@@ -2200,6 +2332,7 @@ review link and the portal, so everyone sees the same thing.
   and vendor-held posts recalled and re-sent when the sequence is re-planned.
 
 ### Step 18.11 — Keep the grid true after scheduling ✅ Done
+
 - **Outside posts:** `GridLayoutService` takes every other Instagram feed post (not Stories) on the
   same account scheduled or published between the plan's first and last dates and places it in its
   real slot. The checklist's soft `outside_posts` item and the preview's "Not in this plan" tiles
@@ -2221,6 +2354,7 @@ review link and the portal, so everyone sees the same thing.
   later tiles, and the calendar filter.
 
 ### Step 18.12 — AI assist (stretch) ✅ Done
+
 - "Suggest captions for this grid": runs the existing caption suggestion per tile from the tile's
   image description and the client's Brand Brain, written into `caption_idea` only when someone
   clicks "Use". Goes through `AiGuardrailService` and counts in `ai_usage_logs`.
@@ -2235,6 +2369,7 @@ review link and the portal, so everyone sees the same thing.
   usage rows, and the disabled state.
 
 ### Step 18.13 — Preview fixture and housekeeping ✅ Done
+
 - `PreviewSeeder` gets one approved grid plan (nine tiles: a 1×3 split, a carousel, a Reel, six
   linked posts) so `/preview` shows the feature off. Write-blocked as usual.
 - `DemoContentSeeder` gets a draft grid per demo client.
@@ -2244,6 +2379,7 @@ review link and the portal, so everyone sees the same thing.
   alone.
 
 ### Step 18.14 — Module docs ✅ Done
+
 - New `.junie/modules/grid-planner.md` on the standard template: purpose, models, the layout core
   and its TS mirror, the feed source contract, actions, policy and role scoping, routes, business
   rules (look vs words approval, position 1 = top-left, split alignment, drift, order at risk),
@@ -2257,6 +2393,7 @@ review link and the portal, so everyone sees the same thing.
   `preview-mode.md`, each with a changelog entry.
 
 ### Phase 18 exit criteria
+
 - A Strategist builds a nine-tile plan for a client's Instagram account (a split banner, a carousel,
   a Reel and single images), sees it in a phone-frame preview on top of the real profile, scrubs
   through how it builds up day by day, and sends it for internal review and then to the client.

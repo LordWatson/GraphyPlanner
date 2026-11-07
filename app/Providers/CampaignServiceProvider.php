@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\CampaignAiProvider;
 use App\Contracts\CampaignFeatures;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\CampaignHealthService;
 use App\Services\Campaigns\Health\BriefNotApprovedRule;
@@ -43,14 +43,14 @@ class CampaignServiceProvider extends ServiceProvider
 
         $this->app->singleton(CampaignHealthService::class, fn ($app) => new CampaignHealthService($app->tagged(self::HEALTH_RULES)));
 
-        // C-2.2 / C-3.3 / C-7.3: same rule as `AiProvider` — DeepSeek only when AI is enabled and
+        // C-2.2 / C-3.3 / C-7.3: same rule as `AiProvider` — Anthropic only when AI is enabled and
         // a key is set, otherwise the Null provider (empty, valid suggestions, no vendor call).
         // C-9.4: settings today; a plan-entitlement implementation replaces this binding later.
         $this->app->singleton(CampaignFeatures::class, SettingsCampaignFeatures::class);
 
         $this->app->bind(CampaignAiProvider::class, function ($app) {
-            return (bool) config('ai.enabled', false) && (string) config('ai.deepseek.api_key', '') !== ''
-                ? $app->make(DeepSeekProvider::class)
+            return (bool) config('ai.enabled', false) && (string) config('ai.anthropic.api_key', '') !== ''
+                ? $app->make(AnthropicProvider::class)
                 : $app->make(NullAiProvider::class);
         });
     }

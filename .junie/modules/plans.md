@@ -1,7 +1,8 @@
 # Plans, entitlements & subscriptions
 
 ## Purpose
-Everything that decides *what a workspace's plan lets it do* and *how it pays for it* — Phase CG-2
+
+Everything that decides _what a workspace's plan lets it do_ and _how it pays for it_ — Phase CG-2
 (`.junie/plans/business-competitor-gap.md`), delivering B-9.1–B-9.4 and B-12.2. Three layers:
 
 1. **Plan definitions** (`config/plans.php`) — the single source of truth for prices and limits.
@@ -13,13 +14,14 @@ This module is distinct from `billing.md`, which is **client invoices** (an agen
 clients). This is **our subscription revenue** (a workspace paying us) and the plan gates.
 
 ## Pricing (Step CG-0.1, confirmed 2026-10-28)
+
 Positioning: "the AI marketing partner for one brand." Annual = two months free (monthly × 10).
 
-| Plan (`key`) | Segment | GBP / USD monthly | Includes |
-|---|---|---|---|
-| `business_free` | business | £0 / $0 | 3 accounts, 30 scheduled posts/mo, 30 AI credits, 5 image credits, 1 seat, 30d analytics, 500 MB |
-| `business_pro` | business | £15 / $19 | all networks, unlimited scheduling, 500 AI / 50 image credits, grid planner, inbox, 365d analytics, 5 GB |
-| `creator_pro` | creator | £29 / $37 | Pro + bio page, store, public media kit, deals, email automation, 2 seats, 1000 AI / 100 image credits, 10 GB |
+| Plan (`key`)    | Segment  | GBP / USD monthly | Includes                                                                                                      |
+| --------------- | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| `business_free` | business | £0 / $0           | 3 accounts, 30 scheduled posts/mo, 30 AI credits, 5 image credits, 1 seat, 30d analytics, 500 MB              |
+| `business_pro`  | business | £15 / $19         | all networks, unlimited scheduling, 500 AI / 50 image credits, grid planner, inbox, 365d analytics, 5 GB      |
+| `creator_pro`   | creator  | £29 / $37         | Pro + bio page, store, public media kit, deals, email automation, 2 seats, 1000 AI / 100 image credits, 10 GB |
 
 ### Agency pricing (Step GTM-0.1, decided 2026-11-07)
 
@@ -27,12 +29,12 @@ Agencies were unlimited and free until this step. They are now a tiered, public,
 **tiered on capacity, never on capability**: every agency plan grants every gate. Cloud Campaign
 charges $199/$299 for less product, so Scale undercuts it.
 
-| Plan (`key`) | Segment | GBP / USD monthly | Brands | Seats | Accounts |
-|---|---|---|---|---|---|
-| `agency_starter` | agency | £49 / $59 | 5 | 3 | 50 |
-| `agency_standard` | agency | £99 / $119 | 15 | 10 | 150 |
-| `agency_scale` | agency | £199 / $239 | 50 | unlimited | 500 |
-| `agency_legacy` | agency | — | unlimited | unlimited | unlimited |
+| Plan (`key`)      | Segment | GBP / USD monthly | Brands    | Seats     | Accounts  |
+| ----------------- | ------- | ----------------- | --------- | --------- | --------- |
+| `agency_starter`  | agency  | £49 / $59         | 5         | 3         | 50        |
+| `agency_standard` | agency  | £99 / $119        | 15        | 10        | 150       |
+| `agency_scale`    | agency  | £199 / $239       | 50        | unlimited | 500       |
+| `agency_legacy`   | agency  | —                 | unlimited | unlimited | unlimited |
 
 `agency_legacy` is the pre-GTM-0.1 unlimited plan, kept **non-public and never sold**. The migration
 `2026_11_20_100000_grandfather_existing_agency_plans` moved every agency org that existed at that
@@ -59,6 +61,7 @@ model, Stripe entity, handle namespace, and **whether the comment inbox is gated
 proposed table puts it in Pro; see Known Gaps).
 
 ## Models / Tables
+
 - `organizations` new columns (migration `2026_11_14_100100_add_billing_columns_to_organizations_table`):
   `plan` (string, nullable → the type default), the four Cashier customer columns (`stripe_id` idx,
   `pm_type`, `pm_last_four`, `trial_ends_at`), `billing_enabled` (nullable bool — the per-org override
@@ -80,6 +83,7 @@ proposed table puts it in Pro; see Known Gaps).
   expired), `planAuditLogs()`.
 
 ## Actions / Services / Contracts
+
 - `App\Enums\Feature` — the 8 numeric **limits** (`social_accounts`, `scheduled_posts_per_month`,
   `team_seats`, `ai_text_credits`, `ai_image_credits`, `brands`, `analytics_history_days`,
   `media_storage_mb`) and 7 boolean **gates** (`grid_planner`, `inbox`, `bio_page`, `store`,
@@ -91,7 +95,7 @@ proposed table puts it in Pro; see Known Gaps).
   (falls back to the type default), `defaultKeyFor($type)`, `public()`, `findByStripePriceId()`.
 - `App\Contracts\Entitlements` (bound to `App\Services\Plans\ConfigEntitlements` in
   `AppServiceProvider`): `plan()`, `limit()`, `allows()`, `remaining()`, and `ensure($org, $feature,
-  $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLimitReachedException`
+$current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLimitReachedException`
   (a gate not granted, or a limit's cap reached). Since Step GTM-0.1 `ensure()` **does** fire for an
   agency on a paid tier (brands, seats, accounts); only `agency_legacy` is unlimited.
 - `App\Exceptions\Plans\PlanLimitReachedException` — renders itself as a **friendly upgrade prompt,
@@ -115,6 +119,7 @@ proposed table puts it in Pro; see Known Gaps).
   `PlanAuditLog`. The global switch is set directly via `PlatformSettings` (no per-org audit row).
 
 ## Enforcement points (Step CG-2.2)
+
 - `CreateSocialAccountAction` → `Feature::SocialAccounts` (org-wide count).
 - `CreatePostAction` → `Feature::ScheduledPostsPerMonth` (posts created this calendar month in the
   org's timezone — the MVP interpretation of "scheduled posts a month").
@@ -132,6 +137,7 @@ proposed table puts it in Pro; see Known Gaps).
   (the plan sets the default; an explicit owner/super-admin quota still wins).
 
 ## Routes / Controllers
+
 - `GET settings/plan` → `Settings\PlanController@edit` (`plan.edit`) — Owner-only; current plan, usage
   meters, upgrade cards, manage-billing. `POST settings/plan/checkout` (`plan.checkout`,
   `StartCheckoutRequest`) → Stripe Checkout via Cashier (`Inertia::location`); guarded so it never
@@ -150,6 +156,7 @@ proposed table puts it in Pro; see Known Gaps).
   enforcement.
 
 ## Business Rules
+
 - `plan = null` resolves to the default for the workspace type (business → `business_free`; agency →
   `agency_starter` since Step GTM-0.1, so an agency that has never paid is capped at the cheapest
   tier rather than unlimited). Existing agency orgs were pinned to `agency_legacy` by migration, so
@@ -167,6 +174,7 @@ proposed table puts it in Pro; see Known Gaps).
   or keys (Principle 4): Cashier uses `STRIPE_KEY`/`STRIPE_SECRET`/`STRIPE_WEBHOOK_SECRET`.
 
 ## Tests
+
 - `tests/Unit/Plans/PlanDefinitionsTest` — every plan defines every feature; every agency tier grants
   every gate; `agency_legacy` alone is unlimited and non-public; the paid tiers' capacity and price
   rise together; default keys resolve.
@@ -189,6 +197,7 @@ proposed table puts it in Pro; see Known Gaps).
 - `tests/Feature/Business/BusinessGridTest` — grid planner gated to Pro (free gets the upgrade prompt).
 
 ## Known Gaps / Open Questions
+
 - **AI credits are unlimited on every agency tier** (Step GTM-0.1 left this as it was). That was free
   when agencies didn't pay; now we sell an unlimited AI allowance for £49/mo, which is an open cost
   exposure, not a decision. Needs a per-tier `ai_text_credits` / `ai_image_credits` cap once there is
@@ -222,7 +231,7 @@ proposed table puts it in Pro; see Known Gaps).
   `brand_deals` (CG-5), `email_automation` (GTM-2), `white_label` (GTM-3.1, agency tiers only),
   `custom_domain` (GTM-3.2, Creator Pro and up), `competitor_benchmarks` (GTM-4, Pro and up) and
   `ads_reporting` (GTM-5, agency tiers only).
-- **A new limit defaults to *unlimited*.** `$limitDefaults` is all nulls, so a limit case added to
+- **A new limit defaults to _unlimited_.** `$limitDefaults` is all nulls, so a limit case added to
   `Feature` without a value on every plan is given away for free. `Feature::TrackedProfiles`
   (GTM-4.1) is set explicitly on all seven plans for that reason, including **0** on Free — which
   is a legitimate cap with no room below it, and is why
@@ -234,7 +243,7 @@ proposed table puts it in Pro; see Known Gaps).
 - No real Stripe products/prices exist yet, so checkout/portal are reachable only once the
   `STRIPE_PRICE_*` env vars are set and the super-admin switch is on; tests cover the guarded "not
   available yet" paths, not a live Stripe round-trip.
-- `scheduled_posts_per_month` is enforced at post *creation* per calendar month (MVP interpretation),
+- `scheduled_posts_per_month` is enforced at post _creation_ per calendar month (MVP interpretation),
   not at the scheduled-transition step.
 - The post and connected-account meters reset on the **org-timezone** month boundary, but the AI
   text-credit meter (`AiUsageGuard`) still resets on the **app-timezone** (UTC) boundary it has used
@@ -244,6 +253,7 @@ proposed table puts it in Pro; see Known Gaps).
   a downgrade simply lowers the plan.
 
 ## Changelog
+
 - 2026-11-07: Phase GTM-5 added `Feature::AdsReporting` (agency tiers only; read-only paid-ads
   reporting — see `ads.md`). Phase GTM-7.1 added agency cap utilisation to the super-admin funnel,
   so the next change to these limits has evidence behind it.

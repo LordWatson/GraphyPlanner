@@ -6,6 +6,7 @@ description: Build or restyle an Inertia/React page or component in resources/js
 # Graphy frontend page
 
 ## Before writing
+
 - Read `.junie/brand-guidelines.md` (Alima: teal sidebar frame, Cloud Cream workspace, Poppins
   SemiBold headlines + DM Mono eyebrows, Ink main buttons / teal brand actions, Signal Orange as
   decoration only, status = colour **and** label/icon).
@@ -14,6 +15,7 @@ description: Build or restyle an Inertia/React page or component in resources/js
   exact prop shapes.
 
 ## Rules
+
 - Page file path must match the controller's render name (`clients/index` →
   `resources/js/pages/clients/index.tsx`), default export.
 - Compose from `@/components/ui/*` (shadcn: button, badge, card, dialog, select, tabs, sheet, tooltip,
@@ -31,4 +33,5 @@ description: Build or restyle an Inertia/React page or component in resources/js
 - Verify light **and** dark mode; keep layouts usable at mobile widths.
 
 ## Done
+
 `npm run check` and `npm run types:check` pass; if you can, run the app (`composer dev`) and look at it.

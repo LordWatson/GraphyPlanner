@@ -1,6 +1,7 @@
 # Public REST API & outgoing webhooks
 
 ## Purpose
+
 Read access to an agency's data over HTTP, and outgoing webhooks so another system can be told the
 moment something happens. Audit item 18 in `.junie/plans/market-readiness-audit.md`.
 
@@ -10,6 +11,7 @@ is a distribution channel with a long lead time. The MCP server is differentiate
 assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's ops person asks.
 
 ## Models / Tables
+
 - `webhook_endpoints`: `org_id`, `url` (https only), `secret` (**encrypted** + `Hidden`), `events`
   (json), `disabled_at`, `disabled_reason`.
 - `webhook_deliveries`: one attempt and its outcome — `event`, `payload`, `attempts`,
@@ -17,6 +19,7 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
   because the first question about a webhook is "did it arrive" and the second is "send it again".
 
 ## Actions / Services / Contracts
+
 - `App\Support\Api\BearerTokenAuth`: resolves a bearer token to an organization and acts as one of
   its members. **Shared with the MCP transport** — same tokens, same tenancy rule, so they cannot
   drift.
@@ -29,7 +32,9 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
   a post transition to one.
 
 ## Routes / Controllers
+
 `routes/api.php`, all under `/api/v1`, all `api.token:<scope>`:
+
 - `GET /me` → `Api\V1\MeController` — what this token is and may do.
 - `GET /clients`, `GET /clients/{client}` → `Api\V1\ClientController`.
 - `GET /posts`, `GET /posts/{post}` → `Api\V1\PostController` — channels inline; `updated_since`
@@ -39,6 +44,7 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
 - `GET /openapi.json` — the spec, unauthenticated (it is documentation, not data).
 
 ## Business Rules
+
 - **One token concept.** The API uses `McpToken`, as that model's own docblock requires ("these two
   must become one token/org/scope concept, not two"). The class name now undersells what it does; a
   rename is mechanical churn that belongs in its own change.
@@ -62,6 +68,7 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
   otherwise keep a worker retrying every event forever and tell nobody.
 
 ## Tests
+
 - `tests/Feature/Api/ApiV1Test.php` (15): auth, scopes, tenancy in both directions, response
   shapes, filters, cursor pagination, 422 on bad input, no credential leakage.
 - `tests/Feature/Api/OutgoingWebhookTest.php` (12): subscribing over the API, secret shown once,
@@ -71,6 +78,7 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
   documented and nothing extra is**, and the documented events are the ones that exist.
 
 ## Known Gaps / Open Questions
+
 - ~~`order.paid` is in the enum but nothing emits it.~~ **Wired 2026-11-07** in `MarkOrderPaidAction`,
   after the commit so nothing is announced that a rollback un-did.
 - **Writes are not built.** v1 is read-only; `POST`/`PATCH` for posts and assets need an

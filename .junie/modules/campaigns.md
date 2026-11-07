@@ -1,6 +1,7 @@
 # Campaigns
 
 ## Purpose
+
 Campaigns are the unit of work an agency sells and delivers: a launch, a season, a push for one
 client. Started as the campaign half of Step 0.7 (a label with dates grouping posts) and grown by
 `.junie/plans/campaigns-enhancement.md` (Steps `C-*`) into the full lifecycle:
@@ -8,6 +9,7 @@ client. Started as the campaign half of Step 0.7 (a label with dates grouping po
 Step C-0.1); the kit link (`assets.campaign_id`) is documented on both sides.
 
 ## Models / Tables
+
 - `Campaign` (`campaigns`): `org_id`, `client_id` (cascade), `owner_id` (nullable, in-org staff),
   `name`, `code` (uppercased, unique per client), `status` (`CampaignStatus`: planning / active /
   paused / completed / archived), `objective` (`CampaignObjective`), `colour` (`CampaignColour`:
@@ -48,6 +50,7 @@ Step C-0.1); the kit link (`assets.campaign_id`) is documented on both sides.
 - Every FK column has an explicit index (`IndexCoverageTest`).
 
 ## Actions / Services / Contracts
+
 All under `App\Actions\Campaigns` unless noted. Multi-write actions run in `DB::transaction`,
 side effects (mail, notifications, publish jobs) in `DB::afterCommit`, and each logs ids at info.
 
@@ -128,7 +131,7 @@ side effects (mail, notifications, publish jobs) in `DB::afterCommit`, and each 
   folded into `can` (`saveTemplate`, `aiPlanner`, `wrapReports`, `invoice`; hub `can.templates`).
   Features (`CampaignFeature`): templates, ai_planner, wrap_reports, invoicing.
 - **Contracts**: `App\Contracts\CampaignAiProvider` (kept apart from `AiProvider` so its test
-  doubles don't grow three methods), bound in `CampaignServiceProvider` to `DeepSeekProvider` when
+  doubles don't grow three methods), bound in `CampaignServiceProvider` to `AnthropicProvider` when
   AI is on with a key, else `NullAiProvider`.
 - **Support** (`App\Support\Campaigns`): `CampaignTimeline`, `CampaignClock` (org timezone
   "today"), `CampaignHealth`/`CampaignHealthFinding`/`CampaignHealthContext`, `CampaignReadiness`,
@@ -140,6 +143,7 @@ side effects (mail, notifications, publish jobs) in `DB::afterCommit`, and each 
   `CampaignTemplatePolicy`.
 
 ## Phase M-3 additions (Step M-3.1 — C-7.1 / C-7.2 / C-7.3 switched on)
+
 - `CampaignKpiService::actuals()` computes reach, impressions (views when a network only reports
   views), engagement rate, follower growth (the client's accounts over the campaign's range) and
   link clicks from `EngagementMetrics` over the campaign scope. Until a reading exists each reports
@@ -162,7 +166,9 @@ side effects (mail, notifications, publish jobs) in `DB::afterCommit`, and each 
   (`ApplyCampaignDefaultsAction::applyToChannels()/linksFor()`, M-2.2).
 
 ## Routes / Controllers
+
 Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `...\Portal`.
+
 - Hub: `GET /campaigns` → `campaigns.index` (`CampaignIndexController`; `view=list|timeline`;
   filters `search`, `client`, `status` only, validated by `CampaignHubRequest`; ordered by start
   date, undated last). The stat strip is display-only.
@@ -180,7 +186,7 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
 - Results (`CampaignResultsController`): `campaigns.kpis.update`, `campaigns.report.update/share/pdf`.
 - AI (`CampaignAiController`, `throttle:ai`, 404 when AI is off): `campaigns.ai.brief/plan/wrap`,
   `campaigns.plan.accept`. `campaigns.ai.plan` answers 202 `{run}`; `GET
-  campaigns/{campaign}/ai/plan/{run}` → `campaigns.ai.plan.status` (outside `throttle:ai`, polled;
+campaigns/{campaign}/ai/plan/{run}` → `campaigns.ai.plan.status` (outside `throttle:ai`, polled;
   404 for an unknown, expired or someone else's run).
 - Run (`CampaignRunController`): `campaigns.pause`, `.resume`, `.shift.preview` (JSON), `.shift`.
 - Compare: `GET /campaigns/compare?ids[]=…` → `campaigns.compare` (`CampaignCompareController`,
@@ -197,6 +203,7 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
 - `RedirectClientReviewersToPortal` sends reviewers on staff campaign URLs to the portal page.
 
 ## Frontend
+
 - Pages: `campaigns/index` (hub: list + timeline), `compare`, `share/campaign` (public), `overview`, `brief`, `plan`, `board`, `assets`,
   `approvals`, `results`, `activity`, `edit`, `templates`; `portal/campaigns/index`, `show`,
   `review`; `clients/tabs/campaigns` (with the first-campaign template prompt).
@@ -213,6 +220,7 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
 ## Business Rules
 
 ### Principles (plan §1.3)
+
 1. **The campaign plans, the post produces.** Deliverables are planned slots. A post is created
    from a slot when work starts. We never flood the posts table with empty placeholders.
 2. **Derived, never stored, for anything judgemental.** Campaign health, readiness and timeline
@@ -226,19 +234,21 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
    (`AnalyticsScope` narrows by campaign), PDFs (`PdfBrand`) and the portal are reused, not forked.
 
 ### Role scoping (plan §1.4)
-| Capability | Owner | Strategist | Designer | Viewer | ClientReviewer |
-|---|---|---|---|---|---|
-| View campaign, plan, board | ✅ | ✅ | ✅ | ✅ | Own client only, posts from "Waiting on client" onward |
-| Create/edit campaign, brief, plan, phases | ✅ | ✅ | — | — | — |
-| Start a post from a deliverable | ✅ | ✅ | ✅ | — | — |
-| Edit the asset kit | ✅ | ✅ | ✅ | — | — |
-| Approve brief, batch approve posts | — | — | — | — | ✅ (own client) |
-| Pause / resume / shift dates | ✅ | ✅ | — | — | — |
-| See fee, budget, invoices, profitability | ✅ | ✅ | — | — | **Never** |
-| See wrap report | ✅ | ✅ | ✅ | ✅ | Only once shared, never billing figures |
-| Manage templates | ✅ | ✅ | — | — | — |
+
+| Capability                                | Owner | Strategist | Designer | Viewer | ClientReviewer                                         |
+| ----------------------------------------- | ----- | ---------- | -------- | ------ | ------------------------------------------------------ |
+| View campaign, plan, board                | ✅    | ✅         | ✅       | ✅     | Own client only, posts from "Waiting on client" onward |
+| Create/edit campaign, brief, plan, phases | ✅    | ✅         | —        | —      | —                                                      |
+| Start a post from a deliverable           | ✅    | ✅         | ✅       | —      | —                                                      |
+| Edit the asset kit                        | ✅    | ✅         | ✅       | —      | —                                                      |
+| Approve brief, batch approve posts        | —     | —          | —        | —      | ✅ (own client)                                        |
+| Pause / resume / shift dates              | ✅    | ✅         | —        | —      | —                                                      |
+| See fee, budget, invoices, profitability  | ✅    | ✅         | —        | —      | **Never**                                              |
+| See wrap report                           | ✅    | ✅         | ✅       | ✅     | Only once shared, never billing figures                |
+| Manage templates                          | ✅    | ✅         | —        | —      | —                                                      |
 
 ### Other rules
+
 - Status transitions follow `CampaignStatusTransitionMap`; an illegal move is a validation error on
   `to` (422 for JSON). Pausing and resuming only go through their own endpoints.
 - The portal sees `CampaignPresenter::forPortal` (identity + timeline) and nothing else: no owner,
@@ -268,8 +278,8 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
 - Templates are org-scoped; another org's template is a 403 to use and invisible in the gallery.
 - Profitability (C-8.3): the Commercials panel shows fee, invoiced, paid (one grouped query) and
   AI spend (est., USD, summed from `ai_usage_logs.cost_estimate`). AI spend follows the analytics
-  `viewAiCost` rule (Owner only), stricter than billing; Strategists get `null`. Campaign DeepSeek
-  calls record `ai.deepseek.estimated_cost_per_call`. Org analytics' revenue section adds
+  `viewAiCost` rule (Owner only), stricter than billing; Strategists get `null`. Campaign Anthropic
+  calls record `ai.anthropic.estimated_cost_per_call`. Org analytics' revenue section adds
   `by_campaign` (billed lines tagged with a campaign, per currency, top 10).
 - Comparing campaigns from another organization is a validation error on `ids.*`, never an empty
   column.
@@ -279,12 +289,14 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
   readable in the portal.
 
 ## Seeders
+
 - `Database\Seeders\Concerns\SeedsCampaignShowcase` (used by `DemoContentSeeder` and
   `PreviewSeeder`): a live campaign with an approved brief and revision, four phases, deliverables in
   every state, KPIs and comments; a paused campaign; a completed campaign with a shared report;
   backdated activity; starter templates.
 
 ## Tests
+
 - `tests/Feature/CampaignControllerTest.php`, `tests/Feature/PortalCampaignControllerTest.php`.
 - `tests/Feature/Campaigns/`: `CampaignLifecycleTest`, `CampaignBriefTest`, `CampaignPlanTest`,
   `CampaignWorkspacePropsTest` (role props, billing, portal allowlist, hub filters + isolation,
@@ -300,14 +312,16 @@ Controllers are thin; Form Requests live in `App\Http\Requests\Campaigns` and `.
   `CampaignTemplate`, `CampaignShareLink`.
 
 ## Known Gaps / Open Questions
+
 - No UI yet for an organization (or the super admin) to flip `campaign_features`; it's set in the
   database or via env defaults until plan entitlements (I-11.3 / B-9) replace the binding.
-- AI spend is a flat per-call estimate; swap for token-based pricing if DeepSeek usage is captured.
+- AI spend is a flat per-call estimate; swap for token-based pricing if Anthropic usage is captured.
 - Engagement KPIs (reach, impressions, engagement rate, follower growth, link clicks) show as
   unavailable until engagement tracking exists.
 - The marketing section uses a live component vignette rather than preview-fixture screenshots.
 
 ## Changelog
+
 - 2026-10-24: Fix — `/campaigns/compare` could never reach two campaigns. The old single-select "Add a campaign…" dropdown navigated with one id per pick, but `CompareCampaignsRequest` required `ids` min:2, so the first pick failed validation and bounced back with nothing selected. Two changes: (1) relaxed validation to `ids` min:1 (a single id is a valid intermediate selection; the comparison still renders only at ≥2 via the controller guard; removed the dead `ids.min` message); (2) replaced the single-select with a true multi-select `MultiCombobox` (`resources/js/components/multi-combobox.tsx`) — check several campaigns in one pass without the popover closing, capped at `max` (4). The page keeps an optimistic local selection (`picked`) so toggles are instant and don't race the round-trip, reconciled to the server's `selected` on change; navigation uses `preserveState` to keep the popover open. Selected campaigns still show as removable chips. Regression test `test_a_single_campaign_is_a_valid_intermediate_selection`. See `frontend.md` › components.
 - 2026-10-24: UI — the campaigns hub (`pages/campaigns/index.tsx`) now opens with the Ink `ChapterHero` in place of `PageHeader`, matching the other primary chapter pages; "New campaign" renders as the `spark` CTA with "Compare"/"Templates" as `on-ink` secondaries. The aside is omitted because the hub's stats are `Deferred` (the `StatStrip` stays below). See `frontend.md`.
 - 2026-10-23: Step M-5.3 — `BatchReviewCampaignPostsAction` now judges a batch-review decision stale by the **content** the client saw (a `post_revisions` revision created after their `seen_at`), not by `updated_at`, so a schedule tweak or autosave no longer forces a re-review. Posts with no history fall back to `updated_at`. See `posts.md` › Phase M-5 › M-5.3.

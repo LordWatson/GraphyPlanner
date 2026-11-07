@@ -6,7 +6,7 @@ use App\Actions\AI\Images\DraftImageBriefAction;
 use App\Contracts\AiProvider;
 use App\Models\BrandBrain;
 use App\Models\Client;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\NullAiProvider;
 use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Step 16.5: DeepSeek as art director: schema enforcement + retry, guardrails, hashtags excluded,
+ * Step 16.5: Anthropic as art director: schema enforcement + retry, guardrails, hashtags excluded,
  * the brand-derived fallback and the brief_hash cache.
  */
 class DraftImageBriefActionTest extends TestCase
@@ -29,9 +29,9 @@ class DraftImageBriefActionTest extends TestCase
     {
         parent::setUp();
 
-        Config::set('ai.deepseek.api_key', 'sk-test');
-        Config::set('ai.deepseek.base_url', 'https://api.deepseek.test');
-        Config::set('ai.images.brief_model', 'deepseek-flash');
+        Config::set('ai.anthropic.api_key', 'sk-test');
+        Config::set('ai.anthropic.base_url', 'https://api.anthropic.test');
+        Config::set('ai.images.brief_model', 'claude-sonnet-5-5');
         Config::set('ai.guardrails.prohibited_topics', ['gambling']);
 
         $this->client = Client::factory()->create();
@@ -60,19 +60,19 @@ class DraftImageBriefActionTest extends TestCase
 
     private function chat(array $json): array
     {
-        return ['choices' => [['finish_reason' => 'stop', 'message' => ['content' => json_encode($json)]]]];
+        return ['content' => [['type' => 'text', 'text' => json_encode($json)]], 'stop_reason' => 'end_turn'];
     }
 
     private function action(): DraftImageBriefAction
     {
-        $this->app->instance(AiProvider::class, new DeepSeekProvider);
+        $this->app->instance(AiProvider::class, new AnthropicProvider);
 
         return $this->app->make(DraftImageBriefAction::class);
     }
 
-    public function test_deepseek_drafts_the_creative_fields_and_the_brand_supplies_the_rest(): void
+    public function test_anthropic_drafts_the_creative_fields_and_the_brand_supplies_the_rest(): void
     {
-        Http::fake(['*/chat/completions' => Http::response($this->chat([
+        Http::fake(['*/v1/messages' => Http::response($this->chat([
             'subject' => 'A pumpkin pastry on a marble counter',
             'composition' => 'Close-up, left third',
             'mood' => 'Cosy',
@@ -89,13 +89,13 @@ class DraftImageBriefActionTest extends TestCase
         $this->assertContains('No cartoons', $brief->avoid);
         $this->assertFalse($result['cached']);
 
-        Http::assertSent(fn (Request $request) => $request['model'] === 'deepseek-flash'
-            && ! str_contains($request['messages'][1]['content'], '#autumn'));
+        Http::assertSent(fn (Request $request) => $request['model'] === 'claude-sonnet-5-5'
+            && ! str_contains($request['messages'][0]['content'], '#autumn'));
     }
 
     public function test_schema_invalid_output_is_retried_once(): void
     {
-        Http::fakeSequence('*/chat/completions')
+        Http::fakeSequence('*/v1/messages')
             ->push($this->chat(['subject' => 'x']))
             ->push($this->chat(['subject' => 'A pastry', 'composition' => 'c', 'mood' => 'm', 'style' => 's']));
 
@@ -105,9 +105,9 @@ class DraftImageBriefActionTest extends TestCase
         Http::assertSentCount(2);
     }
 
-    public function test_a_failing_deepseek_falls_back_to_the_brand_derived_brief(): void
+    public function test_a_failing_anthropic_falls_back_to_the_brand_derived_brief(): void
     {
-        Http::fake(['*/chat/completions' => Http::response(['error' => ['message' => 'down']], 400)]);
+        Http::fake(['*/v1/messages' => Http::response(['error' => ['message' => 'down']], 400)]);
 
         $brief = ($this->action())($this->client, $this->input())['brief'];
 
@@ -117,7 +117,7 @@ class DraftImageBriefActionTest extends TestCase
 
     public function test_banned_phrases_and_hashtags_never_reach_the_brief(): void
     {
-        Http::fake(['*/chat/completions' => Http::response($this->chat([
+        Http::fake(['*/v1/messages' => Http::response($this->chat([
             'subject' => 'A #pastry promo for cheapdeals lovers near a gambling table',
             'composition' => 'Close-up',
             'mood' => 'No cartoons, cosy',
@@ -137,7 +137,7 @@ class DraftImageBriefActionTest extends TestCase
 
     public function test_identical_inputs_hit_the_cache_with_zero_extra_calls(): void
     {
-        Http::fake(['*/chat/completions' => Http::response($this->chat(['subject' => 'A', 'composition' => 'c', 'mood' => 'm', 'style' => 's']))]);
+        Http::fake(['*/v1/messages' => Http::response($this->chat(['subject' => 'A', 'composition' => 'c', 'mood' => 'm', 'style' => 's']))]);
 
         $first = ($this->action())($this->client, $this->input());
         $second = ($this->action())($this->client, $this->input());

@@ -154,7 +154,7 @@ class ClientContextBuilder
     }
 
     /**
-     * One-line campaign summary, shared with DeepSeekProvider's per-post caption prompt.
+     * One-line campaign summary, shared with AnthropicProvider's per-post caption prompt.
      */
     public function describeCampaign(Campaign $campaign): string
     {

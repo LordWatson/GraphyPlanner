@@ -1,6 +1,7 @@
 # Instagram Grid Planner
 
 ## Purpose
+
 Phase 18 (Steps 18.1–18.14). Plan how a client's Instagram profile grid will look before anything
 goes out, preview it as followers will see it (on top of the real profile), get the look signed off
 internally and by the client, then turn each tile into a real `Post` and schedule the set in the
@@ -11,6 +12,7 @@ media, framing and order. Each tile becomes an ordinary `Post` that goes through
 workflow (`PostStatusTransitionMap`, the §6 checklist) for its caption, hashtags and schedule.
 
 ## Platform facts (verified 2026-10-20)
+
 - The profile grid shows **3:4 portrait tiles** (since early 2025), three per row. A 3:4 upload
   (1080×1440) shows in full; a 4:5 feed post is centre-cropped top and bottom on the grid; a Reel's
   cover is cropped from 9:16 to 3:4.
@@ -27,6 +29,7 @@ workflow (`PostStatusTransitionMap`, the §6 checklist) for its caption, hashtag
   publisher cuts to it (`PublishImageCropper::targetRatio()` uses the fixed format), as before.
 
 ## Models / Tables
+
 - `GridPlan` (`grid_plans`): `org_id`, `client_id`, `social_account_id` (an Instagram account of the
   same client — enforced by `StoreGridPlanRequest`; fixed once created), `campaign_id` nullable,
   `name`, `status` (`GridPlanStatus`), `review_message` (the note for the client),
@@ -53,6 +56,7 @@ workflow (`PostStatusTransitionMap`, the §6 checklist) for its caption, hashtag
   `Asset::sourceAsset()`.
 
 ## Layout core (PHP + TS mirror)
+
 - `App\Services\Grids\GridLayoutService::layout(tiles, pinned, outside)` → `GridLayout`: every
   tile's 0-based `slot` (pinned first), `row`, `column`, publish `sequence` (reverse of position;
   1 = goes out first) and each split group's `aligned`/`offset`/`rows`. Outside posts sit in front
@@ -71,6 +75,7 @@ workflow (`PostStatusTransitionMap`, the §6 checklist) for its caption, hashtag
   count), `progress()` (derived, never stored), `pivotFraming()`/`pivotRow()`, `formatsFor()`.
 
 ## Actions / Services / Contracts
+
 - Checklist: `EvaluateGridChecklistAction` — hard `tiles`, `media` (no placeholders, carousel
   bounds from the registry, Reels need a video), `formats`, `split_alignment`, `account`; soft
   `grid_crop`, `dates` (past, out of order, min gap — `GridSequenceValidator`), `outside_posts`.
@@ -108,7 +113,7 @@ workflow (`PostStatusTransitionMap`, the §6 checklist) for its caption, hashtag
   `grid-feed:{account}` for `grids.feed_cache_minutes`, `VendorHttp::forReads`, https URLs only,
   never logs the token or media URLs) else `PublishedPostsProfileFeedSource`; `refresh()` is
   rate-limited (`grids.feed_refresh_per_hour`).
-- AI (Step 18.12): `App\Contracts\GridAiProvider` (DeepSeek / Null, same binding rule as
+- AI (Step 18.12): `App\Contracts\GridAiProvider` (Anthropic / Null, same binding rule as
   `AiProvider`), `GridAiAssist` (`suggestCaptions()`, `checkBalance()` with local dominant colours
   from `ImageNormalizer::dominantColours()`, `fillSlot()` = a 3:4 Image Studio set,
   `useVariant()` marks the variant selected and puts it on the tile). Guardrail-filtered, one
@@ -120,6 +125,7 @@ workflow (`PostStatusTransitionMap`, the §6 checklist) for its caption, hashtag
   `grids.prune_archived_after_months`; unused split slices only).
 
 ## Policy
+
 `GridPlanPolicy`: `viewAny`/`view` — staff of the org (Viewer included), a `ClientReviewer` only for
 their own client and only `clientVisible()` statuses; `create`/`update`/`transition`/`produce` —
 Owner/Strategist/Designer (`update` false while `waiting_client` or `archived`); client reviewers may
@@ -127,6 +133,7 @@ only move `waiting_client → approved|changes_requested`; `overrideApproval` �
 plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is on.
 
 ## Routes / Controllers
+
 - `GET /grids` → `Grids\GridPlanIndexController` — the org-wide grids hub (sidebar: 05 Clients →
   Grids; command palette "Grids"), filter by client/status, "New grid" for any client with an
   Instagram account (`GridPlanPolicy::viewHub`; client contacts → portal). **Step CG-1.2:** now
@@ -146,7 +153,7 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
 - `GET /grids/{grid}/edit` (planner; client reviewers → portal), `PUT /grids/{grid}`,
   `DELETE /grids/{grid}`, `POST …/duplicate`, `POST …/feed/refresh`.
 - `GridTileController`: `POST …/tiles`, `PUT|DELETE …/tiles/{tile}` (scoped), `POST
-  …/tiles/reorder`, `POST …/split`.
+…/tiles/reorder`, `POST …/split`.
 - `GridWorkflowController`: `POST …/transition`, `…/override-approval`, `…/comments`.
 - `GridProductionController`: `POST …/posts`, `…/posts/bulk`, `GET|POST …/schedule`,
   `POST …/schedule-approved`, `…/hold`, `…/outside-posts/{post}`, `…/tiles/{tile}/sync-from-post`,
@@ -160,6 +167,7 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
 - Preview mirrors the GETs (and lists a few writes so the 403 can be asserted).
 
 ## Frontend
+
 - Pages: `clients/tabs/grids.tsx` ("Plan the grid."), `grids/edit.tsx` (the planner),
   `review/grid.tsx`, `portal/grids/index.tsx`, `portal/grids/show.tsx`.
 - Components (`components/grids/`): `grid-preview` (phone frame, IG light/dark, plan-only, crop
@@ -173,6 +181,7 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
   kind (post tones; `in_production`, `live` derived). `/grids` belongs to chapter 04.
 
 ## Business Rules
+
 - Position 1 is top-left; publish order is the reverse. Split groups fill whole rows once pinned
   posts and outside posts are counted, and move as one block.
 - One Instagram account per plan; other channels can be added to a tile's post afterwards.
@@ -185,6 +194,7 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
 - Nothing is ever scheduled, reordered or held on its own — every move is a person's click.
 
 ## Tests
+
 - `tests/Unit/Services/Grids/GridLayoutServiceTest.php` (+ `resources/js/lib/grid-layout.test.ts`).
 - `tests/Feature/Grids/`: `GridPlanModelAndPolicyTest`, `GridChecklistTest`,
   `ProfileFeedSourceTest`, `GridPlanActionsTest`, `GridPlannerPageTest`, `GridWorkflowTest`,
@@ -192,6 +202,7 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
   `GridHousekeepingTest`. Fixtures: `tests/Concerns/BuildsGridPlans.php`.
 
 ## Known Gaps / Open Questions
+
 - Pinned posts are a manual count (no Graph API field). The preview takes the first `pinned_count`
   feed items as the pinned ones.
 - The as-of scrubber treats undated tiles as not yet out.
@@ -203,6 +214,7 @@ plans; `delete` — Owner/Strategist; `useAi` — Owner/Strategist while AI is o
   mode, phone width, the review link and the portal grid pages, and drag-reordering with a mouse.
 
 ## Changelog
+
 - 2026-10-27: Step CG-1.2 (competitor-gap) — the grid planner switched on for the business shell.
   New `Business\GridController` (`/grid` hub + create) + `business/grids/index.tsx`, reusing the shared
   planner/production/AI routes and `GridLibrary`/`GridPlanService`. `StoreGridPlanRequest` now uses

@@ -8,7 +8,7 @@ use App\Models\Client;
  * Step B-8.2 — "plain-language takeaways": turn a brand's own insight numbers (reach by format, best
  * slot, follower growth, streak…) into at most three short, concrete sentences a non-marketer can
  * act on, e.g. "Your reels got 3× the reach of photos this month" or "Tuesday 8am is your best
- * slot." Its own contract (bound like {@see LocalIdeaProvider}) so it rides the DeepSeek text model
+ * slot." Its own contract (bound like {@see LocalIdeaProvider}) so it rides the Anthropic text model
  * without touching the agency {@see AiProvider} doubles.
  *
  * Summary only — nothing is persisted here; the Action caches and meters. Never throws: a

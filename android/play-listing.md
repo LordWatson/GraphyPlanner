@@ -48,29 +48,29 @@ removed from the app, this file changes with it.
 
 ## Graphics to produce
 
-| Asset | Spec | Source |
-|---|---|---|
-| App icon | 512×512 PNG, no alpha | `public/icons/icon-512.png` |
-| Feature graphic | 1024×500 PNG | **to produce** — brand guidelines §3, Ink on Cream, no screenshots in it |
-| Phone screenshots | 2–8, 1080×1920 | **to produce** — Today, Calendar, the post editor, Inbox, Insights |
-| Tablet screenshots | optional | skip for the first release |
+| Asset              | Spec                  | Source                                                                   |
+| ------------------ | --------------------- | ------------------------------------------------------------------------ |
+| App icon           | 512×512 PNG, no alpha | `public/icons/icon-512.png`                                              |
+| Feature graphic    | 1024×500 PNG          | **to produce** — brand guidelines §3, Ink on Cream, no screenshots in it |
+| Phone screenshots  | 2–8, 1080×1920        | **to produce** — Today, Calendar, the post editor, Inbox, Insights       |
+| Tablet screenshots | optional              | skip for the first release                                               |
 
 ## Data safety declaration
 
 What the app actually collects, matched to what the code does. Everything is in transit over TLS and
 a user can request deletion.
 
-| Data type | Collected | Shared | Why | Optional |
-|---|---|---|---|---|
-| Name, email address | Yes | No | Account and sign-in | No |
-| Photos and videos | Yes | **Yes** | The media you attach is sent to the networks you publish to | No |
-| Other user content (captions, comments, replies) | Yes | **Yes** | Published to the networks you choose | No |
-| App interactions (analytics) | Yes | No | Product analytics and error reports | No |
-| Crash logs and diagnostics | Yes | No | Error tracking | No |
-| Approximate location | No | — | — | — |
-| Precise location | No | — | — | — |
-| Financial info | No | — | Card details are entered on Stripe's own hosted pages and never reach Alima | — |
-| Contacts | No | — | — | — |
+| Data type                                        | Collected | Shared  | Why                                                                         | Optional |
+| ------------------------------------------------ | --------- | ------- | --------------------------------------------------------------------------- | -------- |
+| Name, email address                              | Yes       | No      | Account and sign-in                                                         | No       |
+| Photos and videos                                | Yes       | **Yes** | The media you attach is sent to the networks you publish to                 | No       |
+| Other user content (captions, comments, replies) | Yes       | **Yes** | Published to the networks you choose                                        | No       |
+| App interactions (analytics)                     | Yes       | No      | Product analytics and error reports                                         | No       |
+| Crash logs and diagnostics                       | Yes       | No      | Error tracking                                                              | No       |
+| Approximate location                             | No        | —       | —                                                                           | —        |
+| Precise location                                 | No        | —       | —                                                                           | —        |
+| Financial info                                   | No        | —       | Card details are entered on Stripe's own hosted pages and never reach Alima | —        |
+| Contacts                                         | No        | —       | —                                                                           | —        |
 
 Answers to the three questions people get wrong:
 

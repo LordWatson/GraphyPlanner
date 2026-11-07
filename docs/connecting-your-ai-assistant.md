@@ -15,10 +15,10 @@ This guide gets you connected in a couple of minutes.
 2. Switch **MCP access** on. This is the per‑organisation master switch — while it is off, every
    assistant is rejected.
 3. Under **New connection**, give it a name (e.g. “Claude Desktop”) and choose what it may do:
-   - **Read** — explore clients, posts, calendar, campaigns, analytics (the safe default).
-   - **Write drafts** — create and edit drafts, move posts up to *approved*.
-   - **Publish & schedule** — schedule, cancel and start account connections. *Grant with care.*
-   - **AI** — use Graphy’s own AI (trends, ideas, captions), subject to your AI budget.
+    - **Read** — explore clients, posts, calendar, campaigns, analytics (the safe default).
+    - **Write drafts** — create and edit drafts, move posts up to _approved_.
+    - **Publish & schedule** — schedule, cancel and start account connections. _Grant with care._
+    - **AI** — use Graphy’s own AI (trends, ideas, captions), subject to your AI budget.
 4. Click **Create connection token**. **Copy the token now** — it is shown only once.
 5. Copy the **Connection URL** at the top of the page. It looks like `https://your‑graphy‑domain/mcp`.
 
@@ -47,18 +47,18 @@ Edit your `claude_desktop_config.json` (Settings → Developer → Edit Config):
 
 ```json
 {
-  "mcpServers": {
-    "graphy": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://your-graphy-domain/mcp",
-        "--header",
-        "Authorization: Bearer YOUR_TOKEN"
-      ]
+    "mcpServers": {
+        "graphy": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "https://your-graphy-domain/mcp",
+                "--header",
+                "Authorization: Bearer YOUR_TOKEN"
+            ]
+        }
     }
-  }
 }
 ```
 
@@ -70,18 +70,18 @@ Add to `~/.cursor/mcp.json` (or the project’s `.cursor/mcp.json`):
 
 ```json
 {
-  "mcpServers": {
-    "graphy": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://your-graphy-domain/mcp",
-        "--header",
-        "Authorization: Bearer YOUR_TOKEN"
-      ]
+    "mcpServers": {
+        "graphy": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "https://your-graphy-domain/mcp",
+                "--header",
+                "Authorization: Bearer YOUR_TOKEN"
+            ]
+        }
     }
-  }
 }
 ```
 
@@ -101,8 +101,8 @@ Ask your assistant things like:
 
 - “List my clients in Graphy and tell me which look unhealthy.”
 - “Show me what’s on the calendar for Northwind Coffee next week.”
-- “Draft three on‑brand posts for Acme and leave them as drafts.” *(needs Write drafts)*
-- “Schedule the approved post 1423.” *(needs Publish & schedule)*
+- “Draft three on‑brand posts for Acme and leave them as drafts.” _(needs Write drafts)_
+- “Schedule the approved post 1423.” _(needs Publish & schedule)_
 
 Or run a **prompt** (a packaged workflow): `plan_week` or `fill_calendar_gaps` for a client.
 
@@ -130,24 +130,24 @@ To test the remote HTTP transport locally, set `MCP_HTTP_ENABLED=true`, create a
 
 ## What your assistant can do (and the scope it needs)
 
-| Capability | Example tools | Scope |
-|---|---|---|
-| Explore the agency | `list_clients`, `get_client`, `get_brand_brain`, `list_posts`, `get_post`, `get_calendar`, `list_campaigns`, `get_campaign`, `list_assets`, `get_analytics_summary` | Read |
-| Create & refine content | `create_draft_post`, `update_post`, `transition_post_status` (up to *approved*) | Write drafts |
-| Add & attach media | `request_media_upload` + `get_media_upload` (the reliable upload-link flow, incl. media for several posts at once), `upload_media` (a small image as base64), `set_post_media` (replace / add / remove a post's media) | Write drafts |
-| Publish, schedule, connect | `schedule_post`, `cancel_scheduled_post`, `start_account_connection` | Publish & schedule |
-| Use Graphy’s AI | `discover_trends`, `recommend_posts`, `suggest_captions` | AI |
-| Packaged workflows | `plan_week`, `fill_calendar_gaps` (prompts) | (use the tools above) |
+| Capability                 | Example tools                                                                                                                                                                                                          | Scope                 |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| Explore the agency         | `list_clients`, `get_client`, `get_brand_brain`, `list_posts`, `get_post`, `get_calendar`, `list_campaigns`, `get_campaign`, `list_assets`, `get_analytics_summary`                                                    | Read                  |
+| Create & refine content    | `create_draft_post`, `update_post`, `transition_post_status` (up to _approved_)                                                                                                                                        | Write drafts          |
+| Add & attach media         | `request_media_upload` + `get_media_upload` (the reliable upload-link flow, incl. media for several posts at once), `upload_media` (a small image as base64), `set_post_media` (replace / add / remove a post's media) | Write drafts          |
+| Publish, schedule, connect | `schedule_post`, `cancel_scheduled_post`, `start_account_connection`                                                                                                                                                   | Publish & schedule    |
+| Use Graphy’s AI            | `discover_trends`, `recommend_posts`, `suggest_captions`                                                                                                                                                               | AI                    |
+| Packaged workflows         | `plan_week`, `fill_calendar_gaps` (prompts)                                                                                                                                                                            | (use the tools above) |
 
 ### Uploading your media
 
 An assistant can't reliably carry a real photo as text, so for images you need to provide, Graphy uses
 a one-click upload link that handles any number of files across any number of posts.
 
-Say e.g. *"create 3 posts for Northwind — I'll upload media for each."* The assistant gives you **one**
+Say e.g. _"create 3 posts for Northwind — I'll upload media for each."_ The assistant gives you **one**
 link (via **`request_media_upload`**). You open it in any browser (no login), and the page shows a drop
 area per post (or a library area) — drop **one or more** files onto each. When you're done, the
-assistant calls **`get_media_upload`**, which both tells it what landed *and shows it the images* — so
+assistant calls **`get_media_upload`**, which both tells it what landed _and shows it the images_ — so
 it can **write the captions from the actual media**, not before it. Because it can see the media, it
 also works best media-first: it gets your images, looks at them, then writes the branded posts. The
 link is scoped to that one client, expires after ~60 minutes, and every file is validated exactly like a

@@ -6,7 +6,7 @@ use JsonSerializable;
 
 /**
  * A single discovered trend for a client/platform set. `confidence` carries a hypothesis marker
- * (DeepSeek can't browse, so a model trend is a hypothesis, not a browsed fact). Step M-7.5 adds
+ * (Anthropic can't browse, so a model trend is a hypothesis, not a browsed fact). Step M-7.5 adds
  * `source` — a short human label of where the trend came from ("AI hypothesis", "Your top posts") —
  * so the UI is honest about what is model guesswork versus the brand's own real signal.
  */

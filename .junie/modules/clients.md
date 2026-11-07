@@ -1,10 +1,12 @@
 # Client (CRM) Model
 
 ## Purpose
+
 The Client is the core CRM record agencies manage brands/campaigns/posts under. Covers Step 0.3
 (model + CRUD UI) and Step 0.4 (computed Red/Amber/Green health status).
 
 ## Models / Tables
+
 - `Client` (`clients`): `org_id` (FK), `name`, `legal_name`, `website`, `industry`,
   `countries` (json array of ISO codes), `status` (`App\Enums\ClientStatus`: active, paused,
   offboarding, archived), `owner_user_id` (FK to `users`, nullable), `start_date`, `retainer_amount`
@@ -18,11 +20,12 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   `health_reason`, `created_at` — one row per change, written by `RecomputeClientHealthAction`;
   `Client::healthHistory()`. Feeds the health sparkline planned in Step I-6.1.
 - `ClientHashtag` (`client_hashtags`, Step I-2.6): see `posts.md`.
- - `DailyBrief` (`daily_briefs`): `client_id` (FK), `date` (unique per client), `summary` (text, nullable),
-   `trends` (json), `ideas` (json), `created_by` (FK `users`, nullable), timestamps. Represents the
-   Step 2.5 daily AI summary stored per client per day.
+- `DailyBrief` (`daily_briefs`): `client_id` (FK), `date` (unique per client), `summary` (text, nullable),
+  `trends` (json), `ideas` (json), `created_by` (FK `users`, nullable), timestamps. Represents the
+  Step 2.5 daily AI summary stored per client per day.
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Clients\CreateClientAction`: creates a client scoped to the acting user's `org_id`,
   wrapped in `DB::transaction`, logs creation.
 - `App\Actions\Clients\UpdateClientAction`: updates a client, wrapped in `DB::transaction`, logs the
@@ -30,22 +33,22 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - `App\Services\ClientHealthService`: the rule engine for a client's `App\Enums\ClientHealth`
   (`red`/`amber`/`green`) status plus a human-readable reason. Step I-2.5: its result is
   **materialized** on `clients.health_*` by `RecomputeClientHealthAction`; `Client::health(): array{
-  status: ClientHealth, reason: string}` reads the stored columns (computing live only for a row
+status: ClientHealth, reason: string}` reads the stored columns (computing live only for a row
   never computed). Rules are evaluated red-first, then amber, falling back to
   green; each is independently covered in `tests/Unit/Services/ClientHealthServiceTest.php`:
-  - **Red**: `offboarding` status; OR `active` with no `owner_user_id`; OR `active` with both
-    `retainer_amount` and `billing_cycle` missing; OR the client has any `SocialAccount` whose
-    `connection_status` is `token_expired` (Step 1.6 — regardless of `status`, since a client can't
-    publish while a linked account's vendor token is expired/revoked).
-  - **Amber**: `paused` status; OR `active` with no `start_date`; OR `active` with exactly one of
-    `retainer_amount`/`billing_cycle` set (incomplete billing setup).
-  - **Green**: `archived` status, or any `active` client that hits none of the above.
-  - These rules currently only draw on fields already present on `Client` plus `SocialAccount`
-    (Step 1.6). Once Post/PostTarget (0.8, already exists) signals are worth including, revisit this
-    list to fold in things like stale posting cadence or overdue approvals per the original spec §4.2.
-  - `hasTokenExpiredAccount()` uses `Client::loadMissing('socialAccounts')`, so callers that already
-    eager-load `socialAccounts` (list pages) avoid N+1 queries and callers that don't (a single
-    `Client::health()` call) still work correctly.
+    - **Red**: `offboarding` status; OR `active` with no `owner_user_id`; OR `active` with both
+      `retainer_amount` and `billing_cycle` missing; OR the client has any `SocialAccount` whose
+      `connection_status` is `token_expired` (Step 1.6 — regardless of `status`, since a client can't
+      publish while a linked account's vendor token is expired/revoked).
+    - **Amber**: `paused` status; OR `active` with no `start_date`; OR `active` with exactly one of
+      `retainer_amount`/`billing_cycle` set (incomplete billing setup).
+    - **Green**: `archived` status, or any `active` client that hits none of the above.
+    - These rules currently only draw on fields already present on `Client` plus `SocialAccount`
+      (Step 1.6). Once Post/PostTarget (0.8, already exists) signals are worth including, revisit this
+      list to fold in things like stale posting cadence or overdue approvals per the original spec §4.2.
+    - `hasTokenExpiredAccount()` uses `Client::loadMissing('socialAccounts')`, so callers that already
+      eager-load `socialAccounts` (list pages) avoid N+1 queries and callers that don't (a single
+      `Client::health()` call) still work correctly.
 - `App\Actions\Clients\RecomputeClientHealthAction` (Step I-2.5): re-runs `ClientHealthService`
   with fresh, unscoped social accounts, stores the result quietly (no events, `updated_at`
   untouched), writes a `client_health_history` row and busts the org's analytics cache when it
@@ -62,7 +65,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   — client, abilities, tab key and stat cards, all SQL aggregates (one `withCount` query, a
   per-currency sum of sent invoices, a briefs count). **MOVE 5 (ux-overhaul, 2026-10-24):** also
   returns a `setup` payload — the new-client checklist signals `{brandBrain, accounts, portal,
-  content, complete}`. `brandBrain` is true once any core Brand Brain field (voice tone/personality,
+content, complete}`. `brandBrain` is true once any core Brand Brain field (voice tone/personality,
   audience description, offer value proposition, or content pillars) is filled; the other three reuse
   the `withCount` aggregates. The frontend `ClientSetupChecklist`
   (`components/clients/client-setup-checklist.tsx`) renders it on the client's landing (accounts)
@@ -80,12 +83,14 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   full invite/revoke feature, surfaced as a "Portal access" section on the client show page.
 
 ## Phase M-6 additions (Step M-6.3 — approval policy)
+
 - `clients.approval_policy` (`ApprovalPolicy`: `any` / `all` / `sequential`, default `any`; migration
   `2026_11_05_100100`, in `Client` fillable + casts, edit-form "When there are several approvers").
   Drives how a post's `approval_steps` are satisfied across the client's approver contacts
   (`Client::approverContacts()` = review-email contacts, in add order). See `client-portal.md` › M-6.3.
 
 ## Phase M-6 additions (Step M-6.1 — client contacts)
+
 - `client_contacts` (migration `2026_11_04_100100`): `org_id`, `client_id`, `name` (nullable),
   `email`, `phone` (nullable), `role` (`ClientContactRole`: approver / billing / marketing_lead /
   other), `receives_review_emails`, `receives_invoices`, timestamps, soft deletes. FK columns lead
@@ -114,16 +119,17 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   review emails reach every approver, legacy fallback, contacts preferred over legacy, org scope).
 
 ## Phase M-3 additions (Step M-3.4 / I-6.1 — client health v2; M-3.3 report schedule)
+
 - `ClientHealthService::compute(Client, ?now)` now returns `reasons`: every signal that fired as
   `{key, tone, weight, label, owner_only}`, heaviest first. Health = the worst tone; the headline
   `reason` = the heaviest (advisory reasons never headline). Signals and weights: offboarding 100,
   token expired 95, no owner 90, no billing 85, ≥3 failed/partly published posts in 7 days 80 (else
   65 amber), overdue approval due within a day 78 (else 60 amber; waiting > 48 h), overdue invoice
-  > 30 days 76 (else 58 amber; **Owner-only**, counts and ages — never amounts), paused 70, token
-  expiring 55, cadence below 75% of `target_posts_per_week` over 28 days 50, nothing planned in
-  the next 7 days 40, partial billing 30, no start date 20, Brand Brain gaps 10 (**advisory**,
-  green: listed, never changes health). Thresholds in `config/clients.php` (`health`). Cadence,
-  calendar gap and Brand Brain only apply to active clients; archived clients have no reasons.
+    > 30 days 76 (else 58 amber; **Owner-only**, counts and ages — never amounts), paused 70, token
+    > expiring 55, cadence below 75% of `target_posts_per_week` over 28 days 50, nothing planned in
+    > the next 7 days 40, partial billing 30, no start date 20, Brand Brain gaps 10 (**advisory**,
+    > green: listed, never changes health). Thresholds in `config/clients.php` (`health`). Cadence,
+    > calendar gap and Brand Brain only apply to active clients; archived clients have no reasons.
 - Stored in `clients.health_reasons` (migration `2026_10_23_100300`, which also adds
   `clients.target_posts_per_week`, editable on the client form). `RecomputeClientHealthAction`
   keeps the list current; `client_health_history` still records headline changes only.
@@ -151,6 +157,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - Accounts tab: invite links panel, per-account settings and health/expiry lines (M-2.6–M-2.8).
 
 ## Phase M-1 additions
+
 - `DELETE clients/{client}/purge` validates `PurgeClientRequest` (`forceDelete` policy +
   `password` = `current_password`). The archived list asks for it with `confirmWithPassword()`.
 - The roster and the archived list render through the shared `DataTable` (server-side sort on
@@ -158,40 +165,42 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   per browser). The Posts tab uses it too (each row opens the editor).
 
 ## Routes / Controllers
+
 - `Route::resource('clients', ClientController::class)` (under `auth`+`verified` middleware):
-  - `GET /clients` → `index` — `ClientIndexRequest` + `ListClientsAction`; props `clients`
-    (paginator of `ClientPresenter::row`), `filters`, `filterOptions`, `healthCounts`,
-    `archivedCount`. Billing fields redacted per `viewBilling`.
-  - `GET /clients/create` → `create` — Inertia form.
-  - `POST /clients` → `store` — validated via `StoreClientRequest`, delegates to
-    `CreateClientAction`.
-  - `GET /clients/{client}` → `show` — the **Social accounts** tab (`clients/tabs/accounts`).
-  - `GET /clients/{client}/edit` → `edit`.
-  - `PUT /clients/{client}` → `update` — validated via `UpdateClientRequest`, delegates to
-    `UpdateClientAction`.
-  - `DELETE /clients/{client}` → `destroy` (Owner only).
+    - `GET /clients` → `index` — `ClientIndexRequest` + `ListClientsAction`; props `clients`
+      (paginator of `ClientPresenter::row`), `filters`, `filterOptions`, `healthCounts`,
+      `archivedCount`. Billing fields redacted per `viewBilling`.
+    - `GET /clients/create` → `create` — Inertia form.
+    - `POST /clients` → `store` — validated via `StoreClientRequest`, delegates to
+      `CreateClientAction`.
+    - `GET /clients/{client}` → `show` — the **Social accounts** tab (`clients/tabs/accounts`).
+    - `GET /clients/{client}/edit` → `edit`.
+    - `PUT /clients/{client}` → `update` — validated via `UpdateClientRequest`, delegates to
+      `UpdateClientAction`.
+    - `DELETE /clients/{client}` → `destroy` (Owner only).
 - Step I-2.4 — one route per client page tab (`ClientTabController`, each spreading
   `BuildClientPageHeaderAction`'s props; all mirrored under `/preview`):
-  - `GET /clients/{client}/posts` → `posts` (`clients.posts.index`) — `ClientPostsTabRequest`
-    (`search`/`status`/`campaign`/`platform`) → `ListClientPostsAction`, 8/page; also sends
-    `filters`, `filterOptions` (statuses, the client's campaigns) and `targetAccounts`.
-  - `GET /clients/{client}/media` → `media` (`clients.media`) — header props only (no asset rows);
-    the tab uploads via `clients.assets.store` and browses/removes through the paged JSON
-    `clients.assets.index` library dialog (see `assets.md`, 2026-10-18).
-  - `GET /clients/{client}/campaigns` → `campaigns` (`clients.campaigns.index`) — 25/page.
-  - `GET /clients/{client}/billing` → `billing` (`clients.billing`) — `ClientBillingTabRequest`
-    (`viewBilling`; `search`/`status`) → `InvoiceLedgerService::query` scoped to the client,
-    `INVOICES_PER_PAGE` = 8; also sends `filters`.
-  - `GET /clients/{client}/portal-access` → `portalAccess` (`clients.portal-access`) — invitations.
-  - `GET /clients/{client}/ai` → `ai` (`clients.ai.index`) — Owner/Strategist + `ai.enabled`;
-    `trends`/`ideas` are `Inertia::defer` props.
-  - `GET /clients/{client}/briefs` → `briefs` (`clients.briefs`) — same gate; the list is fetched
-    from `GET /clients/{client}/daily-briefs` (`DailyBriefController@index`, JSON).
-  - Creating/removing a campaign, asset, post, invitation or invoice now redirects to its tab.
+    - `GET /clients/{client}/posts` → `posts` (`clients.posts.index`) — `ClientPostsTabRequest`
+      (`search`/`status`/`campaign`/`platform`) → `ListClientPostsAction`, 8/page; also sends
+      `filters`, `filterOptions` (statuses, the client's campaigns) and `targetAccounts`.
+    - `GET /clients/{client}/media` → `media` (`clients.media`) — header props only (no asset rows);
+      the tab uploads via `clients.assets.store` and browses/removes through the paged JSON
+      `clients.assets.index` library dialog (see `assets.md`, 2026-10-18).
+    - `GET /clients/{client}/campaigns` → `campaigns` (`clients.campaigns.index`) — 25/page.
+    - `GET /clients/{client}/billing` → `billing` (`clients.billing`) — `ClientBillingTabRequest`
+      (`viewBilling`; `search`/`status`) → `InvoiceLedgerService::query` scoped to the client,
+      `INVOICES_PER_PAGE` = 8; also sends `filters`.
+    - `GET /clients/{client}/portal-access` → `portalAccess` (`clients.portal-access`) — invitations.
+    - `GET /clients/{client}/ai` → `ai` (`clients.ai.index`) — Owner/Strategist + `ai.enabled`;
+      `trends`/`ideas` are `Inertia::defer` props.
+    - `GET /clients/{client}/briefs` → `briefs` (`clients.briefs`) — same gate; the list is fetched
+      from `GET /clients/{client}/daily-briefs` (`DailyBriefController@index`, JSON).
+    - Creating/removing a campaign, asset, post, invitation or invoice now redirects to its tab.
 - Inertia pages: `resources/js/pages/clients/{index,create,edit}.tsx` and
   `resources/js/pages/clients/tabs/{accounts,posts,media,campaigns,billing,portal-access,ai,briefs}.tsx`.
 
 ## Frontend
+
 - `resources/js/pages/clients/index.tsx` opens with a gradient-brand hero banner ("Client roster"
   headline with `text-gradient-brand` treatment + subtitle) above the client table, matching the
   dashboard's hero pattern; the table itself stays flat per the data-dense-screen rule.
@@ -204,6 +213,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   tab's list card and refresh call live in `components/clients/ai-insights.tsx`.
 
 ## Seeders
+
 - `Database\Seeders\ClientSeeder`: creates three sample clients (`Acme Corp` active, `Nimbus Studios`
   paused, `Blue Harbor Cafe` offboarding) under the "Graphy Agency" organization owned by
   `test@example.com`, and a `reviewer@acme.test` user with the `client_reviewer` role scoped to
@@ -211,6 +221,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - Called from `DatabaseSeeder` right after `OrganizationSeeder`, so the organization already exists.
 
 ## Business Rules
+
 - Clients are always created under the acting user's `org_id`; users cannot create/view clients
   belonging to another organization.
 - `retainer_amount`/`billing_cycle` are hidden from the JSON payload sent to the frontend whenever the
@@ -241,6 +252,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   not billing data, so they aren't gated behind `viewBilling`).
 
 ## Tests
+
 - `tests/Feature/ClientControllerTest.php`: full CRUD + authorization + billing redaction through the
   UI/controller.
 - `tests/Feature/ClientPolicyTest.php`: policy-level coverage per role.
@@ -255,12 +267,13 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - `tests/Feature/SocialAccountHealthAcceptanceTest.php`: the full §12 acceptance scenario — running
   `social-accounts:check-health` against a disconnected vendor token flips the account to
   `token_expired`, the client's health to Red, and produces a Home row.
- - Step 2.5:
-   - `tests/Unit/Actions/AI/CreateDailyBriefActionTest.php`: idempotency per client/date.
-   - `tests/Feature/DailyBriefControllerTest.php`: authorization and scoping for briefs routes.
-   - `tests/Feature/GenerateDailyBriefsCommandTest.php`: one job per active client when command runs.
+- Step 2.5:
+    - `tests/Unit/Actions/AI/CreateDailyBriefActionTest.php`: idempotency per client/date.
+    - `tests/Feature/DailyBriefControllerTest.php`: authorization and scoping for briefs routes.
+    - `tests/Feature/GenerateDailyBriefsCommandTest.php`: one job per active client when command runs.
 
 ## Known Gaps / Open Questions
+
 - An archived client always restores to `active` (its previous status isn't remembered).
 - Soft-deleted assets keep their files until the client/org is purged — no time-based prune yet.
 - The exact §4.2 health rules from the original spec weren't available in this repo; the current
@@ -271,6 +284,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - (Resolved 2026-09-17) `owner_user_id` now has a UI picker on the client create/edit forms.
 
 ## Changelog
+
 - 2026-11-07: **Client onboarding templates** (audit item 19). New `client_templates` + `ClientTemplate`,
   `SaveClientAsTemplateAction` (re-saving a name updates rather than duplicating),
   `CreateClientFromTemplateAction` (**what the person typed always wins over the template**), and
@@ -282,7 +296,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   form. Tests: `ClientTemplateTest` (17), including a drift guard that every templated field is a
   real `Client` fillable and nothing on the never-list has crept in.
 - 2026-11-07: **Client profitability** (audit item 23). New `ClientProfitabilityService`: money
-  received from *paid* invoices against effort inferred from what the app watched happen — posts,
+  received from _paid_ invoices against effort inferred from what the app watched happen — posts,
   revision rounds, assets, inbox replies, reports — weighted in `config/profitability.php`.
   `organizations.blended_hourly_rate_minor` and the optional per-client
   `clients.estimated_hours_per_month` are the only two numbers that cannot be inferred. **No rate
@@ -301,7 +315,7 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   signals and hiding once done. Tests in `ClientTabsTest` (fresh client incomplete; steps tick off
   and complete). Frontend-first + one Brand Brain read; no schema change.
 - 2026-10-22: Step B-4.5 — added `clients.posting_goal` (nullable JSON: `{posts_per_week,
-  preferred_days}`), the primary brand's weekly posting goal for a business workspace. **Separate**
+preferred_days}`), the primary brand's weekly posting goal for a business workspace. **Separate**
   from the single-integer `target_posts_per_week` health input; read it via `Client::postingGoal()`
   (the `App\Support\Workspace\PostingGoal` value object). See `.junie/modules/business-workspaces.md`.
 - 2026-10-24: Steps M-4.1 / M-4.3 — the client gained billing-gated `tax_registration_number`,
@@ -374,8 +388,8 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
   more compact cards instead of per-count `lg:grid-cols-N` logic, and the tab list now groups
   related triggers (Content / Billing & Portal access / AI insights) with a thin vertical divider
   between groups for a tidier, still-modern look.
- - 2026-10-14: Step 2.5 — Added Daily Briefs: model/migration, action, job + command/scheduler,
-   Owner/Strategist-only UI under Clients, and notification to Owners/Strategists (quiet hours respected).
+- 2026-10-14: Step 2.5 — Added Daily Briefs: model/migration, action, job + command/scheduler,
+  Owner/Strategist-only UI under Clients, and notification to Owners/Strategists (quiet hours respected).
 - 2026-09-24: The client show page's Delete button no longer submits immediately; it now opens a
   `Dialog` (shadcn `components/ui/dialog`) that requires typing the client's exact `name` into a text
   input before the destructive "Delete client" button is enabled. Confirming calls `router.delete`

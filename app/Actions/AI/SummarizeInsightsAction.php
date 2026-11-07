@@ -7,7 +7,7 @@ use App\Contracts\InsightsSummarizer;
 use App\Models\Client;
 use App\Services\AI\AiGuardrailService;
 use App\Services\AI\AiTextUsage;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -86,15 +86,15 @@ class SummarizeInsightsAction
         $startedAt = microtime(true);
         $lines = $this->provider->summarizeInsights($brand, $facts);
 
-        $deepSeek = $this->provider instanceof DeepSeekProvider;
+        $anthropic = $this->provider instanceof AnthropicProvider;
         $this->usage->record(
             $brand,
             'summarizeInsights',
             $lines !== [],
             $startedAt,
-            $deepSeek ? 'deepseek' : 'null',
-            $deepSeek ? (string) config('ai.deepseek.model', 'deepseek-flash') : 'none',
-            $deepSeek ? (float) config('ai.deepseek.estimated_cost_per_call', 0) : 0.0,
+            $anthropic ? 'anthropic' : 'null',
+            $anthropic ? (string) config('ai.anthropic.model', 'claude-sonnet-5-5') : 'none',
+            $anthropic ? (float) config('ai.anthropic.estimated_cost_per_call', 0) : 0.0,
         );
 
         $takeaways = [];

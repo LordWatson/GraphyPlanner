@@ -33,11 +33,11 @@ This file sits alongside `.junie/plans/graphy-development-steps.md` (what to bui
 
 ### 1.1 Who it's for
 
-| Segment | Example | What they need most | What they never need |
-|---|---|---|---|
-| Local business | Jess's bakery, a salon, a gym | Speed, a phone-first flow, ideas tied to seasons and local events, "just post it" | Clients, invoices, approval chains, retainers |
-| Creator / influencer | Jack | Daily cadence over many platforms, analytics, sponsor deliverables, `#ad` compliance | Client portal, client health, billing to clients |
-| Small in-house team | A 3-person marketing team at one company | Light review ("check before it goes out"), shared calendar, roles | Multi-client CRM |
+| Segment              | Example                                  | What they need most                                                                  | What they never need                             |
+| -------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Local business       | Jess's bakery, a salon, a gym            | Speed, a phone-first flow, ideas tied to seasons and local events, "just post it"    | Clients, invoices, approval chains, retainers    |
+| Creator / influencer | Jack                                     | Daily cadence over many platforms, analytics, sponsor deliverables, `#ad` compliance | Client portal, client health, billing to clients |
+| Small in-house team  | A 3-person marketing team at one company | Light review ("check before it goes out"), shared calendar, roles                    | Multi-client CRM                                 |
 
 ### 1.2 Principles
 
@@ -93,11 +93,11 @@ query, policy and test in the app and create two code paths for every feature.
 
 ### 2.3 Why not the alternatives
 
-| Option | Why not |
-|---|---|
-| Nullable `client_id` + org-level ownership | Doubles every query/policy path; very high regression risk across ~60 FKs and the analytics core. |
-| A separate "Brand" model replacing `Client` | Massive rename across models, routes, frontend and docs for no product gain. |
-| Separate app/database | Duplicated engine; publishing/AI fixes would land twice. |
+| Option                                      | Why not                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Nullable `client_id` + org-level ownership  | Doubles every query/policy path; very high regression risk across ~60 FKs and the analytics core. |
+| A separate "Brand" model replacing `Client` | Massive rename across models, routes, frontend and docs for no product gain.                      |
+| Separate app/database                       | Duplicated engine; publishing/AI fixes would land twice.                                          |
 
 The `Client` model keeps its name in code. Only the business UI calls it "your brand". Multi-brand
 business workspaces (a bakery with two locations, a creator with a side brand) come almost for free
@@ -105,25 +105,25 @@ later: raise the brand limit and add a brand switcher (Step B-11.4).
 
 ### 2.4 What's reused, adapted or hidden
 
-| Area (module doc) | Business workspace | Notes |
-|---|---|---|
-| Organizations & users (`organizations-users.md`) | **Adapted** | `type`, primary brand, role labels. |
-| Clients CRM (`clients.md`) | **Hidden** | Primary brand row only; no list/create/delete UI. Client health replaced by "brand setup" score. |
-| Brand Brain (`brand-brain.md`) | **Adapted** | Same model, simpler "Brand profile" editor + AI quick-start. |
-| Social accounts (`social-accounts.md`) | **Reused** | Connect flow without `{client}` in the URL; managed credentials. |
-| Campaigns & assets (`campaigns.md`, `assets.md`) | **Reused** | "Media library" and optional "Collections" (campaigns renamed). |
-| Posts & editor (`posts.md`) | **Adapted** | New workflow policy; no client approval mode. |
-| Calendar (`calendar.md`) | **Reused** | Single-brand, no client filter. |
-| Home/dashboard (`home.md`) | **New page** | "This week" dashboard (Step B-4.3). |
+| Area (module doc)                                  | Business workspace                                              | Notes                                                                                            |
+| -------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Organizations & users (`organizations-users.md`)   | **Adapted**                                                     | `type`, primary brand, role labels.                                                              |
+| Clients CRM (`clients.md`)                         | **Hidden**                                                      | Primary brand row only; no list/create/delete UI. Client health replaced by "brand setup" score. |
+| Brand Brain (`brand-brain.md`)                     | **Adapted**                                                     | Same model, simpler "Brand profile" editor + AI quick-start.                                     |
+| Social accounts (`social-accounts.md`)             | **Reused**                                                      | Connect flow without `{client}` in the URL; managed credentials.                                 |
+| Campaigns & assets (`campaigns.md`, `assets.md`)   | **Reused**                                                      | "Media library" and optional "Collections" (campaigns renamed).                                  |
+| Posts & editor (`posts.md`)                        | **Adapted**                                                     | New workflow policy; no client approval mode.                                                    |
+| Calendar (`calendar.md`)                           | **Reused**                                                      | Single-brand, no client filter.                                                                  |
+| Home/dashboard (`home.md`)                         | **New page**                                                    | "This week" dashboard (Step B-4.3).                                                              |
 | Review portal / client portal (`client-portal.md`) | **Hidden**, review link reused as "Share preview" (Step B-3.4). |
-| Publishing (`publishing.md`) | **Reused** | + managed credentials (Phase B-5). |
-| AI (`ai.md`) | **Reused + new prompts** | Local/seasonal ideas, caption from photo, weekly plan. |
-| Analytics (`analytics.md`) | **Reused** core, new page | Single-brand analytics, creator media kit. |
-| Billing — client invoices (`billing.md`) | **Hidden** | Replaced by the workspace's own subscription (Phase B-9). |
-| Staff (`staff.md`) | **Adapted** | "Team", capped by plan. |
-| Notifications (`notifications.md`) | **Adapted** | Copy and event set without client events. |
-| Preview mode (`preview-mode.md`) | **Adapted** | A second fixture: "Preview Bakery". |
-| Super admin (`super-admin.md`) | **Adapted** | Segment metrics by org type. |
+| Publishing (`publishing.md`)                       | **Reused**                                                      | + managed credentials (Phase B-5).                                                               |
+| AI (`ai.md`)                                       | **Reused + new prompts**                                        | Local/seasonal ideas, caption from photo, weekly plan.                                           |
+| Analytics (`analytics.md`)                         | **Reused** core, new page                                       | Single-brand analytics, creator media kit.                                                       |
+| Billing — client invoices (`billing.md`)           | **Hidden**                                                      | Replaced by the workspace's own subscription (Phase B-9).                                        |
+| Staff (`staff.md`)                                 | **Adapted**                                                     | "Team", capped by plan.                                                                          |
+| Notifications (`notifications.md`)                 | **Adapted**                                                     | Copy and event set without client events.                                                        |
+| Preview mode (`preview-mode.md`)                   | **Adapted**                                                     | A second fixture: "Preview Bakery".                                                              |
+| Super admin (`super-admin.md`)                     | **Adapted**                                                     | Segment metrics by org type.                                                                     |
 
 ---
 
@@ -148,6 +148,7 @@ untrusted tenants:
 ## Phase B-0 — Decisions & groundwork
 
 ### Step B-0.1 — Record the architecture decision [MVP] ✅ Done
+
 - Implemented via `.junie/modules/business-workspaces.md` + README row; naming ("one product, two
   signups") and free tier ("free tier + paid upgrade", payments deferred) resolved there.
 - Add `.junie/modules/business-workspaces.md` (template from `.junie/modules/README.md`) with §2 of
@@ -157,6 +158,7 @@ untrusted tenants:
 - **Done when**: the module doc exists and the README table lists it.
 
 ### Step B-0.2 — Inventory of client-scoped surfaces [MVP] ✅ Done
+
 - Implemented via the "B-0.2 — inventory" section of `.junie/modules/business-workspaces.md` (every
   `route:list` name classified agency-only / shared / business-only, driving B-1.4's guards).
 - Produce a checklist (in the module doc) of every route, controller, policy, Inertia page,
@@ -175,6 +177,7 @@ Goal: a business org can exist, has exactly one primary brand, and can't reach a
 No new UI yet.
 
 ### Step B-1.1 — `OrganizationType` and `organizations.type` [MVP] ✅ Done
+
 - Implemented via `App\Enums\OrganizationType`, the `add_type_to_organizations_table` migration,
   `Organization` casts/helpers/`scopeOfType`, and `OrganizationFactory::business()`.
 - `App\Enums\OrganizationType` (`Agency`, `Business`) with `label()`.
@@ -185,6 +188,7 @@ No new UI yet.
   cover the helpers and scope.
 
 ### Step B-1.2 — Primary brand [MVP] ✅ Done
+
 - Implemented via the `add_primary_brand_to_clients_table` migration (driver-aware generated
   `primary_org_id` + unique index), `Organization::primaryBrand()`,
   `App\Actions\Workspace\CreatePrimaryBrandAction`, and `ClientFactory::primary()`.
@@ -200,6 +204,7 @@ No new UI yet.
   by the Action, and that the Action creates the Brand Brain alongside.
 
 ### Step B-1.3 — `CurrentWorkspace` resolver [MVP] ✅ Done
+
 - Implemented via `App\Services\Workspace\CurrentWorkspace` (bound `scoped`),
   `App\Exceptions\Workspace\WorkspaceMisconfiguredException`, and the `workspace` prop in
   `HandleInertiaRequests`.
@@ -212,6 +217,7 @@ No new UI yet.
   misconfigured business org (exception + log).
 
 ### Step B-1.4 — Guards: keep business orgs out of agency features [MVP] ✅ Done
+
 - Implemented via `App\Http\Middleware\EnsureWorkspaceType` (alias `workspace`) applied to the
   agency-only route set in `routes/web.php`; `ClientPolicy::create`/`delete`, `InvoicePolicy` and
   `ClientInvitationPolicy` business denials; and the `ApprovalMode::ClientRequired` rejection in the
@@ -232,6 +238,7 @@ No new UI yet.
   asserts redirect/404, and policy unit tests cover each denial. Existing agency tests stay green.
 
 ### Step B-1.5 — Role mapping for business workspaces [MVP] ✅ Done
+
 - Implemented via `Role::labelFor(OrganizationType)` + `Role::assignableFor(OrganizationType)`, the
   role restriction in `StoreStaffInvitationRequest` + `CreateStaffInvitationAction`, and the
   `roleLabels` map in the shared `workspace` prop.
@@ -243,6 +250,7 @@ No new UI yet.
   render through the shared `workspace` prop.
 
 ### Phase B-1 exit criteria
+
 - A business org with its primary brand can be created in a test via factories/Actions.
 - Every agency-only route and policy rejects it; every existing agency test still passes.
 
@@ -254,6 +262,7 @@ Goal: Jess goes from the marketing page to a configured brand with a connected a
 five minutes.
 
 ### Step B-2.1 — Workspace-type-aware registration [MVP] ✅ Done
+
 - Implemented via a type-aware `RegisterOrganizationAction` (creates the primary brand in the same
   transaction for `business`), `Organizations\BusinessRegistrationController` + `/start` route +
   `StoreBusinessRegistrationRequest` + `organizations/start` page, the `BrandKind` enum +
@@ -273,6 +282,7 @@ five minutes.
   owner role, welcome mail queued, verification event), validation failures, and the throttle.
 
 ### Step B-2.2 — Onboarding state [MVP] ✅ Done
+
 - Implemented via `organizations.onboarding_completed_at` + `Organization::needsOnboarding()`, the
   `App\Services\Workspace\OnboardingProgress` service (checklist from real data), the `/welcome-setup`
   landing (business `LoginResponse` redirect) and skip/complete stamping.
@@ -285,6 +295,7 @@ five minutes.
   redirect + skip.
 
 ### Step B-2.3 — Onboarding wizard UI [MVP] ✅ Done
+
 - Implemented via `resources/js/pages/business/onboarding.tsx` (standalone, mobile-first, four
   skippable steps with a persisted data-driven stepper). **Your brand** and **Your voice** (AI
   quick-start) are wired to the B-2 Actions; **Connect accounts** and **Your first post** wire to the
@@ -292,21 +303,22 @@ five minutes.
   `CurrentWorkspace`), pending the richer B-5.2 / B-6.2 versions.
 - Inertia page `business/onboarding` with four short steps, each saving via existing/B-phase
   Actions:
-  1. **Your brand**: name, what you do (one line), location (city/country — used for local ideas
-     in B-6.1), website or main social handle.
-  2. **Your voice**: AI quick-start (B-2.4) shows a draft voice/audience/pillars to accept or edit.
-  3. **Connect accounts**: the connect flow from B-5.2, one card per platform.
-  4. **Your first post**: three AI-suggested first posts (B-6.2); pick one → editor pre-filled.
+    1. **Your brand**: name, what you do (one line), location (city/country — used for local ideas
+       in B-6.1), website or main social handle.
+    2. **Your voice**: AI quick-start (B-2.4) shows a draft voice/audience/pillars to accept or edit.
+    3. **Connect accounts**: the connect flow from B-5.2, one card per platform.
+    4. **Your first post**: three AI-suggested first posts (B-6.2); pick one → editor pre-filled.
 - Mobile-first layout; every step skippable; progress persists across sessions.
 - **Done when**: a browser walk-through on a phone viewport completes onboarding and produces a
   scheduled post; the `graphy-ui-reviewer` agent passes the page.
 
 ### Step B-2.4 — Brand profile AI quick-start [MVP] ✅ Done
+
 - Implemented via `App\Actions\AI\DraftBrandProfileAction`, the `AiProvider::draftBrandProfile`
   contract method (DeepSeek + Null impls) with `BrandProfileInput`/`AiBrandProfileDraft` DTOs, the
   SSRF-guarded `App\Contracts\WebsiteSummarizer` → `HttpWebsiteSummarizer`, and the
   `business.onboarding.draft` endpoint. Nothing is persisted until acceptance (via
-  `UpdateBrandBrainAction`); usage is logged to `ai_usage_logs`. (Allowance *enforcement* is deferred
+  `UpdateBrandBrainAction`); usage is logged to `ai_usage_logs`. (Allowance _enforcement_ is deferred
   to B-9.2.)
 - `App\Actions\AI\DraftBrandProfileAction`: input = name, one-liner, location, optional website URL /
   handle bio text; output = a draft for `BrandBrain` voice, audience, offer and content pillars via
@@ -321,6 +333,7 @@ five minutes.
   write happens before acceptance.
 
 ### Phase B-2 exit criteria
+
 - A new business user can sign up, get an AI-drafted brand profile, and reach the editor with a
   suggested first post, with no agency vocabulary anywhere in the flow.
 
@@ -331,6 +344,7 @@ five minutes.
 Goal: a solo owner goes from draft to scheduled in one action; a small team can opt into review.
 
 ### Step B-3.1 — `PostWorkflow` contract [MVP]
+
 - `App\Contracts\PostWorkflow`: `allowedTransitions(Post, User): list<PostStatus>`,
   `defaultApprovalMode(): ApprovalMode`, `requiresReview(Organization): bool`.
 - `App\Services\Posts\AgencyPostWorkflow` wraps today's `PostStatusTransitionMap` unchanged.
@@ -345,6 +359,7 @@ Goal: a solo owner goes from draft to scheduled in one action; a small team can 
   regression test proves every agency transition is unchanged.
 
 ### Step B-3.2 — "Schedule now" compound action [MVP]
+
 - `App\Actions\Posts\QuickSchedulePostAction`: from `Draft` (or `Idea`) with review off, validates
   the publish checklist, transitions `→ Approved → Scheduled` and dispatches publishing exactly as
   the normal path does, inside one transaction with one activity-log entry per transition and side
@@ -356,12 +371,14 @@ Goal: a solo owner goes from draft to scheduled in one action; a small team can 
   (no state change), and an unauthorized Viewer.
 
 ### Step B-3.3 — Workspace review setting [V1]
+
 - `organizations.require_post_review` (bool, default `false`), editable by the Owner in Settings
   (business variant). Review notifications go to Owners/Managers only.
 - **Done when**: toggling the setting changes `BusinessPostWorkflow` output (tests) and existing
   in-flight posts in `InternalReview` remain valid after switching it off (they can still be approved).
 
 ### Step B-3.4 — "Share preview" link (reuse the review token) [V1]
+
 - A business owner can share a read-only preview of a post (e.g. with a business partner or a
   sponsor) using the existing `ReviewToken` machinery, with decisions disabled by default and an
   optional "allow comments" flag. Copy on `/review/{token}` uses the brand name, never "client".
@@ -372,6 +389,7 @@ Goal: a solo owner goes from draft to scheduled in one action; a small team can 
   business org never transitions to `WaitingClient`.
 
 ### Phase B-3 exit criteria
+
 - A solo owner schedules a post from a draft with one click; a team with review on can't skip it;
   agency workflow behaviour is byte-for-byte unchanged (regression suite).
 
@@ -382,6 +400,7 @@ Goal: a solo owner goes from draft to scheduled in one action; a small team can 
 Goal: a business user gets their own navigation, URLs and dashboard, built from existing components.
 
 ### Step B-4.1 — Business routes and thin controllers [MVP] ✅ Done
+
 - Implemented via the `business.*` route group in `routes/web.php` and thin controllers in
   `App\Http\Controllers\Business\*` (`DashboardController`, `PostController`, `MediaController`,
   `CollectionController`, `BrandController`, `AccountController`, `IdeaController`,
@@ -395,26 +414,28 @@ Goal: a business user gets their own navigation, URLs and dashboard, built from 
   the **existing** Actions and Form Requests (extend the requests' `authorize()` to accept the
   implicit brand):
 
-  | Route | Reuses |
-  |---|---|
-  | `GET /today` | new dashboard (B-4.3) |
-  | `GET /calendar` | shared `CalendarController` (already org-scoped; hide client filter) |
-  | `GET /posts`, `GET /posts/new`, `POST /posts` | `CreatePostAction`, editor page |
-  | `GET /posts/{post}/edit` etc. | existing `PostController` routes (already brand-agnostic) |
-  | `GET /ideas` | AI trends/ideas Actions for the primary brand |
-  | `GET /media`, `POST /media` | `AssetController` Actions |
-  | `GET /collections/*` | `CampaignController` Actions (campaigns renamed in copy) |
-  | `GET/PUT /brand` (+ `/brand/references`) | `BrandBrainController` Actions |
-  | `GET /accounts`, `POST /accounts/*` | `SocialAccountController` Actions + connect flow |
-  | `GET /insights` | analytics core (Phase B-8) |
-  | `GET /team` | Staff Actions (B-10) |
-  | `GET /settings/workspace`, `/settings/plan` | B-3.3, B-9 |
+    | Route                                         | Reuses                                                               |
+    | --------------------------------------------- | -------------------------------------------------------------------- |
+    | `GET /today`                                  | new dashboard (B-4.3)                                                |
+    | `GET /calendar`                               | shared `CalendarController` (already org-scoped; hide client filter) |
+    | `GET /posts`, `GET /posts/new`, `POST /posts` | `CreatePostAction`, editor page                                      |
+    | `GET /posts/{post}/edit` etc.                 | existing `PostController` routes (already brand-agnostic)            |
+    | `GET /ideas`                                  | AI trends/ideas Actions for the primary brand                        |
+    | `GET /media`, `POST /media`                   | `AssetController` Actions                                            |
+    | `GET /collections/*`                          | `CampaignController` Actions (campaigns renamed in copy)             |
+    | `GET/PUT /brand` (+ `/brand/references`)      | `BrandBrainController` Actions                                       |
+    | `GET /accounts`, `POST /accounts/*`           | `SocialAccountController` Actions + connect flow                     |
+    | `GET /insights`                               | analytics core (Phase B-8)                                           |
+    | `GET /team`                                   | Staff Actions (B-10)                                                 |
+    | `GET /settings/workspace`, `/settings/plan`   | B-3.3, B-9                                                           |
+
 - Business routes are registered with Wayfinder like the rest of the app.
 - **Done when**: each route has a feature test as a business Owner (200 + correct brand scoping) and
   as an agency user (404/redirect), and controllers contain no business logic (convention reviewer
   passes).
 
 ### Step B-4.2 — Business navigation and layout [MVP] ✅ Done
+
 - Implemented via `businessChapters` in `resources/js/lib/chapters.ts`, the `businessGroups()` branch
   in `app-sidebar.tsx` (and the business branch in the ⌘K `command-palette.tsx`), both driven by the
   shared `workspace.type` (read through the new `useWorkspace()` hook), and the `/today` login
@@ -427,23 +448,25 @@ Goal: a business user gets their own navigation, URLs and dashboard, built from 
   navigation is unchanged.
 
 ### Step B-4.3 — "Today" dashboard [MVP] ✅ Done
+
 - Implemented via `App\Actions\Business\GetBusinessDashboardAction` (SQL-side, bounded per I-2.2) and
   the `resources/js/pages/business/today.tsx` page. Sections: **Up next**, **Needs you** (reusing
   `GetNeedsAttentionItemsAction` + stale drafts), **Gaps** (via `PostingGoalGapService`, B-4.5),
   **This week** (publishing consistency available today). **Idea of the day** is reserved for B-6.1
   (null for now). Metrics-dependent results are flagged `hasMetrics: false` until Phase B-8.
 - `App\Actions\Business\GetBusinessDashboardAction` (SQL-side, per I-2.2), returning:
-  - **Up next**: the next 5 scheduled targets with platform, local time and thumbnail;
-  - **Gaps**: days in the next 14 with nothing scheduled (vs. the brand's posting goal, B-4.5);
-  - **Needs you**: failed publishes, expired account connections, posts in review (if enabled),
-    drafts older than 7 days;
-  - **Idea of the day** (from B-6.1, cached daily);
-  - **This week's results** (B-8.1 mini stats), when metrics exist.
+    - **Up next**: the next 5 scheduled targets with platform, local time and thumbnail;
+    - **Gaps**: days in the next 14 with nothing scheduled (vs. the brand's posting goal, B-4.5);
+    - **Needs you**: failed publishes, expired account connections, posts in review (if enabled),
+      drafts older than 7 days;
+    - **Idea of the day** (from B-6.1, cached daily);
+    - **This week's results** (B-8.1 mini stats), when metrics exist.
 - One empty state per section that links to the action that fills it (connect, create, generate).
 - **Done when**: feature tests cover each section's query with fixtures (including timezone
   boundaries for "today" in the brand's timezone), and the page passes `graphy-ui-reviewer`.
 
 ### Step B-4.4 — Copy pass and terminology [MVP] ✅ Done
+
 - Implemented via `resources/js/lib/workspace-copy.ts` and `App\Support\Workspace\WorkspaceCopy`
   (the PHP equivalent) mapping client→brand, campaign→collection, internal-review→review. Business
   shell pages use "brand"/"collection" throughout and never carry "retainer" or "invoice" (asserted
@@ -461,6 +484,7 @@ Goal: a business user gets their own navigation, URLs and dashboard, built from 
   the same for the obvious terms.
 
 ### Step B-4.5 — Posting goal [V1] ✅ Done
+
 - Implemented via the `clients.posting_goal` JSON column + `App\Support\Workspace\PostingGoal` value
   object (`Client::postingGoal()`), the `App\Services\Business\PostingGoalGapService` (unit-tested
   across a week boundary and a DST change), and the posting-goal editor on the `/brand` page
@@ -472,6 +496,7 @@ Goal: a business user gets their own navigation, URLs and dashboard, built from 
 - **Done when**: gaps computation is unit-tested against goals across a week boundary and DST.
 
 ### Phase B-4 exit criteria
+
 - A business user can do everything day-to-day (create, schedule, see calendar, manage media,
   brand and accounts) without ever seeing an agency page or URL containing a client id.
 
@@ -482,6 +507,7 @@ Goal: a business user gets their own navigation, URLs and dashboard, built from 
 Goal: Jess connects Instagram and Facebook with "Log in with…", with no API keys and no setup docs.
 
 ### Step B-5.1 — `PublishCredentials` contract and managed mode [MVP] ✅ Done
+
 - Implemented via `App\Contracts\PublishCredentials` + `App\Services\Publishing\OrganizationOrPlatformCredentials`
   (bound in `AppServiceProvider`), the `App\Enums\PublishMode` enum, `organizations.publish_mode` +
   `organizations.upload_post_profile` columns, and `App\Actions\Workspace\EnsureManagedPublishProfileAction`.
@@ -493,10 +519,10 @@ Goal: Jess connects Instagram and Facebook with "Log in with…", with no API ke
   Introduce `App\Contracts\PublishCredentials` (`apiKeyFor(SocialAccount)`,
   `webhookSecretFor(Organization)`, `mode(Organization)`: `byo` | `managed`), with
   `App\Services\Publishing\OrganizationOrPlatformCredentials` as the implementation:
-  - **byo**: the org's own key (today's agency behaviour, unchanged);
-  - **managed**: a platform key from `config('services.upload_post.platform_key')` (env), with each
-    org isolated as its own Upload-Post profile/user (`organizations.upload_post_profile`, created
-    lazily by `EnsureManagedPublishProfileAction`).
+    - **byo**: the org's own key (today's agency behaviour, unchanged);
+    - **managed**: a platform key from `config('services.upload_post.platform_key')` (env), with each
+      org isolated as its own Upload-Post profile/user (`organizations.upload_post_profile`, created
+      lazily by `EnsureManagedPublishProfileAction`).
 - Business orgs are always `managed`; agencies stay `byo` unless a super admin flips them
   (future-proofing for agency plans).
 - Webhook verification looks up the secret through the contract; managed-mode webhooks are routed
@@ -506,6 +532,7 @@ Goal: Jess connects Instagram and Facebook with "Log in with…", with no API ke
   key ever appears in logs.
 
 ### Step B-5.2 — One-tap account connect [MVP] ✅ Done
+
 - Implemented via the platform-card `business/accounts` page (one card per enabled platform), the
   `POST /accounts/connect/{platform}` route (`business.accounts.connect-platform`) →
   `Business\AccountController::connectPlatform`, and `App\Actions\SocialAccounts\ConnectManagedAccountAction`
@@ -523,6 +550,7 @@ Goal: Jess connects Instagram and Facebook with "Log in with…", with no API ke
   expired account.
 
 ### Step B-5.3 — Plain-language publish failures [MVP] ✅ Done
+
 - Implemented via `App\Enums\PublishFailureReason` (`classify()` maps raw vendor errors to a cause
   with `message()`/`fix()`/`isRetryable()`/`needsReconnect()`), surfaced per failed channel in the
   editor target props (`PostController`) and rendered in `RetryFailedTargetsRow` with a per-channel
@@ -539,6 +567,7 @@ Goal: Jess connects Instagram and Facebook with "Log in with…", with no API ke
   target without republishing the others.
 
 ### Phase B-5 exit criteria
+
 - A business user can connect accounts and publish with no API key fields anywhere in their UI, and
   every failure tells them what to do next.
 
@@ -550,6 +579,7 @@ All AI work goes through the existing `AiProvider`/`ImageProvider` contracts, gu
 usage logging and the allowance from B-9.2.
 
 ### Step B-6.1 — Local & seasonal idea engine [V1] ✅ Done
+
 - Implemented via `App\Contracts\EventCalendar` + `App\Services\Events\StaticEventCalendar` (curated
   GB/US + global dataset, Easter/nth-weekday resolvers, cached per year), `App\Services\AI\IdeaContextBuilder`
   (location/country/season + upcoming local dates + recent titles + pillars → `App\Support\AI\IdeaContext`),
@@ -572,6 +602,7 @@ usage logging and the allowance from B-9.2.
   and excludes recent topics; the scheduled command is `withoutOverlapping()`/`onOneServer()`.
 
 ### Step B-6.2 — Caption from a photo [V1] ✅ Done
+
 - Implemented via the `App\Contracts\VisionProvider` contract (`captionsFromImage`), its
   `App\Services\AI\GeminiVisionProvider` (Gemini `:generateContent`, image inline part + brand-grounded
   system instruction, strict-JSON `responseMimeType`, never throws → empty on failure) and
@@ -590,6 +621,7 @@ usage logging and the allowance from B-9.2.
   leaves the user with an empty caption box (never a blocked editor).
 
 ### Step B-6.3 — "Plan my week" [V1] ✅ Done
+
 - Implemented via `App\Actions\AI\GenerateWeeklyPlanAction` — fills the posting-goal gaps for the next
   7 days with plan items (`ai_post_ideas` rows marked `planned_for`, new nullable column), each with a
   best-time slot (`App\Services\Analytics\BestTimeService` data where there's enough of it, else
@@ -607,6 +639,7 @@ usage logging and the allowance from B-9.2.
   doesn't duplicate), and bulk accept/discard.
 
 ### Step B-6.4 — Repurpose across platforms [V1] ✅ Done
+
 - Implemented via the `App\Contracts\CaptionRepurposer` contract (DeepSeek + Null impls, bound like
   `LocalIdeaProvider`) and `App\Actions\AI\RepurposeCaptionsForPostAction`, which rewrites the post's
   master caption natively per target platform and returns one variant each — guardrailed (banned
@@ -622,6 +655,7 @@ usage logging and the allowance from B-9.2.
   (I-3.3).
 
 ### Step B-6.5 — Image Studio presets for small businesses [Stretch] ✅ Done
+
 - Implemented by reusing the shared Phase 16 Image Studio engine with no new generation/quota code.
   `App\Enums\BusinessImagePreset` (`todays_special`, `opening_hours`, `sale_announcement`,
   `quote_card`) is the content source (label/tagline/field copy/default format + per-preset art
@@ -649,6 +683,7 @@ usage logging and the allowance from B-9.2.
 Jess posts from behind the counter, Jack posts from wherever he is. The phone is the main device.
 
 ### Step B-7.1 — Installable PWA [V1] ✅ Done
+
 - Implemented via `public/manifest.webmanifest` (name/scope/icons + `shortcuts` + the B-7.3
   `share_target`), the generated maskable/any icons under `public/icons/*`, the dependency-free
   `public/sw.js` (offline shell: cache-first for `/build`,`/icons`,`/brand`; network-first
@@ -664,6 +699,7 @@ Jess posts from behind the counter, Jack posts from wherever he is. The phone is
   unaffected.
 
 ### Step B-7.2 — Quick post flow [V1] ✅ Done
+
 - Implemented via `Business\QuickPostController` (`business.posts.quick` / `.quick.store`), the
   `resources/js/pages/business/posts/quick.tsx` standalone mobile screen (capture → B-6.2 captions →
   account chips with localStorage-remembered defaults → "Next slot" / "Now" / pick a time →
@@ -681,6 +717,7 @@ Jess posts from behind the counter, Jack posts from wherever he is. The phone is
   and a feature test covers the server side end-to-end.
 
 ### Step B-7.3 — Share-to-Alima [Stretch] ✅ Done
+
 - Implemented via the manifest `share_target` (POST, `multipart/form-data`, `media` file) pointing at
   `business.posts.quick.share` → `QuickPostController::share`, which validates the shared media
   (same `SafeUpload` rules as the media library), ingests it with `CreateAssetAction`, and
@@ -692,13 +729,14 @@ Jess posts from behind the counter, Jack posts from wherever he is. The phone is
   validated, lands in quick post with the asset attached).
 
 ### Step B-7.4 — Push reminders [Stretch] ✅ Done
+
 - Implemented via the `push_subscriptions` table + `PushSubscription` model (one row per
   user+browser, keyed on `endpoint_hash`), the `App\Contracts\PushNotifier` contract +
   `App\Contracts\PushDeliveryResult` enum + `App\Services\Push\WebPushNotifier` (bound default;
   configured = enabled + VAPID keys, so the opt-in → store → reminder pipeline runs end-to-end — the
   final encrypted VAPID delivery is the one piece deliberately left to a drop-in transport, logged
   until bound). Per-user opt-in through `business.push.{subscribe,unsubscribe}` (→ `Save`/`Delete
-  PushSubscriptionAction`) surfaced by the `resources/js/hooks/use-push.ts` hook +
+PushSubscriptionAction`) surfaced by the `resources/js/hooks/use-push.ts` hook +
   `PushRemindersCard` on Profile settings (business-only). The "goes out in ~30 minutes" reminder is
   `App\Actions\Push\SendPostPushRemindersAction` + the `push:send-post-reminders` command (every 5
   min, idempotent via `post_targets.push_reminder_sent_at`, business orgs only, prunes `Gone`
@@ -718,6 +756,7 @@ Depends on engagement metrics (Phase 12 / Step I-10.1). Until those exist, insig
 consistency only (posts published, on-time rate, streak), which is available today.
 
 ### Step B-8.1 — Single-brand insights page [V1] ✅ Done
+
 - Implemented via `GetBusinessInsightsAction` now reading the shared `EngagementMetrics` scoped to
   the primary brand (reach/engagement by platform, top posts, follower growth) on top of the existing
   consistency slice, plus `BestTimeService` (B-8.3) for best times; the rebuilt
@@ -733,6 +772,7 @@ consistency only (posts published, on-time rate, streak), which is available tod
   agency analytics page is unchanged.
 
 ### Step B-8.2 — Plain-language takeaways [V1] ✅ Done
+
 - Implemented via the `App\Contracts\InsightsSummarizer` contract (DeepSeek + Null impls, bound like
   `LocalIdeaProvider`) and `App\Actions\AI\SummarizeInsightsAction` (compact facts → provider →
   PII-scrubbed takeaways, cached once per brand per ISO week, metered in `ai_usage_logs`; empty when
@@ -748,6 +788,7 @@ consistency only (posts published, on-time rate, streak), which is available tod
   content/opt-out.
 
 ### Step B-8.3 — Best times to post [V1] ✅ Done
+
 - Implemented via `App\Services\Business\BestTimeService`, a business-shell layer over the shared,
   engagement-driven `App\Services\Analytics\BestTimeService`: per connected account it uses the
   account's learned slot when there's enough history, else a platform default
@@ -760,6 +801,7 @@ consistency only (posts published, on-time rate, streak), which is available tod
 - **Done when**: unit tests cover the fallback, the data-driven path, and timezone handling.
 
 ### Step B-8.4 — Creator media kit [V1] ✅ Done
+
 - Implemented via the `media_kits` table + `App\Models\MediaKit` (one per primary brand), the
   `BuildMediaKitAction` (public-safe data only — published posts, public follower counts, never
   emails/drafts/internal notes; "past partners" empty until B-11.2), `UpdateMediaKitAction` /
@@ -784,6 +826,7 @@ enforced from day one, even before payments are switched on. Coordinate with I-1
 businesses share one subscription system.
 
 ### Step B-9.1 — `Entitlements` contract [MVP]
+
 - `App\Contracts\Entitlements` with `limit(Organization, Feature): ?int` and
   `allows(Organization, Feature): bool`; `Feature` enum: `social_accounts`, `scheduled_posts_per_month`,
   `team_seats`, `ai_text_credits`, `ai_image_credits`, `brands`, `analytics_history_days`,
@@ -798,6 +841,7 @@ businesses share one subscription system.
   agency orgs are never limited by default.
 
 ### Step B-9.2 — AI allowance metering [MVP]
+
 - Monthly AI credit counters derived from `ai_usage_logs` (no separate counter table unless profiling
   says otherwise), checked before each AI call; the existing `ai_monthly_image_quota` folds into
   `ai_image_credits`.
@@ -806,6 +850,7 @@ businesses share one subscription system.
   quota migration for existing orgs.
 
 ### Step B-9.3 — Subscriptions with Cashier (Stripe) [V1]
+
 - Laravel Cashier on `Organization` (billable), Stripe Checkout for upgrade, Customer Portal for
   card/invoices/cancel, 14-day trial on paid plans, webhooks → `SyncSubscriptionAction` (idempotent)
   setting `organizations.plan`. Downgrades take effect at period end; over-limit data is kept but
@@ -815,6 +860,7 @@ businesses share one subscription system.
   cancel, payment failure (grace period then free plan), and replay idempotency.
 
 ### Step B-9.4 — Super admin plan controls [V1]
+
 - Super admin can view/override an org's plan and grant temporary credits, with an audit entry.
 - **Done when**: tests cover override + audit and that non-super-admins can't.
 
@@ -823,16 +869,19 @@ businesses share one subscription system.
 ## Phase B-10 — Small teams [V1]
 
 ### Step B-10.1 — Team page for business workspaces [V1]
+
 - Reuse the Staff module (invitations, activity log) under `/team` with business role labels
   (B-1.5), seat limits (B-9.1), and no client-reviewer option.
 - **Done when**: invitation tests cover seat limits and role restrictions for business orgs.
 
 ### Step B-10.2 — Light review & mentions [V1]
+
 - With `require_post_review` on, reviewers get a "To review" list on Today; comments and
   `@mentions` (already built) work unchanged.
 - **Done when**: feature test covers a Creator submitting and a Manager approving, with notifications.
 
 ### Step B-10.3 — Freelance helper access [Stretch]
+
 - Jack hires an editor for a month: time-boxed seat (auto-expires), restricted to Creator role.
 - **Done when**: tests cover expiry (scheduled command revokes access) and the audit trail.
 
@@ -841,6 +890,7 @@ businesses share one subscription system.
 ## Phase B-11 — Creator & business extras [V1/Stretch]
 
 ### Step B-11.1 — Paid partnership compliance [V1] ✅ Done (2026-11-06, as Step CG-5.1)
+
 - Post fields: `is_paid_partnership`, `partner_name`, `partner_handle`. The publish checklist
   requires a disclosure (`#ad`/`#sponsored` or the platform's branded-content flag where the
   adapter supports it) when set, per platform. Optional sponsor approval via B-3.4.
@@ -850,6 +900,7 @@ businesses share one subscription system.
   makes it per-platform): no adapter exposes a branded-content flag, so there is none to set._
 
 ### Step B-11.2 — Brand deals tracker [Stretch → V1] ✅ Done (2026-11-06, as Step CG-5.2)
+
 - `brand_deals` (org-scoped, primary brand): partner, deliverables (n posts per platform), due
   dates, fee, status; posts link to a deal; deliverable progress fills automatically as linked posts
   publish. Feeds the media kit's "past partners" (opt-in per deal).
@@ -860,6 +911,7 @@ businesses share one subscription system.
   `show_on_media_kit`._
 
 ### Step B-11.3 — Link-in-bio page [Stretch → V1] ✅ Done (2026-11-06, as Phase CG-3)
+
 - A public, brand-styled page (`/@{handle}`) with links and the latest published posts, with click
   tracking via I-10.4 link tracking.
 - **Done when**: page renders only published content, handles are unique, and clicks are counted
@@ -868,6 +920,7 @@ businesses share one subscription system.
   I-10.4 link tracking doesn't exist, so CG-3.3 built the minimum `bio_events` daily rollup instead._
 
 ### Step B-11.4 — Multiple brands for one business [Stretch]
+
 - Lift the `brands` entitlement above 1 for higher plans: a brand switcher in the business shell,
   `CurrentWorkspace::brand()` reads the selected brand from the session (validated against the org),
   and `is_primary` remains the default. No agency features are unlocked by this.
@@ -875,6 +928,7 @@ businesses share one subscription system.
   limit.
 
 ### Step B-11.5 — Google Business Profile posting [Stretch]
+
 - Local businesses get more from Google posts than LinkedIn. Add as a platform through the adapter
   pattern (Phase 4 / I-3.4) when the vendor supports it.
 - **Done when**: covered by the adapter's contract tests.
@@ -884,6 +938,7 @@ businesses share one subscription system.
 ## Phase B-12 — Growth paths, marketing & platform [V1]
 
 ### Step B-12.1 — Upgrade a business workspace to an agency [V1]
+
 - `ConvertBusinessToAgencyAction` (Owner only, confirm dialog): flips `type` to `agency`, keeps the
   primary brand as a normal client (`is_primary` cleared), switches publishing credentials to
   `byo` only if the user provides a key (otherwise the org keeps `managed` — the contract allows
@@ -894,18 +949,21 @@ businesses share one subscription system.
   navigation switch, and the rejection for non-Owners.
 
 ### Step B-12.2 — Marketing pages and pricing [V1]
+
 - Welcome page section and a `/for-business` + `/for-creators` page (brand guidelines), pricing
   table generated from `config/plans.php` so prices never drift from enforcement.
 - **Done when**: pages pass `graphy-ui-reviewer`, and a test asserts the pricing table reads the
   plan config.
 
 ### Step B-12.3 — Business preview fixture [V1]
+
 - A second frozen preview org ("Preview Bakery", `type = business`) seeded alongside "Preview
   Studio", reachable from the business marketing page; the preview middleware selects the fixture
   by path (`/preview/business/*`). Requires I-1.1.
 - **Done when**: preview tests cover read access and write rejection for the business fixture.
 
 ### Step B-12.4 — Super admin segmentation [V1] ✅ Done
+
 _Delivered 2026-11-07 by Step GTM-7.1 (CG-9.1): the funnel panel on `/super-admin/analytics` with
 trial → paid, median time to first published post, bio-page adoption, store GMV per currency, churn
 by plan and agency cap utilisation. See `super-admin.md`._
@@ -916,11 +974,11 @@ by plan and agency cap utilisation. See `super-admin.md`._
 
 The three options CG-8.1 named, and why TWA won:
 
-| Option | Verdict |
-|---|---|
+| Option   | Verdict                                                                                                                                                                                            |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PWA only | Rejected. Planoly's free tier is mobile-app-only, and a store listing is how creators enter this category at all. Being absent from Play means being invisible to the people who look there first. |
-| **TWA** | **Chosen.** It is the PWA we already have, wrapped. One codebase, one service worker, one push path, and the listing we needed. |
-| Native | Declined. A second codebase, a second notification stack (FCM) and a second release cycle, for a product whose whole surface is already a well-behaved web app. Nothing we want to build needs it. |
+| **TWA**  | **Chosen.** It is the PWA we already have, wrapped. One codebase, one service worker, one push path, and the listing we needed.                                                                    |
+| Native   | Declined. A second codebase, a second notification stack (FCM) and a second release cycle, for a product whose whole surface is already a well-behaved web app. Nothing we want to build needs it. |
 
 **The CG-1.3 delivery evidence that made this safe**: web push is already working through the
 service worker and VAPID, with `push:send-post-reminders` and `push:send-empty-tomorrow` delivering
@@ -934,6 +992,7 @@ decision is sound but unproven. The steps are in `android/README.md` and `androi
 
 **First review date for the listing copy and the competitor figures behind it: 2027-02-05**, the
 same date `competitors:review-due` (Step GTM-7.2) first fires.
+
 - Platform analytics and the org list filter by `type` and `plan`; new metrics: business signups,
   onboarding completion rate, time-to-first-post, weekly active brands, conversion free → paid.
 - **Done when**: analytics tests cover the type filter and each new metric with fixtures.
@@ -943,12 +1002,14 @@ same date `competitors:review-due` (Step GTM-7.2) first fires.
 ## Phase B-13 — Hardening, docs & launch [MVP before public launch]
 
 ### Step B-13.1 — Abuse and cost safeguards [MVP]
+
 - Signup: email verification required before connecting accounts or using AI; per-IP signup
   throttle; disposable-email blocklist (config). Managed publishing: per-org daily post cap as a
   safety ceiling independent of plan; alerting when a single org's failure rate spikes.
 - **Done when**: tests cover each guard; logs include `org_id` without PII beyond what's needed.
 
 ### Step B-13.2 — Data export and account deletion [MVP]
+
 - Self-serve "Export my data" (posts, captions, media links, analytics CSV) and "Delete workspace"
   (Owner, typed confirmation, 14-day grace, then a queued job deleting org data and revoking the
   managed publish profile).
@@ -956,6 +1017,7 @@ same date `competitors:review-due` (Step GTM-7.2) first fires.
   including storage files (faked).
 
 ### Step B-13.3 — Module docs [MVP]
+
 - Finalise `.junie/modules/business-workspaces.md`; update `organizations-users.md`, `clients.md`
   (`is_primary`), `posts.md` (`PostWorkflow`), `publishing.md` (`PublishCredentials`), `ai.md`,
   `analytics.md`, `billing.md` (subscriptions vs. client invoices), `staff.md`, `preview-mode.md`,
@@ -964,6 +1026,7 @@ same date `competitors:review-due` (Step GTM-7.2) first fires.
 - **Done when**: `sync-module-docs` reports no drift.
 
 ### Step B-13.4 — Launch checklist [MVP]
+
 - Full quality gates (`graphy-checks`), a browser walk-through of both personas (Jess on a phone
   viewport, Jack on desktop with three platforms), the convention and UI reviewers on the full
   diff, and a seeded load test of the Today page and scheduler with 1,000 business orgs.

@@ -26,26 +26,27 @@ class AiBrandFitTest extends TestCase
         parent::setUp();
 
         Config::set('ai.enabled', true);
-        Config::set('ai.deepseek.api_key', 'sk-test');
-        Config::set('ai.deepseek.base_url', 'https://api.deepseek.test');
+        Config::set('ai.anthropic.api_key', 'sk-test');
+        Config::set('ai.anthropic.base_url', 'https://api.anthropic.test');
     }
 
     public function test_suggestions_carry_a_brand_fit_score_and_a_banned_one_is_filtered_out(): void
     {
         Http::fake([
-            '*/chat/completions' => Http::response([
-                'choices' => [[
-                    'finish_reason' => 'stop',
-                    'message' => ['content' => json_encode([
+            '*/v1/messages' => Http::response([
+                'stop_reason' => 'end_turn',
+                'content' => [[
+                    'type' => 'text',
+                    'text' => json_encode([
                         'suggestions' => [
                             // Uses a "never use" phrase — must be dropped by the guardrail.
                             ['caption' => 'Get it cheap today!', 'hashtags' => ['graphy']],
                             // On-brand — kept and scored.
                             ['caption' => 'Education is at our heart.', 'hashtags' => ['graphy']],
                         ],
-                    ])],
+                    ]),
                 ]],
-                'usage' => ['prompt_tokens' => 50, 'completion_tokens' => 30],
+                'usage' => ['input_tokens' => 50, 'output_tokens' => 30],
             ], 200),
         ]);
 

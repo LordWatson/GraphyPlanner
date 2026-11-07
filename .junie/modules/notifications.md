@@ -1,6 +1,7 @@
 # Notifications
 
 ## Purpose
+
 A cross-cutting notification bell surfaced in both the internal app header and the client portal
 header. Built on Laravel's built-in database notifications (`User` already `use`s `Notifiable`),
 it alerts a user when something they have a stake in changes elsewhere in the system — a new
@@ -9,12 +10,14 @@ on click, marks that one notification read and redirects to the page where the u
 can be viewed/acted on.
 
 ## Models / Tables
+
 - `notifications` (Laravel's standard polymorphic table, `Illuminate\Notifications\DatabaseNotification`):
   `id` (uuid), `type`, `notifiable_type`/`notifiable_id`, `data` (json), `read_at`. Migration
   `2026_09_19_151337_create_notifications_table`. Reachable via `User::notifications()`/
   `User::unreadNotifications()` (from the `Notifiable` trait already used by `App\Models\User`).
 
 ## Phase M-6.7 (I-12.1) — preferences, digest, chat notifier
+
 - `users.notification_preferences` (JSON; migration `2026_11_08_100100`) — per `NotificationCategory`
   (approvals, comments, publishing, invoices, campaigns, other), two channels: `in_app` + `digest`.
   `NotificationPreferences` resolves them with defaults (all in-app on; digest on except comments/
@@ -33,6 +36,7 @@ can be viewed/acted on.
   in later. Tests `tests/Feature/Notifications/NotificationPreferencesTest`.
 
 ## Phase M-6.5 (Phase 9) — overdue approval reminders
+
 - `approvals:send-overdue-reminders` (daily 09:00; `SchedulerHeartbeat::COMMANDS`) →
   `SendOverdueApprovalRemindersJob`: for every post past its org's approval SLA and not reminded in
   24h (`posts.last_reminded_at`), sends an in-app `ApprovalOverdue` to the studio (Owner/Strategist)
@@ -41,18 +45,19 @@ can be viewed/acted on.
   double-sends. Tests `tests/Feature/Approvals/ApprovalSlaTest`.
 
 ## Actions / Services / Contracts
+
 - `App\Services\PostNotificationService`: resolves the two recipient audiences for post-related
   notifications and sends them, so the same recipient queries aren't duplicated across every
   Action/Job that needs to notify someone:
-  - `orgRecipients(Post, ?exclude)`: every internal org user (Owner/Strategist/Designer/Viewer) of
-    the post's `org_id`.
-  - `clientPortalRecipients(Post, ?exclude)`: every `Role::ClientReviewer` scoped to the post's
-    `client_id`.
-  - `mentionableRecipients(Post, ?exclude)`: `orgRecipients` merged with `clientPortalRecipients` —
-    every user eligible to be `@`-mentioned in a comment on the post, used both to populate the
-    mention autocomplete list and to validate mention tokens server-side.
-  - `send(Collection $recipients, Notification $notification)`: no-ops on an empty collection,
-    otherwise calls `->notify()` on each recipient.
+    - `orgRecipients(Post, ?exclude)`: every internal org user (Owner/Strategist/Designer/Viewer) of
+      the post's `org_id`.
+    - `clientPortalRecipients(Post, ?exclude)`: every `Role::ClientReviewer` scoped to the post's
+      `client_id`.
+    - `mentionableRecipients(Post, ?exclude)`: `orgRecipients` merged with `clientPortalRecipients` —
+      every user eligible to be `@`-mentioned in a comment on the post, used both to populate the
+      mention autocomplete list and to validate mention tokens server-side.
+    - `send(Collection $recipients, Notification $notification)`: no-ops on an empty collection,
+      otherwise calls `->notify()` on each recipient.
 - `App\Notifications\PostCommentAdded`: a new comment was added and is visible to the other side
   of the conversation. Carries `forPortal: bool` so `toArray()`'s `url` points at `posts.edit`
   (org side) or `portal.posts.show` (client-portal side).
@@ -78,6 +83,7 @@ can be viewed/acted on.
   dropdown, `url` is where `NotificationController::read` redirects.
 
 ## Routes / Controllers
+
 - `GET /notifications` → `notifications.index` (`NotificationController::index`) — returns the
   authenticated user's 50 most recent notifications (id/title/body/url/read_at/created_at) plus
   `unread_count`, as plain JSON (not an Inertia render) for the bell dropdown to lazy-load on open.
@@ -92,6 +98,7 @@ can be viewed/acted on.
   every role, including `Role::ClientReviewer` portal users.
 
 ## Business Rules
+
 - **`@`-mentions in comments**: the comment body may contain `@[Name](id)` tokens, inserted by the
   `MentionTextarea` frontend component (`resources/js/components/mention-textarea.tsx`) when a
   user picks someone from the `@` autocomplete dropdown (backed by the `mentionableUsers` prop —
@@ -103,32 +110,32 @@ can be viewed/acted on.
   or the mentioned user is on the same "side" as the author. `renderCommentBody()` (same frontend
   file) re-renders the tokens as highlighted `@Name` spans wherever a comment is displayed.
 - **Who gets notified, per event** (all dispatched from existing Actions/Jobs, not controllers):
-  - `CreatePostCommentAction`: if the commenter is a `Role::ClientReviewer`, notifies
-    `orgRecipients` with `PostCommentAdded(forPortal: false)`. Otherwise (an org user commented),
-    notifies `clientPortalRecipients` with `PostCommentAdded(forPortal: true)` — but only when the
-    comment isn't `internal_only` (internal notes must never surface to a client, including via a
-    notification). Either way, any `@`-mentioned user is excluded from this "other side" audience
-    (they already got a `PostCommentMentioned`) to avoid a duplicate alert.
-  - `TransitionPostStatusAction`: on a transition to `internal_review` (from `draft` or
-    `changes_requested`), notifies `orgRecipients($post, exclude: $actor)` with
-    `PostWaitingForInternalReview` — every studio member except whoever submitted it. In-app only
-    (no email), and logged with the recipient count. On a transition to `waiting_client`, notifies
-    `clientPortalRecipients` with `PostWaitingForClientReview` (independent of/alongside the
-    existing `ClientReviewRequestedMail` email). On a transition to `approved`/`changes_requested`,
-    notifies `orgRecipients` with `PostApprovalDecided` — but only when the deciding `$user` is a
-    `Role::ClientReviewer` or `null` (the unauthenticated `/review/:token` portal); an internal org
-    user moving a post straight to `approved` is not itself a client decision and doesn't notify.
-    Additionally, `@[Name](id)` "tags" in the transition note (or the Owner's approval-override
-    reason, which lands on the same note) are resolved after commit against `orgRecipients($post,
-    exclude: $actor)` only — never the actor, outsiders, or client-portal users — and each tagged
-    teammate is sent a `PostNoteMentioned`. Tagged users are then excluded from the broad status
-    audience above (via a `whereNotIn('id', …)` on each recipient query) so a tag never arrives
-    alongside a duplicate "post needs review" alert — the same de-dup rule `CreatePostCommentAction`
-    applies for comment mentions. A `null` actor (review portal) can't tag anyone. The tokens are
-    validated exactly like comment mentions (`CommentMentionParser` + a `mentionableRecipients`/
-    `orgRecipients` cross-check), never trusted at face value.
-  - `PublishPostJob`: when a post ends up `failed` after `PublishAdapter::publish()`, notifies
-    `orgRecipients` with `PostPublishFailed`.
+    - `CreatePostCommentAction`: if the commenter is a `Role::ClientReviewer`, notifies
+      `orgRecipients` with `PostCommentAdded(forPortal: false)`. Otherwise (an org user commented),
+      notifies `clientPortalRecipients` with `PostCommentAdded(forPortal: true)` — but only when the
+      comment isn't `internal_only` (internal notes must never surface to a client, including via a
+      notification). Either way, any `@`-mentioned user is excluded from this "other side" audience
+      (they already got a `PostCommentMentioned`) to avoid a duplicate alert.
+    - `TransitionPostStatusAction`: on a transition to `internal_review` (from `draft` or
+      `changes_requested`), notifies `orgRecipients($post, exclude: $actor)` with
+      `PostWaitingForInternalReview` — every studio member except whoever submitted it. In-app only
+      (no email), and logged with the recipient count. On a transition to `waiting_client`, notifies
+      `clientPortalRecipients` with `PostWaitingForClientReview` (independent of/alongside the
+      existing `ClientReviewRequestedMail` email). On a transition to `approved`/`changes_requested`,
+      notifies `orgRecipients` with `PostApprovalDecided` — but only when the deciding `$user` is a
+      `Role::ClientReviewer` or `null` (the unauthenticated `/review/:token` portal); an internal org
+      user moving a post straight to `approved` is not itself a client decision and doesn't notify.
+      Additionally, `@[Name](id)` "tags" in the transition note (or the Owner's approval-override
+      reason, which lands on the same note) are resolved after commit against `orgRecipients($post,
+exclude: $actor)` only — never the actor, outsiders, or client-portal users — and each tagged
+      teammate is sent a `PostNoteMentioned`. Tagged users are then excluded from the broad status
+      audience above (via a `whereNotIn('id', …)` on each recipient query) so a tag never arrives
+      alongside a duplicate "post needs review" alert — the same de-dup rule `CreatePostCommentAction`
+      applies for comment mentions. A `null` actor (review portal) can't tag anyone. The tokens are
+      validated exactly like comment mentions (`CommentMentionParser` + a `mentionableRecipients`/
+      `orgRecipients` cross-check), never trusted at face value.
+    - `PublishPostJob`: when a post ends up `failed` after `PublishAdapter::publish()`, notifies
+      `orgRecipients` with `PostPublishFailed`.
 - A recipient is never notified about their own action — `orgRecipients`/`clientPortalRecipients`
   both accept an `?exclude` user. The internal-review notification is the one dispatch site where
   the actor is part of the audience, so it passes the actor as `exclude`; the others don't need it
@@ -150,36 +157,38 @@ can be viewed/acted on.
   `unreadNotificationsCount` prop and the three routes above (not on any role-specific data).
 
 ## Tests
+
 - `tests/Feature/NotificationTest.php`:
-  - `test_a_client_comment_notifies_org_users` / `test_a_non_internal_org_comment_notifies_client_portal_users` /
-    `test_an_internal_only_org_comment_does_not_notify_client_portal_users` — the three
-    `CreatePostCommentAction` notification-routing rules (`Notification::fake()` +
-    `assertSentTo`/`assertNotSentTo`).
-  - `test_mentioning_a_user_in_a_comment_notifies_them` / `test_mentioning_a_client_user_from_an_org_comment_notifies_them` /
-    `test_an_unmentionable_user_id_in_a_comment_body_is_ignored` — `@`-mention parsing/validation
-    and `PostCommentMentioned` dispatch, including on an `internal_only` comment.
-  - `test_a_post_entering_waiting_client_notifies_client_portal_users` — `TransitionPostStatusAction`
-    → `PostWaitingForClientReview`.
-  - `test_a_post_entering_internal_review_notifies_studio_members_except_the_actor` /
-    `test_the_internal_review_notification_links_to_the_post_editor` /
-    `test_moving_a_post_out_of_internal_review_does_not_send_an_internal_review_notification` —
-    `TransitionPostStatusAction` → `PostWaitingForInternalReview` (actor, client reviewers and other
-    orgs excluded; `url` → `posts.edit`).
-  - `test_a_client_approval_decision_notifies_org_users` — `TransitionPostStatusAction` →
-    `PostApprovalDecided` when a `Role::ClientReviewer` decides.
-  - `test_tagging_a_teammate_in_a_transition_note_notifies_them` /
-    `test_a_teammate_tagged_in_a_transition_note_is_not_also_sent_the_broad_status_notification` /
-    `test_a_client_reviewer_cannot_be_tagged_in_a_transition_note` /
-    `test_an_unmentionable_user_id_in_a_transition_note_is_ignored` /
-    `test_tagging_a_teammate_in_an_approval_override_reason_notifies_them` /
-    `test_the_transition_tag_notification_links_to_the_post_editor` — `@`-mention "tags" in a
-    transition note / override reason → `PostNoteMentioned` (org-only, de-duped from the broad
-    status audience, client reviewers and outsiders ignored, `url` → `posts.edit`).
-  - `test_clicking_a_notification_marks_it_as_read_and_redirects_to_its_url` —
-    `notifications.read` marks `read_at` and redirects to the notification's stored `url`.
-  - `test_a_user_cannot_mark_another_users_notification_as_read` — cross-user 404 isolation.
+    - `test_a_client_comment_notifies_org_users` / `test_a_non_internal_org_comment_notifies_client_portal_users` /
+      `test_an_internal_only_org_comment_does_not_notify_client_portal_users` — the three
+      `CreatePostCommentAction` notification-routing rules (`Notification::fake()` +
+      `assertSentTo`/`assertNotSentTo`).
+    - `test_mentioning_a_user_in_a_comment_notifies_them` / `test_mentioning_a_client_user_from_an_org_comment_notifies_them` /
+      `test_an_unmentionable_user_id_in_a_comment_body_is_ignored` — `@`-mention parsing/validation
+      and `PostCommentMentioned` dispatch, including on an `internal_only` comment.
+    - `test_a_post_entering_waiting_client_notifies_client_portal_users` — `TransitionPostStatusAction`
+      → `PostWaitingForClientReview`.
+    - `test_a_post_entering_internal_review_notifies_studio_members_except_the_actor` /
+      `test_the_internal_review_notification_links_to_the_post_editor` /
+      `test_moving_a_post_out_of_internal_review_does_not_send_an_internal_review_notification` —
+      `TransitionPostStatusAction` → `PostWaitingForInternalReview` (actor, client reviewers and other
+      orgs excluded; `url` → `posts.edit`).
+    - `test_a_client_approval_decision_notifies_org_users` — `TransitionPostStatusAction` →
+      `PostApprovalDecided` when a `Role::ClientReviewer` decides.
+    - `test_tagging_a_teammate_in_a_transition_note_notifies_them` /
+      `test_a_teammate_tagged_in_a_transition_note_is_not_also_sent_the_broad_status_notification` /
+      `test_a_client_reviewer_cannot_be_tagged_in_a_transition_note` /
+      `test_an_unmentionable_user_id_in_a_transition_note_is_ignored` /
+      `test_tagging_a_teammate_in_an_approval_override_reason_notifies_them` /
+      `test_the_transition_tag_notification_links_to_the_post_editor` — `@`-mention "tags" in a
+      transition note / override reason → `PostNoteMentioned` (org-only, de-duped from the broad
+      status audience, client reviewers and outsiders ignored, `url` → `posts.edit`).
+    - `test_clicking_a_notification_marks_it_as_read_and_redirects_to_its_url` —
+      `notifications.read` marks `read_at` and redirects to the notification's stored `url`.
+    - `test_a_user_cannot_mark_another_users_notification_as_read` — cross-user 404 isolation.
 
 ## Known Gaps / Open Questions
+
 - No mail/broadcast channel yet — notifications are database-only (in-app bell). Real-time delivery
   (broadcasting to update the badge without a page navigation) would need a `broadcast` channel and
   a websocket driver (e.g. Reverb), not set up in this repo.
@@ -195,6 +204,7 @@ can be viewed/acted on.
   grows.
 
 ## Changelog
+
 - 2026-11-07: **Team chat actually sends now, and bounced addresses stop receiving mail.**
   `ChatNotifier` had only a no-op binding, so every caller believing it told the team something was
   talking to nothing. New `SlackChatNotifier` (per-org `organizations.chat_webhook_url`, encrypted;
@@ -254,9 +264,11 @@ can be viewed/acted on.
   comment forms/lists.
 
 ## Web push (Step B-7.4 / CG-1.3)
+
 Browser push for business/creator workspaces is a **separate seam** from the in-app bell above — it
 is not a Laravel `Notification`, but the `App\Contracts\PushNotifier` contract (`send(PushSubscription,
 PushMessage): PushDeliveryResult`). Delivery is bound by `config('push.transport')`:
+
 - `log` (default) → `App\Services\Push\WebPushNotifier` — logs the intent and returns `Failed`, so the
   whole opt-in/reminder pipeline runs dependency-free in dev and tests.
 - `webpush` → `App\Services\Push\MinishlinkWebPushNotifier` (**CG-1.3**, `minishlink/web-push`
@@ -268,6 +280,7 @@ PushMessage): PushDeliveryResult`). Delivery is bound by `config('push.transport
 
 Pushes (each an Action that builds a `App\Support\Push\PushMessage`, loops the workspace's
 subscriptions and prunes `Gone`; runs only when `isConfigured()`):
+
 - `SendPostPushRemindersAction` (B-7.4) — "your post goes out at …" (every 5 min).
 - `SendPublishFailurePushAction` (**CG-1.3**) — "a post failed to publish", dispatched from
   `ResolvePostPublishOutcomeAction`'s after-commit beside the `PostPublishFailed` bell, **business orgs
@@ -278,6 +291,7 @@ subscriptions and prunes `Gone`; runs only when `isConfigured()`):
   Tests: `tests/Feature/Business/PushNotificationsTest`.
 
 ## Phase M-9 — overdue inbox reply reminder
+
 - `App\Notifications\InboxReplyOverdue` (database, `NotificationCategory::Comments`) — tells the assignee
   (or, when unassigned, the studio Owner/Strategist) that a public comment has waited past the org's inbox
   reply SLA. Sent by `SendOverdueInboxRemindersJob` (`inbox:send-overdue-reminders`, daily), throttled to
@@ -286,6 +300,7 @@ subscriptions and prunes `Gone`; runs only when `isConfigured()`):
   Comments bucket, so a user who muted comments isn't nudged.
 
 ## Mention alerts
+
 - `App\Notifications\MentionAlert` (database, `NotificationCategory::Comments` — the class name
   carries "Mention") — a word the studio watches has appeared in a newly ingested comment. Sent to
   the Owners/Strategists by `App\Services\Inbox\MentionAlerts`, once per match, from comment

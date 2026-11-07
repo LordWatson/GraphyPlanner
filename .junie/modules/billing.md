@@ -1,6 +1,7 @@
 # Billing / Invoices
 
 ## Purpose
+
 Lets an Owner/Strategist raise invoices against a client's retainer (built from line items or as a
 fixed amount), email them to the client with an Alima-branded PDF attached, chase them with
 reminders, record payments, void or duplicate them, and track everything from an org-wide ledger
@@ -11,6 +12,7 @@ part of the phased plan in `.junie/plans/graphy-development-steps.md`; added as 
 module alongside the Client (CRM) work.
 
 ## Models / Tables
+
 - `Invoice` (`invoices`): `org_id` (FK to `organizations`), `client_id` (FK to `clients`),
   `invoice_number` (generated as `INV-000001`, sequential per organization; unique together with
   `org_id` via a composite unique index — see the 2026-10-13 bugfix note below),
@@ -48,6 +50,7 @@ module alongside the Client (CRM) work.
   `InvoiceItem`, ordered by `sort_order`.
 
 ## Actions / Services / Contracts
+
 - `App\Actions\Invoices\CreateInvoiceAction`: creates a `draft` invoice for a client, auto-generates
   the next sequential `invoice_number` for the client's org, sets `currency` from the request
   (falling back to the client's `Organization::default_currency`), wrapped in `DB::transaction`,
@@ -113,6 +116,7 @@ module alongside the Client (CRM) work.
   equivalent via `resources/js/lib/currency.ts`'s `Intl.NumberFormat`.
 
 ### Invoicing v3 (2026-10-16)
+
 - `CreateInvoiceAction`: `amount` is now optional (defaults to `0`; itemised invoices get theirs on
   finalize) and a missing `due_date` becomes `issue_date + Organization::invoice_payment_terms_days`.
 - `FinalizeInvoiceAction`: also stamps `finalized_at`; a **pure retainer invoice** (no items, client
@@ -153,6 +157,7 @@ module alongside the Client (CRM) work.
   (incl. `edit_currency` = `canChangeCurrency()` + `update`).
 
 ### Per-invoice currency (2026-10-16)
+
 - Each invoice is billed in its own `currency`, picked in the "New invoice" dialog (preselected to
   the org's `default_currency`) and changeable on the edit page while the invoice is an unfinalized
   draft. `StoreInvoiceRequest`/`UpdateInvoiceRequest` accept `currency` as nullable, `Rule::in`
@@ -171,8 +176,8 @@ module alongside the Client (CRM) work.
 - PDF (`resources/views/pdf/invoice.blade.php`) in the Alima language (brand guidelines §9):
   Cloud Cream paper, a Midnight Ink header band carrying the master panda mark on a Deep Teal tile
   (read from `public/brand/alima_mark_cream.svg`), a Poppins SemiBold headline with one upright teal
-  accent word that reads by status ("Payment *due*.", "Payment *overdue*.", "Paid in
-  *full*.", "Invoice *void*.", "Draft *invoice*."), DM Mono spec-sheet labels, a status pill, an ink
+  accent word that reads by status ("Payment _due_.", "Payment _overdue_.", "Paid in
+  _full_.", "Invoice _void_.", "Draft _invoice_."), DM Mono spec-sheet labels, a status pill, an ink
   "Amount due" cell, Billed to / From blocks (client legal name + billing address/email, studio
   billing details), a hairline items table (non-billable rows tagged "Included", retainer as its own
   line), an ink total block, Notes + "How to pay" cards, and a fixed footer with the teal Alima
@@ -181,6 +186,7 @@ module alongside the Client (CRM) work.
   token colours are inlined as hex.
 
 ## Phase M-1 additions
+
 - The ledger (`/invoices` and the client Billing tab) renders through `InvoiceLedgerList` on the
   shared `DataTable`. `/invoices` sorts server-side: `InvoiceIndexRequest` accepts
   `sort` ∈ `InvoiceLedgerService::SORTS` (`invoice_number`, `issue_date`, `due_date`, `amount`) and
@@ -191,6 +197,7 @@ module alongside the Client (CRM) work.
 ## Phase M-4 additions (Invoicing you can actually send)
 
 ### M-4.1 — VAT/tax lines, VAT/TRN numbers, per-client currency
+
 - **Tax rates** are a per-org list: `TaxRate` (`tax_rates`: `org_id`, `name`, `rate` decimal(5,2) %,
   `sort_order`, `archived_at`), org-scoped, `active()` scope. Managed in Settings > Organization
   (Owner-only, `TaxRatePolicy`) via `TaxRateController` (`tax-rates.store`/`.update`/`.archive`) and
@@ -222,6 +229,7 @@ module alongside the Client (CRM) work.
   not code. M-4.1 is feature-complete pending that sign-off.
 
 ### M-4.2 — Payment confirmation handshake (no online payments)
+
 - `InvoiceStatus::PendingConfirmation` ("Payment reported") sits between `sent` and `paid`. State
   machine: `draft → sent → pending_confirmation → paid`, plus `pending_confirmation → sent` (revert),
   `sent → paid` (org direct), `sent → void` unchanged. **A `pending_confirmation` invoice cannot be
@@ -239,6 +247,7 @@ module alongside the Client (CRM) work.
   `is_pending_confirmation` + the reported fields. Graphy never processes money.
 
 ### M-4.3 — Recurring retainer drafts
+
 - `clients.auto_invoice_retainer` (opt-in) + `invoices.retainer_period` (e.g. `2026-11`, `2026-Q4`).
   `GenerateRetainerDraftsAction` (command `invoices:generate-retainer-drafts`, scheduled daily 06:30)
   drafts the current period's retainer invoice for each opted-in client with a retainer and a
@@ -247,6 +256,7 @@ module alongside the Client (CRM) work.
   (`RetainerDraftsReady`).
 
 ## Routes / Controllers
+
 - `GET /invoices` -> `InvoiceController@index` (ledger: `invoices` paginator of `row()`s, `summary`,
   `filters`, `clients` options) and `GET /invoices/export` -> `@export` (streamed CSV, same filters),
   both validated/authorized by `InvoiceIndexRequest` (`viewLedger`).
@@ -331,13 +341,14 @@ module alongside the Client (CRM) work.
   invoice PDF inline (via `<iframe>`) when `pdf_url` is present — no upload/edit controls.
 
 ## Business Rules
+
 - Invoices are always scoped to the client's `org_id`; cross-org access is denied by the policy.
 - **A white-label agency's invoice email is theirs** (Step GTM-3.1). `InvoiceSentMail` already led
   with the agency's name; with `Feature::WhiteLabel` it also carries their logo, accent and footer
   line, and the reply-to is theirs. The PDF is unchanged (it was already the agency's letterhead).
 - **The `/invoices` pages are agency-only** (Step B-1.4) — a business workspace bills on its own
   subscription and the whole route block 404s for it. Step GTM-1.2 is the one exception to the
-  *pipeline* being agency-only: `App\Actions\Deals\IssueDealInvoiceAction` raises and emails an
+  _pipeline_ being agency-only: `App\Actions\Deals\IssueDealInvoiceAction` raises and emails an
   invoice for a creator's brand deal (`brand-deals.md`) through `CreateInvoiceAction` +
   `SendInvoiceAction`. The invoice is an ordinary row in this module's ledger; the creator just has
   no page to open it on, and sees its number and status on the deal row instead.
@@ -369,6 +380,7 @@ module alongside the Client (CRM) work.
   can never be added/edited/deleted again, nor can `amount` be changed via `UpdateInvoiceAction`.
 
 ## Seeders
+
 - `Database\Seeders\InvoiceSeeder`: seeds a mix of paid/sent/draft invoices for the `Recommendo`
   (monthly) and `Frzn` (quarterly) clients created by `ClientSeeder`, using `updateOrCreate` on
   `invoice_number` so it's safe to re-run. Called from `DatabaseSeeder` after `BrandBrainSeeder`.
@@ -376,6 +388,7 @@ module alongside the Client (CRM) work.
   tests; derives `org_id` from the related `Client` when not explicitly set.
 
 ## Tests
+
 - `tests/Feature/InvoiceControllerTest.php`: covers create (Owner allowed, Designer forbidden),
   send/mark-paid happy paths, invalid state transitions (double-send, pay-a-draft), org isolation,
   that client reviewers get an empty `invoices` payload on the client show page, that a `paid`
@@ -400,6 +413,7 @@ module alongside the Client (CRM) work.
   the faked disk; Designer forbidden; rejected on a non-finalized invoice).
 
 ## Known Gaps / Open Questions
+
 - **Tax adviser sign-off pending (M-4.1):** the exact required contents of UK/UAE tax invoices still
   need the adviser's confirmation (recorded in `mvp.md` Decisions). Tax rates/labels are editable
   per-org data, so adjusting to the final wording is config, not code.
@@ -421,6 +435,7 @@ module alongside the Client (CRM) work.
 - Phase 8 (client reporting from invoice line items) is not yet started.
 
 ## Changelog
+
 - 2026-10-24: Phase M-4. **M-4.1** — `TaxRate` model + per-org tax-rate list (Settings, `TaxRatePolicy`,
   `Create`/`Update`/`ArchiveTaxRateAction`, `SeedDefaultTaxRatesAction` + backfill migration,
   `config/tax.php`); org VAT/TRN number + label; client VAT/TRN, `billing_currency`,
@@ -434,8 +449,8 @@ module alongside the Client (CRM) work.
   notification, portal "Mark Paid" dialog + internal Confirm/Not-received buttons; a
   `pending_confirmation` invoice reverts to `sent` before voiding. Tests: `PaymentHandshakeTest`.
   **M-4.3** — `clients.auto_invoice_retainer` + `invoices.retainer_period`, `GenerateRetainerDraftsAction`
-  + `invoices:generate-retainer-drafts` (daily, drafts only, idempotent), `RetainerDraftsReady`. Tests:
-  `RetainerDraftsTest`. Adviser sign-off on exact invoice contents stays pending (see Known Gaps).
+    - `invoices:generate-retainer-drafts` (daily, drafts only, idempotent), `RetainerDraftsReady`. Tests:
+      `RetainerDraftsTest`. Adviser sign-off on exact invoice contents stays pending (see Known Gaps).
 - 2026-10-18: Campaigns enhancement C-8.3 — the campaign Commercials panel shows invoiced and paid (from `invoice_items.campaign_id`) and, for Owners, AI spend.
 - 2026-10-18: Campaigns enhancement C-8 — `campaigns.billing_type` / `fee_amount` and `invoice_items.campaign_id`. `CreateInvoiceFromCampaignAction` adds a fixed-fee campaign to the latest non-finalized draft (or a new invoice), asks for confirmation before billing again, and never edits a finalized invoice. Fees are Owner/Strategist only.
 - 2026-10-18: The client page's Billing tab now runs through `InvoiceLedgerService::query`
@@ -522,7 +537,7 @@ module alongside the Client (CRM) work.
   finalized (previously rejected with a `422`), so a user can correct a mistake and regenerate the
   PDF without starting over. `Invoice::refreshFinalizedAmount()` re-sums the items plus the
   already-snapshotted retainer and re-persists `Invoice::amount` whenever an item changes on an
-  already-finalized invoice; `UpdateInvoiceAction` still blocks a *direct* `amount` edit once
+  already-finalized invoice; `UpdateInvoiceAction` still blocks a _direct_ `amount` edit once
   finalized. `InvoiceController@show`'s `can.manage_items` no longer excludes `is_finalized`.
   Confirmed (isolated test render + an `intl` sanity check) that `App\Support\MoneyFormatter`
   already renders each currency's real symbol correctly (e.g. EUR/GBP), and cleared the stale
@@ -553,7 +568,7 @@ module alongside the Client (CRM) work.
   `resources/js/lib/currency.ts`'s `formatCurrency()` using the shared `currency` Inertia prop.
 - 2026-09-19: Added a dedicated invoice detail/edit page (CRUD): `invoices/{invoice}` (show),
   `invoices/{invoice}/edit` (edit), plus `PUT`/`DELETE` routes and a `POST
-  /invoices/{invoice}/pdf` upload endpoint. New `pdf_*` columns on `invoices` (mirrors `BrandBrain`
+/invoices/{invoice}/pdf` upload endpoint. New `pdf_*` columns on `invoices` (mirrors `BrandBrain`
   persona columns), `UpdateInvoiceAction`/`UploadInvoicePdfAction`/`DeleteInvoiceAction`,
   `InvoicePolicy::update`/`delete`, and `UpdateInvoiceRequest`/`UploadInvoicePdfRequest`. The
   client portal's read-only `portal/invoices/show.tsx` now also renders the uploaded PDF inline.

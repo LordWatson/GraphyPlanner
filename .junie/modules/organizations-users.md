@@ -1,11 +1,13 @@
 # Organizations, Users, Roles & Policies
 
 ## Purpose
+
 Multi-tenant foundation: every `User` belongs to an `Organization` and has a `Role`. Policies enforce
 the access rules described in spec §3 (Owner, Strategist, Designer, Client reviewer, Viewer). Covers
 Step 0.2 of the plan.
 
 ## Models / Tables
+
 - `Organization` (`organizations`): `name`, `slug`, `default_timezone`. Has many `users`, has many
   `clients`.
 - `User` (`users`): adds `org_id` (FK to `organizations`, nullable), `role` (cast to `App\Enums\Role`),
@@ -24,14 +26,17 @@ Step 0.2 of the plan.
   via `BelongsToOrganization`; see `super-admin.md`.
 
 ## Actions / Services / Contracts
+
 - None yet — role/org logic is currently expressed via the `Role` enum and `ClientPolicy` (see
   `clients.md`). Revisit if org/user management grows its own CRUD.
 
 ## Routes / Controllers
+
 - No dedicated organization/user management routes yet (out of scope for Step 0.2 — the plan only
   asked for the data model, roles, and policy enforcement demonstrated on a sample controller).
 
 ## Seeders
+
 - `Database\Seeders\OrganizationSeeder`: creates/updates the "Graphy Agency" organization, assigns
   the `Owner` role (in that org) to the `test@example.com` and `alexander.watson.work@gmail.com`
   users created earlier in `DatabaseSeeder`, and creates one sample user per remaining role
@@ -40,6 +45,7 @@ Step 0.2 of the plan.
   exist) and before `ClientSeeder`.
 
 ## Business Rules
+
 - **Per-client staff access** (`organizations.restrict_staff_to_assigned_clients`, default **off**).
   When on, a non-Owner only sees the clients they are assigned on `client_user`. Two layers:
   `App\Models\Scopes\ClientAccessScope` (registered in `AppServiceProvider` across every
@@ -57,6 +63,7 @@ Step 0.2 of the plan.
   read-only with no billing visibility.
 
 ### Tenant isolation (Step I-1.9)
+
 - `App\Models\Concerns\BelongsToOrganization` + `App\Models\Scopes\OrganizationScope` on every
   org-owned model (`Client`, `Post`, `Campaign`, `Asset`, `SocialAccount`, `Invoice`,
   `InvoiceItem`, `AiTrend`, `AiPostIdea`, `AiImageGeneration`, `AiImageVariant`, `AiUsageLog`,
@@ -84,12 +91,14 @@ Step 0.2 of the plan.
   `tests/Feature/Security/OrganizationScopeTest.php` covers the scope itself.
 
 ## Tests
+
 - `tests/Feature/ClientPolicyTest.php`: asserts allowed/denied actions (`viewAny`, `view`, `create`,
   `update`, `delete`, `viewBilling`) for every role directly against `ClientPolicy`.
 - `tests/Feature/ClientControllerTest.php`: same access rules asserted end-to-end through
   `ClientController` (the "sample controller" required by Step 0.2's done condition).
 
 ## Known Gaps / Open Questions
+
 - The full original spec §3 access table (beyond clients) isn't available in this repo; the
   Designer/Client reviewer/Viewer restrictions were interpreted reasonably per the plan's hints
   ("Designer restricted to assets/Figma links; Client reviewer scoped to one client with no billing
@@ -99,6 +108,7 @@ Step 0.2 of the plan.
   `.junie/modules/staff.md`.
 
 ## Organization signup & platform management (Phase 15)
+
 - Organizations can now be created without a seeder: the public `/register-organization` (agency)
   and `/start` (business/creator) signups and super-admin onboarding all run
   `App\Actions\Organizations\RegisterOrganizationAction`, which creates the `Organization` and its
@@ -123,6 +133,7 @@ Step 0.2 of the plan.
 - Full details: `.junie/modules/super-admin.md`.
 
 ## Changelog
+
 - 2026-11-07: **Per-client staff access.** New `client_user` pivot and
   `organizations.restrict_staff_to_assigned_clients` (default false, so existing orgs are
   unchanged), `User::assignedClients()` / `accessibleClientIds()` (null = unrestricted),

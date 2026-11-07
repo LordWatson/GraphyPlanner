@@ -5,7 +5,7 @@ namespace Tests\Unit\Contracts;
 use App\Contracts\AiProvider;
 use App\Models\Client;
 use App\Models\Post;
-use App\Services\AI\DeepSeekProvider;
+use App\Services\AI\AnthropicProvider;
 use App\Services\AI\NullAiProvider;
 use App\Support\AI\AiBrandProfileDraft;
 use App\Support\AI\AiCaptionSuggestions;
@@ -67,7 +67,7 @@ class AiProviderTest extends TestCase
 
     public function test_the_null_provider_logs_why_no_vendor_call_was_made(): void
     {
-        config(['ai.enabled' => true, 'ai.deepseek.api_key' => '']);
+        config(['ai.enabled' => true, 'ai.anthropic.api_key' => '']);
         Log::spy();
 
         (new NullAiProvider)->recommendPosts(new Client);
@@ -80,7 +80,7 @@ class AiProviderTest extends TestCase
 
     public function test_the_container_resolves_ai_provider_to_null_when_disabled_even_with_an_api_key(): void
     {
-        config(['ai.enabled' => false, 'ai.deepseek.api_key' => 'some-key']);
+        config(['ai.enabled' => false, 'ai.anthropic.api_key' => 'some-key']);
 
         $provider = $this->app->make(AiProvider::class);
 
@@ -89,7 +89,7 @@ class AiProviderTest extends TestCase
 
     public function test_the_container_resolves_ai_provider_to_null_when_enabled_without_an_api_key(): void
     {
-        config(['ai.enabled' => true, 'ai.deepseek.api_key' => '']);
+        config(['ai.enabled' => true, 'ai.anthropic.api_key' => '']);
 
         $provider = $this->app->make(AiProvider::class);
 
@@ -98,10 +98,10 @@ class AiProviderTest extends TestCase
 
     public function test_the_container_resolves_ai_provider_to_deep_seek_when_enabled_and_configured(): void
     {
-        config(['ai.enabled' => true, 'ai.deepseek.api_key' => 'some-key']);
+        config(['ai.enabled' => true, 'ai.anthropic.api_key' => 'some-key']);
 
         $provider = $this->app->make(AiProvider::class);
 
-        $this->assertInstanceOf(DeepSeekProvider::class, $provider);
+        $this->assertInstanceOf(AnthropicProvider::class, $provider);
     }
 }

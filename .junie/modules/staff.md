@@ -1,12 +1,14 @@
 # Staff (Org-Level Team Module)
 
 ## Purpose
+
 A real, first-class module (not a settings sub-page) letting an org Owner see, invite, edit, and
 remove staff (Owner/Strategist/Designer/Viewer — never `client_reviewer`, which is reserved for the
 client-portal flow). Lives in the main app sidebar (Owner-only), styled to match the Clients module
 (gradient header, table roster, per-member show/edit pages).
 
 ## Models / Tables
+
 - `StaffInvitation` (`staff_invitations`): `org_id`, `email`, `role` (cast to `App\Enums\Role`),
   `invited_by_user_id`, `token_hash` (unique, hashed at rest — the plain token is only ever returned
   once, at creation time), `expires_at`, `accepted_at`, `revoked_at`. `isPending()` mirrors
@@ -19,6 +21,7 @@ client-portal flow). Lives in the main app sidebar (Owner-only), styled to match
 - `User::staffActivityLogs()`: `HasMany<StaffActivityLog>` (entries about that user).
 
 ## Actions / Services / Contracts
+
 - `App\Actions\StaffInvitations\CreateStaffInvitationAction`: creates the invitation (wrapped in
   `DB::transaction()`), logs an `invited` `StaffActivityLog` entry, emails the invited address
   (`StaffInvitationMail`) a signed `/staff-invite/:token` link, and logs success/failure.
@@ -33,6 +36,7 @@ client-portal flow). Lives in the main app sidebar (Owner-only), styled to match
   Wrapped in `DB::transaction()`.
 
 ## Routes / Controllers
+
 - `GET /staff` → `StaffController@index` — Owner-only roster: members table + invite form +
   pending/historical invitations, mirroring `clients/index`.
 - `GET /staff/{staff}` → `StaffController@show` — a member's profile + full `StaffActivityLog`
@@ -49,6 +53,7 @@ client-portal flow). Lives in the main app sidebar (Owner-only), styled to match
   (`app.tsx`'s `staff-invite/` case).
 
 ## Frontend
+
 - `resources/js/pages/staff/index.tsx`, `show.tsx`, `edit.tsx` — full CRUD pages styled like the
   Clients module (gradient hero header, table roster, per-member activity timeline).
 - Owner-only "Staff" link in the main app sidebar (`resources/js/components/app-sidebar.tsx`), using
@@ -56,10 +61,12 @@ client-portal flow). Lives in the main app sidebar (Owner-only), styled to match
   now that it's a top-level module.
 
 ## Phase M-1 additions
+
 - The studio roster, client reviewers and invitations render through the shared `DataTable`
   (sorted in place by name, email or role).
 
 ## Business Rules
+
 - `StaffPolicy` (bound to `App\Models\User`): only `Role::Owner`, org-scoped, can view the roster or
   a member's profile, or edit a member. `delete` additionally forbids removing yourself and removing
   the last remaining Owner in the org (so an org can never be locked without an Owner).
@@ -83,6 +90,7 @@ client-portal flow). Lives in the main app sidebar (Owner-only), styled to match
   row, visible per-member on `staff/show`.
 
 ## Tests
+
 - `tests/Feature/StaffControllerTest.php`: roster/profile visibility (Owner-only, org-scoped), update
   (role change + activity log + `client_reviewer` and `super_admin` rejection, plus the action-level
   `super_admin` guard), destroy (activity log, self-removal and last-Owner protections).
@@ -94,11 +102,13 @@ client-portal flow). Lives in the main app sidebar (Owner-only), styled to match
   invited role, and 404s for accepted/expired/revoked/invalid tokens.
 
 ## Known Gaps / Open Questions
+
 - Staff invitations aren't queued (matches the synchronous `ClientInvitationMail` pattern already in
   the codebase) — revisit if invite volume grows.
 - No self-service "leave organization" flow — only an Owner can remove a member.
 
 ## Changelog
+
 - 2026-10-24: Security fix — `Role::SuperAdmin` was assignable inside agency workspaces. The agency
   branch of `Role::assignableFor()` excluded only `ClientReviewer`, and both `UpdateStaffMemberRequest`
   and `StaffController::roleOptions()` filtered roles ad-hoc (dropping only `ClientReviewer`), so an

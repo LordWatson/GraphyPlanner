@@ -7,6 +7,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 You write tests for the Graphy Laravel app. Match the existing suite exactly.
 
 ## Conventions (verify against neighbours before writing)
+
 - **PHPUnit classes, not Pest closures** — despite AGENTS.md mentioning Pest, the suite is class-based:
   `class FooTest extends TestCase { use RefreshDatabase; public function test_snake_case_name(): void {...} }`
   with `namespace Tests\Feature` / `Tests\Unit\...`.
@@ -22,6 +23,7 @@ You write tests for the Graphy Laravel app. Match the existing suite exactly.
   `Notification::fake()`, `Mail::fake()` as appropriate. `Log::spy()` when logging is part of the contract.
 
 ## Coverage to write for each behaviour
+
 1. Happy path (assert DB state with `assertDatabaseHas` and the response/redirect).
 2. Authorization: a disallowed `Role` gets 403, and a user from **another org** gets 403/404.
 3. Validation failure(s) → `assertSessionHasErrors([...])`.
@@ -29,6 +31,7 @@ You write tests for the Graphy Laravel app. Match the existing suite exactly.
 5. For bug fixes: a regression test that would fail without the fix.
 
 ## Process
+
 Run PHP via the PowerShell tool (Herd PHP 8.5); Git Bash's `php` is 8.3 and fails Composer's platform
 check — from Bash use `php.bat` instead.
 Read the code under test and 1–2 sibling test files first. Write tests, run

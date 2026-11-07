@@ -1,22 +1,27 @@
 # Marketing Pages (Welcome & About)
 
 ## Purpose
+
 Public, unauthenticated marketing surfaces used to introduce Alima Planner to prospective users before
 they sign up: the landing page (`/`) and the About page (`/about`), which details the product's
 feature set to help visitors decide whether to register.
 
 ## Models / Tables
+
 - None — these pages render static/derived content only, no persisted data.
 
 ## Actions / Services / Contracts
+
 - None — plain Inertia routes, no controller logic.
 
 ## Routes / Controllers
+
 - `GET /` → `Route::inertia('/', 'welcome')` (`home` route name) — hero, headline feature grid, CTA.
 - `GET /about` → `Route::inertia('about', 'about')` (`about` route name) — expanded feature pillars,
   "how it works" steps, and a closing CTA section. Linked from the welcome page header/footer.
 
 ## Business Rules
+
 - Both pages render outside `AppLayout` (see `resources/js/app.tsx` `layout()` resolver — `welcome`
   and `about` both map to `null`), since they share the public hero shell rather than the internal
   sidebar layout.
@@ -35,9 +40,11 @@ feature set to help visitors decide whether to register.
   client names — not live data.
 
 ## Tests
+
 - `tests/Feature/ExampleTest.php` — asserts `home` and `about` routes return `200 OK`.
 
 ## Known Gaps / Open Questions
+
 - No dedicated Inertia component/props assertions (e.g. `assertInertia`) yet, since the pages carry
   no server-provided props beyond shared `auth` data — add if dynamic marketing props are introduced.
 
@@ -69,7 +76,7 @@ tool 2026" result is affiliate-monetised content, and we were absent from it.
   so it is the thing a commission is owed on, and a separate table would be a second place for the
   same one-to-one fact to disagree with itself. Written inside `RegisterOrganizationAction`'s
   transaction.
-- A **payout is a record of money already sent**, not an instruction to send any. What is *owed* is
+- A **payout is a record of money already sent**, not an instruction to send any. What is _owed_ is
   derived when somebody settles up. There is no payment integration, on purpose: paying a partner
   is a bank transfer and a conversation, and automating it before the first partner exists would be
   building the wrong thing twice.
@@ -78,6 +85,7 @@ tool 2026" result is affiliate-monetised content, and we were absent from it.
   theirs; the code just stops tracking new ones.
 
 ## Changelog
+
 - 2026-10-18: Campaigns enhancement C-9.2 — a Campaigns section on the welcome page (`components/marketing/campaigns-section.tsx`): eyebrow, "Plan it, sign it off, ship it, prove it.", the three points, and a product vignette built from real components (phase band, status pills, readiness, wrap report). No second Signal Orange accent; the hero keeps the page's one.
 - 2026-10-17: About page content refresh — pillar copy now mentions calendar drag-to-reschedule,
   Brand Brain/campaign-grounded AI (captions with hashtags, Daily Briefs) and per-client-currency

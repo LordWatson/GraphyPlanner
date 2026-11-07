@@ -58,14 +58,14 @@ Brief ──► Plan ──► Produce ──► Approve ──► Run ──►
                  ▲ fees and invoicing (C-8) sit alongside ▲
 ```
 
-| Stage | What the agency gets | What the client sees |
-|---|---|---|
-| Brief | A structured brief, AI-drafted from the goal and Brand Brain | A brief to approve in the portal, with a record of who signed it |
-| Plan | Phases (teaser, launch, sustain), a deliverables matrix, templates, an AI plan | A timeline of what's coming |
-| Produce | A campaign board, campaign defaults (hashtags, link, asset kit), readiness score | Nothing until posts reach "Waiting on client" |
-| Approve | Batch review per campaign | "Approve all" for the campaign, one feedback thread |
-| Run | Pause, resume, shift dates, a launch checklist | A live view of what's out and what's next |
-| Report | KPI targets vs actuals, a branded wrap report with AI-drafted commentary | A report page and PDF |
+| Stage   | What the agency gets                                                             | What the client sees                                             |
+| ------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Brief   | A structured brief, AI-drafted from the goal and Brand Brain                     | A brief to approve in the portal, with a record of who signed it |
+| Plan    | Phases (teaser, launch, sustain), a deliverables matrix, templates, an AI plan   | A timeline of what's coming                                      |
+| Produce | A campaign board, campaign defaults (hashtags, link, asset kit), readiness score | Nothing until posts reach "Waiting on client"                    |
+| Approve | Batch review per campaign                                                        | "Approve all" for the campaign, one feedback thread              |
+| Run     | Pause, resume, shift dates, a launch checklist                                   | A live view of what's out and what's next                        |
+| Report  | KPI targets vs actuals, a branded wrap report with AI-drafted commentary         | A report page and PDF                                            |
 
 ### 1.3 Principles
 
@@ -84,17 +84,17 @@ Brief ──► Plan ──► Produce ──► Approve ──► Run ──►
 
 ### 1.4 Role scoping (applies to every step)
 
-| Capability | Owner | Strategist | Designer | Viewer | ClientReviewer |
-|---|---|---|---|---|---|
-| View campaign, plan, board | ✅ | ✅ | ✅ | ✅ | Own client only, posts from "Waiting on client" onward |
-| Create/edit campaign, brief, plan, phases | ✅ | ✅ | — | — | — |
-| Start a post from a deliverable | ✅ | ✅ | ✅ | — | — |
-| Edit the asset kit | ✅ | ✅ | ✅ | — | — |
-| Approve brief, batch approve posts | — | — | — | — | ✅ (own client) |
-| Pause / resume / shift dates | ✅ | ✅ | — | — | — |
-| See fee, budget, invoices, profitability | ✅ | ✅ | — | — | **Never** |
-| See wrap report | ✅ | ✅ | ✅ | ✅ | Only once shared, never billing figures |
-| Manage templates | ✅ | ✅ | — | — | — |
+| Capability                                | Owner | Strategist | Designer | Viewer | ClientReviewer                                         |
+| ----------------------------------------- | ----- | ---------- | -------- | ------ | ------------------------------------------------------ |
+| View campaign, plan, board                | ✅    | ✅         | ✅       | ✅     | Own client only, posts from "Waiting on client" onward |
+| Create/edit campaign, brief, plan, phases | ✅    | ✅         | —        | —      | —                                                      |
+| Start a post from a deliverable           | ✅    | ✅         | ✅       | —      | —                                                      |
+| Edit the asset kit                        | ✅    | ✅         | ✅       | —      | —                                                      |
+| Approve brief, batch approve posts        | —     | —          | —        | —      | ✅ (own client)                                        |
+| Pause / resume / shift dates              | ✅    | ✅         | —        | —      | —                                                      |
+| See fee, budget, invoices, profitability  | ✅    | ✅         | —        | —      | **Never**                                              |
+| See wrap report                           | ✅    | ✅         | ✅       | ✅     | Only once shared, never billing figures                |
+| Manage templates                          | ✅    | ✅         | —        | —      | —                                                      |
 
 Billing visibility follows Phase 17's revenue rule (Owner/Strategist). The `CampaignPresenter`
 (C-0.3) is the single place that drops restricted fields, so a portal or Designer prop can never
@@ -109,16 +109,16 @@ carry them by accident.
 
 ### 1.6 Dependencies on other plans
 
-| Needed for | Step elsewhere | Why |
-|---|---|---|
+| Needed for                  | Step elsewhere                      | Why                                                                              |
+| --------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
 | C-4.2 per-platform defaults | I-3.1 per-platform caption variants | Campaign defaults should fill the per-target fields, not only the master caption |
-| C-4.3 board | I-4.1 content hub board | Share the kanban component instead of building two |
-| C-4.4 assignments | I-4.4 assignees and due dates | Deliverable due dates hand off to `posts.due_at` |
-| C-5.2 batch approval | I-8.2 multi-approver approvals | Batch approve must go through the same approval-step logic once it exists |
-| C-6.1 pause/resume | I-1.2 safe rescheduling ✅ | Unscheduling relies on stale-job protection |
-| C-7.1 engagement KPIs | Phase 12 / I-10.1 | Engagement actuals show "Available once engagement tracking is on" until then |
-| C-7.3 link KPIs | I-10.4 link tracking | Campaign UTMs feed click data |
-| C-3.5 calendar bands | I-5.2 planning layers | Campaign bands are one of those layers; build them here, reuse there |
+| C-4.3 board                 | I-4.1 content hub board             | Share the kanban component instead of building two                               |
+| C-4.4 assignments           | I-4.4 assignees and due dates       | Deliverable due dates hand off to `posts.due_at`                                 |
+| C-5.2 batch approval        | I-8.2 multi-approver approvals      | Batch approve must go through the same approval-step logic once it exists        |
+| C-6.1 pause/resume          | I-1.2 safe rescheduling ✅          | Unscheduling relies on stale-job protection                                      |
+| C-7.1 engagement KPIs       | Phase 12 / I-10.1                   | Engagement actuals show "Available once engagement tracking is on" until then    |
+| C-7.3 link KPIs             | I-10.4 link tracking                | Campaign UTMs feed click data                                                    |
+| C-3.5 calendar bands        | I-5.2 planning layers               | Campaign bands are one of those layers; build them here, reuse there             |
 
 None of these block the MVP. Where a dependency hasn't landed, the step ships its own part and
 leaves a clearly named seam.
@@ -130,6 +130,7 @@ leaves a clearly named seam.
 Goal: give campaigns a real shape in code before adding features on top.
 
 ### Step C-0.1 — Split the module doc and record decisions [MVP] ✅ Done
+
 - Split `.junie/modules/campaigns-assets.md` into `campaigns.md` and `assets.md`. Campaigns is
   about to grow past what one shared doc can hold. Move the history across verbatim, with a
   changelog line in each pointing at the other.
@@ -142,18 +143,19 @@ Goal: give campaigns a real shape in code before adding features on top.
 - Implemented via `campaigns.md` + `assets.md` split; principles and role table recorded. See `.junie/modules/campaigns.md`.
 
 ### Step C-0.2 — Campaign data model v2 [MVP] ✅ Done
+
 - Migration adding to `campaigns`:
-  - `owner_id` (nullable FK `users`, null on delete, indexed): the accountable strategist.
-  - `objective` (nullable, `App\Enums\CampaignObjective`: awareness, engagement, traffic, leads,
-    sales, launch, community, other).
-  - `colour` (nullable, `App\Enums\CampaignColour`: a fixed set of brand accent token names, never
-    hex), used for calendar bands and chips.
-  - `platforms` (json, nullable): intended `Platform` values. Advisory, used by the planner and
-    readiness.
-  - `hashtags` (json, nullable): campaign hashtag set (C-4.2).
-  - `default_link_url` (nullable string) and `utm_campaign` (nullable string, slug-safe).
-  - `code` (nullable string, unique per client): short reference such as `SPR26`, shown on chips
-    and invoices.
+    - `owner_id` (nullable FK `users`, null on delete, indexed): the accountable strategist.
+    - `objective` (nullable, `App\Enums\CampaignObjective`: awareness, engagement, traffic, leads,
+      sales, launch, community, other).
+    - `colour` (nullable, `App\Enums\CampaignColour`: a fixed set of brand accent token names, never
+      hex), used for calendar bands and chips.
+    - `platforms` (json, nullable): intended `Platform` values. Advisory, used by the planner and
+      readiness.
+    - `hashtags` (json, nullable): campaign hashtag set (C-4.2).
+    - `default_link_url` (nullable string) and `utm_campaign` (nullable string, slug-safe).
+    - `code` (nullable string, unique per client): short reference such as `SPR26`, shown on chips
+      and invoices.
 - Keep `goal` as the short "what does success look like" line. Long-form content moves to the brief
   (C-2.1).
 - `App\Enums\CampaignStatus` gains `Paused`. Labels in sentence case.
@@ -167,6 +169,7 @@ Goal: give campaigns a real shape in code before adding features on top.
 - Implemented via migrations `2026_10_19_100000`–`100700`, new enums and models, factories. See `.junie/modules/campaigns.md`.
 
 ### Step C-0.3 — Status transitions and activity log [MVP] ✅ Done
+
 - `App\Actions\Campaigns\CampaignStatusTransitionMap`, mirroring `PostStatusTransitionMap`:
   planning → active/archived; active → paused/completed; paused → active/completed;
   completed → archived/active (reopen); archived → planning (restore).
@@ -181,6 +184,7 @@ Goal: give campaigns a real shape in code before adding features on top.
 - Implemented via `TransitionCampaignStatusAction` + `CampaignStatusTransitionMap`, `campaign_activity_logs`. See `.junie/modules/campaigns.md`.
 
 ### Step C-0.4 — Presenter and derived state services [MVP] ✅ Done
+
 - Move `CampaignController::transform()`/`transformPost()` into
   `App\Support\Campaigns\CampaignPresenter` (like `ClientTabPresenter`), with
   `forStaff(Campaign, User)` and `forPortal(Campaign)`. The portal variant can't emit billing
@@ -189,13 +193,13 @@ Goal: give campaigns a real shape in code before adding features on top.
   plus `daysToLaunch`, `daysLeft` and `ranFor` (the numbers `campaigns/show.tsx` computes in
   TypeScript today, moved server-side so portal and staff agree).
 - `App\Services\CampaignHealthService` (derived, never stored, each result with a reason):
-  - **Red**: launch within 3 days with any deliverable not yet approved; a scheduled post's social
-    account has an expired token; status Active while the end date passed more than 7 days ago.
-  - **Amber**: no owner; no dates; brief not approved once the campaign is Active (after C-2);
-    fewer than half the deliverables started inside 7 days of launch (after C-3).
-  - **Green**: otherwise.
-  Rules that depend on later phases return nothing until those tables exist. Write them behind a
-  small `CampaignHealthRule` interface so each phase adds its rule without editing the service.
+    - **Red**: launch within 3 days with any deliverable not yet approved; a scheduled post's social
+      account has an expired token; status Active while the end date passed more than 7 days ago.
+    - **Amber**: no owner; no dates; brief not approved once the campaign is Active (after C-2);
+      fewer than half the deliverables started inside 7 days of launch (after C-3).
+    - **Green**: otherwise.
+      Rules that depend on later phases return nothing until those tables exist. Write them behind a
+      small `CampaignHealthRule` interface so each phase adds its rule without editing the service.
 - **Done when**: unit tests cover every rule boundary (exactly 3 days, exactly 7 days, timezone of
   the org), and a portal props test asserts no billing or internal keys appear.
 - Implemented via `CampaignPresenter`, `CampaignTimeline`, `CampaignHealthService` (tagged rules), `CampaignReadinessService`. See `.junie/modules/campaigns.md`.
@@ -207,6 +211,7 @@ Goal: give campaigns a real shape in code before adding features on top.
 Goal: make campaigns visible and feel alive, before any new planning features exist.
 
 ### Step C-1.1 — Org-wide campaigns hub [MVP] ✅ Done
+
 - `GET /campaigns` → `campaigns.index` (`CampaignIndexController` + `ListCampaignsAction`). One
   page for every campaign across clients, filterable by client, status, timeline state, owner,
   objective and health, sortable by start date, and paginated server-side.
@@ -226,6 +231,7 @@ Goal: make campaigns visible and feel alive, before any new planning features ex
 - Implemented via `CampaignIndexController` + `ListCampaignsAction` (list, timeline, stats); `campaigns/index.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-1.2 — Campaign workspace page [MVP] ✅ Done
+
 - Rebuild `campaigns/show.tsx` as a tabbed workspace on its own routes (same lazy pattern as the
   client tabs from I-2.4): **Overview**, **Brief** (C-2), **Plan** (C-3), **Board** (C-4),
   **Assets** (C-4), **Approvals** (C-5), **Results** (C-7), **Activity**.
@@ -243,6 +249,7 @@ Goal: make campaigns visible and feel alive, before any new planning features ex
 - Implemented via `CampaignWorkspaceController` + `CampaignLayout`; Overview, Brief, Plan, Board, Assets, Approvals, Results, Activity tabs. See `.junie/modules/campaigns.md`.
 
 ### Step C-1.3 — Campaign context everywhere a post appears [MVP] ✅ Done
+
 - Campaign chip (colour + code) on post cards in the client Posts tab, calendar items, Home,
   the post editor header and portal post pages.
 - Post editor: the campaign select becomes a searchable combobox showing only the client's
@@ -255,6 +262,7 @@ Goal: make campaigns visible and feel alive, before any new planning features ex
 - Implemented via campaign chip on post rows, calendar, editor (`CampaignField`) and client tabs. See `.junie/modules/campaigns.md`.
 
 ### Step C-1.4 — Campaigns in Needs attention and Home [V1] ✅ Done
+
 - `GetNeedsAttentionItemsAction` gains campaign items, computed in SQL (keep I-2.2's rule): red
   health campaigns, status/date mismatches ("Ended 3 days ago, still Active."), campaigns launching
   in 3 days with unapproved work.
@@ -270,6 +278,7 @@ Goal: make campaigns visible and feel alive, before any new planning features ex
 Goal: a campaign starts with a brief the client approves, and the approval is on record.
 
 ### Step C-2.1 — Structured campaign brief [MVP] ✅ Done
+
 - `campaign_briefs` (1:1 with `campaigns`): `background`, `objective_detail`, `audience`,
   `key_messages` (json list), `offer`, `call_to_action`, `mandatories` (json list),
   `avoid` (json list, merged with Brand Brain `weNeverSay[]` for guardrails),
@@ -286,6 +295,7 @@ Goal: a campaign starts with a brief the client approves, and the approval is on
 - Implemented via `CampaignBrief` + `UpdateCampaignBriefAction`; `campaigns/brief.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-2.2 — AI brief drafting [V1] ✅ Done
+
 - `DraftCampaignBriefAction`: from the campaign name, goal, objective, dates and the client's Brand
   Brain, the AI returns a suggested brief. Add `draftCampaignBrief()` to `AiProvider`, implemented
   in `DeepSeekProvider` and `NullAiProvider` (returns an empty, valid suggestion).
@@ -299,6 +309,7 @@ Goal: a campaign starts with a brief the client approves, and the approval is on
 - Implemented via `CampaignAiProvider::draftCampaignBrief` + `DraftCampaignBriefAction`; `brief-ai-draft.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-2.3 — Client brief approval [MVP] ✅ Done
+
 - "Send brief to client" (Owner/Strategist) moves the brief to `sent`, snapshots it into
   `campaign_brief_revisions` (full content json + `content_hash`), and emails portal contacts
   (`CampaignBriefSentMail`, queued, sent after commit).
@@ -319,6 +330,7 @@ Goal: turn the brief into a phased, dated content plan the team can execute and 
 follow.
 
 ### Step C-3.1 — Campaign phases [MVP] ✅ Done
+
 - `campaign_phases`: `campaign_id`, `name`, `starts_on`, `ends_on`, `sort`, `colour`
   (`CampaignColour`). Must sit within the campaign dates (validated; a phase may be undated while
   the campaign is undated).
@@ -330,6 +342,7 @@ follow.
 - Implemented via `CampaignPhase` + phase actions, suggested phases, Gantt strip. See `.junie/modules/campaigns.md`.
 
 ### Step C-3.2 — Deliverables matrix [MVP] ✅ Done
+
 - `campaign_deliverables`: `campaign_id`, `campaign_phase_id` (nullable), `title`, `platform`
   (`Platform`), `format` (nullable string until I-3.2's enum exists), `pillar` (nullable, from
   Brand Brain pillars), `planned_for` (date), `planned_time` (nullable), `assignee_id` (nullable),
@@ -348,6 +361,7 @@ follow.
 - Implemented via `CampaignDeliverable` + save/bulk/start actions; `plan/*` components. See `.junie/modules/campaigns.md`.
 
 ### Step C-3.3 — AI campaign planner [V1] ✅ Done
+
 - `PlanCampaignAction`: from the brief, phases, platforms, dates, Brand Brain pillars and recent
   post history (`ClientContextBuilder`), the AI suggests deliverables: title, platform, format,
   pillar, phase, date, and a one-line angle. Add `planCampaign()` to `AiProvider`.
@@ -361,6 +375,7 @@ follow.
 - Implemented via `PlanCampaignAction` / `AcceptCampaignPlanAction`; `ai-planner.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-3.4 — Campaign templates [V1] ✅ Done
+
 - `campaign_templates` (org-scoped): `name`, `description`, `objective`, `duration_days`, brief
   skeleton (json), phases (json: name, start offset, length, colour), deliverables (json: title,
   platform, format, pillar, phase index, day offset, time).
@@ -378,6 +393,7 @@ follow.
 - Implemented via `CampaignTemplate`, create/use/starter actions, `campaigns/templates.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-3.5 — Campaigns on the calendar [V1] ✅ Done
+
 - Calendar month and week views draw campaign bands (colour + name) across their date range, with
   phase sub-bands on hover. Toggleable layer, remembered per user in `localStorage`.
 - Planned-but-not-started deliverables appear as ghost items on their date, so gaps in the plan are
@@ -394,6 +410,7 @@ follow.
 Goal: make it faster to produce on-brief work inside a campaign than outside one.
 
 ### Step C-4.1 — Campaign asset kit [V1] ✅ Done
+
 - The Assets tab shows assets with `campaign_id = this campaign` and lets the team add from the
   client library (`AssetLibraryDialog` in a new `pick-for-campaign` mode) or upload straight into the
   campaign.
@@ -406,6 +423,7 @@ Goal: make it faster to produce on-brief work inside a campaign than outside one
 - Implemented via `UpdateCampaignAssetKitAction`, `campaigns/assets.tsx`, editor kit scope. See `.junie/modules/campaigns.md`.
 
 ### Step C-4.2 — Campaign defaults on posts [MVP] ✅ Done
+
 - When a post joins a campaign (create or edit), `ApplyCampaignDefaultsAction` offers: add the
   campaign hashtag set, set the default link, append UTM parameters
   (`utm_campaign`, `utm_source` = platform, `utm_medium` = social). Offered as a dismissible prompt
@@ -419,6 +437,7 @@ Goal: make it faster to produce on-brief work inside a campaign than outside one
 - Implemented via `ApplyCampaignDefaultsAction`, `UtmLink`, soft hashtag checklist item. See `.junie/modules/campaigns.md`.
 
 ### Step C-4.3 — Campaign board [MVP] ✅ Done
+
 - Board tab: kanban of the campaign's posts by status, with planned deliverables as an extra
   "Not started" column. Drag between columns calls the existing transition endpoint and only
   offers legal drop targets from `PostStatusTransitionMap::allowedTransitions`.
@@ -430,6 +449,7 @@ Goal: make it faster to produce on-brief work inside a campaign than outside one
 - Implemented via `GetCampaignBoardAction` + generic `kanban-board.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-4.4 — Assignments and due dates on deliverables [V1] ✅ Done
+
 - `assignee_id` and a derived due date (planned date minus the client's approval lead time,
   default 3 working days, configurable per client) on deliverables.
 - When a post is started from a deliverable, assignee and due date carry over to `posts.assignee_id`
@@ -441,6 +461,7 @@ Goal: make it faster to produce on-brief work inside a campaign than outside one
 - Implemented via assignees, `DeliverableDueDate`, `SendDeliverableDueRemindersAction` (daily command). See `.junie/modules/campaigns.md`.
 
 ### Step C-4.5 — Readiness score [MVP] ✅ Done
+
 - `CampaignReadinessService` (derived, never stored): percentage of deliverables that are Approved
   or later, weighted by how soon they're due, plus a list of blockers with reasons ("3 posts still
   in internal review, launch in 4 days.", "No Instagram account connected.", "2 asset
@@ -451,6 +472,7 @@ Goal: make it faster to produce on-brief work inside a campaign than outside one
 - Implemented via `CampaignReadinessService` + `ReadinessMeter`. See `.junie/modules/campaigns.md`.
 
 ### Step C-4.6 — Bulk actions on campaign posts [V1] ✅ Done
+
 - From the Board or Plan: move a selection of posts between phases, reassign, submit all drafts
   for internal review, send all internally approved posts to the client (one email per batch, not
   per post).
@@ -467,6 +489,7 @@ Goal: make it faster to produce on-brief work inside a campaign than outside one
 Goal: the client sees their campaign as one polished story, and approves it in one sitting.
 
 ### Step C-5.1 — Portal campaign page v2 [MVP] ✅ Done
+
 - `portal/campaigns/show`: hero with campaign name, dates and timeline line; brief section (C-2.3);
   phase timeline; posts grouped by phase with `StatusPill`s; a "Needs your review" count with a
   jump link.
@@ -479,6 +502,7 @@ Goal: the client sees their campaign as one polished story, and approves it in o
 - Implemented via `PortalCampaignController::show` v2 with the `forPortal` allowlist. See `.junie/modules/campaigns.md`.
 
 ### Step C-5.2 — Batch approval per campaign [V1] ✅ Done
+
 - "Review this campaign" in the portal: a focused flow through every post waiting on the client,
   one at a time with previews, then **Approve all remaining** with an optional comment.
 - Each decision goes through the existing approval path. When I-8.2 lands, through its approval
@@ -489,6 +513,7 @@ Goal: the client sees their campaign as one polished story, and approves it in o
 - Implemented via `BatchReviewCampaignPostsAction`; `portal/campaigns/review.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-5.3 — Campaign feedback thread [V1] ✅ Done
+
 - One campaign-level conversation in the portal and on the staff Overview tab
   (`campaign_comments`, with @mentions using `CommentMentionParser`), for feedback that isn't about
   a single post ("Can we push the launch a week?").
@@ -498,6 +523,7 @@ Goal: the client sees their campaign as one polished story, and approves it in o
 - Implemented via `CampaignComment` + `CreateCampaignCommentAction`; `campaign-conversation.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-5.4 — Shareable campaign preview [Stretch] ✅ Done
+
 - A tokenized, read-only, expiring link to a campaign's approved and scheduled posts as a visual
   grid, for stakeholders without portal access (the client's CEO, a franchise owner). Token hashed
   at rest like `ReviewToken`. Revocable. No decisions possible through it.
@@ -512,6 +538,7 @@ Goal: the client sees their campaign as one polished story, and approves it in o
 Goal: the campaign can be steered while it's live without editing posts one by one.
 
 ### Step C-6.1 — Pause and resume [V1] ✅ Done
+
 - `PauseCampaignAction`: transitions the campaign to Paused and moves every **Scheduled** post in
   it back to Approved (unscheduling through the existing path, relying on I-1.2's stale-job
   protection), recording the affected post ids in the activity log meta. Never touches Publishing,
@@ -524,6 +551,7 @@ Goal: the campaign can be steered while it's live without editing posts one by o
 - Implemented via `PauseCampaignAction` / `ResumeCampaignAction`; Scheduled → Approved "Unschedule". See `.junie/modules/campaigns.md`.
 
 ### Step C-6.2 — Shift campaign dates [V1] ✅ Done
+
 - `ShiftCampaignAction`: move the campaign, its phases, its deliverables and its not-yet-published
   posts by N days. Each post target keeps its own local time in its own timezone (the dual-timezone
   model), via `ReschedulePostAction`.
@@ -534,6 +562,7 @@ Goal: the campaign can be steered while it's live without editing posts one by o
 - Implemented via `ShiftCampaignAction` (preview + apply via `ReschedulePostAction`). See `.junie/modules/campaigns.md`.
 
 ### Step C-6.3 — Launch checklist and go-live [Stretch] ✅ Done
+
 - A per-campaign launch checklist (template-driven, editable): brief approved, all launch-phase
   posts approved, accounts healthy, link tested, asset requirements met. Items auto-tick from
   derived state where possible; the rest are manual.
@@ -548,6 +577,7 @@ Goal: the campaign can be steered while it's live without editing posts one by o
 Goal: every campaign ends with proof of what it delivered. This is what wins renewals.
 
 ### Step C-7.1 — KPI targets [MVP] ✅ Done
+
 - `campaign_kpis`: `campaign_id`, `metric` (`App\Enums\CampaignMetric`), `target` (decimal),
   `sort`. Metrics available now from existing data: posts published, on-time rate (published at
   the planned time), approval turnaround (median hours from "Waiting on client" to decision),
@@ -562,6 +592,7 @@ Goal: every campaign ends with proof of what it delivered. This is what wins ren
 - Implemented via `CampaignKpi` + `UpdateCampaignKpisAction` + `CampaignKpiService`. See `.junie/modules/campaigns.md`.
 
 ### Step C-7.2 — Results tab [MVP] ✅ Done
+
 - Results tab: KPI target vs actual bars, a published-over-time series by phase, platform split,
   top posts (by engagement once available, by approval speed until then), and approval turnaround.
 - Uses the dataviz conventions already used by `analytics/client.tsx`, and recharts.
@@ -570,6 +601,7 @@ Goal: every campaign ends with proof of what it delivered. This is what wins ren
 - Implemented via `GetCampaignResultsAction`; `campaigns/results.tsx`. See `.junie/modules/campaigns.md`.
 
 ### Step C-7.3 — Wrap report [V1] ✅ Done
+
 - `campaign_reports` (one per campaign, versioned on publish): `summary`, `highlights` (json),
   `learnings`, `next_steps`, `kpi_snapshot` (json, frozen at publish), `status` (draft, shared),
   `shared_at`, `shared_by`.
@@ -586,6 +618,7 @@ Goal: every campaign ends with proof of what it delivered. This is what wins ren
 - Implemented via `CampaignReport`, share with frozen snapshot + PDF, AI wrap draft. See `.junie/modules/campaigns.md`.
 
 ### Step C-7.4 — Compare campaigns [Stretch] ✅ Done
+
 - Pick 2–4 campaigns (same client or across clients for staff) and compare KPIs side by side, with
   objective and duration shown so the comparison is fair.
 - **Done when**: comparing campaigns from another org is a validation error, not an empty column.
@@ -598,6 +631,7 @@ Goal: every campaign ends with proof of what it delivered. This is what wins ren
 Goal: a campaign can be sold, invoiced and checked for profit, without leaving the app.
 
 ### Step C-8.1 — Campaign fee and budget [V1] ✅ Done
+
 - `campaigns.fee_amount` (nullable, minor units, client currency) and `campaigns.billing_type`
   (`App\Enums\CampaignBillingType`: included_in_retainer, fixed_fee, none).
 - Shown only to Owner/Strategist. Stripped by `CampaignPresenter` for everyone else and always for
@@ -607,6 +641,7 @@ Goal: a campaign can be sold, invoiced and checked for profit, without leaving t
 - Implemented via `billing_type` / `fee_amount`, `viewBilling`, commercials panel. See `.junie/modules/campaigns.md`.
 
 ### Step C-8.2 — Invoice a campaign [V1] ✅ Done
+
 - `invoice_items.campaign_id` (nullable FK, null on delete, indexed).
 - "Invoice this campaign" (`CreateInvoiceFromCampaignAction`): creates a draft invoice for the
   client with a line item for the fee (description from campaign name and code), or adds it to the
@@ -618,6 +653,7 @@ Goal: a campaign can be sold, invoiced and checked for profit, without leaving t
 - Implemented via `CreateInvoiceFromCampaignAction` + `invoice_items.campaign_id`. See `.junie/modules/campaigns.md`.
 
 ### Step C-8.3 — Campaign profitability and revenue analytics [Stretch] ✅ Done
+
 - Owner/Strategist panel: fee, invoiced, paid, AI cost for the campaign (from `ai_usage_logs` with
   a campaign id, added to logs for campaign AI actions from C-2.2 onward).
 - Org analytics revenue section gains a "by campaign" breakdown, behind the same Phase 17 role rule.
@@ -632,6 +668,7 @@ Goal: a campaign can be sold, invoiced and checked for profit, without leaving t
 Goal: agencies discover the feature, understand it in a minute, and see it working in the demo.
 
 ### Step C-9.1 — Demo data and preview mode [MVP] ✅ Done
+
 - `DemoContentSeeder` and the preview fixture: one live campaign per demo client with a brief
   (approved), four phases, deliverables in every state, a paused campaign, a completed campaign
   with a shared wrap report, and KPI targets.
@@ -640,19 +677,21 @@ Goal: agencies discover the feature, understand it in a minute, and see it worki
 - Implemented via `SeedsCampaignShowcase` in demo and preview seeders. See `.junie/modules/campaigns.md`.
 
 ### Step C-9.2 — Marketing page section [MVP] ✅ Done
+
 - A "Campaigns" section on the marketing site (`marketing.md`), in the Alima voice. Draft copy:
-  - Eyebrow: `CAMPAIGNS`
-  - Headline: "Plan it, sign it off, ship it, prove it."
-  - Body: "Every campaign gets a brief your client approves, a plan your team can follow, and a
-    wrap report that shows what it achieved. One place, from first idea to final numbers."
-  - Three points: "Briefs clients sign off." · "Plans that build themselves." · "Reports that win
-    the renewal."
+    - Eyebrow: `CAMPAIGNS`
+    - Headline: "Plan it, sign it off, ship it, prove it."
+    - Body: "Every campaign gets a brief your client approves, a plan your team can follow, and a
+      wrap report that shows what it achieved. One place, from first idea to final numbers."
+    - Three points: "Briefs clients sign off." · "Plans that build themselves." · "Reports that win
+      the renewal."
 - One hero accent only. Screenshots from the preview fixture.
 - **Done when**: the section passes `graphy-ui-reviewer`, and copy follows sentence case with full
   stops.
 - Implemented via `components/marketing/campaigns-section.tsx` on the welcome page. See `.junie/modules/campaigns.md`.
 
 ### Step C-9.3 — First-run guidance [V1] ✅ Done
+
 - Empty states that teach: the hub ("Start a campaign from a template and you'll have a plan in a
   minute."), the Plan tab ("Add phases, then plan what goes out when."), the Results tab ("Set a
   target or two and we'll track them for you.").
@@ -661,6 +700,7 @@ Goal: agencies discover the feature, understand it in a minute, and see it worki
 - Implemented via hub/Plan/Results empty states and the client tab's first-campaign template prompt. See `.junie/modules/campaigns.md`.
 
 ### Step C-9.4 — Entitlement seam [Stretch] ✅ Done
+
 - Gate templates, the AI planner, wrap reports and campaign invoicing behind a
   `CampaignFeatures` check that reads org settings today and plan entitlements once I-11.3 / B-9
   land. One class, no `if` branches spread through controllers.
