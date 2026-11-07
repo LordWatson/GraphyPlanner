@@ -74,7 +74,7 @@ use Laravel\Cashier\Billable;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'restrict_staff_to_assigned_clients', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
+#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'restrict_staff_to_assigned_clients', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'blended_hourly_rate_minor', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key'])]
 class Organization extends Model
 {

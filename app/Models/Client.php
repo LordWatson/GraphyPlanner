@@ -68,7 +68,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'org_id', 'name', 'legal_name', 'website', 'industry', 'location', 'countries', 'status', 'is_primary', 'brand_kind',
-    'owner_user_id', 'start_date', 'retainer_amount', 'billing_cycle', 'tags',
+    'owner_user_id', 'start_date', 'retainer_amount', 'estimated_hours_per_month', 'billing_cycle', 'tags',
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
     'approval_lead_days', 'default_approval_mode', 'approval_policy', 'report_schedule', 'target_posts_per_week',

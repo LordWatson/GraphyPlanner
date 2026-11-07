@@ -14,20 +14,34 @@ import {
 import { create, index, store } from '@/routes/clients';
 import { PageHeader } from '@/components/page';
 import { DatePicker } from '@/components/date-picker';
+import { useState } from 'react';
 
 type Option = { value: string; label: string };
+
+type Template = {
+    id: number;
+    name: string;
+    description: string | null;
+    /** Short human list of what the template will set, from `ClientTemplate::summary()`. */
+    summary: string[];
+};
 
 export default function ClientCreate({
     statuses,
     billingCycles,
     languages,
     owners,
+    templates,
 }: {
     statuses: Option[];
     billingCycles: Option[];
     languages: Option[];
     owners: Option[];
+    templates: Template[];
 }) {
+    const [templateId, setTemplateId] = useState('none');
+    const chosen = templates.find((t) => String(t.id) === templateId) ?? null;
+
     return (
         <>
             <Head title="Add client" />
@@ -50,11 +64,81 @@ export default function ClientCreate({
                             data.owner_user_id === 'none'
                                 ? ''
                                 : data.owner_user_id,
+                        // "none" is a Select placeholder, not an id.
+                        client_template_id:
+                            data.client_template_id === 'none'
+                                ? ''
+                                : data.client_template_id,
                     })}
                     className="border-border bg-card grid gap-6 rounded-2xl border p-4 shadow-sm sm:p-6"
                 >
                     {({ processing, errors }) => (
                         <>
+                            {templates.length > 0 && (
+                                <div className="border-border grid gap-2 rounded-xl border p-4">
+                                    <Label htmlFor="client_template_id">
+                                        Start from a template
+                                    </Label>
+                                    <Select
+                                        name="client_template_id"
+                                        defaultValue="none"
+                                        onValueChange={setTemplateId}
+                                    >
+                                        <SelectTrigger
+                                            id="client_template_id"
+                                            className="w-full"
+                                        >
+                                            <SelectValue placeholder="No template" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                No template
+                                            </SelectItem>
+                                            {templates.map((template) => (
+                                                <SelectItem
+                                                    key={template.id}
+                                                    value={String(template.id)}
+                                                >
+                                                    {template.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+
+                                    {chosen ? (
+                                        <div className="text-muted-foreground grid gap-1 text-sm">
+                                            {chosen.description && (
+                                                <p>{chosen.description}</p>
+                                            )}
+                                            {/* What it will set, before you agree to it — a
+                                                template that silently sets a retainer is one
+                                                people stop trusting. */}
+                                            {chosen.summary.length > 0 && (
+                                                <p>
+                                                    Sets:{' '}
+                                                    {chosen.summary.join(' · ')}
+                                                </p>
+                                            )}
+                                            <p>
+                                                Anything you fill in below wins
+                                                over the template.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <p className="text-muted-foreground text-sm">
+                                            Templates carry the approval,
+                                            cadence, billing and brand-brain
+                                            settings — never a client's name or
+                                            email addresses.
+                                        </p>
+                                    )}
+
+                                    <InputError
+                                        message={errors.client_template_id}
+                                    />
+                                </div>
+                            )}
+
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
                                 <Input

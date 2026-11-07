@@ -8,6 +8,7 @@ use App\Enums\ApprovalDecision;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Enums\Role;
+use App\Enums\WebhookEvent;
 use App\Exceptions\Posts\InvalidPostTransitionException;
 use App\Jobs\PublishPostJob;
 use App\Jobs\SendScheduledPostToVendorJob;
@@ -17,6 +18,7 @@ use App\Notifications\PostApprovalDecided;
 use App\Notifications\PostNoteMentioned;
 use App\Notifications\PostWaitingForClientReview;
 use App\Notifications\PostWaitingForInternalReview;
+use App\Services\Api\WebhookDispatcher;
 use App\Services\PostNotificationService;
 use App\Services\Posts\PostRevisionService;
 use App\Services\Posts\PostWorkflowResolver;
@@ -258,6 +260,11 @@ class TransitionPostStatusAction
                 if (in_array($to, [PostStatus::Published, PostStatus::PartiallyPublished], true) && $locked->campaign_id !== null) {
                     app(MarkCampaignWentLiveAction::class)($locked);
                 }
+
+                // Outgoing webhooks. Here because this is the one place a post's status changes, so
+                // an integration cannot miss a transition that some other code path made — and
+                // after the commit, so nothing is announced that a rollback then un-did.
+                $this->announceToWebhooks($locked, $to);
             });
 
             return $locked;
@@ -401,6 +408,30 @@ class TransitionPostStatusAction
             'post_id' => $post->id,
             'publish_dispatch_id' => $post->publish_dispatch_id,
             'publish_at' => $publishAt,
+        ]);
+    }
+
+    /**
+     * Tell every subscribed endpoint that this post reached this status.
+     *
+     * Only the statuses an outside system has a reason to react to (`WebhookEvent::forPostStatus`),
+     * and only through `WebhookDispatcher` — whether anyone is listening, how the delivery is
+     * signed and how it retries are none of this Action's business.
+     */
+    private function announceToWebhooks(Post $post, PostStatus $to): void
+    {
+        $event = WebhookEvent::forPostStatus($to);
+        $organization = $post->organization;
+
+        if ($event === null || $organization === null) {
+            return;
+        }
+
+        app(WebhookDispatcher::class)->dispatch($organization, $event, [
+            'post_id' => $post->id,
+            'client_id' => $post->client_id,
+            'campaign_id' => $post->campaign_id,
+            'status' => $to->value,
         ]);
     }
 }

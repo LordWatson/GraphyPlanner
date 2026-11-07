@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
  * | `exports`      | per user                      | 10/min                   | CSV/PDF exports, invoice PDF build   |
  * | `public-token` | per IP + token, and per IP    | 20/min token, 60/min IP  | review link, client/staff invites    |
  * | `webhooks`     | per IP                        | 120/min                  | Upload-Post webhook                  |
+ * | `api`          | per bearer token (IP if none) | 300/min token, 30/min IP | the public REST API (`routes/api.php`) |
  *
  * Every limiter answers with the same structured 429 (`message` + `retry_after`), which JSON
  * callers show as-is; Inertia visits get the same message as an error toast instead.
@@ -55,6 +56,25 @@ final class RateLimits
             Limit::perMinute(120)->by('webhooks:'.$request->ip()),
             'webhook',
         ));
+
+        // The public REST API, keyed on the **token** rather than the IP: several integrations
+        // behind one office address must not throttle each other, and an integration must not
+        // share a bucket with the agency's own browsing. An unauthenticated request has no token
+        // to key on, so it falls back to the IP — which also caps someone guessing tokens.
+        //
+        // Generous, because this is a reporting API: a nightly warehouse pull or a dashboard
+        // refreshing every minute should never be the thing that trips it.
+        RateLimiter::for('api', function (Request $request) {
+            $bearer = $request->bearerToken();
+
+            return self::limit(
+                $bearer === null || $bearer === ''
+                    ? Limit::perMinute(30)->by('api-ip:'.$request->ip())
+                    // The hash, never the token — a limiter key reaches cache keys and logs.
+                    : Limit::perMinute(300)->by('api-token:'.hash('sha256', $bearer)),
+                'API',
+            );
+        });
     }
 
     /**

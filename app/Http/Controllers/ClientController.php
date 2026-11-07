@@ -9,6 +9,7 @@ use App\Actions\Clients\ListClientsAction;
 use App\Actions\Clients\PurgeClientAction;
 use App\Actions\Clients\RestoreClientAction;
 use App\Actions\Clients\UpdateClientAction;
+use App\Actions\ClientTemplates\CreateClientFromTemplateAction;
 use App\Enums\ApprovalMode;
 use App\Enums\ApprovalPolicy;
 use App\Enums\BillingCycle;
@@ -19,6 +20,7 @@ use App\Http\Requests\PurgeClientRequest;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
+use App\Models\ClientTemplate;
 use App\Models\ConnectInvite;
 use App\Models\SocialAccount;
 use App\Models\TaxRate;
@@ -81,15 +83,45 @@ class ClientController extends Controller
             'approvalPolicies' => array_map(fn (ApprovalPolicy $policy) => ['value' => $policy->value, 'label' => $policy->label(), 'description' => $policy->description()], ApprovalPolicy::cases()),
             'languages' => LanguageOptions::options(),
             'owners' => $this->ownerOptions($request),
+            // Onboarding templates: the engagement shape, so the person filling this in only has
+            // to supply who the client is. Each carries a short summary, because a template that
+            // silently sets a retainer is one people stop trusting.
+            'templates' => ClientTemplate::query()
+                ->orderBy('name')
+                ->get()
+                ->map(fn (ClientTemplate $template) => [
+                    'id' => $template->id,
+                    'name' => $template->name,
+                    'description' => $template->description,
+                    'summary' => $template->summary(),
+                ])
+                ->all(),
         ]);
     }
 
     /**
-     * Store a newly created client.
+     * Store a newly created client, optionally with a template's settings applied.
      */
-    public function store(StoreClientRequest $request, CreateClientAction $action): RedirectResponse
-    {
-        $client = $action($request->user(), $request->validated());
+    public function store(
+        StoreClientRequest $request,
+        CreateClientAction $action,
+        CreateClientFromTemplateAction $fromTemplate,
+    ): RedirectResponse {
+        $data = $request->validated();
+        $templateId = $data['client_template_id'] ?? null;
+        unset($data['client_template_id']);
+
+        if ($templateId === null) {
+            $client = $action($request->user(), $data);
+
+            return to_route('clients.show', $client);
+        }
+
+        // Bound explicitly rather than by route binding: the template is a field on this form, so
+        // the org check lives in the Action (and in the scope that found it).
+        $template = ClientTemplate::query()->findOrFail((int) $templateId);
+
+        $client = $fromTemplate($request->user(), $template, $data);
 
         return to_route('clients.show', $client);
     }

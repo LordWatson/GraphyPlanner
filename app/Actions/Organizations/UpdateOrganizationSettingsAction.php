@@ -17,7 +17,7 @@ class UpdateOrganizationSettingsAction
      * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
      * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
-     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, blended_hourly_rate_minor?: int|string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -65,6 +65,16 @@ class UpdateOrganizationSettingsAction
             // action are unaffected. Turning it on restricts every non-Owner immediately — a
             // member with no assignments sees nothing until somebody puts them on a client, which
             // is the safe direction for a confidentiality setting.
+            // What an hour of the agency's time costs, for client profitability. Nullable: an
+            // unset rate reports effort without inventing a margin.
+            if (array_key_exists('blended_hourly_rate_minor', $data)) {
+                $organization->blended_hourly_rate_minor = $data['blended_hourly_rate_minor'] !== null && $data['blended_hourly_rate_minor'] !== ''
+                    // Floored at zero because the column is unsigned — a negative would throw at
+                    // the database rather than being refused here.
+                    ? max(0, (int) $data['blended_hourly_rate_minor'])
+                    : null;
+            }
+
             if (array_key_exists('restrict_staff_to_assigned_clients', $data)) {
                 $organization->restrict_staff_to_assigned_clients = (bool) $data['restrict_staff_to_assigned_clients'];
             }

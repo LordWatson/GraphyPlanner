@@ -3,7 +3,9 @@
 namespace App\Actions\Store;
 
 use App\Enums\OrderStatus;
+use App\Enums\WebhookEvent;
 use App\Models\Order;
+use App\Services\Api\WebhookDispatcher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -70,7 +72,26 @@ class MarkOrderPaidAction
 
             ($this->transition)($order, OrderStatus::Paid, ['session' => $order->external_session_id]);
 
-            return ($this->fulfil)($order->refresh());
+            $fulfilled = ($this->fulfil)($order->refresh());
+
+            // Outgoing webhook, after the commit so nothing is announced that a rollback un-did.
+            // `order.paid` was in `WebhookEvent` with nothing emitting it, which is the one thing
+            // worse than not offering an event at all: an integration subscribes and waits forever.
+            DB::afterCommit(function () use ($fulfilled): void {
+                $organization = $fulfilled->organization;
+
+                if ($organization !== null) {
+                    app(WebhookDispatcher::class)->dispatch($organization, WebhookEvent::OrderPaid, [
+                        'order_id' => $fulfilled->id,
+                        'product_id' => $fulfilled->product_id,
+                        'amount_minor' => $fulfilled->amount_minor,
+                        'currency' => $fulfilled->currency,
+                        'buyer_email' => $fulfilled->buyer_email,
+                    ]);
+                }
+            });
+
+            return $fulfilled;
         });
     }
 }

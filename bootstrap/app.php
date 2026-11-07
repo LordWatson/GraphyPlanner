@@ -2,6 +2,7 @@
 
 use App\Contracts\ErrorTracker;
 use App\Http\Middleware\AssignCorrelationId;
+use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnsureCampaignFeature;
 use App\Http\Middleware\EnsureClientPortalAccess;
@@ -26,6 +27,10 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        // The public REST API. Its own file and its own middleware stack: no session, no CSRF, no
+        // Inertia — authentication is a bearer token (`api.token`), which is also why it must not
+        // sit inside the `web` group.
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -80,7 +85,16 @@ return Application::configure(basePath: dirname(__DIR__))
             'workspace' => EnsureWorkspaceType::class,
             // Campaigns enhancement C-9.4: gated campaign features.
             'campaign.feature' => EnsureCampaignFeature::class,
+            // The public REST API's bearer-token auth. Takes the scope the route needs:
+            // `api.token:read`.
+            'api.token' => AuthenticateApiToken::class,
         ]);
+
+        // Per token, not per IP: an integration and the agency's own browser traffic should not
+        // share a bucket, and several integrations behind one office IP should not throttle each
+        // other. Falls back to the IP for an unauthenticated request, which is the only thing
+        // there is to key on before the token has been read.
+        $middleware->throttleApi('api');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Step I-16.1 / M-1.1: every reported exception goes to error tracking (Sentry when

@@ -16,6 +16,17 @@
 > **Also closed on the way:** the MySQL CI gap, which was the most important item carried over from
 > phase one — and then finding 29, the 14 failures it exposed.
 >
+> **Phase six — items 19 and 23 done.** Client onboarding templates (three built-ins, save-as-template,
+> apply-on-create, with the never-templated fields pinned by a test) and client profitability
+> (inferred effort against paid invoices, revision-round trend, owner-only). `order.paid` is now
+> emitted too, closing the one inconsistency left from phase five.
+>
+> **Phase five — item 18 partly done.** A read-only `/api/v1` (clients, posts, social accounts,
+> `me`), outgoing webhooks with signed delivery, retries and auto-disable, and an OpenAPI spec with
+> a coverage test. Reuses `McpToken` as the one token concept, per that model's own convergence
+> rule. **Writes, a delivery-replay surface and the Zapier app are not built**, and **items 19 and
+> 23 (onboarding templates, retainer profitability) are still not started.**
+>
 > **Phase four — partly done.** Every carried-over "should fix" and "nice to have" is now closed:
 > findings 6 (booking race), 8 (broadcast scale), 13 (test chunk in the build), 14 (callback
 > throttle), 16 (duplicate docs row), and 12 instrumented and spread. **Items 18, 19 and 23 — the
@@ -32,8 +43,8 @@
 > suppression plus an SPF/DKIM/DMARC check). Item 17's DNS records and the two-domain split are not
 > code and remain outstanding.
 >
-> **Verification as of 2026-11-07:** **2,397 tests, all passing on SQLite *and* MySQL 8.0.46**
-> (14,517 assertions, identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
+> **Verification as of 2026-11-07:** **2,457 tests, all passing on SQLite *and* MySQL 8.0.46**
+> (14,758 assertions, identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
 > errors with nothing new. `composer audit` is clean. `npm run check` is **not** — see finding 30.
 >
 > **New findings raised by this phase:** 17 (org purge leaves the brand logo behind), 18
@@ -1001,7 +1012,7 @@ domain your approval mail uses.
 
 ---
 
-### 18. A public REST API, outgoing webhooks and a Zapier app
+### 18. A public REST API, outgoing webhooks and a Zapier app — ◐ read-only v1 done 2026-11-07
 
 **Why:** Three reasons. It is a procurement checkbox — API access is on every agency evaluation
 list. It is how customers glue you to tools you will never build: their CRM, time tracker, data
@@ -1029,7 +1040,7 @@ assistant protocol is not a substitute for `POST /v1/posts` when the buyer's ops
 
 ---
 
-### 19. Client onboarding templates
+### 19. Client onboarding templates — ✅ fixed 2026-11-07
 
 **Why:** The research flagged onboarding as the scaling bottleneck and specifically recommended
 reusable templates for workspaces, roles and approval stages. Graphy has campaign templates but
@@ -1122,7 +1133,7 @@ core, which is already the right answer; the job is to say so where buyers compa
 
 ---
 
-### 23. Retainer profitability per client
+### 23. Retainer profitability per client — ✅ fixed 2026-11-07
 
 **Why:** The money question every agency owner asks is "which clients are worth keeping". You have
 invoices, retainer drafts, campaign billing and client health — everything except the number that

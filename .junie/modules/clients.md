@@ -271,6 +271,26 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - (Resolved 2026-09-17) `owner_user_id` now has a UI picker on the client create/edit forms.
 
 ## Changelog
+- 2026-11-07: **Client onboarding templates** (audit item 19). New `client_templates` + `ClientTemplate`,
+  `SaveClientAsTemplateAction` (re-saving a name updates rather than duplicating),
+  `CreateClientFromTemplateAction` (**what the person typed always wins over the template**), and
+  `SeedBuiltInTemplatesAction` seeding three shapes per agency at registration — rows not config,
+  so a deleted built-in stays deleted. The copied/never-copied field lists live in one place,
+  `App\Support\Clients\ClientTemplateSnapshot`: identity, email addresses, tax identifiers and
+  the account owner are **never** templated, because copying an approval email would send one
+  client's posts to another client's inbox. New `clients/templates` page and a picker on the create
+  form. Tests: `ClientTemplateTest` (17), including a drift guard that every templated field is a
+  real `Client` fillable and nothing on the never-list has crept in.
+- 2026-11-07: **Client profitability** (audit item 23). New `ClientProfitabilityService`: money
+  received from *paid* invoices against effort inferred from what the app watched happen — posts,
+  revision rounds, assets, inbox replies, reports — weighted in `config/profitability.php`.
+  `organizations.blended_hourly_rate_minor` and the optional per-client
+  `clients.estimated_hours_per_month` are the only two numbers that cannot be inferred. **No rate
+  means no margin**, reported as unavailable rather than as a flattering 100%. Revision rounds are
+  weighted heavily and trended separately, because "revisions climbing while the retainer stays
+  flat" is the pattern that destroys an agency's margin and is invisible per-post. Owner/billing
+  only via `ClientPolicy::viewBilling`, and internal by construction — never a client report.
+  New `clients/profitability` page. Tests: `ClientProfitabilityTest` (13).
 - 2026-11-07: **Per-client staff access.** `ClientAccessScope` limits a restricted member to the
   clients on their `client_user` assignments, across `Client` and every client-owned model. Off
   unless the org sets `restrict_staff_to_assigned_clients`. Rules and rationale in

@@ -1,0 +1,197 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Alima API",
+        "version": "1.0.0",
+        "description": "Read access to an agency's clients, posts and connected channels, plus outgoing webhooks so another system can be told the moment something happens.\n\n**Authentication.** Every request needs `Authorization: Bearer <token>`. Tokens are created in Settings → Agent access and are the same tokens the MCP server uses. A token belongs to exactly one organization and that organization is never taken from request input, so there is no parameter that widens what a token can see.\n\n**Pagination.** Lists are cursor-paginated: read `meta.next_cursor` and pass it back as `?cursor=`. A null cursor means that was the last page. There is deliberately no total count — a reporting client walking the list while people are still creating posts would get rows skipped and repeated by offset paging, and could not tell.\n\n**Rate limit.** 300 requests a minute per token.\n\n**Errors.** Always `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`, except validation failures, which use Laravel's `{\"message\": ..., \"errors\": {...}}`.\n\n**Read-only in v1**, on purpose: reading is where the demand is and it cannot damage a customer's data while the shape of this API is still settling. Writes will come with idempotency keys designed in rather than bolted on."
+    },
+    "servers": [
+        { "url": "/api/v1" }
+    ],
+    "security": [
+        { "bearerAuth": [] }
+    ],
+    "tags": [
+        { "name": "Identity" },
+        { "name": "Clients" },
+        { "name": "Posts" },
+        { "name": "Channels" },
+        { "name": "Webhooks" }
+    ],
+    "paths": {
+        "/me": {
+            "get": {
+                "operationId": "me",
+                "tags": ["Identity"],
+                "summary": "What this token is and what it may do",
+                "description": "The first call to make. Confirms the credentials work and names the organization they belong to, so a 403 elsewhere is something you can diagnose yourself.",
+                "responses": {
+                    "200": { "description": "The token's organization and granted scopes." },
+                    "401": { "$ref": "#/components/responses/Unauthenticated" }
+                }
+            }
+        },
+        "/clients": {
+            "get": {
+                "operationId": "listClients",
+                "tags": ["Clients"],
+                "summary": "The roster this token can see",
+                "parameters": [
+                    { "$ref": "#/components/parameters/PerPage" },
+                    { "$ref": "#/components/parameters/Cursor" },
+                    { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "Only clients with this status." },
+                    { "name": "archived", "in": "query", "schema": { "type": "boolean" }, "description": "Archived clients instead of active ones. They are kept, not deleted." }
+                ],
+                "responses": {
+                    "200": { "description": "A page of clients." },
+                    "401": { "$ref": "#/components/responses/Unauthenticated" },
+                    "403": { "$ref": "#/components/responses/InsufficientScope" }
+                }
+            }
+        },
+        "/clients/{client}": {
+            "get": {
+                "operationId": "getClient",
+                "tags": ["Clients"],
+                "summary": "One client",
+                "parameters": [ { "$ref": "#/components/parameters/ClientId" } ],
+                "responses": {
+                    "200": { "description": "The client." },
+                    "403": { "description": "The client belongs to another organization, or to a client this token's member is not assigned to." },
+                    "404": { "description": "No such client." }
+                }
+            }
+        },
+        "/posts": {
+            "get": {
+                "operationId": "listPosts",
+                "tags": ["Posts"],
+                "summary": "What is planned and what went out",
+                "description": "Each post carries its channels inline, because \"where did this go and did it work\" is the question being asked and fetching targets separately would be N+1 over HTTP.\n\nFor an incremental sync, pass `updated_since` and keep the highest `updated_at` you saw.",
+                "parameters": [
+                    { "$ref": "#/components/parameters/PerPage" },
+                    { "$ref": "#/components/parameters/Cursor" },
+                    { "name": "client_id", "in": "query", "schema": { "type": "integer" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "Archived posts are excluded unless you ask for `status=archived` by name." },
+                    { "name": "updated_since", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "ISO 8601. Remember to URL-encode the `+` in an offset." }
+                ],
+                "responses": {
+                    "200": { "description": "A page of posts, each with its channels." },
+                    "422": { "description": "A filter was malformed — the body names which one." }
+                }
+            }
+        },
+        "/posts/{post}": {
+            "get": {
+                "operationId": "getPost",
+                "tags": ["Posts"],
+                "summary": "One post with its channels",
+                "parameters": [ { "name": "post", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+                "responses": {
+                    "200": { "description": "The post." },
+                    "403": { "description": "Not this organization's post." }
+                }
+            }
+        },
+        "/social-accounts": {
+            "get": {
+                "operationId": "listSocialAccounts",
+                "tags": ["Channels"],
+                "summary": "Connected channels and whether they are working",
+                "description": "`connection_status` is the field to watch: \"why did nothing publish yesterday\" is almost always an expired token. No credentials of any kind are returned.",
+                "parameters": [
+                    { "$ref": "#/components/parameters/PerPage" },
+                    { "$ref": "#/components/parameters/Cursor" },
+                    { "name": "client_id", "in": "query", "schema": { "type": "integer" } },
+                    { "name": "platform", "in": "query", "schema": { "type": "string" } }
+                ],
+                "responses": { "200": { "description": "A page of connected channels." } }
+            }
+        },
+        "/webhooks": {
+            "get": {
+                "operationId": "listWebhooks",
+                "tags": ["Webhooks"],
+                "summary": "This organization's webhook subscriptions",
+                "parameters": [
+                    { "$ref": "#/components/parameters/PerPage" },
+                    { "$ref": "#/components/parameters/Cursor" }
+                ],
+                "responses": { "200": { "description": "A page of endpoints. Secrets are never included." } }
+            },
+            "post": {
+                "operationId": "createWebhook",
+                "tags": ["Webhooks"],
+                "summary": "Subscribe to events",
+                "description": "Needs the `write:drafts` scope.\n\nThe response includes the signing `secret` **once**. Store it: it is never shown again, and it is the only way to tell a real delivery from a forged one.\n\nVerify a delivery by computing `HMAC-SHA256` over `\"{X-Alima-Timestamp}.{raw request body}\"` with the secret, and comparing the hex digest to the `X-Alima-Signature` header (which is prefixed `sha256=`). Reject anything whose timestamp is not recent.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["url", "events"],
+                                "properties": {
+                                    "url": { "type": "string", "format": "uri", "description": "Must be https." },
+                                    "events": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "items": {
+                                            "type": "string",
+                                            "enum": ["post.approved", "post.changes_requested", "post.published", "post.failed", "order.paid"]
+                                        }
+                                    },
+                                    "description": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": { "description": "Created. Contains the secret, once." },
+                    "403": { "$ref": "#/components/responses/InsufficientScope" },
+                    "422": { "description": "A plaintext URL or an unknown event name." }
+                }
+            }
+        },
+        "/webhooks/{endpoint}": {
+            "get": {
+                "operationId": "getWebhook",
+                "tags": ["Webhooks"],
+                "summary": "One subscription",
+                "parameters": [ { "$ref": "#/components/parameters/EndpointId" } ],
+                "responses": {
+                    "200": { "description": "The endpoint. `active` is false, with a `disabled_reason`, once it has been switched off after repeated failures." },
+                    "404": { "description": "No such endpoint for this organization." }
+                }
+            },
+            "delete": {
+                "operationId": "deleteWebhook",
+                "tags": ["Webhooks"],
+                "summary": "Unsubscribe",
+                "description": "Needs the `write:drafts` scope. Its delivery history goes with it.",
+                "parameters": [ { "$ref": "#/components/parameters/EndpointId" } ],
+                "responses": {
+                    "204": { "description": "Gone." },
+                    "403": { "$ref": "#/components/responses/InsufficientScope" },
+                    "404": { "description": "No such endpoint for this organization." }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": { "type": "http", "scheme": "bearer" }
+        },
+        "parameters": {
+            "PerPage": { "name": "per_page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 } },
+            "Cursor": { "name": "cursor", "in": "query", "schema": { "type": "string" }, "description": "From the previous page's `meta.next_cursor`." },
+            "ClientId": { "name": "client", "in": "path", "required": true, "schema": { "type": "integer" } },
+            "EndpointId": { "name": "endpoint", "in": "path", "required": true, "schema": { "type": "integer" } }
+        },
+        "responses": {
+            "Unauthenticated": { "description": "Missing, unknown or revoked token." },
+            "InsufficientScope": { "description": "The token does not carry the scope this endpoint needs. The message names it." }
+        }
+    }
+}

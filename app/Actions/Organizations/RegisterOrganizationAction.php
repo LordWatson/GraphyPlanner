@@ -3,6 +3,7 @@
 namespace App\Actions\Organizations;
 
 use App\Actions\Campaigns\SeedStarterCampaignTemplatesAction;
+use App\Actions\ClientTemplates\SeedBuiltInTemplatesAction;
 use App\Actions\TaxRates\SeedDefaultTaxRatesAction;
 use App\Actions\Workspace\CreatePrimaryBrandAction;
 use App\Enums\BrandKind;
@@ -98,6 +99,14 @@ class RegisterOrganizationAction
 
             // Step M-4.1: UK + UAE starter tax rates, editable in Settings.
             (new SeedDefaultTaxRatesAction)($organization);
+
+            // The three client onboarding templates an agency starts with. An empty template list
+            // teaches nobody what templates are for and the feature goes unused; three recognisable
+            // engagement shapes make it obvious at a glance. Rows rather than config, so an Owner
+            // can edit or delete one and have it stay that way.
+            if ($type === OrganizationType::Agency) {
+                (new SeedBuiltInTemplatesAction)($organization);
+            }
 
             // Step B-2.1: a business workspace owns exactly one primary brand, created here so the
             // org + owner + brand (+ its empty Brand Brain) either all exist or none do.

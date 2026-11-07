@@ -42,6 +42,9 @@ class OrganizationSettingsUpdateRequest extends FormRequest
             // Step M-6.5 (Phase 9): hours a post may wait on review before it's flagged overdue.
             'approval_sla_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
             'restrict_staff_to_assigned_clients' => ['sometimes', 'boolean'],
+            // Minor units, so £50 is 5000. Without it the profitability page can report effort
+            // but no margin.
+            'blended_hourly_rate_minor' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100000000'],
             'upload_post_key' => ['nullable', 'string', 'max:2048'],
             'upload_post_webhook_secret' => ['nullable', 'string', 'max:2048'],
             // A queue worker posts to whatever is stored here, so it has to be an https URL and

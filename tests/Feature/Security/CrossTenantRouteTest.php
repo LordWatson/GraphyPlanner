@@ -35,6 +35,7 @@ use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\ClientInvitation;
 use App\Models\ClientReport;
+use App\Models\ClientTemplate;
 use App\Models\ConnectInvite;
 use App\Models\Coupon;
 use App\Models\DesignImportConnection;
@@ -246,6 +247,7 @@ class CrossTenantRouteTest extends TestCase
             CampaignDeliverable::class => CampaignDeliverable::factory()->create(['campaign_id' => $campaign->id]),
             CampaignShareLink::class => CampaignShareLink::query()->create(['campaign_id' => $campaign->id, 'token_hash' => hash('sha256', 'foreign'), 'expires_at' => now()->addDay()]),
             CampaignTemplate::class => CampaignTemplate::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'name' => 'Their template', 'duration_days' => 14, 'phases' => [], 'deliverables' => []]),
+            ClientTemplate::class => ClientTemplate::query()->withoutGlobalScopes()->create(['org_id' => $org->id, 'name' => 'Their client template', 'snapshot' => ['client' => [], 'brand_brain' => []]]),
             Asset::class => Asset::factory()->for($client)->create(['org_id' => $org->id]),
             SocialAccount::class => $account,
             PostTarget::class => $target,

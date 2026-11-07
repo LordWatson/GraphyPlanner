@@ -29,6 +29,9 @@ class StoreClientRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            // An onboarding template to apply. Scoped to the org's own templates, so a submitted
+            // id from another organization is a validation error rather than a leak.
+            'client_template_id' => ['nullable', 'integer', Rule::exists('client_templates', 'id')->where('org_id', $this->user()->org_id)],
             'legal_name' => ['nullable', 'string', 'max:255'],
             'website' => ['nullable', 'url', 'max:255'],
             'industry' => ['nullable', 'string', 'max:255'],

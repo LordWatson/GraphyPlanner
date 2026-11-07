@@ -54,7 +54,9 @@ use App\Http\Controllers\ClientContactController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientInvitationAcceptController;
 use App\Http\Controllers\ClientInvitationController;
+use App\Http\Controllers\ClientProfitabilityController;
 use App\Http\Controllers\ClientTabController;
+use App\Http\Controllers\ClientTemplateController;
 use App\Http\Controllers\ConnectInviteController;
 use App\Http\Controllers\ContentHubController;
 use App\Http\Controllers\DailyBriefController;
@@ -540,6 +542,24 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
     Route::get('clients/{client}/ai', [ClientTabController::class, 'ai'])->middleware('workspace:agency')->name('clients.ai.index');
     Route::get('clients/{client}/briefs', [ClientTabController::class, 'briefs'])->middleware('workspace:agency')->name('clients.briefs');
     // Step I-1.5: "delete" (above) archives; these act on archived (soft-deleted) clients.
+    // Onboarding templates. "Save this client as a template" is how an agency gets its first one —
+    // nobody fills in a blank template form; they set a client up the way they like and want that
+    // captured. Listing and deleting them lives on the same controller.
+    Route::post('clients/{client}/save-as-template', [ClientTemplateController::class, 'store'])
+        ->middleware('workspace:agency')
+        ->name('clients.save-as-template');
+    // "Client profitability" — the roster by margin, worst first. Owner/billing roles only: this
+    // is the agency's own economics and never reaches a client-facing report.
+    Route::get('client-profitability', ClientProfitabilityController::class)
+        ->middleware('workspace:agency')
+        ->name('client-profitability');
+    Route::get('client-templates', [ClientTemplateController::class, 'index'])
+        ->middleware('workspace:agency')
+        ->name('client-templates.index');
+    Route::delete('client-templates/{template}', [ClientTemplateController::class, 'destroy'])
+        ->middleware('workspace:agency')
+        ->name('client-templates.destroy');
+
     Route::post('clients/{client}/restore', [ClientController::class, 'restore'])
         ->withTrashed()
         ->middleware('workspace:agency')
