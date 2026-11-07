@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AiUsageController;
+use App\Http\Controllers\Settings\AuditLogController;
 use App\Http\Controllers\Settings\McpConnectionController;
 use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\OrganizationController;
@@ -56,6 +57,15 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::delete('settings/organization/logo', [OrganizationController::class, 'removeLogo'])
         ->middleware(RequirePassword::class)
         ->name('organization.logo.destroy');
+    // Audit log (Owner only, via the request's `update` check). Who did what, when — the one
+    // screen a security questionnaire asks for. The export re-checks the password and shares the
+    // export throttle, like the analytics and invoice exports: it is the whole org's activity in
+    // one file.
+    Route::get('settings/audit-log', [AuditLogController::class, 'index'])->name('audit-log.index');
+    Route::get('settings/audit-log/export', [AuditLogController::class, 'export'])
+        ->middleware(['throttle:exports', RequirePassword::class])
+        ->name('audit-log.export');
+
     // Step I-1.6: "Test connection" for the stored Upload-Post key.
     Route::post('settings/organization/test-upload-post', [OrganizationController::class, 'testUploadPost'])
         ->middleware('throttle:6,1')

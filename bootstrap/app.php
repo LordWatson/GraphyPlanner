@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureCampaignFeature;
 use App\Http\Middleware\EnsureClientPortalAccess;
 use App\Http\Middleware\EnsureOrganizationNotSuspended;
 use App\Http\Middleware\EnsurePreviewMode;
+use App\Http\Middleware\EnsureTwoFactorEnrolled;
 use App\Http\Middleware\EnsureUserHasOrganization;
 use App\Http\Middleware\EnsureUserIsSuperAdmin;
 use App\Http\Middleware\EnsureWorkspaceType;
@@ -69,6 +70,10 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
             // Step 15.3: after HandleInertiaRequests so the "suspended" page gets the shared props.
             EnsureOrganizationNotSuspended::class,
+            // Org-wide two-factor: a member of an organisation that requires it and has not
+            // enrolled gets their security page and nothing else. Global on purpose — a security
+            // control that must be remembered on each new route is one that gets forgotten.
+            EnsureTwoFactorEnrolled::class,
             // Step M-8.2: stamp last-active (throttled, after the response) for the partner WAU figure.
             TrackUserActivity::class,
         ]);

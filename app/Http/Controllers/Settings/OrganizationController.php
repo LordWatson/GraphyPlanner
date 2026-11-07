@@ -54,6 +54,7 @@ class OrganizationController extends Controller
                 'webhook_secret_missing' => app(PublishCredentials::class)->webhookSecretFor($organization) === '',
                 'has_chat_webhook_url' => filled($organization->chat_webhook_url),
                 'restrict_staff_to_assigned_clients' => (bool) $organization->restrict_staff_to_assigned_clients,
+                'require_two_factor' => (bool) $organization->require_two_factor,
                 'has_xai_key' => filled($organization->xai_key),
                 // Step I-1.6: enough to recognise which key is stored, never the key itself.
                 'upload_post_key_last4' => self::lastFour($organization->upload_post_key),
@@ -71,6 +72,9 @@ class OrganizationController extends Controller
                 ),
             ],
             'white_label' => app(Entitlements::class)->allows($organization, Feature::WhiteLabel),
+            // The org-wide two-factor switch is disabled until the owner holds a second factor
+            // themselves, because turning it on would otherwise lock them out of this page.
+            'viewer_has_two_factor' => $request->user()->hasEnabledTwoFactorAuthentication(),
             'currencies' => CurrencyOptions::options(),
             // Step M-4.1: the org's tax rates, active first then archived, for the rates manager.
             'tax_rates' => $organization->taxRates()

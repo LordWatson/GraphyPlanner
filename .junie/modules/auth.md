@@ -26,6 +26,24 @@ org/role modeling (Step 0.2).
 - Auth routes are provided by Fortify (login/register/password reset), configured in
   `routes/settings.php` for the settings-specific routes.
 
+## Organisation-wide two-factor
+- `organizations.require_two_factor` (boolean, default **false**) is the Owner switch on
+  Settings -> Organization: "everyone in this organisation must use two-factor authentication".
+- `App\Http\Middleware\EnsureTwoFactorEnrolled` enforces it. Appended to the **`web` group**
+  (`bootstrap/app.php`), not named per route group, because a security control that has to be
+  remembered on each new route is one that gets forgotten. A member of a requiring org who has not
+  enrolled is redirected to `security.edit` on a safe request and gets a **403** on anything else
+  (a redirect is useless to an XHR or a form post).
+- Exempt, on purpose: super admins (no org of their own), `Role::ClientReviewer` (external client
+  contacts in the portal — forcing an authenticator app on somebody else's client would lock them
+  out of their own approvals), and the routes needed to comply, get back in, or leave
+  (`EnsureTwoFactorEnrolled::ALLOWED`: security settings, the Fortify `two-factor.*` endpoints,
+  password confirmation, profile, appearance, verification, logout).
+- `OrganizationSettingsUpdateRequest::after()` refuses to turn it **on** for an owner who has no
+  second factor themselves — otherwise the middleware immediately locks them out of the page that
+  holds the switch. The page disables the checkbox for the same reason
+  (`viewer_has_two_factor`).
+
 ## Phase M-1 additions
 - Fortify's password confirmation (`auth/confirm-password`, `password.confirm` middleware) now
   guards org settings and data exports; irreversible deletes check `current_password` in their
@@ -52,6 +70,9 @@ org/role modeling (Step 0.2).
   pages redirect them to `/super-admin` (`org.member`).
 
 ## Tests
+- `tests/Feature/Security/TwoFactorEnforcementTest.php`: enforcement, the exemptions, that the
+  pages needed to comply stay reachable, and that an owner without a second factor cannot switch it
+  on.
 - `tests/Feature/Auth/AuthenticationTest.php`: covers the default `/dashboard` redirect, the
   `Role::ClientReviewer` -> `/portal` redirect, and that an intended URL still wins for client
   reviewers.
@@ -61,6 +82,8 @@ org/role modeling (Step 0.2).
   pure authentication.
 
 ## Changelog
+- 2026-11-07: Organisation-wide two-factor enforcement (`organizations.require_two_factor`,
+  `EnsureTwoFactorEnrolled`). Audit log export lives in `settings.md`.
 - 2026-10-25: Self-serve signups now receive a single welcome email whose one button is a signed
   48-hour `verification.verify` link (`RegisterOrganizationAction` no longer fires `Registered`, so
   no duplicate Fortify verification email). The `auth/verify-email.tsx` greeting copy was reworded to

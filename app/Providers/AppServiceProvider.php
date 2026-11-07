@@ -41,6 +41,7 @@ use App\Models\GridPlan;
 use App\Models\InboxConversation;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\MentionKeyword;
 use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
@@ -62,6 +63,7 @@ use App\Policies\GridPlanPolicy;
 use App\Policies\InboxConversationPolicy;
 use App\Policies\InvoiceItemPolicy;
 use App\Policies\InvoicePolicy;
+use App\Policies\MentionKeywordPolicy;
 use App\Policies\OrganizationPolicy;
 use App\Policies\OrganizationReportPolicy;
 use App\Policies\PostPolicy;
@@ -403,6 +405,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(OrganizationReport::class, OrganizationReportPolicy::class);
         // Phase M-9: the social inbox.
         Gate::policy(InboxConversation::class, InboxConversationPolicy::class);
+        Gate::policy(MentionKeyword::class, MentionKeywordPolicy::class);
         Gate::policy(SavedReply::class, SavedReplyPolicy::class);
     }
 

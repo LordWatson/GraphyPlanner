@@ -20,6 +20,11 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
   `delivery_status` (`pending`/`sent`/`failed`) + `delivery_error`. Unique on
   `(inbox_conversation_id, external_message_id)`.
 - `SavedReply` (`saved_replies`): per-org canned replies, org-wide (`client_id` null) or client-scoped.
+- `MentionKeyword` (`mention_keywords`): the words the studio wants to hear about. **Org-wide only**
+  (no `client_id`) — an agency watching "refund" wants it wherever it is said, and the alert names
+  the client; a per-client list would double the surface for a question nobody asked. Unique on
+  `(org_id, term)`, capped at `MentionKeyword::MAX_PER_ORG` (50), with a `match_count` so the page
+  can show which words earn their place. `BelongsToOrganization`.
 - `organizations.inbox_sla_hours`: the inbox's own reply SLA (independent of `approval_sla_hours`).
 - `post_targets.comments_synced_at`: when comments were last pulled for a target (sweep ordering/throttle).
 - Enums: `InboxStatus`, `CommentSentiment` (precedence: question > negative > positive > neutral;
@@ -52,6 +57,17 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
 - Jobs/commands: `SyncOrganizationCommentsJob` + `inbox:sync-comments` (hourly), `SendOverdueInboxRemindersJob`
   + `inbox:send-overdue-reminders` (daily). Both registered in `SchedulerHeartbeat::COMMANDS`.
 - Notification: `InboxReplyOverdue` (database, `Comments` category) to the assignee or the studio, once/24h.
+- `App\Services\Inbox\MentionAlerts`: keyword alerts over the comments **already ingested** — the
+  narrow, honest version of listening (nothing is crawled; say so on the comparison pages).
+  `scan()` is called by `IngestCommentsForTargetAction` **after** its transaction commits, so no
+  alert is sent for a comment that rolled back, and only for messages it newly created — the hourly
+  sweep re-reads the same posts, and a stored comment never alerts twice. Matching is whole-word,
+  case- and accent-insensitive (`(?<![\p{L}\p{N}])term(?![\p{L}\p{N}])`), so "art" does not fire
+  on "start" and a term beside a hashtag or emoji still counts. Notifies the **studio**
+  (Owner/Strategist), not the assignee: a thread has no assignee when its first comment lands,
+  which is exactly when an alert matters. Term and recipient lists are cached per instance.
+- Notification: `MentionAlert` (database, `Comments` category — the class name carries "Mention").
+  Carries the term, the author and a link; **not** the comment body, which is one click away.
 
 ## Routes / Controllers
 - `GET /inbox` → `InboxController@index` — Inertia `inbox/index` (list + filters + saved replies + counts).
@@ -61,6 +77,11 @@ TikTok, LinkedIn, YouTube Shorts, Threads and X. **Pinterest and Google Business
 - `POST /inbox/{conversation}/ai/draft` → `@draft` — AI draft (`throttle:ai`), returns `{text}`.
 - `POST /inbox/refresh` → `@refresh` — dispatch the sweep now.
 - `POST /saved-replies`, `PATCH|DELETE /saved-replies/{savedReply}` → `SavedReplyController`.
+- `GET|POST /inbox/alerts`, `DELETE /inbox/alerts/{mentionKeyword}` → `MentionKeywordController`
+  (page `inbox/alerts`, linked from the inbox hero). Registered **before** `inbox/{conversation}`,
+  or "alerts" would be taken for a conversation id. `MentionKeywordPolicy` mirrors
+  `SavedReplyPolicy`: Owner/Strategist/Designer manage, Viewer reads, client reviewers never reach
+  it.
 - **Step CG-1.1:** the whole group is now a **shared surface** under `['portal.redirect']` only
   (the `workspace:agency` guard was dropped) — both the agency studio and a business/creator
   workspace reach `/inbox`, exactly like the shared calendar/dashboard. There is **one**

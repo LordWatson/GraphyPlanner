@@ -17,7 +17,7 @@ class UpdateOrganizationSettingsAction
      * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
      * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
-     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, blended_hourly_rate_minor?: int|string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, require_two_factor?: bool|int|string|null, blended_hourly_rate_minor?: int|string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -77,6 +77,13 @@ class UpdateOrganizationSettingsAction
 
             if (array_key_exists('restrict_staff_to_assigned_clients', $data)) {
                 $organization->restrict_staff_to_assigned_clients = (bool) $data['restrict_staff_to_assigned_clients'];
+            }
+
+            // Org-wide two-factor. The form refuses to turn this on for an owner who has no second
+            // factor themselves (see `OrganizationSettingsUpdateRequest::after`), so by the time it
+            // reaches here somebody can still get back in.
+            if (array_key_exists('require_two_factor', $data)) {
+                $organization->require_two_factor = (bool) $data['require_two_factor'];
             }
 
             if (! empty($data['xai_key'])) {

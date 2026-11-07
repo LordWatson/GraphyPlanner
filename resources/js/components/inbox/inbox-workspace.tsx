@@ -1,6 +1,7 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
+    BellRing,
     CheckCircle2,
     Clock,
     ExternalLink,
@@ -39,6 +40,7 @@ import { formatDateTime } from '@/lib/dates';
 import { http } from '@/lib/http';
 import { cn } from '@/lib/utils';
 import { index as inboxIndex, refresh as refreshRoute } from '@/routes/inbox';
+import { index as mentionAlerts } from '@/routes/inbox/alerts';
 import {
     draft as draftRoute,
     reply as replyRoute,
@@ -302,6 +304,12 @@ export function InboxWorkspace(props: InboxWorkspaceProps) {
                         <Button variant="on-ink" size="lg" onClick={refresh}>
                             <RefreshCw />
                             Refresh
+                        </Button>
+                        <Button asChild variant="on-ink" size="lg">
+                            <Link href={mentionAlerts()}>
+                                <BellRing />
+                                Mention alerts
+                            </Link>
                         </Button>
                     </>
                 }

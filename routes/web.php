@@ -75,6 +75,7 @@ use App\Http\Controllers\InvoiceItemController;
 use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\McpUploadController;
 use App\Http\Controllers\MediaKitShareController;
+use App\Http\Controllers\MentionKeywordController;
 use App\Http\Controllers\MyWorkController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Organizations\BusinessRegistrationController;
@@ -782,6 +783,11 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
     Route::middleware('portal.redirect')->group(function () {
         Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
         Route::post('inbox/refresh', [InboxController::class, 'refresh'])->name('inbox.refresh');
+        // Mention alerts: the words the studio wants to hear about. Registered **before**
+        // `inbox/{conversation}` below, or "alerts" would be taken for a conversation id.
+        Route::get('inbox/alerts', [MentionKeywordController::class, 'index'])->name('inbox.alerts.index');
+        Route::post('inbox/alerts', [MentionKeywordController::class, 'store'])->name('inbox.alerts.store');
+        Route::delete('inbox/alerts/{mentionKeyword}', [MentionKeywordController::class, 'destroy'])->name('inbox.alerts.destroy');
         Route::get('inbox/{conversation}', [InboxController::class, 'show'])->name('inbox.conversations.show');
         Route::patch('inbox/{conversation}', [InboxController::class, 'update'])->name('inbox.conversations.update');
         Route::post('inbox/{conversation}/reply', [InboxController::class, 'reply'])->name('inbox.conversations.reply');

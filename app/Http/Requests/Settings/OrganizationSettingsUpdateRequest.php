@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Settings;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class OrganizationSettingsUpdateRequest extends FormRequest
 {
@@ -13,6 +14,7 @@ class OrganizationSettingsUpdateRequest extends FormRequest
     {
         return [
             'brand_accent.regex' => __('Use a six-digit hex colour, like #205557.'),
+            'require_two_factor.enrolled' => __('Set up two-factor authentication on your own account first — otherwise turning this on would lock you out.'),
         ];
     }
 
@@ -23,6 +25,25 @@ class OrganizationSettingsUpdateRequest extends FormRequest
     {
         return $this->user()->organization !== null
             && $this->user()->can('update', $this->user()->organization);
+    }
+
+    /**
+     * The one rule that cannot be expressed as a validation rule: turning org-wide two-factor on
+     * is irreversible from the inside if the person doing it has no second factor, because
+     * `EnsureTwoFactorEnrolled` immediately locks them out of settings. So it is refused here
+     * rather than left as a support ticket.
+     *
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($this->boolean('require_two_factor') && ! $this->user()->hasEnabledTwoFactorAuthentication()) {
+                    $validator->errors()->add('require_two_factor', $this->messages()['require_two_factor.enrolled']);
+                }
+            },
+        ];
     }
 
     /**
@@ -42,6 +63,10 @@ class OrganizationSettingsUpdateRequest extends FormRequest
             // Step M-6.5 (Phase 9): hours a post may wait on review before it's flagged overdue.
             'approval_sla_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
             'restrict_staff_to_assigned_clients' => ['sometimes', 'boolean'],
+            // Every member must hold a second factor. Guarded below: an owner cannot switch it on
+            // without one themselves, because the middleware that enforces it would lock them out
+            // of this very page.
+            'require_two_factor' => ['sometimes', 'boolean'],
             // Minor units, so £50 is 5000. Without it the profitability page can report effort
             // but no margin.
             'blended_hourly_rate_minor' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100000000'],

@@ -63,6 +63,7 @@ type OrganizationProps = {
         invoice_payment_terms_days: number;
         approval_sla_hours: number | null;
         restrict_staff_to_assigned_clients: boolean;
+        require_two_factor: boolean;
         has_upload_post_key: boolean;
         has_upload_post_webhook_secret: boolean;
         webhook_secret_missing: boolean;
@@ -82,6 +83,8 @@ type OrganizationProps = {
     can_manage_tax_rates: boolean;
     /** Step GTM-3.1: whether the plan lets this branding reach a client. */
     white_label: boolean;
+    /** Whether the owner reading this page holds a second factor themselves. */
+    viewer_has_two_factor: boolean;
 };
 
 export default function Organization({
@@ -90,7 +93,17 @@ export default function Organization({
     tax_rates: taxRates,
     can_manage_tax_rates: canManageTaxRates,
     white_label: whiteLabel,
+    viewer_has_two_factor: viewerHasTwoFactor,
 }: OrganizationProps) {
+    // Both toggles are submitted through a hidden field: an unchecked checkbox sends nothing, so
+    // without one the settings could be turned on but never off again.
+    const [restrictStaff, setRestrictStaff] = useState(
+        organization.restrict_staff_to_assigned_clients,
+    );
+    const [requireTwoFactor, setRequireTwoFactor] = useState(
+        organization.require_two_factor,
+    );
+
     return (
         <>
             <Head title="Organization settings" />
@@ -300,11 +313,17 @@ export default function Organization({
                                     <Label>Client access</Label>
                                     <label className="flex items-start gap-2 text-sm">
                                         <Checkbox
-                                            name="restrict_staff_to_assigned_clients"
-                                            value="1"
-                                            defaultChecked={
-                                                organization.restrict_staff_to_assigned_clients
+                                            checked={restrictStaff}
+                                            onCheckedChange={(checked) =>
+                                                setRestrictStaff(
+                                                    checked === true,
+                                                )
                                             }
+                                        />
+                                        <input
+                                            type="hidden"
+                                            name="restrict_staff_to_assigned_clients"
+                                            value={restrictStaff ? '1' : '0'}
                                         />
                                         <span>
                                             Limit each teammate to the clients
@@ -324,6 +343,39 @@ export default function Organization({
                                         message={
                                             errors.restrict_staff_to_assigned_clients
                                         }
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Two-factor authentication</Label>
+                                    <label className="flex items-start gap-2 text-sm">
+                                        <Checkbox
+                                            checked={requireTwoFactor}
+                                            disabled={!viewerHasTwoFactor}
+                                            onCheckedChange={(checked) =>
+                                                setRequireTwoFactor(
+                                                    checked === true,
+                                                )
+                                            }
+                                        />
+                                        <input
+                                            type="hidden"
+                                            name="require_two_factor"
+                                            value={requireTwoFactor ? '1' : '0'}
+                                        />
+                                        <span>
+                                            Everyone in this organisation must
+                                            use two-factor authentication.
+                                        </span>
+                                    </label>
+                                    <p className="text-muted-foreground text-xs">
+                                        {viewerHasTwoFactor
+                                            ? 'Anyone without it is sent to their own security settings and can go nowhere else until they have set it up. Client reviewers in the portal are not affected.'
+                                            : 'Set two-factor up on your own account first — otherwise turning this on would lock you out as well.'}
+                                    </p>
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.require_two_factor}
                                     />
                                 </div>
 

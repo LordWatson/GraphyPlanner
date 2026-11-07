@@ -45,6 +45,7 @@ use App\Models\InboxConversation;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\McpToken;
+use App\Models\MentionKeyword;
 use App\Models\Order;
 use App\Models\Organization;
 use App\Models\OrganizationReport;
@@ -350,6 +351,8 @@ class CrossTenantRouteTest extends TestCase
             // Phase M-9: the other org's inbox thread and a saved reply (inbox/{conversation}, saved-replies/{savedReply}).
             InboxConversation::class => InboxConversation::factory()->forAccount($account)->create(['org_id' => $org->id]),
             SavedReply::class => SavedReply::factory()->create(['org_id' => $org->id]),
+            // A word the other org watches (inbox/alerts/{mentionKeyword}).
+            MentionKeyword::class => MentionKeyword::create(['org_id' => $org->id, 'term' => 'theirs']),
         ];
     }
 }

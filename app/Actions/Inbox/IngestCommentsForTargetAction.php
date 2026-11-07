@@ -11,6 +11,7 @@ use App\Models\InboxConversation;
 use App\Models\InboxMessage;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
+use App\Services\Inbox\MentionAlerts;
 use App\Services\Inbox\SentimentClassifier;
 use App\Support\Inbox\InboundComment;
 use Carbon\CarbonInterface;
@@ -39,6 +40,7 @@ class IngestCommentsForTargetAction
     public function __construct(
         private readonly CommentSource $source,
         private readonly SentimentClassifier $sentiment = new SentimentClassifier,
+        private readonly MentionAlerts $mentions = new MentionAlerts,
     ) {}
 
     /**
@@ -62,8 +64,10 @@ class IngestCommentsForTargetAction
 
         $byRoot = $this->groupByRoot($reading->comments);
         $summary = ['conversations' => 0, 'messages' => 0];
+        /** @var list<array{InboxConversation, list<InboxMessage>}> $arrived */
+        $arrived = [];
 
-        DB::transaction(function () use ($account, $target, $byRoot, &$summary) {
+        DB::transaction(function () use ($account, $target, $byRoot, &$summary, &$arrived) {
             foreach ($byRoot as $rootId => $comments) {
                 $root = $comments[0];
 
@@ -88,15 +92,31 @@ class IngestCommentsForTargetAction
                     $summary['conversations']++;
                 }
 
+                $new = [];
+
                 foreach ($comments as $comment) {
-                    if ($this->upsertMessage($conversation, $comment)) {
+                    $message = $this->upsertMessage($conversation, $comment);
+
+                    if ($message !== null) {
                         $summary['messages']++;
+                        $new[] = $message;
                     }
+                }
+
+                if ($new !== []) {
+                    $arrived[] = [$conversation, $new];
                 }
 
                 $this->rollUpConversation($conversation);
             }
         });
+
+        // Mention alerts, after the commit: a watched word must never be announced for a comment
+        // that was rolled back, and only comments stored *now* alert — the hourly sweep re-reads
+        // the same posts, so a stored comment must not fire a second time.
+        foreach ($arrived as [$conversation, $messages]) {
+            $this->mentions->scan($conversation, $messages);
+        }
 
         Log::info('Inbox comments ingested', [
             'org_id' => $account->org_id,
@@ -114,18 +134,21 @@ class IngestCommentsForTargetAction
      * Create a new inbound message for a comment we haven't seen. Existing messages (including a
      * reply we sent, stored outbound and keyed by the vendor's id) are left exactly as they are, so
      * the sync never flips our own reply to inbound or overwrites its delivery state.
+     *
+     * Returns the new message, or null when there was nothing to store — which is also what tells
+     * the caller whether a mention alert is due.
      */
-    private function upsertMessage(InboxConversation $conversation, InboundComment $comment): bool
+    private function upsertMessage(InboxConversation $conversation, InboundComment $comment): ?InboxMessage
     {
         $exists = $conversation->messages()
             ->where('external_message_id', $comment->externalId)
             ->exists();
 
         if ($exists) {
-            return false;
+            return null;
         }
 
-        $conversation->messages()->create([
+        return $conversation->messages()->create([
             'org_id' => $conversation->org_id,
             'external_message_id' => $comment->externalId,
             'parent_external_id' => $comment->parentExternalId,
@@ -136,8 +159,6 @@ class IngestCommentsForTargetAction
             'sentiment' => $this->sentiment->classify($comment->body),
             'posted_at' => $comment->postedAt ?? now(),
         ]);
-
-        return true;
     }
 
     /**

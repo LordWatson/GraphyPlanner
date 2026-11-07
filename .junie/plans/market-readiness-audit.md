@@ -4,6 +4,17 @@
 
 > **Status (2026-11-07)**
 >
+> **Phase seven — the buildable parts of the "when the market asks" bucket are done.** Item 21
+> steps 2 and 3 (organisation-wide two-factor enforcement; the audit log and its CSV export) and
+> item 24 step 3 (mention alerts). Three features, each with tests and module docs.
+>
+> **Still open in that bucket, and why.** Item 20 (DMs) needs vendor DM access we do not have.
+> Item 21 step 1 (SAML) needs an identity provider to test against and a package decision; step 4
+> (the security page) is marketing copy, not code; **step 5 (per-organisation data export) is
+> buildable code and is the obvious next piece**; step 6 (SOC 2) is a commercial decision. Item 24
+> step 1 (Bluesky) needs credentials, and step 4 is comparison-page copy. Item 26 (localisation) is
+> a translation sweep across every page rather than a feature.
+>
 > **Phase one — done.** Findings 1, 2, 3, 4 fixed with tests, plus 15. GTM-0.3 (tax and entity)
 > is not code and still needs an accountant. Finding 1's fix is now **confirmed against real
 > MySQL 8.0.46**: `escape '\'` returns error 1064, `escape '!'` is accepted.
@@ -33,8 +44,9 @@
 > public API, client onboarding templates and retainer profitability — are not started**; they are
 > the three features of the first-quarter group and each deserves its own run.
 >
-> **New finding:** 30 — `npm run check` has been failing CI on three oversized editor components,
-> independently of any change here. It also means my earlier claim that every CI gate passes was
+> **New finding:** 30 — `npm run check` has been failing CI on three oversized editor components
+> **and** on a formatter check that reports 380 unformatted files (mostly `.md`), independently of
+> any change here. It also means my earlier claim that every CI gate passes was
 > wrong: I had checked `composer audit`, Pint, PHPStan, `tsc` and the suite, but not the frontend
 > guards.
 >
@@ -43,8 +55,8 @@
 > suppression plus an SPF/DKIM/DMARC check). Item 17's DNS records and the two-domain split are not
 > code and remain outstanding.
 >
-> **Verification as of 2026-11-07:** **2,457 tests, all passing on SQLite *and* MySQL 8.0.46**
-> (14,758 assertions, identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
+> **Verification as of 2026-11-07:** **2,498 tests, all passing on SQLite *and* MySQL 8.0.46**
+> (identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
 > errors with nothing new. `composer audit` is clean. `npm run check` is **not** — see finding 30.
 >
 > **New findings raised by this phase:** 17 (org purge leaves the brand logo behind), 18
@@ -1086,7 +1098,7 @@ the deal against anyone who has DMs even partially.
 
 ---
 
-### 21. Enterprise trust: SSO, audit export, and a security page
+### 21. Enterprise trust: SSO, audit export, and a security page — ◐ steps 2 and 3 done 2026-11-07
 
 **Why:** SSO and audit logs are repeatedly described as the contents of the enterprise tier, and
 SOC 2 comes up in every procurement conversation above a certain deal size. You will not win a
@@ -1095,11 +1107,22 @@ SOC 2 comes up in every procurement conversation above a certain deal size. You 
 **Steps:**
 1. Add SAML/OIDC single sign-on. Fortify is already in place; add a per-organisation provider
    (`sso_connections`) with an "SSO only" enforcement option. Price it on the top plan.
-2. Add an organisation-level "all members must have 2FA" switch. Fortify's 2FA is already enabled;
-   the enforcement is what is missing.
-3. Add audit log export. `post_activity_logs` and the staff activity log exist; add an
-   organisation-wide, filterable, CSV-exportable audit view (who did what, when, from where). A
-   day of work that answers half a questionnaire.
+2. ✅ **Done.** `organizations.require_two_factor` plus `EnsureTwoFactorEnrolled`, appended to the
+   `web` group so it cannot be forgotten on a new route. A member who has not enrolled is sent to
+   their security page on a safe request and refused with a 403 on anything else. Super admins and
+   client reviewers are exempt on purpose — forcing an authenticator app on somebody else's client
+   contact would lock them out of their own approvals with nobody able to help. The form refuses to
+   turn the switch **on** for an owner with no second factor, because the middleware would
+   otherwise lock them out of the page holding the switch.
+3. ✅ **Done.** Settings → Audit log (owner only) and a CSV export behind `throttle:exports` +
+   password confirmation. `App\Services\Security\AuditTrail` unions the four activity tables that
+   already existed — staff, posts, campaigns, plan — into one filterable stream (date window,
+   person), read in the organisation's own timezone. It writes nothing of its own, so it cannot
+   become a second version of the truth, and a drift test fails if a new `*_activity_logs` or
+   `*_audit_logs` table appears that is neither read nor explicitly excluded with a reason.
+   Bounded at 5,000 rows per source: an export of a month or a quarter, not years.
+   **Not covered:** "from where" — no IP or user-agent is recorded anywhere in the app today, so
+   that column would have to be added at each write site first.
 4. Write the security page: subprocessors, where data lives, retention, encryption, how to report
    a vulnerability, DPA on request. `.junie/mcp-security-review.md` shows you already think this
    way — publish it.
@@ -1156,7 +1179,7 @@ joins over data you already store.
 
 ---
 
-### 24. Reach: Bluesky, Reddit, and an honest listening story
+### 24. Reach: Bluesky, Reddit, and an honest listening story — ◐ step 3 done 2026-11-07
 
 **Why:** Nine networks is a competitive set, but Bluesky is now standard on competitor grids and is
 cheap to add. Real social listening is explicitly deferred in your plan and I agree with that call
@@ -1166,10 +1189,15 @@ cheap to add. Real social listening is explicitly deferred in your plan and I ag
 1. Add Bluesky. Public API, no app review, fits `PlatformCapabilities` plus the rollout gate you
    already have. Likely the cheapest platform you will ever add.
 2. Evaluate Reddit and Mastodon the same way. Reddit matters for B2B clients and has a real API.
-3. For listening, ship the narrow honest version rather than nothing: keyword alerts over the
-   comments and mentions you already ingest for connected accounts. Call it "mention alerts", not
-   "social listening".
-4. On the comparison pages, say plainly that you do not do web-wide listening, and name who does.
+3. ✅ **Done.** "Mention alerts": a per-organisation list of watched words
+   (`mention_keywords`, capped at 50), checked against every comment the hourly sweep newly
+   ingests, notifying the studio once per match. Matching is whole-word and accent-insensitive, so
+   "art" never fires on "start" — the failure that would get the feature switched off in a day.
+   Scanned **after** the ingestion transaction commits and only for messages stored on that pass,
+   so a re-read post never alerts twice. Managed at `/inbox/alerts`, linked from the inbox hero.
+   The copy says plainly that it reads the comments Alima already collects, not the open web.
+4. **Still to do.** On the comparison pages, say plainly that you do not do web-wide listening, and
+   name who does. (The product itself now says it, on the alerts page.)
    Your `/compare/{rival}` pages are already built on dated, checked figures; that credibility is
    worth more than a checkmark.
 5. Revisit real listening only when a lost deal names it as the reason, and record that in the

@@ -284,3 +284,10 @@ subscriptions and prunes `Gone`; runs only when `isConfigured()`):
   once per 24h per thread via `inbox_conversations.reminder_sent_at`. See `inbox.md` and
   `InboxSlaService`. `NotificationCategory::forNotificationClass()` maps any `*Inbox*` notification to the
   Comments bucket, so a user who muted comments isn't nudged.
+
+## Mention alerts
+- `App\Notifications\MentionAlert` (database, `NotificationCategory::Comments` — the class name
+  carries "Mention") — a word the studio watches has appeared in a newly ingested comment. Sent to
+  the Owners/Strategists by `App\Services\Inbox\MentionAlerts`, once per match, from comment
+  ingestion after its transaction commits. Carries the term, the author and a link to the inbox;
+  **not** the comment body. See `inbox.md` (`MentionAlerts`, `MentionKeyword`).

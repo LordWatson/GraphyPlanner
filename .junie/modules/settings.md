@@ -38,6 +38,34 @@ Profile/Security/Appearance settings pages.
   off. Drives `App\Services\Inbox\InboxSlaService`, the daily `inbox:send-overdue-reminders` reminder and the
   overdue flag in the inbox. See `inbox.md`.
 
+## Audit log (Owner only)
+- `settings/audit-log` (`audit-log.index`) and `settings/audit-log/export`
+  (`audit-log.export`, behind `throttle:exports` + `RequirePassword`, like the analytics and
+  invoice exports) -> `App\Http\Controllers\Settings\AuditLogController`, page
+  `settings/audit-log.tsx`, nav entry in `layouts/settings/layout.tsx` (owners only).
+- `App\Services\Security\AuditTrail` normalises four **existing** tables into one stream:
+  `staff_activity_logs`, `post_activity_logs`, `campaign_activity_logs` and `plan_audit_logs`
+  (`AuditTrail::SOURCES`). It is read-only and writes nothing of its own, so it cannot become a
+  second, disagreeing version of the truth.
+- Deliberately **not** read, with reasons, in `AuditTrail::NOT_AUDITED`: `ai_usage_logs` (metering,
+  not people's actions), `mcp_call_logs` (own console view), `grid_plan_activity_logs`
+  (collaboration, not an access event).
+- Why a union and not one `audit_logs` table: a single table would mean rewriting four working,
+  tested write paths and migrating their history for a reporting view. The shortcut is confined to
+  this one class and bounded at `AuditTrail::MAX_ROWS` (5,000 per source) so an export reads a
+  window rather than an org's whole history. `AuditTrailTest` fails if a new `*_activity_logs` or
+  `*_audit_logs` table appears that is neither read nor excluded.
+- Filters (`AuditLogRequest`): `from`/`to` (defaulting to the last 30 days) and `actor`, which is
+  `Rule::exists` **scoped to this org's members** so it cannot probe user ids elsewhere. The window
+  is interpreted in the org's `default_timezone` and converted to UTC; timestamps are rendered back
+  in that timezone on the page and in the CSV header.
+- The page shows the most recent 200 entries and says so; the CSV carries the whole window.
+
+## Organisation-wide two-factor
+- `organizations.require_two_factor` (boolean, default false; migration `2027_03_19_100100`), the
+  Owner switch on this page. Enforcement, the exemptions and the lockout guard are documented in
+  `auth.md` ("Organisation-wide two-factor").
+
 ## Actions / Services / Contracts
 - `App\Actions\Organizations\UpdateOrganizationSettingsAction`: `DB::transaction`-wrapped upsert of
   `default_timezone`, `default_currency`, plus the three keys. A blank/omitted key in the request
@@ -138,6 +166,15 @@ existing org already has.
   placeholder.
 
 ## Changelog
+- 2026-11-07: Added the Owner-only **Audit log** page and CSV export (`AuditTrail`,
+  `AuditLogController`, `AuditLogRequest`, `settings/audit-log.tsx`) and the organisation-wide
+  **two-factor** switch (`organizations.require_two_factor`; enforcement in `auth.md`). Also fixed
+  the `restrict_staff_to_assigned_clients` checkbox on `settings/organization.tsx`: it was an
+  uncontrolled `Checkbox` with no hidden field, so an unchecked box submitted nothing and the
+  setting could be turned on but never off. Both toggles now follow the house pattern (controlled
+  `Checkbox` + hidden `1`/`0` input) used on `settings/workspace.tsx`. Tests in
+  `tests/Feature/Security/AuditTrailTest.php` and
+  `tests/Feature/Security/TwoFactorEnforcementTest.php`.
 - 2026-10-24: UI — `SettingsLayout` (which wraps every settings sub-page) now opens with the Ink `ChapterHero` in place of `PageHeader`, matching the other chapter pages. No aside (settings has no stable count); the section nav and forms below are unchanged. See `frontend.md`.
 - 2026-10-24: Step M-4.1 — the Organization settings page gained the agency's VAT/TRN number +
   label (`tax_registration_number`/`tax_registration_label`, drive the "Tax invoice" heading) and a
