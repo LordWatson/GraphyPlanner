@@ -197,6 +197,19 @@ This is the one step with real infrastructure surface, and **the app does not ow
 - Publishing must never share workers with AI or report work (asserted in
   `tests/Feature/QueueInfrastructureTest.php`, which also checks every supervisor timeout is below
   `retry_after`).
+- **CI runs the suite on both engines.** The `ci` job uses SQLite (fast, no service); the `mysql`
+  job runs it against MySQL 8 with `graphy_test` as the database. Tests on one engine only are not
+  enough: `AGENTS.md` requires SQL to work on both, and a `LIKE ... ESCAPE '\'` clause shipped in
+  three places because MySQL rejects it (error 1064) while SQLite accepts it.
+- **`/up` fails while asset storage is misconfigured** (`ASSETS_DISK` naming a disk that does not
+  exist, or an `s3` disk with no bucket/key/secret), so a half-finished storage switch is caught by
+  the load balancer rather than by the first user to upload a file. See
+  `ObservabilityServiceProvider::assetDiskMisconfiguration()`.
+- **A single app boot peaks at ~36 MB** with all providers and 627 routes. CI asserts a boot
+  succeeds at PHP's 128 MB default, so a provider that starts loading the world fails the build
+  instead of quietly raising every worker's memory floor. The *test suite* needs more (512 MB, set
+  in `phpunit.xml`) because PHPUnit keeps every test's application alive — a different thing, and
+  not a sign the app is heavy.
 
 ## Tests
 - `tests/Feature/Database/IndexCoverageTest.php`, `tests/Feature/QueueInfrastructureTest.php`.
@@ -225,16 +238,44 @@ committed):
 - Cold analytics misses the 500 ms target — see `analytics.md` (needs `org_id` on
   `post_activity_logs`).
 - No failed-job alerting or error tracking yet (Step I-16.1).
-- On MySQL, `PurgeOrganizationJob` fails when the org has invoices (`SQLSTATE 1451` on
-  `invoices_client_id_foreign`): `invoices.client_id` is `NO ACTION` (Step I-1.5) and deleting the
-  organization reaches clients before invoices. The SQLite suite passes, so it isn't caught there
-  (`ClientArchiveTest::test_deleting_an_organization_soft_deletes_it_then_purges_its_files` fails
-  when run on MySQL, on the base commit too). Pre-existing; not changed here.
-- Two more tests fail only on MySQL, also pre-existing: calendar times come back as `09:00:00`
-  (MySQL `TIME`) where tests expect `09:00`, and saved-report filters come back with JSON keys
-  reordered (MySQL normalizes JSON key order).
+- ~~Three classes of MySQL-only failure (org purge hitting `SQLSTATE 1451`, `TIME` columns read back
+  with seconds, JSON key reordering).~~ **Fixed 2026-11-07** — all 14 affected tests pass on both
+  engines, and the `mysql` CI job is blocking so the class cannot come back. See the changelog.
 
 ## Changelog
+- 2026-11-07: **The dependency audit gate passes again, and email deliverability can be checked.**
+  Symfony updated 8.1.9 → 8.1.11 across the board, clearing 11 advisories on 6 packages that had
+  been failing `composer audit` in CI independently of any code change (audit finding 28). New
+  `php artisan mail:check-dns` reports SPF, DKIM and DMARC on `mail.from.address` and exits non-zero,
+  so it can be a release-checklist step — reusing the `DnsResolver` contract built for bio-page
+  domains, so it needs no new seam and never touches the network in tests. New `MAIL_DKIM_SELECTOR`
+  and `RESEND_WEBHOOK_SECRET`. Audit item 17 (the code half; the DNS records themselves are still
+  outstanding).
+- 2026-11-07: **The suite now runs on MySQL in CI, and the 14 failures that exposed are fixed.**
+  New blocking `tests (mysql)` job (MySQL 8 service, `graphy_test`, `DB_CONNECTION=mysql` — PHPUnit's
+  `<env>` does not overwrite an already-set variable, so no second config file is needed), plus a
+  boot smoke test at PHP's 128 MB default. `phpunit.xml` now sets `memory_limit=512M` for the suite
+  itself (PHPUnit holds every test's application alive; a single boot peaks at ~36 MB).
+  `brianium/paratest` added so `artisan test --parallel` works.
+  The failures it found, all previously invisible:
+  * **`PurgeOrganizationJob` threw `SQLSTATE 1451` on MySQL**, so a deleted organisation was never
+    actually purged. `invoices.client_id` was set to `NO ACTION` believing that is deferred to the
+    end of the statement; InnoDB treats it as `RESTRICT` and checks it immediately. The job now
+    deletes the org's invoices inside its transaction before `forceDelete()`, and the migration's
+    comment has been corrected. A *client* purge still refuses while invoices exist, by design.
+  * **`post_targets.scheduled_local_time` read back as `09:00:00`** — the schema's only `TIME`
+    column. It reached the frontend unchanged, so the calendar and post editor showed seconds in
+    production and never in a test. A `PostTarget` accessor now normalises reads to `H:i`, which
+    fixes every reader at once.
+  * **Stored JSON key order** differs by engine; five tests used order-sensitive `assertSame` on
+    JSON columns and now use `assertEquals` (order-insensitive on object keys, still ordered on
+    nested lists).
+  * **`Schema::getTables()` / `getTableListing()` are server-wide on MySQL** (388 tables across
+    eight databases on a dev machine). Both call sites are now scoped to the connection's own
+    database — which also means
+    `SecretsAndPrivateMediaTest::test_no_database_column_holds_a_raw_review_token` actually runs
+    there now instead of erroring on a table from another project.
+  See finding 29 in `.junie/plans/market-readiness-audit.md`.
 - 2026-10-21: Phase M-3 — scheduler: `analytics:sync-engagement` daily 04:00 (jobs on `reports`), `analytics:send-client-reports` hourly, `clients:recompute-health` now hourly; all registered in `SchedulerHeartbeat`. New config files `config/analytics.php`, `config/clients.php`.
 - 2026-10-18: Created. Steps I-2.1 (hot-path indexes + coverage test) and I-2.8 (Redis defaults,
   Horizon with per-workload supervisors, named queues, super-admin-only dashboard).

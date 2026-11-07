@@ -35,6 +35,21 @@ class UpdateStaffMemberAction
                 'role' => $toRole,
             ]);
 
+            // Per-client access. Only touched when submitted, so every other caller of this action
+            // (and its tests) keeps working. An Owner is never restricted, so assignments on one
+            // are meaningless — syncing them anyway would quietly suggest otherwise.
+            if (array_key_exists('client_ids', $data) && $toRole !== Role::Owner) {
+                $ids = array_map('intval', (array) $data['client_ids']);
+                $staff->assignedClients()->sync($ids);
+
+                Log::info('Staff client assignments updated', [
+                    'org_id' => $staff->org_id,
+                    'user_id' => $staff->id,
+                    'actor_user_id' => $actor->id,
+                    'client_count' => count($ids),
+                ]);
+            }
+
             if ($fromRole !== $toRole) {
                 StaffActivityLog::create([
                     'org_id' => $staff->org_id,

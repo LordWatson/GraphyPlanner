@@ -2,10 +2,15 @@
 
 namespace App\Services;
 
+use App\Contracts\ChatNotifier;
 use App\Enums\Role;
 use App\Models\GridPlan;
 use App\Models\Post;
 use App\Models\User;
+use App\Notifications\ApprovalOverdue;
+use App\Notifications\PostApprovalDecided;
+use App\Notifications\PostPublishFailed;
+use App\Notifications\PostWaitingForClientReview;
 use App\Support\Notifications\NotificationPreferences;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
@@ -119,5 +124,70 @@ class PostNotificationService
                 $recipient->notify($notification);
             }
         }
+
+        $this->announceToChat($recipients->first(), $notification);
+    }
+
+    /**
+     * The notifications worth interrupting a team channel for: a post going to the client, the
+     * client's answer either way, a publish failing, and an approval going past its SLA. Anything
+     * else stays in the bell — a channel that reports everything gets muted, and then it reports
+     * nothing.
+     *
+     * @var list<class-string>
+     */
+    private const CHAT_ANNOUNCED = [
+        PostWaitingForClientReview::class,
+        PostApprovalDecided::class,
+        PostPublishFailed::class,
+        ApprovalOverdue::class,
+    ];
+
+    /**
+     * Post one message per notification (not per recipient — it is a shared channel).
+     *
+     * Hooked here because every post notification already goes through `send()`, and every
+     * notification's `toArray()` already carries the `title`, `body` and `url` a chat line needs.
+     * No per-notification code, and nothing to forget when a new one is added — it simply will not
+     * announce unless it is listed above.
+     */
+    private function announceToChat(?User $recipient, Notification $notification): void
+    {
+        // Checked before anything touches the database, so the notifications that are not
+        // announced — most of them — cost nothing at all.
+        if ($recipient === null || ! in_array($notification::class, self::CHAT_ANNOUNCED, true)) {
+            return;
+        }
+
+        // Explicit: lazy loading is disabled app-wide, and the recipient collections reaching this
+        // method do not all arrive with `organization` loaded.
+        $organization = $recipient->loadMissing('organization')->organization;
+
+        if ($organization === null) {
+            return;
+        }
+
+        // Every announced notification stores to the database and so has a `toArray`, but the base
+        // `Notification` does not promise one — so this asks rather than assumes. A notification
+        // that cannot describe itself has nothing to say in a channel either.
+        if (! method_exists($notification, 'toArray')) {
+            return;
+        }
+
+        $chat = app(ChatNotifier::class);
+
+        if (! $chat->isConfiguredFor($organization)) {
+            return;
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = $notification->toArray($recipient);
+
+        $chat->notifyOrganization(
+            $organization,
+            (string) ($payload['title'] ?? 'Update'),
+            (string) ($payload['body'] ?? ''),
+            isset($payload['url']) ? (string) $payload['url'] : null,
+        );
     }
 }

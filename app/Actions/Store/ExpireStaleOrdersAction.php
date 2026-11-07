@@ -17,9 +17,10 @@ use Throwable;
  *
  * Two kinds of stale order:
  *
- *  - **Abandoned checkouts.** A pending order holds its booking slot (and a coupon redemption) from
- *    the moment the buyer is sent to Stripe. After an hour it is cancelled and the slot released, so
- *    one abandoned tab cannot sit on a Friday afternoon forever.
+ *  - **Abandoned checkouts.** A pending order holds its booking slot *and* a coupon redemption from
+ *    the moment the buyer is sent to Stripe. After an hour it is cancelled and both are released, so
+ *    one abandoned tab cannot sit on a Friday afternoon forever — nor can fifty of them spend a
+ *    capped discount code that nobody ever paid with.
  *  - **Unanswered paid questions.** The card was authorised, never captured. Past
  *    `authorised_until` the authorisation is released at the provider and the order cancelled —
  *    deliberately well inside the ~7 days a card authorisation survives, so we never try to capture
@@ -58,13 +59,15 @@ class ExpireStaleOrdersAction
             ->withoutOrgScope()
             ->where('status', OrderStatus::Pending)
             ->where('created_at', '<', now()->subMinutes(self::PENDING_TTL_MINUTES))
-            ->with('product')
+            ->with('product', 'coupon')
             ->limit(500)
             ->get();
 
         foreach ($orders as $order) {
             ($this->transition)($order, OrderStatus::Cancelled, ['reason' => 'abandoned']);
             $order->booking?->delete();
+            // The slot is not the only thing an abandoned checkout was holding.
+            $order->coupon?->releaseRedemption();
             $this->nudgeAbandoned($order);
         }
 

@@ -45,6 +45,7 @@ use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\Post;
 use App\Models\SavedReply;
+use App\Models\Scopes\ClientAccessScope;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
 use App\Models\SuperAdminReport;
@@ -90,6 +91,7 @@ use App\Services\Inbox\UploadPostCommentSource;
 use App\Services\LocalAssetStorage;
 use App\Services\Media\FfprobeMediaProber;
 use App\Services\Notifications\NullChatNotifier;
+use App\Services\Notifications\SlackChatNotifier;
 use App\Services\Payments\NullPaymentProvider;
 use App\Services\Payments\StripeConnectProvider;
 use App\Services\Plans\ConfigEntitlements;
@@ -169,7 +171,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Step M-6.7 (I-12.1): team-chat notifications behind a contract. The MVP is a no-op; a
         // WhatsApp implementation (not Slack) drops in here later without touching callers.
-        $this->app->bind(ChatNotifier::class, NullChatNotifier::class);
+        // Team chat. Slack by default and safe unconfigured — an org with no webhook URL is simply
+        // never notified. `CHAT_NOTIFIER=null` turns it off entirely. Bound by config like
+        // `AdsSource` and `VirusScanner`, so swapping in Teams-specific formatting later touches
+        // one line.
+        $this->app->bind(ChatNotifier::class, fn () => config('notifications.chat') === 'slack'
+            ? $this->app->make(SlackChatNotifier::class)
+            : $this->app->make(NullChatNotifier::class));
 
         // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
         // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private
@@ -347,6 +355,32 @@ class AppServiceProvider extends ServiceProvider
         // workspace itself (`org.member` sends them to `/super-admin`), so in practice this grants
         // the platform-level abilities on `OrganizationPolicy`/`SuperAdminReportPolicy`.
         Gate::before(fn (User $user): ?bool => $user->isSuperAdmin() ? true : null);
+
+        // Per-client staff access, for single records. `ClientAccessScope` is the safety net for
+        // queries, but route-model binding deliberately resolves without scopes so a policy can
+        // answer 403 — which means a restricted member could otherwise reach another client's post
+        // by URL. One `before` covers every policy at once: it returns false (deny) when the
+        // subject belongs to a client the member is not on, and null otherwise so the real policy
+        // still decides. Runs after the super-admin grant above, which short-circuits first.
+        Gate::before(function (User $user, string $ability, array $arguments = []): ?bool {
+            foreach ($arguments as $argument) {
+                if ($argument instanceof Client && ! ClientAccessScope::allows($user, $argument)) {
+                    return false;
+                }
+
+                if ($argument instanceof Model && $argument->getAttribute('client_id') !== null
+                    && ! ClientAccessScope::allowsClientId($user, (int) $argument->getAttribute('client_id'))) {
+                    return false;
+                }
+                // A `Client` with no id yet (a create check) falls through `allows()` as allowed.
+            }
+
+            return null;
+        });
+
+        foreach (ClientAccessScope::MODELS as $model) {
+            $model::addGlobalScope(new ClientAccessScope);
+        }
 
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(ClientReport::class, ClientReportPolicy::class);

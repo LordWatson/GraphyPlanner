@@ -47,6 +47,14 @@ jobs:
       - name: Setup Application
         run: composer setup
 
+      # One boot of this app peaks at ~36MB, so PHP's 128MB default is a wide margin. If a boot
+      # ever needs more than that, something has gone badly wrong (a provider loading the world, a
+      # config file reading a database) and it should fail here rather than quietly raise every
+      # worker's memory floor. Not the same thing as the test suite's limit, which is set in
+      # phpunit.xml because PHPUnit keeps every test's application alive.
+      - name: Smoke test the application boot at PHP's default memory limit
+        run: php -d memory_limit=128M artisan route:list --json > /dev/null
+
       # Step I-16.2 / M-1.2: fail the build on high or critical advisories.
       - name: Audit PHP dependencies
         run: composer audit --locked --abandoned=report --ignore-severity=low --ignore-severity=medium
@@ -72,3 +80,68 @@ jobs:
       - name: Run end-to-end journeys
         if: ${{ !cancelled() }}
         run: npm run test:e2e
+
+  # Production runs MySQL 8; the job above runs SQLite because it is fast and needs no service.
+  # That gap is not cosmetic: SQL the two engines disagree about passes there and fails in
+  # production. A `LIKE ... ESCAPE '\'` clause shipped in three places for exactly that reason —
+  # MySQL rejects it as an unterminated string literal (error 1064), SQLite accepts it — and a
+  # fully green 2,309-test suite could not see it. This job is what closes that gap.
+  mysql:
+    name: tests (mysql)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          # `Tests\TestCase::isTestDatabase()` refuses any non-SQLite database whose name does not
+          # contain "test", which is the guard against a run pointing at real data.
+          MYSQL_DATABASE: graphy_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    # PHPUnit's `<env>` entries do not overwrite a variable that is already set, so these win over
+    # the SQLite defaults in phpunit.xml without needing a second config file.
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: graphy_test
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      CACHE_STORE: array
+      CACHE_LIMITER: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          php -r "file_exists('.env') || copy('.env.example', '.env');"
+          php artisan key:generate
+
+      # Blocking, like the SQLite job. Its first run found 14 failures no SQLite run could see —
+      # a TIME column read back with seconds, JSON key order, and an organisation delete that threw
+      # `SQLSTATE 1451` — all fixed before this gate went live (finding 29 in
+      # `.junie/plans/market-readiness-audit.md`). Keep it blocking: an advisory gate gets ignored.
+      - name: Run the test suite against MySQL
+        run: php artisan test

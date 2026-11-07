@@ -17,9 +17,10 @@ use Throwable;
 /**
  * Step I-1.5 — the second half of a super admin's organization delete. `DeleteOrganizationAction`
  * soft-deletes the organization (it vanishes everywhere at once); this job then removes every
- * stored file its clients owned (assets, invoice and persona PDFs, AI previews) through
- * `AssetStorage`, and finally hard-deletes the organization so the database cascades remove its
- * rows. Idempotent: an organization that was restored or is already gone is left alone.
+ * stored file it owned — its clients' assets, invoice and persona PDFs and AI previews, plus the
+ * organization's own white-label logo — through `AssetStorage`, and finally hard-deletes the
+ * organization so the database cascades remove its rows. Idempotent: an organization that was
+ * restored or is already gone is left alone.
  */
 class PurgeOrganizationJob implements ShouldQueue
 {
@@ -50,7 +51,14 @@ class PurgeOrganizationJob implements ShouldQueue
         }
 
         $clientIds = DB::table('clients')->where('org_id', $organization->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $files = $inventory->forClients($clientIds);
+
+        // Both owners: the clients' files, and the organization's own (the white-label logo, which
+        // belongs to no client and so was previously left in storage for good).
+        $files = $inventory->forClients($clientIds)
+            ->merge($inventory->forOrganizations([$organization->id]))
+            ->unique(fn (array $file) => $file['disk'].'|'.$file['path'])
+            ->values();
+
         $failed = 0;
 
         foreach ($files as $file) {
@@ -67,7 +75,26 @@ class PurgeOrganizationJob implements ShouldQueue
             }
         }
 
-        DB::transaction(fn () => $organization->forceDelete());
+        DB::transaction(function () use ($organization, $clientIds) {
+            // `invoices.client_id` is `NO ACTION`, which the migration that set it believed was
+            // deferred to the end of the statement — so cascading `organizations → clients →
+            // invoices` in one delete was expected to work. InnoDB treats `NO ACTION` as a synonym
+            // for `RESTRICT` and checks it immediately, so on MySQL the cascade hit
+            // `SQLSTATE 23000 / 1451` and this job failed every retry, leaving the organization
+            // soft-deleted forever with its files undeleted. SQLite does defer, which is why the
+            // test suite never saw it.
+            //
+            // Removing an organization's invoices is the intended behaviour (a *client* purge
+            // still refuses while invoices exist — see `PurgeClientAction`); they just have to go
+            // first, explicitly. `invoice_items` cascades from them and `brand_deals.invoice_id`
+            // is `nullOnDelete`, so nothing else needs ordering.
+            DB::table('invoices')
+                ->where('org_id', $organization->id)
+                ->orWhereIn('client_id', $clientIds)
+                ->delete();
+
+            $organization->forceDelete();
+        });
 
         Log::warning('Organization purged', [
             'org_id' => $this->organizationId,

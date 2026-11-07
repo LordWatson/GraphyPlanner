@@ -17,7 +17,7 @@ class UpdateOrganizationSettingsAction
      * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
      * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
-     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, xai_key?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -61,8 +61,25 @@ class UpdateOrganizationSettingsAction
                 $organization->upload_post_webhook_secret = $data['upload_post_webhook_secret'];
             }
 
+            // Per-client staff access. Only touched when submitted, so other callers of this
+            // action are unaffected. Turning it on restricts every non-Owner immediately — a
+            // member with no assignments sees nothing until somebody puts them on a client, which
+            // is the safe direction for a confidentiality setting.
+            if (array_key_exists('restrict_staff_to_assigned_clients', $data)) {
+                $organization->restrict_staff_to_assigned_clients = (bool) $data['restrict_staff_to_assigned_clients'];
+            }
+
             if (! empty($data['xai_key'])) {
                 $organization->xai_key = $data['xai_key'];
+            }
+
+            // The team-chat webhook is a credential, so it follows the same rule as the keys above:
+            // a blank submit keeps what is stored, and the form never redisplays it. Turning the
+            // integration off is a deliberate act with its own button
+            // (`OrganizationController::removeChatWebhook`), not something a blank field does by
+            // accident while somebody was editing their timezone.
+            if (! empty($data['chat_webhook_url'])) {
+                $organization->chat_webhook_url = $data['chat_webhook_url'];
             }
 
             // Step GTM-3.1: white-label branding. Saved whether or not the plan includes it —

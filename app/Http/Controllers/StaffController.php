@@ -7,6 +7,8 @@ use App\Actions\Staff\UpdateStaffMemberAction;
 use App\Enums\OrganizationType;
 use App\Enums\Role;
 use App\Http\Requests\UpdateStaffMemberRequest;
+use App\Models\Client;
+use App\Models\Scopes\ClientAccessScope;
 use App\Models\StaffActivityLog;
 use App\Models\StaffInvitation;
 use App\Models\User;
@@ -67,9 +69,27 @@ class StaffController extends Controller
     {
         $this->authorize('update', $staff);
 
+        $organization = $request->user()->organization;
+        $restricted = (bool) $organization->restrict_staff_to_assigned_clients;
+
         return Inertia::render('staff/edit', [
             'member' => $this->transform($staff, $request->user()),
-            'roles' => $this->roleOptions($request->user()->organization->type),
+            'roles' => $this->roleOptions($organization->type),
+            // Per-client access. The picker only appears when the organization restricts access
+            // that way; the whole roster is listed without the access scope, because this is the
+            // Owner choosing who goes on what.
+            'restrictsClients' => $restricted,
+            'clients' => $restricted
+                ? Client::query()
+                    ->withoutGlobalScope(ClientAccessScope::class)
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn (Client $client) => ['id' => $client->id, 'name' => $client->name])
+                    ->all()
+                : [],
+            'assignedClientIds' => $restricted
+                ? $staff->assignedClients()->pluck('clients.id')->map(fn ($id) => (int) $id)->all()
+                : [],
         ]);
     }
 

@@ -5,6 +5,7 @@ namespace App\Actions\Posts;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Post;
+use App\Support\LikeSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -28,9 +29,9 @@ class ListClientPostsAction
         return $client->posts()
             ->with(['targets.socialAccount', 'campaign'])
             ->when($search !== '', function (Builder $query) use ($search) {
-                // Treat the user's input literally: `%` / `_` are not wildcards here.
-                $escaped = addcslashes($search, '\%_');
-                $query->whereRaw("lower(master_caption) like ? escape '\'", ['%'.mb_strtolower($escaped).'%']);
+                // Treat the user's input literally: `%` / `_` are not wildcards here. See
+                // `LikeSearch` for why the escape character is `!` and never a backslash.
+                $query->whereRaw("lower(master_caption) like ? escape '!'", [LikeSearch::literal($search)]);
             })
             ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
             // Archived posts are dropped work — hidden from the default list unless the user

@@ -2,7 +2,13 @@ import { Form, Head } from '@inertiajs/react';
 import OrganizationController from '@/actions/App/Http/Controllers/Settings/OrganizationController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,14 +19,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { edit, testUploadPost } from '@/routes/organization';
+import { edit, testChat, testUploadPost } from '@/routes/organization';
+import { destroy as removeChat } from '@/routes/organization/chat';
 import {
     store as storeTaxRate,
     update as updateTaxRate,
     archive as archiveTaxRate,
 } from '@/routes/tax-rates';
 import { useState } from 'react';
-import { Pencil, Plus, Trash2, Undo2, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 
 /** "Key is set (…a1b2)" — Step I-1.6 shows the last four characters, never the key. */
 function storedHint(
@@ -55,8 +62,11 @@ type OrganizationProps = {
         tax_registration_label: string | null;
         invoice_payment_terms_days: number;
         approval_sla_hours: number | null;
+        restrict_staff_to_assigned_clients: boolean;
         has_upload_post_key: boolean;
         has_upload_post_webhook_secret: boolean;
+        webhook_secret_missing: boolean;
+        has_chat_webhook_url: boolean;
         has_xai_key: boolean;
         upload_post_key_last4: string | null;
         upload_post_webhook_secret_last4: string | null;
@@ -287,6 +297,37 @@ export default function Organization({
                                 </div>
 
                                 <div className="grid gap-2">
+                                    <Label>Client access</Label>
+                                    <label className="flex items-start gap-2 text-sm">
+                                        <Checkbox
+                                            name="restrict_staff_to_assigned_clients"
+                                            value="1"
+                                            defaultChecked={
+                                                organization.restrict_staff_to_assigned_clients
+                                            }
+                                        />
+                                        <span>
+                                            Limit each teammate to the clients
+                                            they are put on.
+                                        </span>
+                                    </label>
+                                    <p className="text-muted-foreground text-xs">
+                                        Off by default, so everyone sees every
+                                        client. Turn it on if you work with
+                                        freelancers, or hold brands that
+                                        compete. Owners always see the whole
+                                        roster; you choose the rest on each
+                                        teammate's page.
+                                    </p>
+                                    <InputError
+                                        className="mt-2"
+                                        message={
+                                            errors.restrict_staff_to_assigned_clients
+                                        }
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
                                     <Label htmlFor="approval_sla_hours">
                                         Approval SLA (hours)
                                     </Label>
@@ -412,6 +453,36 @@ export default function Organization({
                                 />
                             </div>
 
+                            {organization.webhook_secret_missing && (
+                                <Alert variant="destructive">
+                                    <TriangleAlert />
+                                    <AlertTitle>
+                                        Publish results are not being recorded
+                                    </AlertTitle>
+                                    <AlertDescription>
+                                        <p>
+                                            Upload-Post tells us whether a post
+                                            went live by calling us back, signed
+                                            with your webhook secret. Without
+                                            the secret we cannot tell a real
+                                            result from a forged one, so we
+                                            refuse every one of them — posts
+                                            will sit as "publishing" even after
+                                            they have gone out.
+                                        </p>
+                                        <p>
+                                            Copy the{' '}
+                                            <code className="font-mono">
+                                                whsec_…
+                                            </code>{' '}
+                                            value from your Upload-Post
+                                            notifications dashboard into the
+                                            webhook secret field below.
+                                        </p>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
                             <div className="grid gap-2">
                                 <Label htmlFor="upload_post_key">
                                     Upload-Post API key
@@ -461,6 +532,37 @@ export default function Organization({
                                 <InputError
                                     className="mt-2"
                                     message={errors.upload_post_webhook_secret}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="chat_webhook_url">
+                                    Team chat webhook (Slack or Teams)
+                                </Label>
+
+                                <Input
+                                    id="chat_webhook_url"
+                                    type="password"
+                                    className="mt-1 block w-full"
+                                    name="chat_webhook_url"
+                                    autoComplete="off"
+                                    placeholder={
+                                        organization.has_chat_webhook_url
+                                            ? 'Webhook is set'
+                                            : 'https://hooks.slack.com/services/…'
+                                    }
+                                />
+
+                                <p className="text-muted-foreground text-sm">
+                                    We post approvals, change requests, publish
+                                    failures and overdue reviews here — the
+                                    moments somebody needs to act on. Nothing
+                                    else.
+                                </p>
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.chat_webhook_url}
                                 />
                             </div>
 
@@ -528,6 +630,49 @@ export default function Organization({
                             </>
                         )}
                     </Form>
+                )}
+
+                {organization.has_chat_webhook_url && (
+                    <div className="border-border flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+                        <p className="text-muted-foreground text-sm">
+                            Post a message to your team channel now, so you can
+                            see it arrive.
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                            <Form
+                                {...testChat.form()}
+                                options={{ preserveScroll: true }}
+                            >
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
+                                        {processing
+                                            ? 'Sending…'
+                                            : 'Send test message'}
+                                    </Button>
+                                )}
+                            </Form>
+
+                            <Form
+                                {...removeChat.form()}
+                                options={{ preserveScroll: true }}
+                            >
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        variant="ghost"
+                                        disabled={processing}
+                                    >
+                                        Turn off
+                                    </Button>
+                                )}
+                            </Form>
+                        </div>
+                    </div>
                 )}
             </div>
         </>

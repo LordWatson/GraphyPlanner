@@ -108,12 +108,18 @@ class McpReadToolsTest extends TestCase
             'scheduled_at_utc' => $instant,
         ]);
 
+        // The fixtures above deliberately store the full `HH:MM:SS` form, because that is what
+        // MySQL hands back for a `TIME` column. `PostTarget` normalises reads to `H:i`, so the
+        // assistant is told `13:00` on either database rather than `13:00` on one and `13:00:00`
+        // on the other. (`09:00:00` appears in `scheduled_at_utc` regardless, so only the Dubai
+        // time can be checked for absence.)
         GraphyServer::tool(GetPostTool::class, ['post_id' => $post->id])
             ->assertOk()
             ->assertSee('Europe/London')
             ->assertSee('Asia/Dubai')
-            ->assertSee('09:00:00')
-            ->assertSee('13:00:00');
+            ->assertSee('09:00')
+            ->assertSee('13:00')
+            ->assertDontSee('13:00:00');
     }
 
     public function test_get_calendar_renders_the_window_in_both_timezones(): void

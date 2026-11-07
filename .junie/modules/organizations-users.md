@@ -40,6 +40,14 @@ Step 0.2 of the plan.
   exist) and before `ClientSeeder`.
 
 ## Business Rules
+- **Per-client staff access** (`organizations.restrict_staff_to_assigned_clients`, default **off**).
+  When on, a non-Owner only sees the clients they are assigned on `client_user`. Two layers:
+  `App\Models\Scopes\ClientAccessScope` (registered in `AppServiceProvider` across every
+  client-owned model) filters lists and lookups, and a second `Gate::before` denies any ability on a
+  record belonging to an unassigned client — needed because route-model binding resolves without
+  scopes so a policy can answer 403. Owners and super admins are never restricted; a member
+  assigned to nothing sees nothing (not everything). Assignments are edited on the staff member's
+  page. See `clients.md` and finding 9 in `.junie/plans/market-readiness-audit.md`.
 - A user's `org_id` scopes what data (e.g. clients) they can see; policies additionally gate by
   `role`.
 - `client_reviewer` users are further scoped to a single `client_id`; they cannot list clients
@@ -115,6 +123,14 @@ Step 0.2 of the plan.
 - Full details: `.junie/modules/super-admin.md`.
 
 ## Changelog
+- 2026-11-07: **Per-client staff access.** New `client_user` pivot and
+  `organizations.restrict_staff_to_assigned_clients` (default false, so existing orgs are
+  unchanged), `User::assignedClients()` / `accessibleClientIds()` (null = unrestricted),
+  `ClientAccessScope` + a `Gate::before` denial, the client picker on `staff/edit`, and the
+  settings toggle. `BelongsToOrganization::resolveRouteBinding()` now lifts both access scopes so
+  the answer is a consistent 403 rather than 404 on some routes. Tests:
+  `ClientAccessScopeTest` (17), including a drift guard that fails if any table with a `client_id`
+  column is neither scoped nor exempt. Audit finding 9.
 - 2026-10-25: Merged the two post-signup emails into one — `RegisterOrganizationAction` now stops
   firing `Registered` and instead passes a signed 48h `verifyUrl` to `OrganizationWelcomeMail`, so a
   self-serve owner gets a single welcome email with one verify-and-enter button. `verify-email.tsx`

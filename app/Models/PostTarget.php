@@ -9,6 +9,7 @@ use App\Support\Publishing\CaptionComposer;
 use App\Support\Publishing\FormatSpec;
 use Database\Factories\PostTargetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -73,6 +74,28 @@ class PostTarget extends Model
             'status' => PostTargetStatus::class,
             'hashtags_override' => 'array',
         ];
+    }
+
+    /**
+     * Always `HH:MM`, whichever database is underneath.
+     *
+     * This is the one real `TIME` column in the schema. MySQL hands a `TIME` back as `09:00:00`;
+     * SQLite returns the `09:00` that was written. The value is read straight through to the
+     * frontend (`BuildCalendarOccurrencesAction` → `occurrences.*.account_local.time`), copied onto
+     * grid tiles, and compared against times built with `format('H:i')`, so without normalising it
+     * the calendar and post editor showed seconds in production and never in a test — and
+     * `grid_tiles.planned_local_time` is `string(8)` precisely because somebody sized it for the
+     * longer form rather than noticing why it was longer.
+     *
+     * Reads only: a write still stores whatever it was given, which is already `H:i` everywhere.
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function scheduledLocalTime(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): ?string => $value === null ? null : substr($value, 0, 5),
+        );
     }
 
     /**

@@ -93,6 +93,7 @@ use App\Http\Controllers\PostRevisionController;
 use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\ResendWebhookController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SavedPostViewController;
 use App\Http\Controllers\SavedReplyController;
@@ -278,6 +279,14 @@ Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle
 Route::post('webhooks/stripe-connect', [ConnectWebhookController::class, 'handle'])
     ->middleware('throttle:webhooks')
     ->name('webhooks.stripe-connect');
+
+// The mail provider's delivery events. Only bounces and complaints are acted on, and only to stop
+// sending to that address again — deliverability is shared, so one address kept in a marketing
+// list damages the domain that also carries approval requests. Verified by its own Svix signature
+// and fails closed (see `ResendWebhookController`); CSRF-exempt via the `webhooks/*` pattern.
+Route::post('webhooks/resend', [ResendWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.resend');
 
 // Step 15.2: the public organization signup — the first real "create an organization" path.
 // Fortify's own `/register` (which created org-less users) is replaced by it; the old URL

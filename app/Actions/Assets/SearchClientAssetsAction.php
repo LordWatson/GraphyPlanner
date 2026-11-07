@@ -5,6 +5,7 @@ namespace App\Actions\Assets;
 use App\Enums\AssetType;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Support\LikeSearch;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class SearchClientAssetsAction
@@ -27,9 +28,9 @@ class SearchClientAssetsAction
             // Step C-4.1: one campaign's asset kit (the client relation keeps it to this client).
             ->when($campaignId !== null, fn ($query) => $query->where('campaign_id', $campaignId))
             ->when($search !== '', function ($query) use ($search) {
-                // Treat the user's input literally: `%` / `_` are not wildcards here.
-                $escaped = addcslashes($search, '\\%_');
-                $query->whereRaw("lower(original_filename) like ? escape '\\'", ['%'.mb_strtolower($escaped).'%']);
+                // Treat the user's input literally: `%` / `_` are not wildcards here. See
+                // `LikeSearch` for why the escape character is `!` and never a backslash.
+                $query->whereRaw("lower(original_filename) like ? escape '!'", [LikeSearch::literal($search)]);
             })
             ->when($type !== null, fn ($query) => $query->where('type', $type))
             ->orderByDesc('created_at')

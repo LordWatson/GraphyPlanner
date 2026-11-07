@@ -15,6 +15,9 @@ use Illuminate\Support\Carbon;
  * {@see CreateCheckoutAction} — two buyers racing for the last use of a code
  * can't both get it.
  *
+ * A redemption is claimed when checkout *starts*, so it has to be handed back when the sale does
+ * not complete — see {@see releaseRedemption()}.
+ *
  * @property int $id
  * @property int $org_id
  * @property int|null $product_id
@@ -62,6 +65,28 @@ class Coupon extends Model
     public function isExhausted(): bool
     {
         return $this->max_redemptions !== null && $this->redemptions >= $this->max_redemptions;
+    }
+
+    /**
+     * Hand back the redemption this coupon's order claimed, because the sale did not happen: the
+     * checkout was abandoned and swept up, or the order was refunded.
+     *
+     * A redemption is claimed when a buyer *starts* checkout, before any money moves, so without
+     * this a capped code is spent by people who changed their mind — fifty abandoned tabs killed
+     * a `max_redemptions = 50` code for the fifty-first buyer, the one who would have paid.
+     *
+     * Done in SQL, floored at zero, so a double release (a refund arriving from both `/store` and
+     * the Stripe webhook) cannot push the count negative and hand out free uses.
+     */
+    public function releaseRedemption(): void
+    {
+        static::query()
+            // Called from the hourly sweep and the Stripe webhook, neither of which has a
+            // signed-in member for the org scope to read.
+            ->withoutOrgScope()
+            ->whereKey($this->getKey())
+            ->where('redemptions', '>', 0)
+            ->decrement('redemptions');
     }
 
     public function appliesTo(Product $product): bool

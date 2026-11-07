@@ -119,4 +119,17 @@ return [
     // contact. Falls back to the from address when unset.
     'support_address' => env('MAIL_SUPPORT_ADDRESS'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | DKIM selector
+    |--------------------------------------------------------------------------
+    |
+    | The selector the mail provider publishes its public key under, so
+    | `php artisan mail:check-dns` knows where to look: `<selector>._domainkey.<domain>`. Resend
+    | uses `resend`; change it if the provider or the sending domain changes.
+    |
+    */
+
+    'dkim_selector' => env('MAIL_DKIM_SELECTOR', 'resend'),
+
 ];

@@ -17,8 +17,8 @@ use Illuminate\Support\Facades\Log;
  * money back.
  *
  * Marking it refunded is also what revokes delivery: {@see Order::canDownload()} is false from that
- * moment, so an unexpired download link the buyer still has stops working, and the booking slot is
- * released back into availability.
+ * moment, so an unexpired download link the buyer still has stops working, and the booking slot
+ * and any discount redemption are released back.
  */
 class RefundOrderAction
 {
@@ -42,6 +42,9 @@ class RefundOrderAction
 
             // Free the slot: a refunded booking is not a booking any more.
             $order->booking?->delete();
+
+            // And the discount code: a refunded sale did not use it up.
+            $order->coupon?->releaseRedemption();
 
             Log::info('Order refunded', [
                 'order_id' => $order->id,

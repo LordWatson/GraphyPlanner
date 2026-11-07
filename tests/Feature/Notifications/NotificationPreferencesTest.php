@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\ApprovalOverdue;
 use App\Notifications\PostCommentAdded;
 use App\Services\Notifications\NullChatNotifier;
+use App\Services\Notifications\SlackChatNotifier;
 use App\Services\PostNotificationService;
 use App\Support\Notifications\NotificationPreferences;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,9 +142,18 @@ class NotificationPreferencesTest extends TestCase
         $this->assertSame(20, $unread['unread_count']);
     }
 
-    public function test_the_chat_notifier_is_the_null_implementation(): void
+    /**
+     * This used to assert the notifier was the no-op, which was the honest description of team
+     * chat until it was actually built. What has to stay true is the part that mattered: an
+     * organization that has not configured a channel is never notified, so nothing here sends
+     * anything. See `TeamChatNotificationTest` for delivery itself.
+     */
+    public function test_an_organization_without_a_chat_channel_is_never_notified(): void
     {
-        $this->assertInstanceOf(NullChatNotifier::class, app(ChatNotifier::class));
+        $this->assertInstanceOf(SlackChatNotifier::class, app(ChatNotifier::class));
         $this->assertFalse(app(ChatNotifier::class)->isConfiguredFor($this->org));
+
+        config(['notifications.chat' => 'null']);
+        $this->assertInstanceOf(NullChatNotifier::class, app(ChatNotifier::class));
     }
 }

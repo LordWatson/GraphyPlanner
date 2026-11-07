@@ -195,6 +195,18 @@ can be viewed/acted on.
   grows.
 
 ## Changelog
+- 2026-11-07: **Team chat actually sends now, and bounced addresses stop receiving mail.**
+  `ChatNotifier` had only a no-op binding, so every caller believing it told the team something was
+  talking to nothing. New `SlackChatNotifier` (per-org `organizations.chat_webhook_url`, encrypted;
+  works for Teams too), bound by `config('notifications.chat')`, with a settings field, a "Send test
+  message" button and a "Turn off" button. Announced through the single `PostNotificationService::send()`
+  seam and limited to the five moments somebody must act on — post waiting on client, approved,
+  changes requested, publish failed, approval overdue — because a channel that reports everything
+  gets muted. New `suppressed_emails` + `ResendWebhookController` (Svix signature, fails closed) and
+  a `MessageSending` listener that drops suppressed recipients from every mail path at once. New
+  `mail:check-dns` reports SPF/DKIM/DMARC on the sending domain. Tests:
+  `TeamChatNotificationTest` (15), `EmailSuppressionTest` (12), `EmailAuthenticationCheckTest` (8).
+  Audit findings 10 and 17.
 - 2026-10-27: Step CG-1.3 (competitor-gap) — real web-push delivery + two new pushes. Added
   `MinishlinkWebPushNotifier` (`minishlink/web-push ^11.0`) behind a `push.transport` config switch
   (default `log` keeps dev/tests on the no-op logger), `SendPublishFailurePushAction` (business orgs,

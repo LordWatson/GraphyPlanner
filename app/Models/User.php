@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Models\Scopes\ClientAccessScope;
 use App\Models\Scopes\OrganizationScope;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -97,6 +99,55 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class)->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * The clients this staff member has been put on, when the organization restricts access that
+     * way. Distinct from `client()` above, which is the one client a *client reviewer* belongs to.
+     *
+     * @return BelongsToMany<Client, $this>
+     */
+    public function assignedClients(): BelongsToMany
+    {
+        return $this->belongsToMany(Client::class)
+            ->withoutGlobalScope(OrganizationScope::class)
+            // And its own access scope: this relation is what the scope *reads* to decide what may
+            // be read, so leaving it on sends `accessibleClientIds()` into infinite recursion.
+            ->withoutGlobalScope(ClientAccessScope::class);
+    }
+
+    /**
+     * The client ids this user may see, or **null for "all of them"**.
+     *
+     * Null rather than an exhaustive list on purpose: it is the difference between "no restriction
+     * applies" and "assigned to nothing", and conflating the two would either open everything up or
+     * lock an Owner out of their own roster. Callers must treat null as unrestricted.
+     *
+     * Unrestricted when: the organization has not turned the restriction on, the user is an Owner
+     * (somebody has to see the whole roster), or the user is a platform super admin. A client
+     * reviewer is unaffected — their access is already pinned to `client_id` by the portal guard.
+     *
+     * @return list<int>|null
+     */
+    public function accessibleClientIds(): ?array
+    {
+        if ($this->isSuperAdmin() || $this->isOwner() || $this->hasRole(Role::ClientReviewer)) {
+            return null;
+        }
+
+        if ($this->relationLoaded('organization')) {
+            $restricted = (bool) $this->organization?->restrict_staff_to_assigned_clients;
+        } else {
+            $restricted = (bool) Organization::query()
+                ->whereKey($this->org_id)
+                ->value('restrict_staff_to_assigned_clients');
+        }
+
+        if (! $restricted) {
+            return null;
+        }
+
+        return array_values($this->assignedClients()->pluck('clients.id')->map(fn ($id) => (int) $id)->all());
     }
 
     /**

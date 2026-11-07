@@ -121,7 +121,11 @@ class CampaignBriefTest extends TestCase
         $this->assertSame(BriefStatus::Sent, $brief->status);
         $this->assertSame(1, $revision->number);
         $this->assertSame(CampaignBrief::hashContent($brief->content()), $revision->content_hash);
-        $this->assertSame($brief->content(), $revision->content);
+        // `assertEquals`: the revision's content comes back out of a JSON column, and MySQL
+        // normalises a JSON object's key order where SQLite preserves it. The content is the
+        // contract, the key order is not. (The hash above is unaffected — it is always computed
+        // from a freshly built array and only ever compared against the stored string.)
+        $this->assertEquals($brief->content(), $revision->content);
         Mail::assertQueued(CampaignBriefSentMail::class, fn ($mail) => $mail->hasTo($this->reviewer->email));
         Notification::assertSentTo($this->reviewer, CampaignBriefReady::class);
         $this->assertDatabaseHas('campaign_activity_logs', ['campaign_id' => $this->campaign->id, 'event' => 'brief.sent']);

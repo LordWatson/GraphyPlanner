@@ -606,6 +606,16 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   `review.show`.
 
 ## Business Rules
+- **`scheduled_local_time` always reads as `HH:MM`.** It is the schema's only `TIME` column, and
+  MySQL returns a `TIME` as `09:00:00` where SQLite returns the `09:00` that was written. A
+  `PostTarget` read accessor normalises it, so the calendar, the editor, grid tiles and the push
+  reminders all agree on both engines. Writes are untouched (input is already `H:i`). Do not
+  reintroduce raw reads of the column.
+- **Caption search is literal, and its escape character is never a backslash.** `ListPostsAction`
+  (content hub) and `ListClientPostsAction` (client Posts tab) build their `LIKE` pattern through
+  `App\Support\LikeSearch`, which escapes `%`, `_` and itself with `!`. A backslash escape clause
+  (`escape '\'`) is an unterminated string literal on MySQL and a valid one on SQLite, so the test
+  suite cannot see that mistake — do not reintroduce it here or anywhere else.
 - **Disconnected channels drop on save.** A target whose social account was soft-deleted isn't in
   `targetAccounts`, so the editor leaves it out of its editable channels (`initialEditorState` in
   `pages/posts/edit.tsx`) and the next save removes it. `UpdatePostRequest` still rejects a
@@ -905,6 +915,22 @@ and the bulk move reuse the campaign machinery so the rules can't drift.
   — worth revisiting since it's unauthenticated and token-guessing-resistant only via token entropy.
 
 ## Changelog
+- 2026-11-07: **Bugfix — the calendar showed seconds on MySQL.**
+  `post_targets.scheduled_local_time` is a `TIME` column, so MySQL handed it back as `09:00:00`
+  while SQLite returned `09:00`. The value went straight to the frontend
+  (`BuildCalendarOccurrencesAction` → `occurrences.*.account_local.time`), onto grid tiles, and
+  into comparisons against `format('H:i')` values — wrong in production, right in every test.
+  Fixed once with a `PostTarget::scheduledLocalTime` read accessor rather than at each of the
+  several call sites. 7 tests across `CalendarControllerTest`, `PortalCalendarTest`,
+  `PostControllerTest`, `RecyclePostTest`, `ReschedulePostTest` and `RescheduleTargetTest` now pass
+  on both engines. Audit finding 29.
+- 2026-11-07: **Bugfix — caption search crashed on MySQL.** `ListPostsAction` and
+  `ListClientPostsAction` sent `escape '\'`, which MySQL rejects as an unterminated string literal
+  while SQLite (the test database) accepts it as a one-character string — so the content hub's and
+  the client Posts tab's search boxes 500'd in production with a fully green suite. Both now build
+  the pattern with the new `App\Support\LikeSearch` (escapes with `!`); `addcslashes` is gone.
+  Tests: `LikeSearchTest` (6), `ContentHubTest::test_caption_search_matches_the_term_literally`.
+  Audit finding 1 — `SearchClientAssetsAction` had the same bug, see `assets.md`.
 - 2026-11-06: Step CG-5.1 (B-11.1) added paid-partnership disclosure to posts:
   `posts.is_paid_partnership`, `partner_name`, `partner_handle` (and `brand_deal_id` from CG-5.2),
   plus a **hard** `partnership_disclosure` item in `EvaluatePostChecklistAction` that blocks

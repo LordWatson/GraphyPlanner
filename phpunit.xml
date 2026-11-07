@@ -18,6 +18,15 @@
         </include>
     </source>
     <php>
+        <!--
+            One boot of this app peaks at ~36MB, but PHPUnit holds every test's application for the
+            life of the process, so the suite grows past PHP's 128MB default somewhere in the
+            2,300th test and dies. The failure surfaces as an exhaustion inside
+            `bootstrap/cache/routes-v7.php` — the largest single allocation in a boot, and so where
+            the limit happens to land — which reads like a routing problem and is not one. Setting
+            it here means `composer test` works on a default PHP install.
+        -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

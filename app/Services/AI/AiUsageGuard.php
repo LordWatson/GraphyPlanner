@@ -24,6 +24,11 @@ use Carbon\CarbonImmutable;
 class AiUsageGuard
 {
     /**
+     * The credit bucket name shared with `MonthlyCreditCounter`.
+     */
+    public const TEXT_BUCKET = 'text';
+
+    /**
      * Throw if the org has no remaining budget. A null budget means unlimited.
      */
     public function ensureWithinBudget(?Organization $organization, ?CarbonImmutable $now = null): void
@@ -60,10 +65,25 @@ class AiUsageGuard
             return;
         }
 
-        $used = $this->textRequestsThisMonth($organization, $now);
+        // Claimed, not counted: a plain count lets every request that starts in the same moment
+        // read the same low number and pass. See `MonthlyCreditCounter`.
+        //
+        // Nothing releases a text claim, and nothing needs to: `AiCallMeter` records a row for
+        // every attempt, failed ones included, so a claim and a record are the same event.
+        $claimed = app(MonthlyCreditCounter::class)->claim(
+            self::TEXT_BUCKET,
+            $organization->id,
+            1,
+            $allowance,
+            fn (): int => $this->textRequestsThisMonth($organization, $now),
+            $now,
+        );
 
-        if ($used >= $allowance) {
-            throw new AiBudgetExceededException(budget: $allowance, used: $used);
+        if (! $claimed) {
+            throw new AiBudgetExceededException(
+                budget: $allowance,
+                used: $this->textRequestsThisMonth($organization, $now),
+            );
         }
     }
 

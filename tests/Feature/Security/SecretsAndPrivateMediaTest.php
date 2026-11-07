@@ -108,7 +108,18 @@ class SecretsAndPrivateMediaTest extends TestCase
         $this->assertFalse(Schema::hasColumn('post_activity_logs', 'review_url'));
 
         // Scan every table: the plain token must not be stored anywhere (only its hash is).
-        foreach (Schema::getTableListing() as $table) {
+        //
+        // Scoped to this database on purpose. `Schema::getTableListing()` reads
+        // `information_schema` on MySQL, which is server-wide — it returns every table in every
+        // database on the server, so the unscoped call made this test query tables that do not
+        // exist here ("Base table or view not found: ai_prompt_templates") and the security
+        // assertion never ran on MySQL at all. SQLite has one schema and takes no argument.
+        $connection = DB::connection();
+        $tables = $connection->getDriverName() === 'sqlite'
+            ? Schema::getTableListing()
+            : Schema::getTableListing($connection->getDatabaseName());
+
+        foreach ($tables as $table) {
             $table = str($table)->afterLast('.')->toString();
 
             if (in_array($table, ['jobs', 'failed_jobs', 'job_batches'], true)) {

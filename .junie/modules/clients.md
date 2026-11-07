@@ -271,6 +271,10 @@ The Client is the core CRM record agencies manage brands/campaigns/posts under. 
 - (Resolved 2026-09-17) `owner_user_id` now has a UI picker on the client create/edit forms.
 
 ## Changelog
+- 2026-11-07: **Per-client staff access.** `ClientAccessScope` limits a restricted member to the
+  clients on their `client_user` assignments, across `Client` and every client-owned model. Off
+  unless the org sets `restrict_staff_to_assigned_clients`. Rules and rationale in
+  `organizations-users.md`; audit finding 9.
 - 2026-10-24: UX overhaul MOVE 5 (`.junie/plans/ux-overhaul.md`) — `BuildClientPageHeaderAction`
   now returns a `setup` payload and the client's landing tab shows a guided `ClientSetupChecklist`
   (Brand Brain → connect accounts → invite the client → first post), ticking off from server

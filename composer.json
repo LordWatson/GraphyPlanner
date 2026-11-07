@@ -22,11 +22,13 @@
         "laravel/pulse": "^1.8",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
+        "league/flysystem-aws-s3-v3": "^3.35",
         "minishlink/web-push": "^11.0",
         "resend/resend-php": "^1.13",
         "sentry/sentry-laravel": "^4.29"
     },
     "require-dev": {
+        "brianium/paratest": "^7.20",
         "fakerphp/faker": "^1.24",
         "larastan/larastan": "^3.9",
         "laravel/pail": "^1.2.5",

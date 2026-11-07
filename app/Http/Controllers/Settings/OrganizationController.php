@@ -6,7 +6,9 @@ use App\Actions\Organizations\TestUploadPostConnectionAction;
 use App\Actions\Organizations\UpdateBrandLogoAction;
 use App\Actions\Organizations\UpdateOrganizationSettingsAction;
 use App\Contracts\AssetStorage;
+use App\Contracts\ChatNotifier;
 use App\Contracts\Entitlements;
+use App\Contracts\PublishCredentials;
 use App\Enums\Feature;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\OrganizationSettingsUpdateRequest;
@@ -43,6 +45,15 @@ class OrganizationController extends Controller
                 'approval_sla_hours' => $organization->approval_sla_hours,
                 'has_upload_post_key' => filled($organization->upload_post_key),
                 'has_upload_post_webhook_secret' => filled($organization->upload_post_webhook_secret),
+                // Step 1.5: the publish webhook fails closed, so an organization with no
+                // *resolvable* secret has every publish result refused and silently never recorded.
+                // Asked through `PublishCredentials` rather than read off the column, so a managed
+                // workspace (which verifies with the platform secret and needs none of its own) is
+                // not warned about a problem it does not have. This is the page where the person who
+                // can fix it is standing.
+                'webhook_secret_missing' => app(PublishCredentials::class)->webhookSecretFor($organization) === '',
+                'has_chat_webhook_url' => filled($organization->chat_webhook_url),
+                'restrict_staff_to_assigned_clients' => (bool) $organization->restrict_staff_to_assigned_clients,
                 'has_xai_key' => filled($organization->xai_key),
                 // Step I-1.6: enough to recognise which key is stored, never the key itself.
                 'upload_post_key_last4' => self::lastFour($organization->upload_post_key),
@@ -125,6 +136,54 @@ class OrganizationController extends Controller
         Inertia::flash('toast', $ok
             ? ['type' => 'success', 'message' => __('Upload-Post accepted your key. You’re connected.')]
             : ['type' => 'error', 'message' => __('Upload-Post didn’t accept the key. Check it and try again.')]);
+
+        return to_route('organization.edit');
+    }
+
+    /**
+     * Post a message to the organization's chat channel now, so the owner can see it arrive.
+     * Nobody trusts a webhook field they cannot test, and a silent integration is one that gets
+     * blamed later for the messages it never sent.
+     */
+    public function testChatWebhook(Request $request, ChatNotifier $chat): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+
+        $this->authorize('update', $organization);
+
+        if (! $chat->isConfiguredFor($organization)) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('Add an https webhook URL first, then save.')]);
+
+            return to_route('organization.edit');
+        }
+
+        $chat->notifyOrganization(
+            $organization,
+            __('Alima is connected'),
+            __('Approvals, change requests and publish failures will appear here.'),
+            route('dashboard'),
+        );
+
+        // Delivery is best-effort by contract (it never throws), so this says "sent", not
+        // "delivered" — the honest claim, and the channel itself is the confirmation.
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Test message sent. Check the channel.')]);
+
+        return to_route('organization.edit');
+    }
+
+    /**
+     * Turn team-chat delivery off. Its own endpoint because the settings form keeps a blank
+     * credential field rather than clearing it, so removal has to be something the owner asks for.
+     */
+    public function removeChatWebhook(Request $request): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+
+        $this->authorize('update', $organization);
+
+        $organization->update(['chat_webhook_url' => null]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Team chat notifications are off.')]);
 
         return to_route('organization.edit');
     }

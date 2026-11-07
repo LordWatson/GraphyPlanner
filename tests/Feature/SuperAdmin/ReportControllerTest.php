@@ -87,7 +87,8 @@ class ReportControllerTest extends TestCase
         $this->assertSame('Monthly board update', $report->name);
         $this->assertSame($this->superAdmin->id, $report->created_by);
         // Relative presets are stored without dates so they re-resolve on every run.
-        $this->assertSame([
+        // `assertEquals`: stored JSON, and MySQL normalises a JSON object's key order.
+        $this->assertEquals([
             'range' => '90d',
             'from' => null,
             'to' => null,

@@ -587,6 +587,18 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   other server-to-server callback.
 
 ## Business Rules
+- **The publish webhook fails closed.** `UploadPostWebhookController` refuses any delivery it
+  cannot verify — including one for an organization that has not stored a webhook secret yet. It
+  used to trust those, which meant anyone who learned a `job_id` could mark a post published (with
+  a URL the client would then see) or failed on any byo organization before its secret was pasted,
+  i.e. every new one. A missing secret now raises `webhooks.upload_post.secret_missing` through
+  `OpsAlerter`, because no publish result is recorded until somebody fixes it.
+- `publishing.webhook_allow_unsigned` (`PUBLISH_WEBHOOK_ALLOW_UNSIGNED`) accepts unsigned
+  deliveries. It is a local-development escape hatch for replaying a captured payload with `curl`
+  and must stay false in every deployed environment.
+- Signature *shape* checks (fresh numeric timestamp, `sha256=` prefix) run before the `PostTarget`
+  lookup, so an unsigned flood costs no queries. The HMAC itself needs the target's organization to
+  resolve the secret, so it is checked after.
 - The interface is the single seam between the app and any publishing vendor — no Action/Controller
   should call a vendor SDK/HTTP client directly; they depend on `App\Contracts\PublishAdapter`.
 - `NullPublishAdapter` intentionally fails every `publish()` target and reports unhealthy accounts, so
@@ -795,6 +807,18 @@ networks; a profile per *organization* broke as soon as a second brand wanted th
   against the real API docs/sandbox if this proves too loose or too strict.
 
 ## Changelog
+- 2026-11-07: **Security — the publish webhook fails closed.** A delivery for an organization with
+  no stored webhook secret was previously accepted unverified (`return true` with a log warning);
+  it is now refused with a 401 and a `webhooks.upload_post.secret_missing` ops alert. Signature
+  shape checks moved ahead of the target lookup; the malformed-payload log no longer writes
+  `$request->all()` (attacker-chosen content on a public endpoint) and records only `job_id`,
+  `platform` and the payload's key names. New `publishing.webhook_allow_unsigned` escape hatch,
+  default false and asserted so. New `Tests\Concerns\SignsUploadPostWebhooks` — every test about
+  what a publish outcome *does* now signs its delivery. Tests:
+  `UploadPostWebhookControllerTest` (+4: unsigned-no-secret refusal, signed-no-secret refusal with
+  alert, escape hatch on and off by default, malformed header refusal), `EngagementSyncTest` (2
+  webhook tests now signed). Found by the audit in `.junie/plans/market-readiness-audit.md`
+  (finding 4).
 - 2026-11-07: Bugfix — `ensureProfileExists()` accepts `{"message": "Username already in use"}`
   as "already exists". Found immediately after the change below, because a shared client profile
   makes that response the normal path. Regression test:

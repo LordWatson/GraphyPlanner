@@ -1,6 +1,7 @@
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,9 +27,16 @@ type Member = {
 export default function StaffEdit({
     member,
     roles,
+    restrictsClients,
+    clients,
+    assignedClientIds,
 }: {
     member: Member;
     roles: Option[];
+    /** Only true when the organization limits staff to the clients they are put on. */
+    restrictsClients: boolean;
+    clients: { id: number; name: string }[];
+    assignedClientIds: number[];
 }) {
     return (
         <>
@@ -87,6 +95,46 @@ export default function StaffEdit({
                                 </Select>
                                 <InputError message={errors.role} />
                             </div>
+
+                            {restrictsClients && (
+                                <div className="grid gap-2">
+                                    <Label>Clients</Label>
+                                    <p className="text-muted-foreground text-sm">
+                                        {member.role === 'owner'
+                                            ? 'Owners always see every client.'
+                                            : 'This member can only see the clients you tick here.'}
+                                    </p>
+
+                                    {member.role !== 'owner' && (
+                                        <div className="border-border mt-1 grid max-h-64 gap-2 overflow-y-auto rounded-xl border p-3">
+                                            {clients.length === 0 && (
+                                                <p className="text-muted-foreground text-sm">
+                                                    No clients yet.
+                                                </p>
+                                            )}
+                                            {clients.map((client) => (
+                                                <label
+                                                    key={client.id}
+                                                    className="flex items-center gap-2 text-sm"
+                                                >
+                                                    <Checkbox
+                                                        name="client_ids[]"
+                                                        value={String(
+                                                            client.id,
+                                                        )}
+                                                        defaultChecked={assignedClientIds.includes(
+                                                            client.id,
+                                                        )}
+                                                    />
+                                                    {client.name}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <InputError message={errors.client_ids} />
+                                </div>
+                            )}
 
                             <div className="flex items-center gap-4">
                                 <Button disabled={processing}>

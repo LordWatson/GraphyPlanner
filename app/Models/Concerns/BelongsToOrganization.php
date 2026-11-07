@@ -2,6 +2,7 @@
 
 namespace App\Models\Concerns;
 
+use App\Models\Scopes\ClientAccessScope;
 use App\Models\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -40,7 +41,12 @@ trait BelongsToOrganization
     public function resolveRouteBinding($value, $field = null): ?Model
     {
         return $this->resolveRouteBindingQuery(
-            $this->newQueryWithoutScope(OrganizationScope::class),
+            // Both access scopes are lifted, for the same reason: a bound model must reach its
+            // policy so the answer is a 403 that says "not yours", on every route alike. Leaving
+            // `ClientAccessScope` on made the answer depend on whether the route happened to use
+            // the soft-deletable binding below (which lifts every scope) — 404 here, 403 there.
+            $this->newQueryWithoutScope(OrganizationScope::class)
+                ->withoutGlobalScope(ClientAccessScope::class),
             $value,
             $field,
         )->first();

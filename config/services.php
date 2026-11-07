@@ -20,6 +20,11 @@ return [
 
     'resend' => [
         'key' => env('RESEND_API_KEY'),
+        // The endpoint secret (`whsec_…`) for the delivery-event webhook that suppresses bounced
+        // and complained addresses. `ResendWebhookController` refuses every delivery until it is
+        // set — the signature is the only authorisation on that endpoint, and a forged one would
+        // add somebody else's address to a platform-wide do-not-send list.
+        'webhook_secret' => env('RESEND_WEBHOOK_SECRET'),
     ],
 
     'ses' => [

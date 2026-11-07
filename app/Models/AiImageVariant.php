@@ -8,6 +8,8 @@ use App\Enums\ImageVariantKind;
 use App\Enums\ImageVariantStatus;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
+use App\Services\AI\Images\ImageQuotaGuard;
+use App\Services\AI\MonthlyCreditCounter;
 use Database\Factories\AiImageVariantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -53,6 +55,24 @@ class AiImageVariant extends Model
 {
     /** @use HasFactory<AiImageVariantFactory> */
     use BelongsToOrganization, HasFactory;
+
+    /**
+     * A failed render is never billed (`ImageQuotaGuard::usedThisMonth()` excludes it), so the
+     * credit claimed for it before the vendor was called has to go back.
+     *
+     * Done as a model event because three different places mark a variant failed —
+     * `PrepareImageGenerationAction`, `RenderImageVariantAction` and `GenerateImageVariantJob` —
+     * and a fourth would otherwise quietly keep the credit. `wasChanged` means a variant marked
+     * failed twice only releases once.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (self $variant): void {
+            if ($variant->wasChanged('status') && $variant->status === ImageVariantStatus::Failed) {
+                app(MonthlyCreditCounter::class)->release(ImageQuotaGuard::BUCKET, $variant->org_id);
+            }
+        });
+    }
 
     /**
      * @return array<string, string>

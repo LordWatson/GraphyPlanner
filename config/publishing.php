@@ -65,4 +65,21 @@ return [
     */
     'delivery_timeout_hours' => (int) env('PUBLISH_DELIVERY_TIMEOUT_HOURS', 24),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Unsigned publish webhooks (local development only)
+    |--------------------------------------------------------------------------
+    |
+    | `UploadPostWebhookController` fails closed: the signature is the whole authorisation on that
+    | public endpoint, so a delivery it cannot verify — including one for an organization with no
+    | webhook secret stored yet — is refused with a 401 and an ops alert.
+    |
+    | Setting this to true accepts unsigned deliveries, which lets you replay a captured payload
+    | against a local machine with `curl`. It must be false in every deployed environment:
+    | with it on, anyone who learns a `job_id` can mark a post published (with a URL the client
+    | will see) or failed. `SecurityHardeningTest` asserts the default stays false.
+    |
+    */
+    'webhook_allow_unsigned' => (bool) env('PUBLISH_WEBHOOK_ALLOW_UNSIGNED', false),
+
 ];

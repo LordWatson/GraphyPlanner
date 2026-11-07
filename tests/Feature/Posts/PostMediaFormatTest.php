@@ -92,7 +92,8 @@ class PostMediaFormatTest extends TestCase
         ])->assertRedirect(route('posts.edit', $post))->assertSessionHasNoErrors();
 
         $post->refresh();
-        $this->assertSame(['instagram' => '4:5', 'tiktok' => '9:16', 'facebook' => 'original'], $post->media_format);
+        // `assertEquals`: `media_format` is a JSON column and MySQL normalises its key order.
+        $this->assertEquals(['instagram' => '4:5', 'tiktok' => '9:16', 'facebook' => 'original'], $post->media_format);
 
         $assets = $post->assets()->get()->keyBy('id');
         $this->assertEqualsWithDelta(0.1235, (float) $assets[$first->id]->pivot->crop_x, 1e-6);

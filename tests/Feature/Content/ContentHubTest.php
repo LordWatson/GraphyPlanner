@@ -110,6 +110,37 @@ class ContentHubTest extends TestCase
                 ->where('posts.data.0.id', $linkedInPost->id));
     }
 
+    /**
+     * The caption search. `%`, `_` and a backslash are all matched literally — the backslash case
+     * is the one that used to send SQL MySQL rejects (`escape '\'`), which only passed here
+     * because the suite runs on SQLite. See `LikeSearch`.
+     */
+    public function test_caption_search_matches_the_term_literally(): void
+    {
+        $plain = $this->makePost(['master_caption' => 'Summer LAUNCH is coming']);
+        $wildcards = $this->makePost(['master_caption' => 'Save 50%_today']);
+        $backslash = $this->makePost(['master_caption' => 'Path is C:\\Users\\brand']);
+
+        foreach ([
+            'launch' => $plain,
+            '50%_' => $wildcards,
+            'c:\\users' => $backslash,
+        ] as $term => $expected) {
+            $this->actingAs($this->owner)
+                ->get(route('content.index', ['search' => $term]))
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page->has('posts.data', 1)
+                    ->where('posts.data.0.id', $expected->id));
+        }
+
+        // A lone `%` is a character, not "match everything".
+        $this->actingAs($this->owner)
+            ->get(route('content.index', ['search' => '%']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('posts.data', 1)
+                ->where('posts.data.0.id', $wildcards->id));
+    }
+
     public function test_archived_posts_are_hidden_unless_asked_for(): void
     {
         $this->makePost(['status' => PostStatus::Archived]);

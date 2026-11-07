@@ -4,6 +4,7 @@ namespace App\Actions\Posts;
 
 use App\Enums\PostStatus;
 use App\Models\Post;
+use App\Support\LikeSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -48,9 +49,9 @@ class ListPostsAction
 
         return Post::query()
             ->when($search !== '', function (Builder $query) use ($search) {
-                // The user's input is literal — `%` / `_` are not wildcards here.
-                $escaped = addcslashes($search, '\%_');
-                $query->whereRaw("lower(master_caption) like ? escape '\'", ['%'.mb_strtolower($escaped).'%']);
+                // The user's input is literal — `%` / `_` are not wildcards here. See `LikeSearch`
+                // for why the escape character is `!` and never a backslash.
+                $query->whereRaw("lower(master_caption) like ? escape '!'", [LikeSearch::literal($search)]);
             })
             ->when(filled($status), fn (Builder $query) => $query->where('status', $status))
             // Archived posts surface only when asked for by name.

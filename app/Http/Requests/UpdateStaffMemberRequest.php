@@ -31,6 +31,14 @@ class UpdateStaffMemberRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'role' => ['required', Rule::enum(Role::class)->only($staffRoles)],
+            // The clients this member is put on, when the org restricts access that way. `exists`
+            // is scoped to the org's own clients, so a submitted id from another organization is a
+            // validation error rather than an assignment.
+            'client_ids' => ['sometimes', 'array'],
+            'client_ids.*' => [
+                'integer',
+                Rule::exists('clients', 'id')->where('org_id', $this->user()->org_id),
+            ],
         ];
     }
 }

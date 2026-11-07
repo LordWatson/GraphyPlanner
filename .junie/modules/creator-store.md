@@ -134,6 +134,19 @@ Frontend: `pages/business/store.tsx`, `components/store/product-form.tsx`, `page
 `StatusPill` kinds `order` and `product` in `resources/js/lib/status.ts`.
 
 ## Business Rules
+- **A coupon redemption is claimed at checkout *start* and released when the sale does not
+  happen.** `Coupon::releaseRedemption()` is called by `ExpireStaleOrdersAction` (abandoned
+  checkout), `RefundOrderAction` and the webhook's `charge.refunded` path. Without the release a
+  capped code was spent by people who changed their mind — fifty abandoned tabs killed a
+  `max_redemptions = 50` code for the fifty-first buyer, the one who would have paid. The
+  decrement is done in SQL and floored at zero, so a refund arriving from both `/store` and Stripe
+  cannot hand out a free use.
+- **A Connect webhook claim is not a completion.** `connect_webhook_events.processed_at` is
+  nullable: the row is inserted on claim, stamped once the handler returns, and deleted if the
+  handler throws, so Stripe's retry of a failed delivery is a real second attempt. Only a genuine
+  `UniqueConstraintViolationException` counts as a replay — every other database error surfaces as
+  a 500 Stripe will retry. An unfinished claim older than `STALE_CLAIM_MINUTES` (5) is taken over,
+  which is the only recovery from a worker killed mid-handler.
 - **0% platform fee.** No `application_fee_amount`, ever. `payments.platform_fee_percent` is 0 and
   exists so the one place that would have to change is named, not so it can be turned up quietly.
 - **The creator is the merchant.** Buyers pay them; Alima never holds the funds, and payout schedule
@@ -259,6 +272,22 @@ an answer changes them.
   claiming the sale, and the email is the real delivery.
 
 ## Changelog
+- 2026-11-07: **Bugfix — a failed Connect webhook handler no longer loses a paid order.** The claim
+  row was written with `processed_at = now()` *before* the event was handled, so a handler that
+  threw returned a 500, Stripe's retry was dismissed as a replay, and the card stayed charged
+  against an order stuck `pending` with no deliveries left to come. `processed_at` is now nullable
+  (migration `2027_01_23_100100_make_connect_webhook_events_processed_at_nullable`), stamped only
+  on success, released on failure, and taken over after 5 minutes if a worker died holding it. The
+  blanket `catch (QueryException)` — which read a dropped connection or a deadlock as "already
+  handled" — is now `catch (UniqueConstraintViolationException)`. Tests: `ConnectWebhookTest` (+4:
+  failed handler then successful retry, successful delivery stamps the claim, abandoned claim taken
+  over, fresh claim left alone). Audit finding 2.
+- 2026-11-07: **Bugfix — abandoned and refunded orders hand back their coupon redemption.** New
+  `Coupon::releaseRedemption()`, called from `ExpireStaleOrdersAction`, `RefundOrderAction` and the
+  webhook refund path; the sweep now eager-loads `coupon` alongside `product`. `redemptions` was
+  previously only ever incremented. Tests: `CreatorStoreTest` (+2: the sweep hands the code back
+  and un-exhausts it; a refund hands it back and a second release cannot go negative). Audit
+  finding 3.
 - 2026-11-07: Phase GTM-2 wired the store into the audience list: the buyer is captured at
   checkout with an explicit marketing opt-in, fulfilment queues a purchase follow-up a day later,
   and the hourly abandoned-checkout cancellation sends the nudge. See `audience.md`.

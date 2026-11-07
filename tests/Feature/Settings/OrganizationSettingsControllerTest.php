@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Enums\OrganizationType;
 use App\Enums\Role;
 use App\Models\Organization;
 use App\Models\User;
@@ -42,6 +43,42 @@ class OrganizationSettingsControllerTest extends TestCase
             ->where('organization.has_xai_key', false)
             ->has('currencies')
         );
+    }
+
+    /**
+     * Step 1.5 — the publish webhook fails closed, so an organization with no resolvable webhook
+     * secret has every publish result refused and silently never recorded. The settings page is
+     * where the person who can fix that is standing, so it has to say so.
+     */
+    public function test_the_settings_page_warns_when_no_webhook_secret_can_be_resolved()
+    {
+        $user = User::factory()->role(Role::Owner)->create();
+
+        $this->actingAs($user)->get(route('organization.edit'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('organization.webhook_secret_missing', true));
+
+        $user->organization->update(['upload_post_webhook_secret' => 'whsec_set']);
+
+        $this->actingAs($user)->get(route('organization.edit'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('organization.webhook_secret_missing', false));
+    }
+
+    /**
+     * A managed workspace verifies with Alima's platform secret and needs none of its own, so it
+     * must not be nagged about a problem it does not have.
+     */
+    public function test_a_managed_workspace_is_not_warned_about_a_webhook_secret()
+    {
+        config(['services.upload_post.platform_webhook_secret' => 'whsec_platform']);
+
+        $user = User::factory()->role(Role::Owner)->create();
+        $user->organization->update(['type' => OrganizationType::Business]);
+
+        $this->actingAs($user)->get(route('organization.edit'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('organization.webhook_secret_missing', false));
     }
 
     public function test_non_owner_cannot_view_the_organization_settings_page()

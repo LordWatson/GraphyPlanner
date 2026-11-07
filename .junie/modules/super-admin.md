@@ -228,6 +228,25 @@ settles up, so there is only ever one number that can be wrong. Ending a partner
 attribution. See `marketing.md`.
 
 ## Changelog
+- 2026-11-07: **An organization purge no longer leaves its white-label logo in storage.**
+  `StoredFileInventory::forClients()` could not see it (the logo belongs to no client), and the
+  purge had no other sweep, so the file survived the organization and every row referencing it. New
+  `forOrganizations()`, merged into `PurgeOrganizationJob`. `forClients()` stays client-only by
+  design — a single-client purge must not take the agency's logo with it — and that split is now
+  written down and tested. Tests: `ClientArchiveTest` (+1, +1 assertion on the existing purge test).
+  Audit finding 27.
+- 2026-11-07: **Bugfix — deleting an organisation never completed on MySQL.**
+  `PurgeOrganizationJob` hard-deletes the organisation so the cascades remove its rows, but
+  `invoices.client_id` is `NO ACTION`, which the migration that set it believed was deferred to the
+  end of the statement. InnoDB treats `NO ACTION` as `RESTRICT` and checks it immediately, so the
+  cascade raised `SQLSTATE 23000 / 1451`, the job burned all three retries, and the organisation was
+  left soft-deleted forever with its client media still in storage — on every MySQL deployment,
+  for any agency that had ever issued an invoice. The job now deletes the organisation's invoices
+  inside its transaction before `forceDelete()` (the existing test already asserted they should be
+  gone, so this was the intended behaviour with a broken mechanism), and the migration comment is
+  corrected. A single-client purge still refuses while invoices exist (`PurgeClientAction`), which
+  is the rule that constraint is actually there to enforce. Tests: `ClientArchiveTest`,
+  `SuperAdmin\OrganizationManagementTest` — 25 green on MySQL. Audit finding 29.
 - 2026-10-24: Phase M-8 (design-partner release) — `organizations.is_design_partner`, the partner
   usage view (`GetPartnerUsageAction`, WAU via `users.last_active_at`/`TrackUserActivity`) and the
   in-app feedback capture (`product_feedback`, `SubmitProductFeedbackAction`, staff

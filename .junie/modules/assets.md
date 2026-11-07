@@ -149,6 +149,9 @@ shared campaigns & assets doc in Step C-0.1).
   for video uploads and an `<img>` for images.
 - Private media (Step I-1.6): `config('assets.disk')` defaults to the private `local` disk, served
   only through signed, expiring URLs at `/files/*`.
+- Filename search treats the user's text literally and builds its `LIKE` pattern through
+  `App\Support\LikeSearch` — never `addcslashes()` with a backslash escape clause, which MySQL
+  rejects as an unterminated string literal while SQLite (the test database) accepts it.
 
 ## Tests
 - `tests/Feature/AssetControllerTest.php`: uploads (Owner, Designer, video auto-typing, video size
@@ -158,8 +161,11 @@ shared campaigns & assets doc in Step C-0.1).
 - `tests/Unit/Services/AI/Images/ImageStorageTest.php`: AI image storage.
 
 ## Known Gaps / Open Questions
-- S3 storage and direct uploads (Step M-1.3) are deferred until the bucket exists; uploads still go
-  through PHP to the private local disk.
+- **S3 is now installable but not deployed.** `league/flysystem-aws-s3-v3` is installed, so
+  `ASSETS_DISK=s3` works; the bucket, the CDN in front of it and the env switch are outstanding.
+  Until that is done the app cannot run on more than one web node — a file uploaded on node A does
+  not exist on node B. Moving the existing files is `php artisan storage:migrate-disk` (below).
+- Direct browser-to-S3 uploads (Step M-1.3) are still deferred: uploads go through PHP either way.
 - **PHP ini limits must accommodate `max_video_upload_size_kb`**: PHP's own
   `upload_max_filesize`/`post_max_size`/`memory_limit` are enforced before `StoreAssetRequest` runs.
   See `ops.md` (Step I-2.8) for the production values. nginx's `client_max_body_size` defaults
@@ -167,9 +173,8 @@ shared campaigns & assets doc in Step C-0.1).
   (`posts/edit.tsx`, `clients/tabs/media.tsx`) show a specific "larger than the server accepts"
   toast for a 413.
 - `width`/`height` columns exist but nothing probes uploaded image dimensions yet.
-- Storage is local-only for now; `App\Contracts\AssetStorage` is the seam for real S3 signed-URL
-  uploads (spec §10). The AWS flysystem adapter is **not installed**, so `ASSETS_DISK=s3` would
-  fail until it is — see above.
+- `App\Contracts\AssetStorage` remains the seam for direct S3 signed-URL uploads (spec §10). The
+  AWS flysystem adapter is installed as of 2026-11-07, so the disk itself is no longer the blocker.
 - **Nothing records that an asset was scanned**, only that its `source` came through a path that
   scans (`AssetSource::isVirusScanned()`, Step GTM-1.1). A design/cloud import stores third-party
   bytes unscanned, which is why such a file cannot be sold as a paid download. If a scanned-at
@@ -180,6 +185,28 @@ shared campaigns & assets doc in Step C-0.1).
   `campaigns.md`.
 
 ## Changelog
+- 2026-11-07: **S3 made usable, and a way to move what is already stored.**
+  `league/flysystem-aws-s3-v3` installed (`ASSETS_DISK=s3` previously failed at runtime, not boot).
+  New `php artisan storage:migrate-disk --from=local --to=s3` (`MigrateStoredFilesDiskCommand`):
+  copies every stored file to another disk and repoints the rows. It covers **all six** tables that
+  hold a file — `assets` (original *and* probe thumbnail, one disk column, two paths),
+  `brand_brains.persona_*`, `invoices.pdf_*`, `ai_image_variants.preview_*`,
+  `brand_brain_reference_assets.normalized_*` and `organizations.brand_logo_*` — streams rather
+  than reading files whole, never deletes the source (re-runnable and reversible), rewrites the
+  stored URL only when the target disk is public (`StoredFileUrl` re-signs a private disk's URL on
+  every read), and exits non-zero after logging each failed row. `--dry-run` reports without
+  changing anything. `/up` now fails while `assets.disk` names a missing disk or an `s3` disk with
+  no bucket/key/secret (`ObservabilityServiceProvider::assetDiskMisconfiguration()`), so a
+  half-finished switch is caught by the load balancer, not the first upload. Tests:
+  `tests/Feature/Storage/StoredFilesDiskMigrationTest.php` (12) — including one that reads the
+  schema and fails if any `*_disk` column is not covered by the command, because getting that list
+  wrong leaves files behind silently. Audit finding 5 (code half; bucket/CDN/env still outstanding).
+- 2026-11-07: **Bugfix — asset filename search crashed on MySQL.** `SearchClientAssetsAction` sent
+  `escape '\'`, an unterminated string literal on MySQL (backslash escapes the closing quote) and a
+  valid one-character string on SQLite, so the whole suite passed while the asset library's search
+  box 500'd in production. Now built by the new `App\Support\LikeSearch`, which escapes with `!`.
+  Tests: `LikeSearchTest` (6), `AssetControllerTest::test_asset_library_search_handles_a_backslash_in_the_term`.
+  Audit finding 1 — the same bug was in `ListPostsAction` and `ListClientPostsAction`, see `posts.md`.
 - 2026-11-07: Step GTM-1.1 — `AssetStorage::readStream()` (+ `LocalAssetStorage`) and
   `AssetSource::isVirusScanned()` / `Asset::downloadRefusalReason()`, used by the creator store's
   download route. See `creator-store.md`.

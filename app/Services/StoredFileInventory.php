@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
  * the client and organization purges to remove files from storage (through `AssetStorage`) before
  * the rows cascade away, so purging never leaves orphaned files behind.
  *
+ * Two methods, because the files hang off two different owners. {@see forClients()} is deliberately
+ * client-only — a client purge must not reach the organization's own files — so anything stored
+ * against `organizations` lives in {@see forOrganizations()} and an organization purge calls both.
+ *
  * Queries go through the query builder on purpose: they must see soft-deleted rows too.
  */
 class StoredFileInventory
@@ -40,6 +44,29 @@ class StoredFileInventory
                 'preview_path',
             ))
             ->merge($this->pairs(DB::table('brand_brain_reference_assets')->whereIn('asset_id', $assetIds), 'normalized_disk', 'normalized_path'))
+            ->unique(fn (array $file) => $file['disk'].'|'.$file['path'])
+            ->values();
+    }
+
+    /**
+     * Step GTM-3.1 — files stored against the organization itself rather than one of its clients.
+     * Only the white-label brand logo today.
+     *
+     * Needed because `forClients()` cannot see it: the logo belongs to no client, so an
+     * organization purge used to delete every client file and leave the logo in storage, referenced
+     * by nothing, for good.
+     *
+     * @param  array<int, int>  $orgIds
+     * @return Collection<int, array{disk: string, path: string}>
+     */
+    public function forOrganizations(array $orgIds): Collection
+    {
+        if ($orgIds === []) {
+            return collect();
+        }
+
+        return $this
+            ->pairs(DB::table('organizations')->whereIn('id', $orgIds), 'brand_logo_disk', 'brand_logo_path')
             ->unique(fn (array $file) => $file['disk'].'|'.$file['path'])
             ->values();
     }

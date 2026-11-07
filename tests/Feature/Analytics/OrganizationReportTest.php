@@ -64,7 +64,12 @@ class OrganizationReportTest extends TestCase
         $this->assertSame('Monday check-in', $report->name);
         $this->assertSame($this->owner->id, $report->created_by);
         // Presets stay relative: no dates stored.
-        $this->assertSame([
+        //
+        // `assertEquals`, not `assertSame`: MySQL normalises the key order of a stored JSON object
+        // and SQLite preserves it, and the order of those keys is not part of the contract. PHP's
+        // `==` on arrays compares key/value pairs regardless of order while still comparing nested
+        // *lists* in order, which is what we want — `metrics` order is meaningful, key order is not.
+        $this->assertEquals([
             'range' => '30d', 'from' => null, 'to' => null,
             'client_ids' => [$this->acme->id], 'campaign_ids' => [], 'platforms' => [], 'metrics' => ['posts', 'approvals'],
         ], $report->filters);
@@ -78,7 +83,8 @@ class OrganizationReportTest extends TestCase
             'filters' => ['range' => 'custom', 'from' => '2026-09-01', 'to' => '2026-09-30'],
         ])->assertRedirect();
 
-        $this->assertSame(
+        // `assertEquals`: stored JSON key order differs by database engine — see above.
+        $this->assertEquals(
             ['range' => 'custom', 'from' => '2026-09-01', 'to' => '2026-09-30'],
             collect(OrganizationReport::query()->sole()->filters)->only(['range', 'from', 'to'])->all(),
         );

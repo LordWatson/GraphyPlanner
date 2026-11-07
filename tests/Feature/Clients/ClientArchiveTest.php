@@ -16,6 +16,7 @@ use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\StoredFileInventory;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -189,6 +190,12 @@ class ClientArchiveTest extends TestCase
         $path = UploadedFile::fake()->image('logo.png')->storeAs('assets', 'logo.png', 'public');
         Asset::factory()->for($this->client)->uploaded()->create(['org_id' => $this->org->id, 'disk' => 'public', 'path' => $path]);
         Invoice::factory()->for($this->client)->create(['org_id' => $this->org->id]);
+
+        // The white-label logo belongs to the organization, not to any client, so a client-shaped
+        // sweep cannot see it — it used to survive the purge, referenced by nothing, for good.
+        $logoPath = UploadedFile::fake()->image('brand.png')->storeAs('branding', 'brand.png', 'public');
+        $this->org->update(['brand_logo_disk' => 'public', 'brand_logo_path' => $logoPath]);
+
         $admin = User::factory()->superAdmin()->create();
 
         // The queue runs synchronously in tests, so the purge job runs right after commit.
@@ -197,5 +204,25 @@ class ClientArchiveTest extends TestCase
         $this->assertNull(Organization::withTrashed()->find($this->org->id));
         $this->assertSame(0, Invoice::withTrashed()->where('org_id', $this->org->id)->count());
         Storage::disk('public')->assertMissing($path);
+        Storage::disk('public')->assertMissing($logoPath);
+    }
+
+    /**
+     * The other half of the split: purging a single client must not reach the organization's own
+     * files. A shared sweep would take the agency's logo with the first client it deleted.
+     */
+    public function test_purging_a_client_leaves_the_organizations_own_logo_alone(): void
+    {
+        Storage::fake('public');
+        $logoPath = UploadedFile::fake()->image('brand.png')->storeAs('branding', 'brand.png', 'public');
+        $this->org->update(['brand_logo_disk' => 'public', 'brand_logo_path' => $logoPath]);
+
+        $files = app(StoredFileInventory::class)->forClients([$this->client->id]);
+
+        $this->assertFalse($files->contains(fn (array $file) => $file['path'] === $logoPath));
+        $this->assertTrue(
+            app(StoredFileInventory::class)->forOrganizations([$this->org->id])
+                ->contains(fn (array $file) => $file['path'] === $logoPath),
+        );
     }
 }

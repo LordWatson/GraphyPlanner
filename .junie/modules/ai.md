@@ -484,6 +484,15 @@ Tunes the business shell's idea generation to a brand's place and moment. Kept o
 - Tests: `tests/Feature/Business/InsightsTakeawaysTest.php`.
 
 ## Changelog
+- 2026-11-07: **AI credits are claimed before they are spent.** Both guards used to count recorded
+  usage and compare it to the allowance, so every request starting in the same moment read the same
+  low number and passed — an org with two image credits left could fan out nine renders and have all
+  nine let through. New `MonthlyCreditCounter` claims atomically (`Cache::add` to seed from the
+  records, then `increment`), used by `AiUsageGuard::ensureWithinPlanTextCredits()` and
+  `ImageQuotaGuard::assertCanGenerate()`. A failed render hands its claim back through an
+  `AiImageVariant` model event, which covers all three places a variant is marked failed. Text needs
+  no release: `AiCallMeter` records every attempt, so a claim and a record are the same event. Tests:
+  `AiCreditClaimTest` (9). Audit finding 7.
 - 2026-10-23: Step B-8.2 — `InsightsSummarizer` contract (DeepSeek/Null) + `SummarizeInsightsAction`
   (weekly-cached, PII-scrubbed, metered takeaways) behind the `/insights` panel and the weekly digest.
 - 2026-10-23: Step B-6.5 — business Image Studio presets: `BusinessImagePreset` +

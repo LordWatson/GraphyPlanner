@@ -358,6 +358,27 @@ class AssetControllerTest extends TestCase
             ->assertJsonPath('data.0.id', $percent->id);
     }
 
+    /**
+     * A backslash in the search term. Worth its own test because the escape clause this query
+     * sends used to be `escape '\'`, which MySQL rejects as an unterminated string literal while
+     * SQLite — what this suite runs on — accepts it. See `App\Support\LikeSearch`.
+     */
+    public function test_asset_library_search_handles_a_backslash_in_the_term(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+
+        $backslash = Asset::factory()->for($client)->create(['original_filename' => 'back\\slash.jpg']);
+        Asset::factory()->for($client)->create(['original_filename' => 'backslash.jpg']);
+
+        $this->actingAs($owner)
+            ->getJson(route('clients.assets.index', ['client' => $client, 'search' => 'back\\slash']))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $backslash->id);
+    }
+
     public function test_asset_library_rejects_an_unknown_type_filter(): void
     {
         $org = Organization::factory()->create();

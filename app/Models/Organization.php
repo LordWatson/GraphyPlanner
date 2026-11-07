@@ -36,6 +36,7 @@ use Laravel\Cashier\Billable;
  * @property bool $is_design_partner
  * @property Carbon|null $onboarding_completed_at
  * @property bool $require_post_review
+ * @property bool $restrict_staff_to_assigned_clients
  * @property bool $insights_digest_opt_out
  * @property string $default_timezone
  * @property string $default_currency
@@ -48,6 +49,7 @@ use Laravel\Cashier\Billable;
  * @property int $invoice_payment_terms_days
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
+ * @property string|null $chat_webhook_url
  * @property PublishMode|null $publish_mode
  * @property string|null $upload_post_profile Legacy: the pre-per-client managed profile (see `EnsurePublishProfileAction`).
  * @property string|null $xai_key
@@ -72,8 +74,8 @@ use Laravel\Cashier\Billable;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
-#[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
+#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'restrict_staff_to_assigned_clients', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
+#[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key'])]
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
@@ -95,6 +97,7 @@ class Organization extends Model
         'type' => 'agency',
         'is_design_partner' => false,
         'require_post_review' => false,
+        'restrict_staff_to_assigned_clients' => false,
         'insights_digest_opt_out' => false,
         'ai_enabled' => false,
         'mcp_enabled' => false,
@@ -112,9 +115,13 @@ class Organization extends Model
             'is_design_partner' => 'boolean',
             'onboarding_completed_at' => 'datetime',
             'require_post_review' => 'boolean',
+            'restrict_staff_to_assigned_clients' => 'boolean',
             'insights_digest_opt_out' => 'boolean',
             'upload_post_key' => 'encrypted',
             'upload_post_webhook_secret' => 'encrypted',
+            // A Slack/Teams incoming-webhook URL *is* the credential — anyone holding it can post
+            // into the channel — so it is encrypted and hidden like the keys above it.
+            'chat_webhook_url' => 'encrypted',
             'publish_mode' => PublishMode::class,
             'xai_key' => 'encrypted',
             'invoice_payment_terms_days' => 'integer',

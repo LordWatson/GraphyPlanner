@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Store;
 
+use App\Actions\Store\FulfilOrderAction;
 use App\Contracts\PaymentProvider;
 use App\Enums\OrderStatus;
 use App\Enums\OrganizationType;
@@ -17,6 +18,8 @@ use App\Services\Payments\StripeConnectProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
+use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -177,6 +180,123 @@ class ConnectWebhookTest extends TestCase
         $this->assertSame(OrderStatus::Fulfilled, $order->status);
         $this->assertSame(1, $order->events()->where('type', 'status.paid')->count());
         $this->assertSame(1, ConnectWebhookEvent::query()->where('stripe_event_id', 'evt_checkout_1')->count());
+    }
+
+    /**
+     * The claim is not a completion. A handler that throws must leave the event unprocessed, so
+     * Stripe's retry is a real second attempt — otherwise the retry was dismissed as a replay and
+     * the buyer's card stayed charged against an order stuck `pending` forever.
+     */
+    public function test_a_failed_handler_leaves_the_event_unprocessed_and_the_retry_completes_the_sale(): void
+    {
+        $this->account();
+        $order = $this->pendingOrder();
+
+        $event = [
+            'id' => 'evt_checkout_boom',
+            'type' => 'checkout.session.completed',
+            'data' => ['object' => [
+                'id' => 'cs_test_1',
+                'amount_total' => 500,
+                'currency' => 'gbp',
+                'payment_intent' => 'pi_test_1',
+                'metadata' => ['order_id' => (string) $order->id],
+            ]],
+        ];
+
+        // Fulfilment blows up — a mail provider that is rate-limiting, say.
+        $this->instance(FulfilOrderAction::class, Mockery::mock(FulfilOrderAction::class, function ($mock) {
+            $mock->shouldReceive('__invoke')->andThrow(new RuntimeException('mail provider unavailable'));
+        }));
+
+        $this->deliver($event)->assertStatus(500);
+
+        $this->assertSame(OrderStatus::Pending, $order->refresh()->status);
+        $this->assertNull(ConnectWebhookEvent::query()->where('stripe_event_id', 'evt_checkout_boom')->value('processed_at'));
+
+        // Stripe retries once the provider is back.
+        $this->app->forgetInstance(FulfilOrderAction::class);
+
+        $this->deliver($event)->assertOk();
+
+        $this->assertSame(OrderStatus::Fulfilled, $order->refresh()->status);
+        $this->assertNotNull(ConnectWebhookEvent::query()->where('stripe_event_id', 'evt_checkout_boom')->value('processed_at'));
+    }
+
+    /**
+     * A claim is only stamped once the handler returns, so the row a *successful* delivery leaves
+     * behind is what makes the next one a replay.
+     */
+    public function test_a_successful_delivery_stamps_the_claim(): void
+    {
+        $this->account();
+        $order = $this->pendingOrder();
+
+        $this->deliver([
+            'id' => 'evt_checkout_ok',
+            'type' => 'checkout.session.completed',
+            'data' => ['object' => [
+                'id' => 'cs_test_1',
+                'amount_total' => 500,
+                'currency' => 'gbp',
+                'metadata' => ['order_id' => (string) $order->id],
+            ]],
+        ])->assertOk();
+
+        $this->assertNotNull(ConnectWebhookEvent::query()->where('stripe_event_id', 'evt_checkout_ok')->value('processed_at'));
+    }
+
+    /**
+     * A worker killed between taking the claim and releasing it would otherwise leave the event
+     * unprocessable forever. Past `STALE_CLAIM_MINUTES` the next delivery takes the claim over.
+     */
+    public function test_an_abandoned_claim_is_taken_over_by_a_later_delivery(): void
+    {
+        $this->account();
+        $order = $this->pendingOrder();
+
+        // What a killed process leaves behind: claimed, never completed.
+        ConnectWebhookEvent::create(['stripe_event_id' => 'evt_checkout_stale', 'type' => 'checkout.session.completed'])
+            ->forceFill(['created_at' => now()->subMinutes(30)])->save();
+
+        $this->deliver([
+            'id' => 'evt_checkout_stale',
+            'type' => 'checkout.session.completed',
+            'data' => ['object' => [
+                'id' => 'cs_test_1',
+                'amount_total' => 500,
+                'currency' => 'gbp',
+                'metadata' => ['order_id' => (string) $order->id],
+            ]],
+        ])->assertOk();
+
+        $this->assertSame(OrderStatus::Fulfilled, $order->refresh()->status);
+        $this->assertNotNull(ConnectWebhookEvent::query()->where('stripe_event_id', 'evt_checkout_stale')->value('processed_at'));
+    }
+
+    /**
+     * A fresh claim belongs to a delivery that may still be working, so a second simultaneous
+     * delivery of the same event steps aside rather than processing it too.
+     */
+    public function test_a_fresh_claim_is_left_alone(): void
+    {
+        $this->account();
+        $order = $this->pendingOrder();
+
+        ConnectWebhookEvent::create(['stripe_event_id' => 'evt_checkout_inflight', 'type' => 'checkout.session.completed']);
+
+        $this->deliver([
+            'id' => 'evt_checkout_inflight',
+            'type' => 'checkout.session.completed',
+            'data' => ['object' => [
+                'id' => 'cs_test_1',
+                'amount_total' => 500,
+                'currency' => 'gbp',
+                'metadata' => ['order_id' => (string) $order->id],
+            ]],
+        ])->assertOk();
+
+        $this->assertSame(OrderStatus::Pending, $order->refresh()->status);
     }
 
     public function test_a_refund_taken_at_stripe_is_mirrored_here(): void

@@ -20,6 +20,7 @@ use App\Support\Analytics\Engagement\AccountMetricsReading;
 use App\Support\Analytics\Engagement\PostMetricsReading;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\Concerns\SignsUploadPostWebhooks;
 use Tests\Feature\Analytics\Concerns\BuildsEngagementFixtures;
 use Tests\Feature\Analytics\Concerns\FakeEngagementSource;
 use Tests\TestCase;
@@ -31,7 +32,7 @@ use Tests\TestCase;
  */
 class EngagementSyncTest extends TestCase
 {
-    use BuildsEngagementFixtures, RefreshDatabase;
+    use BuildsEngagementFixtures, RefreshDatabase, SignsUploadPostWebhooks;
 
     public function test_each_sync_appends_a_reading_and_points_the_channel_at_the_newest(): void
     {
@@ -186,7 +187,7 @@ class EngagementSyncTest extends TestCase
         $post = Post::factory()->for($account->client)->create(['org_id' => $org->id, 'status' => PostStatus::Publishing]);
         $target = $post->targets()->create(['social_account_id' => $account->id, 'status' => PostTargetStatus::Pending, 'external_post_id' => 'job-77']);
 
-        $this->postJson(route('webhooks.upload-post'), [
+        $this->postSignedUploadPostWebhook($org, [
             'event' => 'upload_completed',
             'job_id' => 'job-77',
             'request_id' => 'req-77',
@@ -210,7 +211,7 @@ class EngagementSyncTest extends TestCase
         $post = Post::factory()->for($account->client)->create(['org_id' => $org->id, 'status' => PostStatus::Publishing]);
         $target = $post->targets()->create(['social_account_id' => $account->id, 'status' => PostTargetStatus::Pending, 'external_post_id' => 'job-78']);
 
-        $this->postJson(route('webhooks.upload-post'), [
+        $this->postSignedUploadPostWebhook($org, [
             'event' => 'upload_completed',
             'job_id' => 'job-78',
             'platform' => 'instagram',

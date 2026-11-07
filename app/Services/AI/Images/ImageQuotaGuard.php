@@ -8,6 +8,7 @@ use App\Enums\ImageVariantStatus;
 use App\Exceptions\AI\AiImageQuotaExceededException;
 use App\Models\AiImageVariant;
 use App\Models\Organization;
+use App\Services\AI\MonthlyCreditCounter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
 
@@ -23,6 +24,12 @@ use Illuminate\Support\Facades\Log;
 class ImageQuotaGuard
 {
     /**
+     * The credit bucket name shared with `MonthlyCreditCounter` and with `AiImageVariant`, which
+     * releases a claim when a render fails.
+     */
+    public const BUCKET = 'images';
+
+    /**
      * @throws AiImageQuotaExceededException
      */
     public function assertCanGenerate(Organization $organization, int $images): void
@@ -33,13 +40,23 @@ class ImageQuotaGuard
             return;
         }
 
-        $used = $this->usedThisMonth($organization);
+        // Claimed atomically rather than counted, because a count lets a fan-out (the grid's
+        // "fill with AI" dispatches one job per tile) pass the same check nine times over. Images
+        // are the expensive side — each one is a real charge at the vendor. See
+        // `MonthlyCreditCounter`; a failed render hands its claim back via `AiImageVariant`.
+        $claimed = app(MonthlyCreditCounter::class)->claim(
+            self::BUCKET,
+            $organization->id,
+            $images,
+            $quota,
+            fn (): int => $this->usedThisMonth($organization),
+        );
 
-        if ($used + $images > $quota) {
+        if (! $claimed) {
             Log::warning('AI image quota exceeded', [
                 'org_id' => $organization->id,
                 'quota' => $quota,
-                'used' => $used,
+                'used' => $this->usedThisMonth($organization),
                 'requested' => $images,
             ]);
 

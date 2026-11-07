@@ -61,6 +61,18 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
         ->middleware('throttle:6,1')
         ->name('organization.test-upload-post');
 
+    // Posts a message to the org's team-chat channel so the owner can watch it arrive. Throttled
+    // like the connection test above — it makes an outbound call on request.
+    Route::post('settings/organization/test-chat', [OrganizationController::class, 'testChatWebhook'])
+        ->middleware('throttle:6,1')
+        ->name('organization.test-chat');
+
+    // Removing the webhook throws away a stored credential, so it re-checks the password like the
+    // logo delete and the settings PUT. Sending a test message does not — it changes nothing.
+    Route::delete('settings/organization/chat', [OrganizationController::class, 'removeChatWebhook'])
+        ->middleware(RequirePassword::class)
+        ->name('organization.chat.destroy');
+
     // Step CG-2.5 / B-9.3: the Owner-only plan page — current plan, usage meters, Stripe Checkout
     // (upgrade) and the Customer Portal (manage billing). Billing ships dark behind the super-admin
     // switch; the page renders either way and the controller guards every Stripe call.
