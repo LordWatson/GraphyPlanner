@@ -38,7 +38,9 @@ export type StatusKind =
     | 'sentiment'
     | 'order'
     | 'product'
-    | 'deal';
+    | 'deal'
+    | 'audienceContact'
+    | 'bioDomain';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -217,6 +219,19 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
         delivered: { tone: 'success', label: 'Delivered' },
         paid: { tone: 'muted', label: 'Paid' },
         declined: { tone: 'muted', label: 'Declined' },
+    },
+    // Phase GTM-2: a contact's permission state. `pending` is a warning rather than neutral
+    // because it is actionable — an unconfirmed contact is in no segment and gets no marketing.
+    audienceContact: {
+        confirmed: { tone: 'success', label: 'Confirmed' },
+        pending: { tone: 'warning', label: 'Waiting to confirm' },
+        unsubscribed: { tone: 'muted', label: 'Unsubscribed' },
+    },
+    // Step GTM-3.2: a custom domain is either serving the page or it is not. `pending` is a
+    // warning, not neutral: until DNS points here the address shows nothing.
+    bioDomain: {
+        verified: { tone: 'success', label: 'Live' },
+        pending: { tone: 'warning', label: 'Waiting on DNS' },
     },
 };
 

@@ -41,6 +41,42 @@ feature set to help visitors decide whether to register.
 - No dedicated Inertia component/props assertions (e.g. `assertInertia`) yet, since the pages carry
   no server-provided props beyond shared `auth` data — add if dynamic marketing props are introduced.
 
+## Step GTM-7.3 — distribution: comparison pages and the partner programme
+
+Worth more than any feature in the GTM plan and cheaper than all of them: every "best social media
+tool 2026" result is affiliate-monetised content, and we were absent from it.
+
+- **`GET /compare/{rival}`** — one honest page per competitor, generated from
+  `config/competitors.php`. Two rules: **every figure carries one dated "last checked"** (printed on
+  the page, and nagged about by `competitors:review-due` so it can't rot), and **the rival's
+  strengths come first**. We never claim a competitor lacks something — only what they charge and
+  what they say they include. A comparison page that pretends otherwise gets quoted back at you.
+- **`GET /partners`** — the affiliate programme's public page. Deliberately plain and not
+  self-serve: what the commission is, how attribution works, and an email address.
+- **`GET /agents`** (Step GTM-7.4) — agent access claimed on depth. See `mcp.md`.
+- Comparison and partner links sit in the marketing shell's **footer**, because an unlinked page
+  earns nothing. The four slugs are hard-coded there (so every marketing page doesn't carry the
+  competitor config) and `LaunchMechanicsTest` asserts them against config so the two can't drift.
+
+**The referral programme** (`referral_partners`, `referral_payouts`, and
+`organizations.referral_partner_id`):
+
+- `CaptureReferralCode` middleware stores `?ref=CODE` from **any** page for 30 days. It validates
+  the code against a live partner **before** storing it, so the cookie can only ever hold a real
+  code; **first touch wins**, because whoever introduced somebody earned it; and nothing about the
+  visitor is stored — one cookie, one code, no row until they sign up.
+- Attribution lives on `organizations`, not a join table: the org is already the Cashier billable,
+  so it is the thing a commission is owed on, and a separate table would be a second place for the
+  same one-to-one fact to disagree with itself. Written inside `RegisterOrganizationAction`'s
+  transaction.
+- A **payout is a record of money already sent**, not an instruction to send any. What is *owed* is
+  derived when somebody settles up. There is no payment integration, on purpose: paying a partner
+  is a bank transfer and a conversation, and automating it before the first partner exists would be
+  building the wrong thing twice.
+- Super admin: `/super-admin/referrals` (add a partner, see who they sent, record a payout, end a
+  partnership). Ending one **keeps every attribution** — the customers they already sent are still
+  theirs; the code just stops tracking new ones.
+
 ## Changelog
 - 2026-10-18: Campaigns enhancement C-9.2 — a Campaigns section on the welcome page (`components/marketing/campaigns-section.tsx`): eyebrow, "Plan it, sign it off, ship it, prove it.", the three points, and a product vignette built from real components (phase band, status pills, readiness, wrap report). No second Signal Orange accent; the hero keeps the page's one.
 - 2026-10-17: About page content refresh — pillar copy now mentions calendar drag-to-reschedule,

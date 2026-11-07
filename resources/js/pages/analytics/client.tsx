@@ -8,6 +8,11 @@ import {
     FileText,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AdsPanel, type AdsData } from '@/components/analytics/ads-panel';
+import {
+    BenchmarksPanel,
+    type BenchmarksData,
+} from '@/components/analytics/benchmarks-panel';
 import { OrganizationAnalyticsView } from '@/components/analytics/organization-analytics-view';
 import { OrganizationFilterBar } from '@/components/analytics/organization-filter-bar';
 import type {
@@ -50,6 +55,13 @@ type Props = {
     filters: OrgFilters;
     filterOptions: OrgFilterOptions;
     can: AnalyticsAbilities;
+    /** Step GTM-4.2: a client-page-only panel, so it is a page prop, not part of `summary`. */
+    benchmarks: BenchmarksData;
+    benchmarkPlatforms: { value: string; label: string }[];
+    canManageBenchmarks: boolean;
+    /** Step GTM-5.2: read-only paid-ads reporting, beside the organic figures. */
+    ads: AdsData;
+    adPlatforms: { value: string; label: string }[];
 };
 
 /**
@@ -62,6 +74,11 @@ export default function ClientAnalytics({
     filters,
     filterOptions,
     can,
+    benchmarks,
+    benchmarkPlatforms,
+    canManageBenchmarks,
+    ads,
+    adPlatforms,
 }: Props) {
     const [loading, setLoading] = useState(false);
     const state = stateFromFilters(filters);
@@ -177,6 +194,20 @@ export default function ClientAnalytics({
                     className="transition-opacity duration-200 aria-busy:opacity-60"
                 >
                     <OrganizationAnalyticsView summary={summary} />
+
+                    <BenchmarksPanel
+                        clientId={client.id}
+                        benchmarks={benchmarks}
+                        platforms={benchmarkPlatforms}
+                        canManage={canManageBenchmarks}
+                    />
+
+                    <AdsPanel
+                        clientId={client.id}
+                        ads={ads}
+                        platforms={adPlatforms}
+                        canManage={canManageBenchmarks}
+                    />
                 </div>
             </Page>
         </>

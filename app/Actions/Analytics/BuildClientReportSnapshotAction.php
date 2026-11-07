@@ -2,6 +2,7 @@
 
 namespace App\Actions\Analytics;
 
+use App\Actions\Benchmarks\GetClientBenchmarksAction;
 use App\Enums\CampaignReportStatus;
 use App\Enums\Platform;
 use App\Models\CampaignReport;
@@ -114,8 +115,41 @@ class BuildClientReportSnapshotAction
                 'decisions' => $approvals['client_turnaround']['decisions'],
             ],
             'campaigns' => $this->wrapReports($client, $range),
+            // Step GTM-4.2: the benchmark block, frozen into the snapshot like everything else
+            // here — a published report never changes after the fact. Empty (and so not rendered)
+            // when the plan has no benchmarks or the brand tracks nothing.
+            'benchmarks' => $this->benchmarks($client),
+            // Step GTM-5.2: read-only ad spend beside the organic figures, frozen like the rest.
+            'ads' => $this->ads($client),
             'generated_at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * Step GTM-5.2 — the paid-ads block. Null (so the section is skipped) when the plan has no
+     * ads reporting or the brand has no ad accounts.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function ads(Client $client): ?array
+    {
+        $payload = app(GetClientAdsAction::class)($client);
+
+        return $payload['entitled'] && $payload['accounts'] !== [] ? $payload : null;
+    }
+
+    /**
+     * Step GTM-4.2 — the tracked-competitor block for the report, with its plain-English takeaway.
+     * Returns `null` rather than an empty shell when there is nothing to show, so the PDF and the
+     * portal page can simply skip the section.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function benchmarks(Client $client): ?array
+    {
+        $payload = app(GetClientBenchmarksAction::class)($client, withTakeaway: true);
+
+        return $payload['entitled'] && $payload['profiles'] !== [] ? $payload : null;
     }
 
     /**

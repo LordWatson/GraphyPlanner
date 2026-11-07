@@ -33,6 +33,15 @@ interface AssetStorage
     public function contents(string $disk, string $path): ?string;
 
     /**
+     * Step GTM-1.1 — a read stream for a stored file, or null when it no longer exists. Paid
+     * downloads are streamed through our own route so every hit is counted and a refund stops the
+     * link, and a 500MB file must not be read into memory to do that.
+     *
+     * @return resource|null
+     */
+    public function readStream(string $disk, string $path);
+
+    /**
      * Resolve a reachable URL for a stored file. Step I-1.6: for a private disk this is a signed
      * URL that expires after `assets.url_ttl_minutes`.
      */

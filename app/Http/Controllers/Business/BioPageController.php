@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Business;
 
+use App\Actions\Business\AddBioPageDomainAction;
 use App\Actions\Business\BuildBioPageAction;
 use App\Actions\Business\SaveBioPageAction;
+use App\Actions\Business\VerifyBioPageDomainAction;
 use App\Contracts\Entitlements;
 use App\Enums\BioBlockType;
 use App\Enums\BioTheme;
@@ -13,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Business\SaveBioPageRequest;
 use App\Models\BioBlock;
 use App\Models\BioPage;
+use App\Models\BioPageDomain;
 use App\Models\Product;
 use App\Services\Workspace\CurrentWorkspace;
 use Illuminate\Http\RedirectResponse;
@@ -68,8 +71,22 @@ class BioPageController extends Controller
                 ->get(['id', 'title'])
                 ->map(fn (Product $product) => ['id' => $product->id, 'title' => $product->title])
                 ->values(),
+            // Step GTM-3.2: the creator's own hostnames, and what they have to put in DNS.
+            'domains' => $page === null ? [] : $page->domains()->orderBy('id')->get()->map(fn (BioPageDomain $domain) => [
+                'id' => $domain->id,
+                'hostname' => $domain->hostname,
+                'verified' => $domain->isVerified(),
+                'ssl_status' => $domain->ssl_status,
+                'last_error' => $domain->last_error,
+                'verification_token' => $domain->verification_token,
+                'last_checked_at' => $domain->last_checked_at?->toIso8601String(),
+            ])->values(),
+            'domainTarget' => (string) config('bio.domain_target'),
+            'maxDomains' => BioPageDomain::MAX_PER_PAGE,
             'entitled' => $organization !== null
                 && app(Entitlements::class)->allows($organization, Feature::BioPage),
+            'domainsEntitled' => $organization !== null
+                && app(Entitlements::class)->allows($organization, Feature::CustomDomain),
             'canManage' => $request->user()?->can('update', $brand) ?? false,
         ]);
     }
@@ -92,6 +109,65 @@ class BioPageController extends Controller
      * A free handle to offer a brand that hasn't picked one: its name slugified, with a short
      * suffix when that's already somebody's.
      */
+    /**
+     * Step GTM-3.2 — claim a hostname for this brand's page. Created unverified: it serves
+     * nothing until DNS points here.
+     */
+    public function storeDomain(Request $request, CurrentWorkspace $workspace, AddBioPageDomainAction $action): RedirectResponse
+    {
+        $brand = $workspace->brand();
+        $this->authorize('update', $brand);
+
+        // Normalised before validating, because people paste `https://links.me.com/` and the
+        // strict hostname rule below would otherwise just say no.
+        $request->merge(['hostname' => BioPageDomain::normaliseHostname((string) $request->input('hostname'))]);
+
+        $validated = $request->validate([
+            'hostname' => ['required', 'string', 'max:253', 'regex:/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/'],
+        ]);
+
+        $page = BioPage::query()->where('client_id', $brand->id)->firstOrFail();
+        $domain = $action($page, $validated['hostname']);
+
+        Inertia::flash('toast', $domain->isVerified()
+            ? ['type' => 'success', 'message' => __('Domain verified and live.')]
+            : ['type' => 'info', 'message' => __('Domain added. Point your DNS at us and check again.')]);
+
+        return back();
+    }
+
+    /**
+     * Re-check one domain now. The same Action the nightly sweep uses, so it can take a domain
+     * offline as well as bring one online.
+     */
+    public function verifyDomain(BioPageDomain $domain, CurrentWorkspace $workspace, VerifyBioPageDomainAction $action): RedirectResponse
+    {
+        $brand = $workspace->brand();
+        $this->authorize('update', $brand);
+        abort_unless($domain->page?->client_id === $brand->id, 404);
+
+        $verified = $action($domain);
+
+        Inertia::flash('toast', $verified
+            ? ['type' => 'success', 'message' => __('Domain verified and live.')]
+            : ['type' => 'error', 'message' => $domain->refresh()->last_error ?? __('Not pointing here yet.')]);
+
+        return back();
+    }
+
+    public function destroyDomain(BioPageDomain $domain, CurrentWorkspace $workspace): RedirectResponse
+    {
+        $brand = $workspace->brand();
+        $this->authorize('update', $brand);
+        abort_unless($domain->page?->client_id === $brand->id, 404);
+
+        $domain->delete();
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Domain removed. Your @handle address still works.')]);
+
+        return back();
+    }
+
     private function suggestHandle(string $name): string
     {
         $base = Str::limit(Str::slug($name, ''), 24, '') ?: 'mybrand';

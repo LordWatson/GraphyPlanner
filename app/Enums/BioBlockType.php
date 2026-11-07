@@ -4,8 +4,8 @@ namespace App\Enums;
 
 /**
  * Step CG-3.1 — the kinds of block a bio page can hold. Only {@see self::live()} types are
- * buildable: `email_capture` arrives with the audience phase (CG-6) and is rejected by validation
- * until then, so a page can never hold a block nothing renders.
+ * buildable, so a page can never hold a block nothing renders. Step GTM-2.1 switched
+ * `email_capture` on; `booking` is not a block at all (see below).
  *
  * Step CG-4.2 switched `product` on. There is no separate `booking` block — a booking is a product
  * type, so it is sold through a `product` block like everything else in the store.
@@ -38,7 +38,7 @@ enum BioBlockType: string
      */
     public static function live(): array
     {
-        return [self::Link, self::LatestPosts, self::MediaKit, self::Product];
+        return [self::Link, self::LatestPosts, self::MediaKit, self::Product, self::EmailCapture];
     }
 
     /**

@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Analytics;
 
 use App\Actions\Analytics\GenerateOrganizationReportPdfAction;
 use App\Actions\Analytics\GetAnalyticsFilterOptionsAction;
+use App\Actions\Analytics\GetClientAdsAction;
 use App\Actions\Analytics\GetOrganizationAnalyticsSummaryAction;
+use App\Actions\Benchmarks\GetClientBenchmarksAction;
+use App\Enums\Platform;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Analytics\OrganizationAnalyticsFilterRequest;
 use App\Http\Responses\CsvDownload;
@@ -12,6 +15,7 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\OrganizationReport;
 use App\Models\User;
+use App\Services\Analytics\Benchmarks\CompositeCompetitorProfileSource;
 use App\Support\Analytics\AnalyticsAccess;
 use App\Support\Analytics\OrganizationAnalyticsCsv;
 use App\Support\Analytics\OrganizationAnalyticsFilters;
@@ -45,7 +49,7 @@ class AnalyticsController extends Controller
     /**
      * Step 17.5 — one client's analytics: the same summary scoped to that client.
      */
-    public function client(OrganizationAnalyticsFilterRequest $request, Client $client, GetOrganizationAnalyticsSummaryAction $summary, GetAnalyticsFilterOptionsAction $options): Response
+    public function client(OrganizationAnalyticsFilterRequest $request, Client $client, GetOrganizationAnalyticsSummaryAction $summary, GetAnalyticsFilterOptionsAction $options, GetClientBenchmarksAction $benchmarks, GetClientAdsAction $ads): Response
     {
         $this->authorize('view', $client);
 
@@ -56,6 +60,20 @@ class AnalyticsController extends Controller
 
         return Inertia::render('analytics/client', [
             'client' => ['id' => $client->id, 'name' => $client->name, 'status' => $client->status->value],
+            // Step GTM-4.2: benchmarks are a client-page thing only, so they are a page prop here
+            // rather than part of the shared summary that four other surfaces render.
+            'benchmarks' => $benchmarks($client),
+            'canManageBenchmarks' => $user->can('update', $client),
+            // Step GTM-5.2: read-only paid-ads reporting, beside the organic figures.
+            'ads' => $ads($client),
+            'adPlatforms' => array_values(array_map(
+                fn (Platform $platform) => ['value' => $platform->value, 'label' => $platform->label()],
+                GetClientAdsAction::supportedPlatforms(),
+            )),
+            'benchmarkPlatforms' => array_values(array_map(
+                fn (Platform $platform) => ['value' => $platform->value, 'label' => $platform->label()],
+                array_filter(Platform::cases(), fn (Platform $platform) => CompositeCompetitorProfileSource::supports($platform)),
+            )),
             'summary' => $summary($organization, $filters, $user),
             'filters' => $filters->toArray(),
             'filterOptions' => [

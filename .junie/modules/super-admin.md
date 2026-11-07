@@ -197,6 +197,36 @@ New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.t
 - Password-reset tokens expire after `auth.passwords.users.expire` (60 min), so an onboarded owner
   may need to request a fresh link — the welcome email explains how.
 
+## Step GTM-7.1 — the funnel (closes CG-9.1 / B-12.4)
+
+`GetFunnelMetricsAction` + a funnel panel on `/super-admin/analytics`: trial → paid, median time to
+first published post, bio-page adoption, store GMV per currency, churn by plan, and **agency cap
+utilisation against the GTM-0.1 limits**.
+
+Two rules:
+
+- **Store GMV is read from our own `orders`, never a Stripe balance.** Creators are paid directly
+  into their own connected accounts, so our balance has never seen that money and asking it would
+  give a wrong answer with total confidence.
+- **A denominator of zero is `null`, not 0%.** A new install has no conversion rate; printing 0%
+  would read as "nobody converts".
+
+It is **lifetime to date and ignores the analytics filters**, so it is a separate page prop rather
+than another section of `GetPlatformAnalyticsSummaryAction` — "how long does a new workspace take to
+publish" is not a question about last month.
+
+The agency figure is the one with teeth: an agency at 90% of its brands is an upgrade waiting to
+happen, and a tier averaging a fifth of its cap is a cap set too high. That is the evidence the next
+price change needs.
+
+## Step GTM-7.3 — the referral console
+
+`/super-admin/referrals` (under the **partners** chapter, no new chapter number): add a partner, see
+who they sent and how many are paying, record a payout, end a partnership. A payout is a record of
+money already sent — there is no payment integration — and what is *owed* is derived when somebody
+settles up, so there is only ever one number that can be wrong. Ending a partnership keeps every
+attribution. See `marketing.md`.
+
 ## Changelog
 - 2026-10-24: Phase M-8 (design-partner release) — `organizations.is_design_partner`, the partner
   usage view (`GetPartnerUsageAction`, WAU via `users.last_active_at`/`TrackUserActivity`) and the

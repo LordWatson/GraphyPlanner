@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Deals\GetBrandDealsAction;
+use App\Actions\Deals\IssueDealInvoiceAction;
 use App\Enums\DealStatus;
 use App\Enums\Platform;
 use App\Models\Concerns\BelongsToOrganization;
@@ -33,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $due_on
  * @property string|null $notes
  * @property string|null $contact_email
+ * @property int|null $invoice_id
  * @property bool $show_on_media_kit
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -74,6 +76,18 @@ class BrandDeal extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class, 'org_id');
+    }
+
+    /**
+     * Step GTM-1.2 — the invoice this deal was billed on, when the creator raised one here. Set
+     * only by {@see IssueDealInvoiceAction} (it is not fillable), and its
+     * presence is what stops a deal being invoiced twice.
+     *
+     * @return BelongsTo<Invoice, $this>
+     */
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**

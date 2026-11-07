@@ -8,8 +8,14 @@
      */
     use App\Support\Pdf\PdfBrand;
 
-    $logo = PdfBrand::markTile();
+    /*
+     * Step GTM-3.1: the band mark, the accent word and the footer follow the agency's branding
+     * when its plan includes white labelling; otherwise they are Alima's. The paper, the type and
+     * the layout never change — this is a white label, not a theme.
+     */
+    $logo = $brandLogo ?? PdfBrand::markTile();
     $wordmark = PdfBrand::wordmark();
+    $accent = $branding->accent;
     $period = $snapshot['period']['label'] ?? $report->periodLabel();
     $client = $snapshot['client']['name'] ?? ($report->client->name ?? 'Client');
     $studio = $snapshot['studio']['name'] ?? ($report->organization->name ?? '');
@@ -18,6 +24,15 @@
     $totals = $engagement['totals'] ?? [];
     $followers = $engagement['followers'] ?? [];
     $approvals = $snapshot['approvals'] ?? [];
+    // Step GTM-4.2: the tracked-competitor block. Absent (not empty) when the plan has no
+    // benchmarks or the brand tracks nothing, so the section simply doesn't appear.
+    $benchmarks = $snapshot['benchmarks'] ?? null;
+    // Step GTM-5.2: read-only ad spend. Absent when the plan has no ads reporting or the brand has
+    // no ad accounts, so the section simply doesn't appear.
+    $ads = $snapshot['ads'] ?? null;
+    $money = function (?int $minor, ?string $currency) {
+        return $minor === null ? '—' : \App\Support\MoneyFormatter::format($minor / 100, $currency ?: 'GBP');
+    };
     $count = fn ($value) => $value === null ? '—' : number_format((int) $value);
     $percent = fn ($value) => $value === null ? '—' : rtrim(rtrim(number_format((float) $value, 1), '0'), '.').'%';
     $signed = fn ($value) => $value === null ? '—' : (($value > 0 ? '+' : '').number_format((int) $value));
@@ -55,13 +70,15 @@
         .dash { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background-color: #F03D2A; margin-right: 6px; }
         .band { background-color: #181723; color: #F5F2E8; padding: 56px 52px 22px; margin-top: -34px; }
         .band .logo { width: 34px; height: 34px; }
+        /* An agency's own logo is any shape, so it is bounded by height and left to find its width. */
+        .band .brand-logo { height: 34px; max-width: 150px; }
         .band .studio { font-size: 22px; line-height: 1; color: #F5F2E8; padding-left: 12px; }
         .band .caption { font-size: 8px; letter-spacing: 1.4px; color: #AEACB5; padding-left: 12px; padding-top: 5px; }
         .band .eyebrow { color: #AEACB5; }
         .band .range { font-size: 12px; color: #F5F2E8; padding-top: 3px; }
         .sheet { padding: 26px 52px 0; }
         .title { font-size: 40px; line-height: 1.04; letter-spacing: -1px; margin: 14px 0 0; }
-        .title em { font-style: normal; color: #205557; }
+        .title em { font-style: normal; color: {{ $accent }}; }
         .lead { font-size: 12.5px; color: #4A4857; margin-top: 12px; line-height: 1.55; white-space: pre-line; }
         .note { margin-top: 18px; background-color: #ECE2E5; border: 1px solid #DBC3DE; border-radius: 10px; padding: 14px 16px; }
         .note p { margin: 6px 0 0; font-size: 11.5px; white-space: pre-line; }
@@ -85,11 +102,20 @@
     <div class="footer">
         <table>
             <tr>
-                <td class="eyebrow" style="vertical-align: middle;">{{ $studio }} &nbsp;&middot;&nbsp; Marketing brighter together.</td>
-                <td class="right" style="vertical-align: middle;">
-                    <span class="eyebrow" style="letter-spacing: 1px;">Prepared with</span>
-                    <img class="wordmark" src="{{ $wordmark }}" alt="Alima">
+                <td class="eyebrow" style="vertical-align: middle;">
+                    {{ $studio }}
+                    @if ($branding->footer)
+                        &nbsp;&middot;&nbsp; {{ $branding->footer }}
+                    @elseif (! $branding->isWhiteLabel)
+                        &nbsp;&middot;&nbsp; Marketing brighter together.
+                    @endif
                 </td>
+                @unless ($branding->isWhiteLabel)
+                    <td class="right" style="vertical-align: middle;">
+                        <span class="eyebrow" style="letter-spacing: 1px;">Prepared with</span>
+                        <img class="wordmark" src="{{ $wordmark }}" alt="Alima">
+                    </td>
+                @endunless
             </tr>
         </table>
     </div>
@@ -100,7 +126,7 @@
                 <td style="vertical-align: middle;">
                     <table style="width: auto;">
                         <tr>
-                            <td style="vertical-align: middle;"><img class="logo" src="{{ $logo }}" alt=""></td>
+                            <td style="vertical-align: middle;"><img class="{{ $brandLogo ? 'brand-logo' : 'logo' }}" src="{{ $logo }}" alt=""></td>
                             <td style="vertical-align: middle;">
                                 <div class="serif studio">{{ $studio }}</div>
                                 <div class="mono caption">MONTHLY REPORT</div>
@@ -188,6 +214,70 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+        @endif
+
+        @if ($benchmarks)
+            <div class="section">
+                <span class="eyebrow">{{ $letter() }} &mdash; How you compare</span>
+                <table class="rows">
+                    <thead><tr><th class="eyebrow">Profile</th><th class="eyebrow right">Followers</th><th class="eyebrow right">Posts</th><th class="eyebrow right">Interactions / post</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>{{ $benchmarks['us']['name'] ?? $client }}</strong> <span class="muted mono" style="font-size: 8.5px;">YOU</span></td>
+                            <td class="num">{{ $count($benchmarks['us']['followers'] ?? null) }}</td>
+                            <td class="num">{{ $count($benchmarks['us']['post_count'] ?? null) }}</td>
+                            <td class="num">{{ $count($benchmarks['us']['avg_engagement'] ?? null) }}</td>
+                        </tr>
+                        @foreach ($benchmarks['profiles'] as $row)
+                            <tr>
+                                <td>{{ $row['name'] }}@if (! ($row['has_data'] ?? false))<span class="muted"> &mdash; no public figures</span>@endif</td>
+                                <td class="num">{{ $count($row['followers'] ?? null) }}</td>
+                                <td class="num">{{ $count($row['post_count'] ?? null) }}</td>
+                                <td class="num">{{ $count($row['avg_engagement'] ?? null) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @if (! empty($benchmarks['takeaway']))
+                    <p class="muted" style="margin-top: 8px; font-size: 10px;">{{ $benchmarks['takeaway'] }}</p>
+                @endif
+                <p class="muted" style="margin-top: 6px; font-size: 9px;">
+                    Public figures over the last {{ $benchmarks['window_days'] }} days. A dash means the platform
+                    did not report it &mdash; never a zero.
+                </p>
+            </div>
+        @endif
+
+        @if ($ads)
+            <div class="section">
+                <span class="eyebrow">{{ $letter() }} &mdash; Paid and organic</span>
+                <table class="rows">
+                    <thead><tr><th class="eyebrow">Ad account</th><th class="eyebrow right">Spend</th><th class="eyebrow right">Clicks</th><th class="eyebrow right">Results</th><th class="eyebrow right">Cost / result</th></tr></thead>
+                    <tbody>
+                        @foreach ($ads['accounts'] as $row)
+                            <tr>
+                                <td>{{ $row['name'] }}@if (! ($row['has_data'] ?? false))<span class="muted"> &mdash; nothing reported</span>@endif</td>
+                                <td class="num">{{ $money($row['spend_minor'] ?? null, $row['currency'] ?? null) }}</td>
+                                <td class="num">{{ $count($row['clicks'] ?? null) }}</td>
+                                <td class="num">{{ $count($row['conversions'] ?? null) }}</td>
+                                <td class="num">{{ $money($row['cpa_minor'] ?? null, $row['currency'] ?? null) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                <p class="muted" style="margin-top: 8px; font-size: 10px;">
+                    Organically, {{ $count($ads['organic']['posts'] ?? 0) }} posts went out
+                    @if (($ads['organic']['engagement'] ?? null) !== null)
+                        and brought {{ $count($ads['organic']['engagement']) }} interactions.
+                    @else
+                        (interactions not reported).
+                    @endif
+                </p>
+                <p class="muted" style="margin-top: 4px; font-size: 9px;">
+                    Last {{ $ads['window_days'] }} days, read from the ad platform. A dash means it did not report
+                    that figure &mdash; never a zero. Alima reports on spend and never changes it.
+                </p>
             </div>
         @endif
 

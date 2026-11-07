@@ -23,14 +23,20 @@ shared campaigns & assets doc in Step C-0.1).
 
 ## Actions / Services / Contracts
 - `App\Contracts\AssetStorage`: abstracts where/how an uploaded file is stored (`store`, `url`,
-  `signedUrl`, `delete`, `storeContents`, `contents`) so the spec §10 Upload-Post-style
+  `signedUrl`, `delete`, `storeContents`, `contents`, `readStream`) so the spec §10 Upload-Post-style
   signed-URL/S3 flow can be dropped in later without touching any Action/Controller.
+  `readStream()` (Step GTM-1.1) is for serving a file we must not hold in memory — a paid store
+  download, which can be 500MB; `contents()` is for the small files we actually inspect (probing,
+  AI inputs, PDFs).
 - `App\Services\LocalAssetStorage`: the only implementation today. Stores files on the Laravel
   filesystem disk named by `config('assets.disk')`. Bound to `AssetStorage` in
   `AppServiceProvider::register()`. Records the file's mime type (used both for `Asset::type`
   auto-detection and by `AssetPreview` on the frontend to decide whether to render an `<img>` or
   `<video>` tag). **Not yet S3**: the `s3` disk is already defined in `config/filesystems.php`, so
-  switching later should only require setting `ASSETS_DISK=s3` (plus `AWS_*` env vars).
+  switching needs `composer require league/flysystem-aws-s3-v3` (not installed) plus
+  `ASSETS_DISK=s3` and the `AWS_*` env vars — no application code. Step GTM-1.1 verified the paid
+  store download path end to end through this contract, so that switch is the only thing left for
+  it.
 - `App\Actions\Assets\CreateAssetAction`: creates an `Asset` for a client (optionally scoped to a
   campaign). For `source = upload`, stores the file via `AssetStorage::store()` under
   `assets/{org_id}/{client_id}` and records disk/path/url/mime/size/original_filename; for
@@ -162,13 +168,21 @@ shared campaigns & assets doc in Step C-0.1).
   toast for a 413.
 - `width`/`height` columns exist but nothing probes uploaded image dimensions yet.
 - Storage is local-only for now; `App\Contracts\AssetStorage` is the seam for real S3 signed-URL
-  uploads (spec §10).
+  uploads (spec §10). The AWS flysystem adapter is **not installed**, so `ASSETS_DISK=s3` would
+  fail until it is — see above.
+- **Nothing records that an asset was scanned**, only that its `source` came through a path that
+  scans (`AssetSource::isVirusScanned()`, Step GTM-1.1). A design/cloud import stores third-party
+  bytes unscanned, which is why such a file cannot be sold as a paid download. If a scanned-at
+  column ever lands, make that method read it.
 - Figma/URL assets and the `rights` field can no longer be created from the UI (the endpoint still
   accepts them).
 - Campaign asset kit (Step C-4.1) will add a `pick-for-campaign` mode to `AssetLibraryDialog`; see
   `campaigns.md`.
 
 ## Changelog
+- 2026-11-07: Step GTM-1.1 — `AssetStorage::readStream()` (+ `LocalAssetStorage`) and
+  `AssetSource::isVirusScanned()` / `Asset::downloadRefusalReason()`, used by the creator store's
+  download route. See `creator-store.md`.
 - 2026-10-26: Media over MCP — `CreateAssetFromBase64Action` ingests base64 media from the AI
   assistant through the same `SafeUpload`/size validation + `CreateAssetAction` pipeline the web
   uploader uses (reuse, not a second path). See `mcp.md` for the `upload_media`/`set_post_media` tools.

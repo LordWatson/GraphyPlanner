@@ -6,14 +6,30 @@ import { BrandMark } from '@/components/brand-mark';
 import { Button } from '@/components/ui/button';
 import {
     about,
+    agents,
+    compare,
     dashboard,
     forBusiness,
     forCreators,
     login,
+    partners,
     pricing,
     register,
 } from '@/routes';
 import type { Auth } from '@/types';
+
+/**
+ * Step GTM-7.3 — the comparison pages, in footer order. Hard-coded rather than read from
+ * `config/competitors.php`, because every marketing page would otherwise have to carry the whole
+ * competitor config just to draw four links. The slugs are asserted against config by
+ * `MarketingPagesTest`, so one can't drift from the other unnoticed.
+ */
+const COMPARISONS = [
+    { slug: 'planoly', name: 'Planoly' },
+    { slug: 'metricool', name: 'Metricool' },
+    { slug: 'cloud-campaign', name: 'Cloud Campaign' },
+    { slug: 'later', name: 'Later' },
+];
 
 /**
  * Step CG-2.7 — the standalone chrome shared by the public segment & pricing pages. Mirrors the
@@ -54,6 +70,14 @@ export function MarketingShell({
                             className="hidden sm:inline-flex"
                         >
                             <Link href={pricing()}>Pricing</Link>
+                        </Button>
+                        {/* Step GTM-7.4: agent access, claimed on depth. */}
+                        <Button
+                            variant="ghost"
+                            asChild
+                            className="hidden lg:inline-flex"
+                        >
+                            <Link href={agents()}>Agent access</Link>
                         </Button>
                         {auth.user ? (
                             <Button asChild>
@@ -101,6 +125,25 @@ export function MarketingShell({
                                 <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                             </Link>
                         </div>
+                        {/* Step GTM-7.3: the comparison pages and the partner programme need
+                            somewhere to be found from — an unlinked page earns nothing. */}
+                        <nav className="border-cream/15 flex flex-wrap gap-x-6 gap-y-2 border-t pt-6 text-sm">
+                            {COMPARISONS.map((rival) => (
+                                <Link
+                                    key={rival.slug}
+                                    href={compare(rival.slug)}
+                                    className="text-cream/70 hover:text-cream"
+                                >
+                                    Alima vs {rival.name}
+                                </Link>
+                            ))}
+                            <Link
+                                href={partners()}
+                                className="text-cream/70 hover:text-cream"
+                            >
+                                Partner programme
+                            </Link>
+                        </nav>
                         <div className="eyebrow border-cream/15 text-cream/55 flex flex-wrap justify-between gap-3 border-t pt-4">
                             <span>© {new Date().getFullYear()} Alima</span>
                             <span>Strategy · Content · Growth · Impact</span>

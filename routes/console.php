@@ -115,3 +115,25 @@ $safely(Schedule::command('inbox:send-overdue-reminders')->dailyAt('09:15'), 'in
 // they were holding) and release the card authorisation on paid questions nobody answered in time.
 // Hourly, well inside the ~7 days a Stripe authorisation survives. See ExpireStaleOrdersAction.
 $safely(Schedule::command('store:expire-orders')->hourlyAt(50), 'store:expire-orders');
+
+// Step GTM-0.1: ends the 12-month agency grandfather, moving orgs off the legacy unlimited plan
+// onto `agency_standard` on the day their period expires. Daily — the date is a day, not an hour.
+// See EndPlanGrandfatherAction.
+$safely(Schedule::command('plans:end-grandfather')->dailyAt('03:00'), 'plans:end-grandfather');
+
+// Step GTM-3.2: a bio-page custom domain that has been repointed must stop serving, and one whose
+// DNS has just propagated should start without the creator coming back to press a button.
+$safely(Schedule::command('bio-domains:reverify')->dailyAt('03:30'), 'bio-domains:reverify');
+
+// Step GTM-4.1: one public reading per tracked competitor profile per day. Early, so the figures
+// are in place before anyone opens analytics, and well clear of the engagement sweep.
+$safely(Schedule::command('benchmarks:sync')->dailyAt('04:00'), 'benchmarks:sync');
+
+// Step GTM-5.1: read-only ad spend. It re-reads the whole window each night because ad platforms
+// restate recent days as conversions land.
+$safely(Schedule::command('ads:sync')->dailyAt('04:30'), 'ads:sync');
+
+// Step GTM-7.2: the comparison pages quote competitors' prices, so somebody has to re-read them.
+// Checked daily and silent until the quarter is up, which is what makes "one stale quarter, one
+// alert" possible without a second schedule.
+$safely(Schedule::command('competitors:review-due')->dailyAt('09:00'), 'competitors:review-due');

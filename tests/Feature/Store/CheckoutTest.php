@@ -4,6 +4,7 @@ namespace Tests\Feature\Store;
 
 use App\Actions\Store\FulfilOrderAction;
 use App\Actions\Store\MarkOrderPaidAction;
+use App\Enums\AssetSource;
 use App\Enums\OrderStatus;
 use App\Enums\OrganizationType;
 use App\Enums\ProductStatus;
@@ -223,6 +224,8 @@ class CheckoutTest extends TestCase
 
         $asset = Asset::factory()->for($this->brand)->create([
             'org_id' => $this->org->id,
+            // Step GTM-1.1: a sellable file is an upload (so it was virus-scanned) on a private disk.
+            'source' => AssetSource::Upload,
             'disk' => config('assets.disk', 'public'),
             'path' => 'downloads/guide.pdf',
             'original_filename' => 'guide.pdf',
@@ -265,6 +268,43 @@ class CheckoutTest extends TestCase
         ]);
 
         $this->get(app(FulfilOrderAction::class)->downloadUrl($fresh))->assertStatus(410);
+    }
+
+    public function test_a_download_is_refused_when_its_file_is_public_or_was_never_scanned(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        // Step GTM-1.1 — two files we will not charge for: one anyone could fetch without paying,
+        // one imported from another service that never went through the virus scanner.
+        foreach ([
+            ['disk' => 'public', 'source' => AssetSource::Upload],
+            ['disk' => 'local', 'source' => AssetSource::Dropbox],
+        ] as $attributes) {
+            $asset = Asset::factory()->for($this->brand)->create([
+                'org_id' => $this->org->id,
+                'path' => 'downloads/guide.pdf',
+                'original_filename' => 'guide.pdf',
+                'mime_type' => 'application/pdf',
+                ...$attributes,
+            ]);
+            Storage::disk($attributes['disk'])->put('downloads/guide.pdf', 'PDF BYTES');
+
+            $product = $this->product(['download_asset_id' => $asset->id]);
+            $order = Order::create([
+                'org_id' => $this->org->id,
+                'product_id' => $product->id,
+                'buyer_email' => 'buyer@example.test',
+                'amount_minor' => 1200,
+                'currency' => 'GBP',
+                'status' => OrderStatus::Fulfilled,
+                'paid_at' => now(),
+                'fulfilled_at' => now(),
+            ]);
+
+            $this->get(app(FulfilOrderAction::class)->downloadUrl($order))->assertStatus(410);
+            $this->assertSame(0, $order->refresh()->download_count);
+        }
     }
 
     public function test_a_booking_checkout_claims_the_slot_and_the_next_buyer_cannot_take_it(): void

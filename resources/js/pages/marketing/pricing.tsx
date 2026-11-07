@@ -22,7 +22,7 @@ export default function Pricing({ pricing }: { pricing: PricingData }) {
                         <span className="text-signal">no surprises.</span>
                     </>
                 }
-                description="Start free. Upgrade when you're ready for the full AI partner, unlimited scheduling and the creator tools. Cancel anytime."
+                description="Start free as one brand, earn from your audience as a creator, or run a roster as an agency. Cancel anytime."
             />
 
             <PricingTable pricing={pricing} />
@@ -31,6 +31,13 @@ export default function Pricing({ pricing }: { pricing: PricingData }) {
                 Every paid plan includes a 14-day trial. Annual billing saves
                 you two months. On Creator Pro you keep 100% of what you sell —
                 Alima never takes a cut.
+            </p>
+
+            {/* Step GTM-1.3: said here rather than discovered after the first sale. */}
+            <p className="text-muted-foreground mx-auto max-w-xl text-center text-sm">
+                Store sales are paid straight into your own Stripe account, so
+                you are the seller of record and your own sales tax or VAT is
+                yours to handle.
             </p>
         </MarketingShell>
     );

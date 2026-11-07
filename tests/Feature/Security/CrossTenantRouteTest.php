@@ -4,6 +4,8 @@ namespace Tests\Feature\Security;
 
 use App\Enums\AiTextJobKind;
 use App\Enums\AiTextJobStatus;
+use App\Enums\AudienceSource;
+use App\Enums\ConnectionStatus;
 use App\Enums\DealStatus;
 use App\Enums\DesignImportProvider;
 use App\Enums\GridPlanStatus;
@@ -13,12 +15,16 @@ use App\Enums\PostStatus;
 use App\Enums\ProductStatus;
 use App\Enums\ProductType;
 use App\Enums\Role;
+use App\Models\AdAccount;
 use App\Models\AiImageGeneration;
 use App\Models\AiImageVariant;
 use App\Models\AiPostIdea;
 use App\Models\AiTextJob;
 use App\Models\AiTrend;
 use App\Models\Asset;
+use App\Models\AudienceContact;
+use App\Models\BioPage;
+use App\Models\BioPageDomain;
 use App\Models\BrandDeal;
 use App\Models\Campaign;
 use App\Models\CampaignDeliverable;
@@ -52,6 +58,7 @@ use App\Models\SavedReply;
 use App\Models\SocialAccount;
 use App\Models\StaffInvitation;
 use App\Models\TaxRate;
+use App\Models\TrackedProfile;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -253,6 +260,43 @@ class CrossTenantRouteTest extends TestCase
                 'currency' => 'GBP',
             ]),
             Product::class => $product,
+            // Step GTM-5.2: the other org's ad account (clients/{client}/ad-accounts/{adAccount}).
+            AdAccount::class => AdAccount::create([
+                'org_id' => $org->id,
+                'client_id' => $client->id,
+                'platform' => Platform::Facebook,
+                'external_account_id' => '9876543210',
+                'connection_status' => ConnectionStatus::Connected,
+            ]),
+            // Step GTM-4.1: the other org's tracked competitor profile
+            // (clients/{client}/benchmarks/{profile}).
+            TrackedProfile::class => TrackedProfile::create([
+                'org_id' => $org->id,
+                'client_id' => $client->id,
+                'platform' => Platform::Instagram,
+                'handle' => 'their-rival',
+            ]),
+            // Step GTM-3.2: the other org's bio page and the hostname pointed at it
+            // (bio/domains/{domain}).
+            BioPageDomain::class => BioPage::create([
+                'org_id' => $org->id,
+                'client_id' => $client->id,
+                'handle' => 'their-handle',
+                'theme' => 'cream',
+                'published_at' => now(),
+            ])->domains()->create([
+                'hostname' => 'links.theirbrand.test',
+                'verification_token' => BioPageDomain::newToken(),
+            ]),
+            // Phase GTM-2: the other org's audience contact (audience/contacts/{contact}). The
+            // public confirm/unsubscribe routes bind it too, but they sit behind `signed`, so an
+            // unsigned cross-tenant request is refused by the signature before anything else.
+            AudienceContact::class => AudienceContact::create([
+                'org_id' => $org->id,
+                'client_id' => $client->id,
+                'email' => 'their-fan@example.test',
+                'source' => AudienceSource::Import,
+            ]),
             Coupon::class => Coupon::create(['org_id' => $org->id, 'code' => 'THEIRS', 'percent_off' => 10]),
             Order::class => Order::create([
                 'org_id' => $org->id,

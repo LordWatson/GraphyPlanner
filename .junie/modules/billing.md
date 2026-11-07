@@ -332,6 +332,15 @@ module alongside the Client (CRM) work.
 
 ## Business Rules
 - Invoices are always scoped to the client's `org_id`; cross-org access is denied by the policy.
+- **A white-label agency's invoice email is theirs** (Step GTM-3.1). `InvoiceSentMail` already led
+  with the agency's name; with `Feature::WhiteLabel` it also carries their logo, accent and footer
+  line, and the reply-to is theirs. The PDF is unchanged (it was already the agency's letterhead).
+- **The `/invoices` pages are agency-only** (Step B-1.4) — a business workspace bills on its own
+  subscription and the whole route block 404s for it. Step GTM-1.2 is the one exception to the
+  *pipeline* being agency-only: `App\Actions\Deals\IssueDealInvoiceAction` raises and emails an
+  invoice for a creator's brand deal (`brand-deals.md`) through `CreateInvoiceAction` +
+  `SendInvoiceAction`. The invoice is an ordinary row in this module's ledger; the creator just has
+  no page to open it on, and sees its number and status on the deal row instead.
 - Only `Owner`/`Strategist` can create, send, mark invoices as paid, edit their details, upload/
   replace the PDF, or delete them — the same roles allowed to see billing-sensitive client fields
   (`ClientPolicy::viewBilling`).

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\BrandedForClient;
 use App\Models\GridPlan;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -15,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class ClientGridReviewRequestedMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use BrandedForClient, Queueable, SerializesModels;
 
     public function __construct(
         public GridPlan $plan,
@@ -28,6 +29,6 @@ class ClientGridReviewRequestedMail extends Mailable implements ShouldQueue
     {
         return $this
             ->subject("Your new grid is ready to look at — {$this->plan->client->name}")
-            ->view('emails.client-grid-review-requested');
+            ->view('emails.client-grid-review-requested', $this->brandingFor($this->plan->client->organization));
     }
 }

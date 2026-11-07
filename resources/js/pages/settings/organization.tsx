@@ -61,10 +61,17 @@ type OrganizationProps = {
         upload_post_key_last4: string | null;
         upload_post_webhook_secret_last4: string | null;
         xai_key_last4: string | null;
+        brand_accent: string | null;
+        brand_sender_name: string | null;
+        brand_reply_to: string | null;
+        brand_footer: string | null;
+        brand_logo_url: string | null;
     };
     currencies: Option[];
     tax_rates: TaxRate[];
     can_manage_tax_rates: boolean;
+    /** Step GTM-3.1: whether the plan lets this branding reach a client. */
+    white_label: boolean;
 };
 
 export default function Organization({
@@ -72,6 +79,7 @@ export default function Organization({
     currencies,
     tax_rates: taxRates,
     can_manage_tax_rates: canManageTaxRates,
+    white_label: whiteLabel,
 }: OrganizationProps) {
     return (
         <>
@@ -182,6 +190,100 @@ export default function Organization({
                                             errors.invoice_payment_terms_days
                                         }
                                     />
+                                </div>
+
+                                {/* Step GTM-3.1: the agency's own branding on the three surfaces
+                                    a client sees, saved whatever the plan says. The plan decides
+                                    whether it reaches anyone. */}
+                                <div className="border-border/70 grid gap-4 rounded-xl border p-4">
+                                    <div className="grid gap-1">
+                                        <Label>Client-facing branding</Label>
+                                        <p className="text-muted-foreground text-xs">
+                                            {whiteLabel
+                                                ? 'Your name, colour and logo on the client portal, the monthly report and the emails your clients get.'
+                                                : 'On an agency plan this replaces Alima on the client portal, the monthly report and your clients&rsquo; emails. Set it up now &mdash; it goes live when you upgrade.'}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid gap-2 sm:grid-cols-[10rem_1fr]">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="brand_accent">
+                                                Accent colour
+                                            </Label>
+                                            <Input
+                                                id="brand_accent"
+                                                name="brand_accent"
+                                                defaultValue={
+                                                    organization.brand_accent ??
+                                                    ''
+                                                }
+                                                placeholder="#205557"
+                                            />
+                                            <InputError
+                                                message={errors.brand_accent}
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="brand_sender_name">
+                                                Email sender name
+                                            </Label>
+                                            <Input
+                                                id="brand_sender_name"
+                                                name="brand_sender_name"
+                                                defaultValue={
+                                                    organization.brand_sender_name ??
+                                                    ''
+                                                }
+                                                placeholder={organization.name}
+                                            />
+                                            <InputError
+                                                message={
+                                                    errors.brand_sender_name
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="brand_reply_to">
+                                            Reply-to address
+                                        </Label>
+                                        <Input
+                                            id="brand_reply_to"
+                                            name="brand_reply_to"
+                                            type="email"
+                                            defaultValue={
+                                                organization.brand_reply_to ??
+                                                ''
+                                            }
+                                            placeholder="hello@youragency.com"
+                                        />
+                                        <p className="text-muted-foreground text-xs">
+                                            Replies reach you. The emails are
+                                            still sent from Alima&rsquo;s
+                                            servers so they pass SPF and DKIM.
+                                        </p>
+                                        <InputError
+                                            message={errors.brand_reply_to}
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="brand_footer">
+                                            Footer line
+                                        </Label>
+                                        <Input
+                                            id="brand_footer"
+                                            name="brand_footer"
+                                            defaultValue={
+                                                organization.brand_footer ?? ''
+                                            }
+                                            placeholder="Your Agency Ltd &middot; hello@youragency.com"
+                                        />
+                                        <InputError
+                                            message={errors.brand_footer}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="grid gap-2">
@@ -398,6 +500,8 @@ export default function Organization({
                     )}
                 </Form>
 
+                <BrandLogoPanel logoUrl={organization.brand_logo_url} />
+
                 {canManageTaxRates && <TaxRatesManager taxRates={taxRates} />}
 
                 {organization.has_upload_post_key && (
@@ -427,6 +531,81 @@ export default function Organization({
                 )}
             </div>
         </>
+    );
+}
+
+/**
+ * Step GTM-3.1 — the white-label logo. Its own form because it is a file upload on its own
+ * endpoint; the settings form above stays a plain JSON submit.
+ */
+function BrandLogoPanel({ logoUrl }: { logoUrl: string | null }) {
+    return (
+        <div className="border-border grid gap-3 rounded-xl border p-4">
+            <div className="grid gap-1">
+                <Label htmlFor="brand_logo">Logo</Label>
+                <p className="text-muted-foreground text-xs">
+                    PNG, JPG or WebP, up to 2 MB. Shown on the client portal,
+                    the monthly report and your clients&rsquo; emails. Without
+                    one, your name is used.
+                </p>
+            </div>
+
+            {logoUrl && (
+                <img
+                    src={logoUrl}
+                    alt="Your logo"
+                    className="bg-muted h-12 w-auto max-w-[220px] self-start rounded object-contain p-1"
+                />
+            )}
+
+            <div className="flex flex-wrap items-end gap-3">
+                <Form
+                    {...OrganizationController.uploadLogo.form()}
+                    options={{ preserveScroll: true }}
+                    className="flex flex-wrap items-end gap-3"
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <div className="grid gap-1.5">
+                                <Input
+                                    id="brand_logo"
+                                    name="brand_logo"
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp"
+                                    required
+                                    className="w-full sm:w-72"
+                                />
+                                <InputError message={errors.brand_logo} />
+                            </div>
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                disabled={processing}
+                            >
+                                {processing ? 'Uploading…' : 'Upload'}
+                            </Button>
+                        </>
+                    )}
+                </Form>
+
+                {logoUrl && (
+                    <Form
+                        {...OrganizationController.removeLogo.form()}
+                        options={{ preserveScroll: true }}
+                    >
+                        {({ processing }) => (
+                            <Button
+                                type="submit"
+                                variant="ghost"
+                                disabled={processing}
+                            >
+                                Remove
+                            </Button>
+                        )}
+                    </Form>
+                )}
+            </div>
+        </div>
     );
 }
 

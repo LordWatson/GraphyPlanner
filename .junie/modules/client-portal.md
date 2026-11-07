@@ -268,6 +268,22 @@ list/detail, completing Phase 6.
   `Role::ClientReviewer` and `Role::Viewer`) — it now renders a read-only view of the caption,
   hashtags, target accounts, music/location, and media in that case.
 
+## Step GTM-3.1 — white-label shell
+
+The portal is the main surface white labelling is bought for. `HandleInertiaRequests` resolves the
+agency's branding once and shares it as `portal.branding` (alongside `portal.agency`), so every
+portal page is branded by the shell rather than page by page:
+
+- the hairline band at the top becomes the agency's single accent instead of the Alima spectrum;
+- the header shows their logo when they have uploaded one, their name when they haven't;
+- the footer carries their own line, and the "Powered by Alima" credit comes off — that is
+  what they are paying for.
+
+**Only the client-facing surfaces.** The agency's own studio shell is never re-themed: Signal
+Orange and the Alima marks are ours (brand guidelines §3), and `Branding::alima()` is the only state
+the product chrome is rendered in. Without `Feature::WhiteLabel` the portal is Alima's, whatever is
+stored on the organization.
+
 ## Business Rules
 - Client reviewers never see internal UI: every internal route they could reach redirects into the
   portal (`RedirectClientReviewersToPortal`), and `AppLayout` renders the portal shell for them.

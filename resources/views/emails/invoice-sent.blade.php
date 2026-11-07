@@ -10,11 +10,21 @@
         <tr>
             <td align="center">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#FBFAF6; border-radius:14px; overflow:hidden; border:1px solid #E1DDD0;">
-                    <tr>
-                        <td style="background-color:#181723; padding:22px 32px;">
-                            <span style="font-family:'Poppins', Arial, sans-serif; color:#F5F2E8; font-size:22px;">{{ $organization->name }}</span>
-                        </td>
-                    </tr>
+                    {{-- Step GTM-3.1: already the agency's name; a white-label agency's logo and
+                         accent replace the Ink band and the plain wordmark. --}}
+                    @if ($brandLogoUrl)
+                        <tr>
+                            <td style="background-color:{{ $branding->accent }}; padding:22px 32px;">
+                                <img src="{{ $brandLogoUrl }}" height="36" alt="{{ $organization->name }}" style="display:block; border:0; height:36px; max-width:200px;">
+                            </td>
+                        </tr>
+                    @else
+                        <tr>
+                            <td style="background-color:#181723; padding:22px 32px;">
+                                <span style="font-family:'Poppins', Arial, sans-serif; color:#F5F2E8; font-size:22px;">{{ $organization->name }}</span>
+                            </td>
+                        </tr>
+                    @endif
                     <tr>
                         <td style="padding:32px;">
                             <p style="margin:0 0 10px; font-family:'DM Mono', Menlo, monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#6B6977;">
@@ -22,11 +32,11 @@
                             </p>
                             <h1 style="margin:0 0 18px; font-family:'Poppins', Arial, sans-serif; font-weight:600; font-size:34px; line-height:1.05; color:#181723;">
                                 @if ($isReminder && $invoice->isOverdue())
-                                    Payment <em style="color:#205557; font-style:normal;">overdue</em>.
+                                    Payment <em style="color:{{ $branding->accent }}; font-style:normal;">overdue</em>.
                                 @elseif ($isReminder)
-                                    A friendly <em style="color:#205557; font-style:normal;">reminder</em>.
+                                    A friendly <em style="color:{{ $branding->accent }}; font-style:normal;">reminder</em>.
                                 @else
-                                    Your <em style="color:#205557; font-style:normal;">invoice</em>.
+                                    Your <em style="color:{{ $branding->accent }}; font-style:normal;">invoice</em>.
                                 @endif
                             </h1>
 
@@ -71,7 +81,7 @@
 
                             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
                                 <tr>
-                                    <td style="border-radius:999px; background-color:#205557;">
+                                    <td style="border-radius:999px; background-color:{{ $branding->accent }};">
                                         <a href="{{ $portalUrl }}" style="display:inline-block; padding:12px 26px; font-size:15px; font-weight:600; color:#FBFAF6; text-decoration:none; border-radius:999px;">
                                             View invoice
                                         </a>

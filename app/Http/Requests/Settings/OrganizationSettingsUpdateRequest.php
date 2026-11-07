@@ -7,6 +7,16 @@ use Illuminate\Foundation\Http\FormRequest;
 class OrganizationSettingsUpdateRequest extends FormRequest
 {
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'brand_accent.regex' => __('Use a six-digit hex colour, like #205557.'),
+        ];
+    }
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
@@ -34,6 +44,14 @@ class OrganizationSettingsUpdateRequest extends FormRequest
             'upload_post_key' => ['nullable', 'string', 'max:2048'],
             'upload_post_webhook_secret' => ['nullable', 'string', 'max:2048'],
             'xai_key' => ['nullable', 'string', 'max:2048'],
+
+            // Step GTM-3.1: white-label branding. Stored whatever the plan says (it is the org's
+            // own data); `BrandingResolver` is what decides whether it reaches a client surface,
+            // so a downgrade takes the branding off every surface without losing what was typed.
+            'brand_accent' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'brand_sender_name' => ['nullable', 'string', 'max:120'],
+            'brand_reply_to' => ['nullable', 'email:filter', 'max:255'],
+            'brand_footer' => ['nullable', 'string', 'max:300'],
         ];
     }
 }

@@ -1,0 +1,39 @@
+{
+    "packageId": "com.alima.app",
+    "host": "app.alima.com",
+    "name": "Alima",
+    "launcherName": "Alima",
+    "display": "standalone",
+    "themeColor": "#205557",
+    "themeColorDark": "#181723",
+    "navigationColor": "#205557",
+    "navigationColorDark": "#181723",
+    "navigationDividerColor": "#205557",
+    "navigationDividerColorDark": "#181723",
+    "backgroundColor": "#F5F2E8",
+    "enableNotifications": true,
+    "startUrl": "/today?source=twa",
+    "iconUrl": "https://app.alima.com/icons/icon-512.png",
+    "maskableIconUrl": "https://app.alima.com/icons/icon-maskable-512.png",
+    "splashScreenFadeOutDuration": 300,
+    "signingKey": {
+        "path": "./android.keystore",
+        "alias": "android"
+    },
+    "appVersionName": "1.0.0",
+    "appVersionCode": 1,
+    "shortcuts": [],
+    "generatorApp": "bubblewrap-cli",
+    "webManifestUrl": "https://app.alima.com/manifest.webmanifest",
+    "fallbackType": "customtabs",
+    "features": {},
+    "alphaDependencies": {
+        "enabled": false
+    },
+    "enableSiteSettingsShortcut": true,
+    "isChromeOSOnly": false,
+    "isMetaQuest": false,
+    "fullScopeUrl": "https://app.alima.com/",
+    "minSdkVersion": 23,
+    "orientation": "portrait"
+}

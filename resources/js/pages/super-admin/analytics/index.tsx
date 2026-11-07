@@ -6,6 +6,10 @@ import {
     AnalyticsFilterBar,
     filterQuery,
 } from '@/components/super-admin/analytics-filter-bar';
+import {
+    FunnelPanel,
+    type FunnelMetrics,
+} from '@/components/super-admin/funnel-panel';
 import { PlatformAnalyticsView } from '@/components/super-admin/platform-analytics-view';
 import type { Option, PlatformSummary } from '@/components/super-admin/types';
 import { Button } from '@/components/ui/button';
@@ -20,9 +24,12 @@ import { create as createReport } from '@/routes/super-admin/reports';
  */
 export default function PlatformAnalytics({
     summary,
+    funnel,
     organizationOptions,
 }: {
     summary: PlatformSummary;
+    /** Step GTM-7.1: lifetime-to-date business figures, not range-filtered. */
+    funnel: FunnelMetrics;
     organizationOptions: Option[];
 }) {
     const state: FilterState = {
@@ -90,6 +97,8 @@ export default function PlatformAnalytics({
                     onChange={apply}
                     organizationOptions={organizationOptions}
                 />
+
+                <FunnelPanel funnel={funnel} />
 
                 <PlatformAnalyticsView summary={summary} />
             </Page>

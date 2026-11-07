@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Actions\Organizations\TestUploadPostConnectionAction;
+use App\Actions\Organizations\UpdateBrandLogoAction;
 use App\Actions\Organizations\UpdateOrganizationSettingsAction;
+use App\Contracts\AssetStorage;
+use App\Contracts\Entitlements;
+use App\Enums\Feature;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\OrganizationSettingsUpdateRequest;
 use App\Models\TaxRate;
+use App\Rules\SafeUpload;
 use App\Support\Options\CurrencyOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +23,7 @@ class OrganizationController extends Controller
     /**
      * Show the organization's settings page (Owner-only).
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, AssetStorage $storage): Response
     {
         $organization = $request->user()->organization;
 
@@ -43,7 +48,18 @@ class OrganizationController extends Controller
                 'upload_post_key_last4' => self::lastFour($organization->upload_post_key),
                 'upload_post_webhook_secret_last4' => self::lastFour($organization->upload_post_webhook_secret),
                 'xai_key_last4' => self::lastFour($organization->xai_key),
+                // Step GTM-3.1: white-label branding. `white_label` says whether it currently
+                // reaches a client (the plan gate); the values are the org's either way.
+                'brand_accent' => $organization->brand_accent,
+                'brand_sender_name' => $organization->brand_sender_name,
+                'brand_reply_to' => $organization->brand_reply_to,
+                'brand_footer' => $organization->brand_footer,
+                'brand_logo_url' => $organization->brand_logo_path === null ? null : $storage->url(
+                    (string) $organization->brand_logo_disk,
+                    (string) $organization->brand_logo_path,
+                ),
             ],
+            'white_label' => app(Entitlements::class)->allows($organization, Feature::WhiteLabel),
             'currencies' => CurrencyOptions::options(),
             // Step M-4.1: the org's tax rates, active first then archived, for the rates manager.
             'tax_rates' => $organization->taxRates()
@@ -59,6 +75,40 @@ class OrganizationController extends Controller
                 ]),
             'can_manage_tax_rates' => $request->user()->can('manage', TaxRate::class),
         ]);
+    }
+
+    /**
+     * Step GTM-3.1 — the white-label logo. Its own endpoint rather than a field on the settings
+     * PUT, so that form stays a plain JSON submit (the invoice PDF upload works the same way).
+     */
+    public function uploadLogo(Request $request, UpdateBrandLogoAction $action): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+        $this->authorize('update', $organization);
+
+        $extensions = ['png', 'jpg', 'jpeg', 'webp'];
+
+        $validated = $request->validate([
+            'brand_logo' => ['required', 'file', 'mimes:'.implode(',', $extensions), 'max:2048', new SafeUpload($extensions)],
+        ]);
+
+        $action($organization, $validated['brand_logo']);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Logo saved.')]);
+
+        return back();
+    }
+
+    public function removeLogo(Request $request, UpdateBrandLogoAction $action): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+        $this->authorize('update', $organization);
+
+        $action->remove($organization);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Logo removed.')]);
+
+        return back();
     }
 
     /**

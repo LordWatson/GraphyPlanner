@@ -151,21 +151,37 @@ Frontend: `pages/business/store.tsx`, `components/store/product-form.tsx`, `page
   checkout and after a coupon, so a 100%-off code can't produce a charge Stripe refuses.
 - **Downloads are streamed through our route**, never the file's storage URL, so every hit is
   counted and the expiry, use limit and refund check all still apply to a link sitting in an inbox.
+  Step GTM-1.1: streamed with `AssetStorage::readStream()`, not read into memory, so the same route
+  serves a 500MB file from S3.
+- **Not every file may be sold** (Step GTM-1.1, `Asset::downloadRefusalReason()`): the file must be
+  on a **private** disk and its bytes must have been virus-scanned on the way in
+  (`AssetSource::isVirusScanned()` — a web/MCP upload was, a Canva/Drive/Dropbox/URL import was
+  not). Checked when the product goes live, so the creator finds out, **and** on every download hit,
+  so a product that went live before the rule existed is still never served. The buyer's 410 never
+  says which rule it was; the reason is logged.
 - **Refund revokes delivery**: `Order::canDownload()` is false from that moment and the booking row
   is deleted.
-- **An abandoned checkout holds its slot and coupon use** until `store:expire-orders` releases them.
+- **An abandoned checkout holds its slot and coupon use** until `store:expire-orders` releases them,
+  and releasing it is also what sends the abandoned-checkout email (Step GTM-2.2) — so a completed
+  order can never get one, because it never reaches that sweep.
+- **The buyer joins the creator's list at checkout, not at fulfilment** (Step GTM-2.1): an
+  abandoned checkout needs a contact to email too. Buying is **not** consent to marketing — only
+  the `marketing_opt_in` box on the checkout form sets it. See `audience.md`.
 
 ## Tests
 - `tests/Feature/Store/CreatorStoreTest.php` — products created/archived behind the gate; a Free
   workspace can't create one; a Designer can't touch products, refunds or answers; another brand's
-  product 404s; a live download needs a file (a draft needn't); another brand's asset is dropped;
+  product 404s; a live download needs a file (a draft needn't), and refuses a public-disk or
+  imported-and-unscanned file while accepting an upload on the private disk (GTM-1.1); another
+  brand's asset is dropped;
   refund revokes the download and can't happen twice; answering captures and emails; an expired or
   non-Q&A order can't be answered; the expiry command cancels and releases; an illegal status change
   throws; a launch campaign is four drafts, never scheduled; the page renders un-entitled.
 - `tests/Feature/Store/CheckoutTest.php` — the product page; draft/unpublished/foreign 404s; one
   pending order with a normalised buyer; tip minimums; an account that can't charge; coupon expiry,
   scope and use limit; amount/currency mismatch leaves the order pending; a replay changes nothing;
-  download expiry, limit, unsigned URL and refund; a booking claims its slot and the next buyer
+  download expiry, limit, unsigned URL and refund; a public-disk or unscanned file refused at the
+  download route itself without spending a use (GTM-1.1); a booking claims its slot and the next buyer
   can't; the product bio block and its click-through; resend only mails the address on the order.
 - `tests/Feature/Store/ConnectWebhookTest.php` — signed fixtures through the **real** verification:
   unsigned and wrongly signed refused, `account.updated` sync, replay processed once, a Stripe-side
@@ -175,9 +191,41 @@ Frontend: `pages/business/store.tsx`, `components/store/product-form.tsx`, `page
   spring-forward day is dropped, notice/window bounds, and a taken slot isn't offered again.
 
 ## Known Gaps / Open Questions
-- **S3 is still pending** (`assets.md`). Downloads are served through our own route from whatever
-  disk `AssetStorage` is bound to, so the file is never public — but the plan's CG-4.3 prerequisite
-  ("paid downloads must not be served from local disk") isn't truly met until the S3 binding lands.
+
+### 🚩 LAUNCH BLOCKER — Step GTM-0.3, payments/tax/entity (undecided as of 2026-11-07)
+
+CG-0.2 was never answered and the store shipped anyway. **The store must not take money from a real
+customer until all five of these are answered in writing.** No `STRIPE_PRICE_*` exists and the
+super-admin billing switch defaults off, so nothing is live today — that is the only thing currently
+preventing it, and it is not a deliberate guard. Reviewed and deliberately left open at GTM-0, since
+answering 1–4 needs an accountant, not a developer.
+
+1. **Which legal entity holds the Stripe platform account** (UK or UAE), for Cashier *and* for
+   Connect. Decides where our subscription revenue and the platform relationship sit.
+2. **Connect account type.** Express is the recommendation on file: Stripe-hosted onboarding and
+   dashboard, least compliance surface for us. Not yet confirmed.
+3. **Sales tax / VAT on creators' sales.** Either the creator's own responsibility with Stripe Tax
+   on their connected account (the Planoly/Stan model, which is what the code assumes today), or a
+   merchant-of-record partner (Fourthwall/Gumroad model). **Get an accountant's view on UK/EU VAT
+   for digital goods before choosing** — digital goods to EU consumers are the risk, not the UK.
+4. **Launch currencies for creator sales** (GBP + USD minimum; AED if Dubai matters early).
+5. **Whether the free plan can sell, and at what fee.** (Today it cannot: `Feature::Store` is off
+   on every gate of `business_free`, so this is a decision to make, not a hole to plug.) Beacons charges 9%, Linktree 12%, Planoly
+   has no free web plan. If free selling is allowed, the fee goes in `config/plans.php` as a per-plan
+   value — not a constant — and is enforced in the `PaymentProvider` implementation, with a test per
+   plan fee.
+
+When answered: record the answers here, mark CG-0.2 and GTM-0.3 done, and update CG-4's steps where
+an answer changes them.
+
+### Other gaps
+- **S3 is one ops step away, not a code gap** (Step GTM-1.1). The download path goes through
+  `AssetStorage` end to end and streams whatever disk is configured, and a file on the `public` disk
+  is now refused outright, so CG-4.3's "paid downloads must not be served from local disk" is
+  enforced in code. What remains is deployment, and it is **not done**:
+  `composer require league/flysystem-aws-s3-v3`, `ASSETS_DISK=s3` and the `AWS_*` vars (see
+  `config/assets.php`). Until then paid files sit on the private `local` disk — served only through
+  the signed route, but on the app server's own volume.
 - **A download's file is picked by media id**, typed into the product form, because there is no asset
   picker component to reuse yet. Fine for one creator; replace with a picker when one exists.
 - **No Stripe Tax and no VAT handling** (plan §5.2 is still open): the creator is the merchant of
@@ -211,6 +259,13 @@ Frontend: `pages/business/store.tsx`, `components/store/product-form.tsx`, `page
   claiming the sale, and the email is the real delivery.
 
 ## Changelog
+- 2026-11-07: Phase GTM-2 wired the store into the audience list: the buyer is captured at
+  checkout with an explicit marketing opt-in, fulfilment queues a purchase follow-up a day later,
+  and the hourly abandoned-checkout cancellation sends the nudge. See `audience.md`.
+- 2026-11-07: Step GTM-1.1 — the download route streams through `AssetStorage::readStream()` instead
+  of reading the whole file into memory, and `Asset::downloadRefusalReason()` refuses a public-disk
+  or never-virus-scanned file both when the product goes live and on every download hit. The S3 gap
+  note is now what it actually is: a deployment step, not missing code.
 - 2026-11-06: Phase CG-4 (CG-4.1–4.7) built: `PaymentProvider` + Stripe Connect Express onboarding
   and its own signed, idempotent webhook; products, checkout, orders and the status machine; signed
   expiring downloads with a use limit and a resend; coupons with a locked redemption count;

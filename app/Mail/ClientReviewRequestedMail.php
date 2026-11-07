@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\BrandedForClient;
 use App\Models\Post;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -15,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class ClientReviewRequestedMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use BrandedForClient, Queueable, SerializesModels;
 
     public function __construct(
         public Post $post,
@@ -29,6 +30,6 @@ class ClientReviewRequestedMail extends Mailable implements ShouldQueue
     {
         return $this
             ->subject("New content ready for your review — {$this->post->client->name}")
-            ->view('emails.client-review-requested');
+            ->view('emails.client-review-requested', $this->brandingFor($this->post->client->organization));
     }
 }

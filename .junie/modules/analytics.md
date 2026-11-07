@@ -200,6 +200,43 @@ Staff group (`auth`, `verified`, `org.member`):
   `nextWeeklySlot()` in `lib/timezones.ts`). Top posts ship in the engagement section; pillar,
   format and hashtag breakdowns are not built (MVP note).
 
+### Paid ads, read-only (Phase GTM-5)
+
+Lives in **`ads.md`**. Two touch points here: the "Ad spend" panel on the client analytics page
+(another page prop, for the same reason benchmarks are one) and the "Paid and organic" block frozen
+into the client-report snapshot. `SyncAdAccountMetricsAction` and `SyncOrganizationAdsAction` sit in
+`App{B}Actions{B}Analytics` beside the engagement sync they are modelled on.
+
+**The contract has no write method and is not to gain one** — see `ads.md` for why that is a rule
+rather than a preference.
+
+### Competitor benchmarks (Phase GTM-4)
+
+Lives in **`benchmarks.md`**. Three touch points here: the "How you compare" panel on the client
+analytics page (a page prop on `analytics/client`, deliberately **not** part of
+`GetOrganizationAnalyticsSummaryAction`, which feeds four surfaces), the benchmark block frozen
+into the client-report snapshot, and the plain-English takeaway through the existing
+`InsightsSummarizer` seam.
+
+**Step GTM-4.3 (keyword mentions) was dropped, not deferred.** The plan allowed either shipping it
+or recording why not. The idea was to match named keywords against the sources we already ingest
+rather than crawl anything new — and those sources turn out to be the wrong ones: `CommentSource`
+reads comments on **our own** posts, so a keyword match there tells a brand that somebody mentioned
+a word under a post they already own, and `TrendSource` returns platform-level trends with no
+per-brand mention volume at all. Neither answers "who is talking about us", which is the only
+question the feature would be bought for. Building it would have produced a panel that looks like
+listening and isn't, which is worse than an honest absence — and the plan's own §1.1 rules out
+buying a real listening vendor. Revisit only if a platform ships a mentions endpoint we can read.
+
+### White-labelled reports (Step GTM-3.1)
+
+`GenerateClientReportPdfAction` resolves the org's branding and passes it (plus the logo as a
+`data:` URI — dompdf cannot fetch a URL) into `pdf.client-report`. With `Feature::WhiteLabel` the
+band mark, the accent word and the footer line are the agency's, and the "Prepared with Alima"
+credit comes off. **The paper, the type and the layout never change**: it is a white label, not a
+theme. Without the gate the report is Alima's, whatever is stored on the organization. The portal's
+report *page* is branded by the portal shell (`client-portal.md`).
+
 ### Client monthly reports (M-3.3 / I-10.3 / Phase 8)
 - **Table** `client_reports` (migration `2026_10_23_100200`; model `ClientReport`, org-scoped):
   `client_id`, `period_start/end`, `status` (`ClientReportStatus`: draft | published),

@@ -905,7 +905,35 @@ businesses share one subscription system.
   by path (`/preview/business/*`). Requires I-1.1.
 - **Done when**: preview tests cover read access and write rejection for the business fixture.
 
-### Step B-12.4 — Super admin segmentation [V1]
+### Step B-12.4 — Super admin segmentation [V1] ✅ Done
+_Delivered 2026-11-07 by Step GTM-7.1 (CG-9.1): the funnel panel on `/super-admin/analytics` with
+trial → paid, median time to first published post, bio-page adoption, store GMV per currency, churn
+by plan and agency cap utilisation. See `super-admin.md`._
+
+### Step GTM-6.1 decision log — PWA, TWA or native (closes CG-8.1)
+
+**Decided 2026-11-07: Trusted Web Activity. Native is explicitly declined.**
+
+The three options CG-8.1 named, and why TWA won:
+
+| Option | Verdict |
+|---|---|
+| PWA only | Rejected. Planoly's free tier is mobile-app-only, and a store listing is how creators enter this category at all. Being absent from Play means being invisible to the people who look there first. |
+| **TWA** | **Chosen.** It is the PWA we already have, wrapped. One codebase, one service worker, one push path, and the listing we needed. |
+| Native | Declined. A second codebase, a second notification stack (FCM) and a second release cycle, for a product whose whole surface is already a well-behaved web app. Nothing we want to build needs it. |
+
+**The CG-1.3 delivery evidence that made this safe**: web push is already working through the
+service worker and VAPID, with `push:send-post-reminders` and `push:send-empty-tomorrow` delivering
+on their own schedules and a heartbeat proving they run. Inside a verified TWA that same
+subscription continues to work untouched — which is precisely the thing that would have needed
+rebuilding for native.
+
+**Still outstanding, and not something code can close**: the Play listing itself, and confirming a
+push notification arrives on a real device from the installed app. Until the second one is done this
+decision is sound but unproven. The steps are in `android/README.md` and `android/play-listing.md`.
+
+**First review date for the listing copy and the competitor figures behind it: 2027-02-05**, the
+same date `competitors:review-due` (Step GTM-7.2) first fires.
 - Platform analytics and the org list filter by `type` and `plan`; new metrics: business signups,
   onboarding completion rate, time-to-first-post, weekly active brands, conversion free → paid.
 - **Done when**: analytics tests cover the type filter and each new metric with fixtures.

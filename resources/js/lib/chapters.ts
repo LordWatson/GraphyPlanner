@@ -238,7 +238,13 @@ export const platformChapters: Record<PlatformChapterKey, Chapter> = {
         summary: 'Design-partner usage and the in-app feedback inbox.',
         icon: MessageSquareHeart,
         swatch: 'bg-signal',
-        prefixes: ['/super-admin/partners', '/super-admin/feedback'],
+        // Step GTM-7.3: the affiliate programme sits here too — both answer "who is helping us
+        // grow" — rather than taking a platform chapter number of its own.
+        prefixes: [
+            '/super-admin/partners',
+            '/super-admin/feedback',
+            '/super-admin/referrals',
+        ],
     },
     platformBilling: {
         key: 'platformBilling',
@@ -342,13 +348,13 @@ export const businessChapters: Record<BusinessChapterKey, Chapter> = {
         number: '08',
         title: 'Brand',
         summary:
-            'Your voice, audience, look, link in bio, media kit and brand deals.',
+            'Your voice, look, link in bio, media kit, email list and brand deals.',
         icon: SwatchBook,
         swatch: 'bg-teal dark:ring-1 dark:ring-inset dark:ring-cream/50',
-        // Step CG-3.2 / CG-5.2: the bio page, the media kit and the deals tracker are all how the
-        // brand shows itself and who it works with, so they sit under this chapter as sub-items
-        // rather than taking numbers of their own.
-        prefixes: ['/brand', '/bio', '/media-kit', '/deals'],
+        // Step CG-3.2 / CG-5.2 / GTM-2: the bio page, the media kit, the email list and the deals
+        // tracker are all how the brand shows itself and who it works with, so they sit under this
+        // chapter as sub-items rather than taking numbers of their own.
+        prefixes: ['/brand', '/bio', '/media-kit', '/audience', '/deals'],
     },
     // Phase CG-4: the creator store. Its own chapter rather than a sub-item of Brand — money is
     // not a brand asset, and a creator opens it as often as they open Posts.

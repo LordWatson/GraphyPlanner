@@ -6,6 +6,7 @@ import {
     Handshake,
     LayoutGrid,
     ListChecks,
+    Mails,
     Megaphone,
     Moon,
     Search,
@@ -43,6 +44,7 @@ import { index as businessIdeas } from '@/routes/business/ideas';
 import { index as businessInsights } from '@/routes/business/insights';
 import { index as businessMedia } from '@/routes/business/media';
 import { index as businessPosts } from '@/routes/business/posts';
+import { index as businessAudience } from '@/routes/business/audience';
 import { index as businessDeals } from '@/routes/business/deals';
 import { index as businessStore } from '@/routes/business/store';
 import { index as clientsIndex } from '@/routes/clients';
@@ -237,6 +239,17 @@ function useCommands(close: () => void): Command[] {
             chapterCommand(businessChapters.insights, businessInsights()),
             chapterCommand(businessChapters.store, businessStore()),
             chapterCommand(businessChapters.brand, businessBrand()),
+            {
+                id: 'section-business-audience',
+                group: 'Chapters',
+                label: 'Audience',
+                hint: 'Your email list, and writing to it.',
+                keywords:
+                    'audience email list subscriber contact newsletter broadcast',
+                icon: Mails,
+                chapter: businessChapters.brand,
+                run: visit(businessAudience()),
+            },
             {
                 id: 'section-business-deals',
                 group: 'Chapters',

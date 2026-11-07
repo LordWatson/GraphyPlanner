@@ -3,6 +3,7 @@
 namespace Tests\Feature\Store;
 
 use App\Actions\Store\TransitionOrderStatusAction;
+use App\Enums\AssetSource;
 use App\Enums\OrderStatus;
 use App\Enums\OrganizationType;
 use App\Enums\PostStatus;
@@ -164,6 +165,34 @@ class CreatorStoreTest extends TestCase
         // A draft may be half-finished.
         $this->actingAs($owner)
             ->post(route('business.store.products.store'), $this->payload(['type' => 'download', 'status' => 'draft', 'settings' => []]))
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_a_live_download_refuses_a_public_or_unscanned_file(): void
+    {
+        [, $brand, $owner] = $this->creatorBrand();
+
+        $file = fn (AssetSource $source, string $disk): Asset => Asset::factory()->for($brand)->create([
+            'org_id' => $brand->org_id,
+            'source' => $source,
+            'disk' => $disk,
+            'path' => 'downloads/'.fake()->uuid().'.pdf',
+        ]);
+
+        // Step GTM-1.1 — the creator is told before a buyer finds out: a file on the public disk is
+        // readable without paying, and an imported file was never virus-scanned.
+        foreach ([$file(AssetSource::Upload, 'public'), $file(AssetSource::Dropbox, 'local')] as $refused) {
+            $this->actingAs($owner)
+                ->post(route('business.store.products.store'), $this->payload([
+                    'type' => 'download', 'download_asset_id' => $refused->id, 'settings' => [],
+                ]))
+                ->assertSessionHasErrors('download_asset_id');
+        }
+
+        $this->actingAs($owner)
+            ->post(route('business.store.products.store'), $this->payload([
+                'type' => 'download', 'download_asset_id' => $file(AssetSource::Upload, 'local')->id, 'settings' => [],
+            ]))
             ->assertSessionHasNoErrors();
     }
 

@@ -199,9 +199,8 @@ via `stripe_webhook_events`); a global + per-org Stripe switch (`PlatformSetting
 super admin → Billing); `/settings/plan`; super-admin plan/credit/billing controls with a
 `plan_audit_logs` trail; and the public `/for-business`, `/for-creators`, `/pricing` pages. Prices:
 Free £0 / Pro £15/$19 / Creator Pro £29/$37, annual = two months free. Decisions taken: USD set a
-little higher than GBP; the Stripe switch is global + per-org override. Open: inbox gating on Free
-(§6) is deferred — the `inbox` gate is defined and tested at the contract level but the shared
-`/inbox` surface is not yet hard-gated._
+little higher than GBP; the Stripe switch is global + per-org override. Inbox gating on Free (§6) was
+answered in Step GTM-1.3: Free includes the inbox, and the gate now says so._
 
 ### Step CG-2.1 — Plan definitions [MVP] ✅ Done
 - `config/plans.php` with `business_free`, `business_pro`, `creator_pro` (and `agency_*`
@@ -436,20 +435,26 @@ and a new enquiry raises no notification — it waits on the page. See the modul
 
 Goal: capture and nurture buyers and fans, matching Planoly's CRM and Stan's email flows.
 
-### Step CG-6.1 — Buyers and subscribers [V1]
+### Step CG-6.1 — Buyers and subscribers [V1] ✅ Done
+_Built 2026-11-07 as Step GTM-2.1. See `audience.md`._
 - `audience_contacts` (`org_id`, `client_id`, email, name, source `order|bio_capture|import`,
   `consent_at`, `unsubscribed_at`), with an `email_capture` bio block (double opt-in), CSV import
   (opt-in email sent, never assumed consent), and a contacts list in the business shell.
 - **Done when**: tests cover double opt-in, unsubscribe, import never marking consent, and B-13.2
   export/deletion covering contacts.
 
-### Step CG-6.2 — Automated emails [V1]
+### Step CG-6.2 — Automated emails [V1] ✅ Done
+_Built 2026-11-07 as Step GTM-2.2. One deviation: `purchase` and `abandoned` are treated as
+transactional (about the person's own order) and do not require a marketing opt-in, or neither
+could ever fire; both are still stopped by an unsubscribe, and a broadcast always needs confirmed
+consent. See `audience.md`._
 - Purchase follow-up, abandoned checkout (from `checkout.session.expired`) and welcome, sent through
   Resend with an unsubscribe link and the brand's styling. Queued, idempotent per contact + trigger.
 - **Done when**: tests cover each trigger firing once, unsubscribed contacts skipped, and the
   abandoned email cancelled if the order completes.
 
-### Step CG-6.3 — Broadcasts with AI drafts [V1]
+### Step CG-6.3 — Broadcasts with AI drafts [V1] ✅ Done
+_Built 2026-11-07 as Step GTM-2.3. See `audience.md`._
 - Write a one-off email to a segment (all, buyers of product X). "Draft with AI" fills it from the
   Brand Brain. The owner sends; AI never sends.
 - **Done when**: tests cover segment selection, the send being human-initiated only, and metering.
@@ -480,7 +485,12 @@ Goal: capture and nurture buyers and fans, matching Planoly's CRM and Stan's ema
 
 ## Phase CG-8 — Mobile reach [Stretch]
 
-### Step CG-8.1 — App-store presence decision [Stretch]
+### Step CG-8.1 — App-store presence decision [Stretch] ✅ Answered
+_Answered 2026-11-07 in Step GTM-6.1: **a Trusted Web Activity wrapping the existing PWA. Native is
+explicitly declined.** Web push already works through the same service worker inside a TWA, so there
+is no FCM project and no second notification path to keep alive. The wrapper, the listing copy and
+the data-safety declaration are in `android/`; the listing itself and the on-device push check are
+still outstanding. See `business-workspaces.md`._
 - Use CG-1.3 push delivery data and B-12.4 funnel metrics to decide between: keeping the PWA only,
   listing it in Google Play as a Trusted Web Activity, or a native app. Record the decision in the
   module doc.
@@ -490,12 +500,17 @@ Goal: capture and nurture buyers and fans, matching Planoly's CRM and Stan's ema
 
 ## Phase CG-9 — Launch & watch [V1]
 
-### Step CG-9.1 — Funnel metrics [V1]
+### Step CG-9.1 — Funnel metrics [V1] ✅ Done
+_Built 2026-11-07 as Step GTM-7.1, which also delivers B-12.4. Store GMV is read from our own
+`orders`, never a Stripe balance, because creators are paid into their own connected accounts. See
+`super-admin.md`._
 - **Delivers B-12.4**, adding: trial start → paid conversion, time to first published post, % of
   creators with a published bio page, store GMV (from orders, not Stripe balance), churn by plan.
 - **Done when**: B-12.4's done-when plus fixtures for each new metric.
 
-### Step CG-9.2 — Quarterly competitor review [V1]
+### Step CG-9.2 — Quarterly competitor review [V1] ✅ Done
+_Built 2026-11-07 as Step GTM-7.2: `competitors:review-due`, silent until the quarter is up. First
+review date 2027-02-05. It checks nothing automatically, on purpose._
 - A scheduled reminder (super admin notification) each quarter to re-check competitor pricing
   and refresh the gap analysis docs. The "How we compare" table (CG-2.7) is updated or removed.
 - **Done when**: the command and its test exist; the first review date is in the module doc.
@@ -541,11 +556,17 @@ CG-1 and CG-2.
 2. **Tax and VAT.** Creator-handled with Stripe Tax, or a merchant-of-record partner (CG-0.2)?
 3. **Stripe entity.** UK or UAE platform account, and which countries creators can onboard from?
 4. **Free plan selling.** Allowed with a fee, or paid plans only?
-5. **Handle namespace.** `alima.bio/@handle`, a subpath on the app domain, or custom domains (a
-   paid-plan feature at Stan/Beacons/Linktree)?
-6. **Inbox on Free.** Buffer includes it on every plan. Do we include it on Free, or use it to
-   drive upgrades?
+5. ~~**Handle namespace.**~~ **Answered 2026-11-07 (Step GTM-3.2): the subpath on the app domain
+   stays canonical, with custom domains alongside it on Creator Pro.** No `alima.bio` domain. See
+   `bio-pages.md`.
+6. ~~**Inbox on Free.**~~ **Answered 2026-11-07 (Step GTM-1.3): yes, Free includes the comment
+   inbox.** `business_free` now grants `Feature::Inbox`, which is also what the ungated `/inbox`
+   surface already did. See `plans.md`.
 7. **Instagram auto-DM** is blocked on Phase 5. Is Phase 5 worth pulling forward for it?
+
+**Benchmark data sourcing** (GTM plan §7) — **answered 2026-11-07 (Phase GTM-4): Instagram only,
+through Meta's Business Discovery.** No other network we publish to offers a legitimate read of a
+profile we don't own, and scraping is off the table. See `benchmarks.md`.
 
 ---
 

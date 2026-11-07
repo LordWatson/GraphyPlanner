@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Contracts\PushNotifier;
 use App\Enums\Role;
 use App\Models\User;
+use App\Services\Branding\BrandingResolver;
 use App\Services\Publishing\PlatformCapabilities;
 use App\Services\SharedPropsCache;
 use Illuminate\Http\Request;
@@ -87,6 +88,9 @@ class HandleInertiaRequests extends Middleware
                         // The managing agency (the reviewer's organization). Surfaced on every portal
                         // page so the client always sees who runs their account — not just "Alima".
                         'agency' => ['name' => $current->organization?->name],
+                        // Step GTM-3.1: the agency's own branding for the surfaces its client
+                        // sees. Resolved once here (and gate-aware), never re-derived per page.
+                        'branding' => app(BrandingResolver::class)->for($current->organization)->toArray(),
                         // Phase 18: the "Grids" nav item shows once the client has a grid to see.
                         'grids' => $cache->portalGrids($current->client_id),
                     ]

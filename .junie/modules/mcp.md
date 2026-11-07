@@ -448,6 +448,29 @@ is enforced and the test that proves it.
   settings page carries the connection URL + inline instructions, and `docs/connecting-your-ai-assistant.md`
   is the self-serve guide).
 
+## Step GTM-7.4 — MCP is table stakes now; depth is the claim
+
+The November 2026 competitor review found **Buffer and Metricool shipping official MCP servers on
+their free plans, Planable listing MCP on every tier including Basic, and Hootsuite shipping
+product-level MCPs.** "We have agent access and they don't" is therefore dead as a pitch, and it was
+never actually made on the marketing site anyway.
+
+What `/agents` (Step GTM-7.4) claims instead is the part a buyer's security review asks about and a
+single-user connector cannot answer, all of which this module already does:
+
+- **org-scoped isolation** — a connection sees one organization, enforced by the same scope the
+  rest of the app uses, not filtered in a response;
+- **capability scopes** — read insights without being able to draft, draft without publishing;
+- **per-connection rate limits** — one noisy assistant can't spend an org's whole AI allowance;
+- **an audit trail** — which connection did what, when;
+- **two master switches** — per-org and platform-wide, effective on the next call;
+- **a security review checked into the repository** rather than written for a procurement form.
+
+Plus the product rule: **an assistant drafts, a person sends.** Nothing here can publish on its own.
+
+When this is next revisited, check whether competitors have closed the depth gap rather than whether
+they have an MCP server at all — that question is settled.
+
 ## Changelog
 
 - 2026-10-26: Media over MCP — **`get_post` returns the post's images as vision previews** (default on,

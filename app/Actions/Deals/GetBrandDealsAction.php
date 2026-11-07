@@ -29,7 +29,11 @@ class GetBrandDealsAction
         $deals = BrandDeal::query()
             ->withoutOrgScope()
             ->where('client_id', $brand->id)
-            ->with(['posts' => fn ($query) => $query->select(['id', 'brand_deal_id', 'status', 'master_caption'])])
+            ->with([
+                'posts' => fn ($query) => $query->select(['id', 'brand_deal_id', 'status', 'master_caption']),
+                // Step GTM-1.2: so the row can say it has been billed instead of offering to bill again.
+                'invoice:id,invoice_number,status,sent_to_email',
+            ])
             ->orderByRaw("status IN ('paid', 'declined')")
             ->orderBy('due_on')
             ->orderByDesc('id')
@@ -54,6 +58,12 @@ class GetBrandDealsAction
             'contact_email' => $deal->contact_email,
             'show_on_media_kit' => $deal->show_on_media_kit,
             'posts_count' => $deal->posts->count(),
+            'invoice' => $deal->invoice === null ? null : [
+                'number' => $deal->invoice->invoice_number,
+                'status' => $deal->invoice->status->value,
+                'status_label' => $deal->invoice->status->label(),
+                'sent_to' => $deal->invoice->sent_to_email,
+            ],
             'deliverables' => array_map(fn (array $target) => [
                 'platform' => $target['platform']->value,
                 'platform_label' => $target['platform']->label(),

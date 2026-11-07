@@ -49,6 +49,13 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
     Route::put('settings/organization', [OrganizationController::class, 'update'])
         ->middleware(RequirePassword::class)
         ->name('organization.update');
+    // Step GTM-3.1: the white-label logo, on its own endpoint so the settings PUT stays JSON.
+    Route::post('settings/organization/logo', [OrganizationController::class, 'uploadLogo'])
+        ->middleware(RequirePassword::class)
+        ->name('organization.logo.store');
+    Route::delete('settings/organization/logo', [OrganizationController::class, 'removeLogo'])
+        ->middleware(RequirePassword::class)
+        ->name('organization.logo.destroy');
     // Step I-1.6: "Test connection" for the stored Upload-Post key.
     Route::post('settings/organization/test-upload-post', [OrganizationController::class, 'testUploadPost'])
         ->middleware('throttle:6,1')

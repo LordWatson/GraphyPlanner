@@ -2,7 +2,9 @@
 
 namespace App\Actions\Store;
 
+use App\Actions\Audience\CaptureAudienceContactAction;
 use App\Contracts\PaymentProvider;
+use App\Enums\AudienceSource;
 use App\Enums\OrderStatus;
 use App\Enums\ProductType;
 use App\Exceptions\Store\CheckoutUnavailableException;
@@ -15,6 +17,7 @@ use App\Services\Store\BookingSlotService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Step CG-4.2 / CG-4.4 / CG-4.5 — turn a buyer's intent into a pending {@see Order} and a hosted
@@ -34,6 +37,7 @@ class CreateCheckoutAction
     public function __construct(
         private readonly PaymentProvider $provider,
         private readonly BookingSlotService $slots,
+        private readonly CaptureAudienceContactAction $capture,
     ) {}
 
     /**
@@ -97,6 +101,14 @@ class CreateCheckoutAction
                 'slot' => $slot?->toIso8601String(),
             ]));
 
+            // Step GTM-2.1: the buyer joins the creator's list here, not at fulfilment, because an
+            // abandoned checkout needs a contact to email too. Consent is only what they ticked.
+            $this->capture(
+                $product,
+                $order,
+                (bool) ($data['marketing_opt_in'] ?? false),
+            );
+
             return $order;
         });
 
@@ -117,6 +129,30 @@ class CreateCheckoutAction
         ]);
 
         return ['order' => $order, 'url' => $checkout['url']];
+    }
+
+    /**
+     * Record the buyer on the brand's audience list. A failure here must never cost the creator a
+     * sale, so it is logged and swallowed: the contact can be captured again next time, the sale
+     * cannot.
+     */
+    private function capture(Product $product, Order $order, bool $consented): void
+    {
+        try {
+            ($this->capture)(
+                $product->client,
+                $order->buyer_email,
+                $order->buyer_name,
+                AudienceSource::Order,
+                $consented,
+            );
+        } catch (Throwable $e) {
+            Log::warning('Could not capture the buyer as an audience contact', [
+                'order_id' => $order->id,
+                'org_id' => $order->org_id,
+                'exception' => $e::class,
+            ]);
+        }
     }
 
     /**

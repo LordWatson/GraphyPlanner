@@ -7,6 +7,8 @@ use App\Enums\AssetSource;
 use App\Enums\AssetType;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
+use App\Rules\SafeUpload;
+use App\Services\LocalAssetStorage;
 use App\Support\StoredFileUrl;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -80,6 +82,29 @@ class Asset extends Model
         }
 
         return $this->type === AssetType::Video ? null : $this->url;
+    }
+
+    /**
+     * Step GTM-1.1 — why this file may not be sold as a paid download, or null when it may. Checked
+     * both when a download product goes live (so the creator finds out, not a buyer) and on every
+     * hit of a buyer's link, because a product that went live before these rules existed must still
+     * never be served. The reason is for the log and the creator's form, never for the buyer.
+     *
+     *  - `missing_file`: the row has no stored bytes (an external link, or a failed import).
+     *  - `public_disk`: rows remember their own disk and older ones can be on `public`, where the
+     *    paid content is readable by anyone who finds its permanent URL.
+     *  - `unscanned`: the bytes never went through {@see SafeUpload}
+     *    ({@see AssetSource::isVirusScanned()}), so we have never looked inside the file we would
+     *    be charging people for.
+     */
+    public function downloadRefusalReason(): ?string
+    {
+        return match (true) {
+            blank($this->disk) || blank($this->path) => 'missing_file',
+            LocalAssetStorage::isPublicDisk((string) $this->disk) => 'public_disk',
+            ! $this->source->isVirusScanned() => 'unscanned',
+            default => null,
+        };
     }
 
     /**

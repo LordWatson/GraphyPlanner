@@ -2,6 +2,7 @@
 
 use App\Contracts\ErrorTracker;
 use App\Http\Middleware\AssignCorrelationId;
+use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnsureCampaignFeature;
 use App\Http\Middleware\EnsureClientPortalAccess;
 use App\Http\Middleware\EnsureOrganizationNotSuspended;
@@ -37,7 +38,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // permissions policies on every response — global, so webhooks, files and errors get them.
         $middleware->append(SecurityHeaders::class);
 
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        // Step GTM-7.3: the referral code is already public (it comes out of a URL anybody can
+        // read) and is validated against a real partner before it is ever stored, so encrypting it
+        // buys nothing and makes it harder to debug a wrong attribution.
+        $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'referral_code']);
 
         // Step 1.5: the Upload-Post webhook is a server-to-server call with no session/CSRF
         // token — it's verified instead via its own signature header (see
@@ -50,6 +54,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             // Step I-1.1: the preview owner is never a real session outside `/preview/*`.
             RejectPreviewUserOutsidePreview::class,
+            // Step GTM-7.3: remember `?ref=CODE` from any page, so a signup days later still
+            // credits the partner who sent them.
+            CaptureReferralCode::class,
             // Step I-16.1 / M-1.1: user + org ids into `Context` (logs, jobs, error tracking).
             ShareRequestContext::class,
             HandleAppearance::class,

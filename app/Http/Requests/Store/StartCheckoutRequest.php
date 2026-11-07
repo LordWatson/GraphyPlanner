@@ -33,6 +33,9 @@ class StartCheckoutRequest extends FormRequest
             'coupon_code' => ['nullable', 'string', 'max:32'],
             'message' => ['nullable', 'string', 'max:2000'],
             'slot' => ['nullable', 'date'],
+            // Step GTM-2.1: the buyer's own marketing opt-in. Its absence is a no, and buying
+            // without ticking it is not consent to anything but the receipt.
+            'marketing_opt_in' => ['nullable', 'boolean'],
         ];
     }
 }

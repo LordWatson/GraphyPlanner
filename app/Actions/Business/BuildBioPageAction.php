@@ -73,7 +73,13 @@ class BuildBioPageAction
                     'url' => route('bio.click', ['handle' => $page->handle, 'block' => $block->id]),
                 ],
             BioBlockType::LatestPosts => $this->latestPosts($page, (int) ($settings['limit'] ?? 3)),
-            // CG-6's email_capture can't be saved yet (BioBlockType::live()), so nothing renders it.
+            // Step GTM-2.1: the sign-up form. It posts to the page's own subscribe route rather
+            // than carrying a destination, and the owner's preview renders it inert.
+            BioBlockType::EmailCapture => [
+                ...$base,
+                'label' => $settings['label'] ?? 'Get my emails',
+                'url' => route('bio.subscribe', ['handle' => $page->handle]),
+            ],
             default => null,
         };
     }

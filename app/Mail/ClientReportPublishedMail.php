@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Actions\Analytics\GenerateClientReportPdfAction;
+use App\Mail\Concerns\BrandedForClient;
 use App\Models\ClientReport;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -17,7 +18,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class ClientReportPublishedMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use BrandedForClient, Queueable, SerializesModels;
 
     public function __construct(public ClientReport $report, public ?string $contactName = null)
     {
@@ -34,6 +35,7 @@ class ClientReportPublishedMail extends Mailable implements ShouldQueue
                 'snapshot' => $this->report->snapshot ?? [],
                 'studio' => $studio,
                 'url' => route('portal.reports.show', $this->report),
+                ...$this->brandingFor($this->report->organization),
             ])
             ->attachData($pdf($this->report), GenerateClientReportPdfAction::filename($this->report), [
                 'mime' => 'application/pdf',

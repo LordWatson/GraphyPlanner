@@ -4,15 +4,19 @@ use App\Enums\Platform;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiFeedbackController;
 use App\Http\Controllers\AiImageController;
+use App\Http\Controllers\Analytics\AdAccountController;
 use App\Http\Controllers\Analytics\AnalyticsController as OrganizationAnalyticsController;
+use App\Http\Controllers\Analytics\BenchmarkController;
 use App\Http\Controllers\Analytics\ClientReportController;
 use App\Http\Controllers\Analytics\ReportController as OrganizationReportController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AudienceLinkController;
 use App\Http\Controllers\Auth\FacebookInstagramConnectController;
 use App\Http\Controllers\BioPageController;
 use App\Http\Controllers\BrandBrainController;
 use App\Http\Controllers\BulkPostImportController;
 use App\Http\Controllers\Business\AccountController as BusinessAccountController;
+use App\Http\Controllers\Business\AudienceController as BusinessAudienceController;
 use App\Http\Controllers\Business\BioPageController as BusinessBioPageController;
 use App\Http\Controllers\Business\BrandController as BusinessBrandController;
 use App\Http\Controllers\Business\BrandDealController as BusinessBrandDealController;
@@ -105,17 +109,29 @@ use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardCo
 use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
 use App\Http\Controllers\SuperAdmin\PartnerController as SuperAdminPartnerController;
 use App\Http\Controllers\SuperAdmin\PlatformSettingController;
+use App\Http\Controllers\SuperAdmin\ReferralController as SuperAdminReferralController;
 use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'welcome')->name('home');
+// Step GTM-3.2: the marketing page on our own host, the creator's bio page on a verified custom
+// domain. Every other route matches on a custom host unchanged, so this is the only split needed.
+Route::get('/', [BioPageController::class, 'home'])->name('home');
 Route::inertia('about', 'about')->name('about');
 
 // Step CG-2.7 / B-12.2: public segment & pricing pages (pricing table generated from config/plans.php).
 Route::get('for-business', [MarketingController::class, 'forBusiness'])->name('for-business');
 Route::get('for-creators', [MarketingController::class, 'forCreators'])->name('for-creators');
 Route::get('pricing', [MarketingController::class, 'pricing'])->name('pricing');
+// Step GTM-7.3: honest comparison pages, generated from `config/competitors.php` so every figure
+// carries one dated "last checked", and the affiliate programme's public page.
+Route::get('compare/{rival}', [MarketingController::class, 'compare'])
+    ->where('rival', '[a-z0-9-]+')
+    ->name('compare');
+Route::get('partners', [MarketingController::class, 'partners'])->name('partners');
+// Step GTM-7.4: agent access, claimed on depth rather than existence — every competitor has an MCP
+// server now, and none of them answers a security review.
+Route::get('agents', [MarketingController::class, 'agents'])->name('agents');
 
 // Step 0.13: the client review portal is unauthenticated — access is granted purely by
 // possession of a valid `ReviewToken`, never a logged-in session (spec §10/§12).
@@ -153,6 +169,12 @@ Route::middleware('throttle:public-token')->group(function () {
         ->where('handle', '[a-z0-9][a-z0-9._-]*')
         ->whereNumber('block')
         ->name('bio.click');
+    // Step GTM-2.1: an `email_capture` block's sign-up. Double opt-in, honeypot, and its own
+    // throttle on top of the group's, because it is a public write that sends an email.
+    Route::post('@{handle}/subscribe', [BioPageController::class, 'subscribe'])
+        ->where('handle', '[a-z0-9][a-z0-9._-]*')
+        ->middleware('throttle:6,1')
+        ->name('bio.subscribe');
 
     // Phase CG-4: the creator store, on the same handle as the bio page it sells from. Guests by
     // design -- a buyer is an email address, not an account -- and only ever a `live` product on a
@@ -202,10 +224,35 @@ Route::middleware('throttle:public-token')->group(function () {
     Route::post('mcp-upload/{token}', [McpUploadController::class, 'store'])->name('mcp-upload.store');
 });
 
+// Step GTM-6.1: Android's Digital Asset Links file. It is what makes the Play app a *trusted* web
+// activity — without it Android shows browser chrome and the install is pointless. 404s until the
+// package and fingerprint are configured, rather than serving a file that would fail verification
+// quietly. Public and uncached-by-session: Android fetches it with no cookies.
+Route::get('.well-known/assetlinks.json', function () {
+    $package = (string) config('twa.package');
+    $fingerprints = (array) config('twa.fingerprints');
+
+    abort_if($package === '' || $fingerprints === [], 404);
+
+    return response()->json([[
+        'relation' => ['delegate_permission/common.handle_all_urls'],
+        'target' => [
+            'namespace' => 'android_app',
+            'package_name' => $package,
+            'sha256_cert_fingerprints' => array_values($fingerprints),
+        ],
+    ]]);
+})->name('well-known.assetlinks');
+
 // Step CG-4.3 / CG-4.5: the buyer's own links from their receipt email. `signed` is the whole
 // authorisation — there is no session — so the expiry, the use limit and the refund check inside
 // each controller are what make a link that is still sitting in an inbox stop working.
 Route::middleware(['signed', 'throttle:public-token'])->group(function () {
+    // Step GTM-2.1: the contact's own two links. Confirming is what grants consent; unsubscribing
+    // never expires, because an email from six months ago still has to be able to stop the next one.
+    Route::get('audience/confirm/{contact}', [AudienceLinkController::class, 'confirm'])->name('audience.confirm');
+    Route::get('audience/unsubscribe/{contact}', [AudienceLinkController::class, 'unsubscribe'])->name('audience.unsubscribe');
+
     Route::get('store/download/{order}', StoreDownloadController::class)->name('store.download');
     Route::get('store/booking/{order}', [StoreBookingController::class, 'show'])->name('store.booking.show');
     Route::post('store/booking/{order}/move', [StoreBookingController::class, 'move'])->name('store.booking.move');
@@ -370,11 +417,27 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::post('deals', [BusinessBrandDealController::class, 'store'])->name('deals.store');
         Route::put('deals/{deal}', [BusinessBrandDealController::class, 'update'])->name('deals.update');
         Route::delete('deals/{deal}', [BusinessBrandDealController::class, 'destroy'])->name('deals.destroy');
+        // Step GTM-1.2: bill the sponsor on the normal invoice pipeline. Business workspaces still
+        // have no invoice *pages* (Step B-1.4) — a deal invoice is raised, PDF'd and emailed here.
+        Route::post('deals/{deal}/invoice', [BusinessBrandDealController::class, 'invoice'])->name('deals.invoice');
+
+        // Phase GTM-2: the creator's email list. `audience/draft` returns text and never sends;
+        // `audience/broadcasts` is the only thing that sends, and only from this human request.
+        Route::get('audience', [BusinessAudienceController::class, 'index'])->name('audience.index');
+        Route::post('audience/import', [BusinessAudienceController::class, 'import'])->name('audience.import');
+        Route::delete('audience/contacts/{contact}', [BusinessAudienceController::class, 'destroyContact'])->name('audience.contacts.destroy');
+        Route::post('audience/broadcasts', [BusinessAudienceController::class, 'send'])->name('audience.broadcasts.store');
+        Route::post('audience/draft', [BusinessAudienceController::class, 'draft'])->name('audience.draft');
 
         // Step CG-3.2: the link-in-bio editor. One PUT saves the page and its whole ordered block
         // list, so add/edit/hide/reorder/remove are a single transactional write.
         Route::get('bio', [BusinessBioPageController::class, 'edit'])->name('bio.edit');
         Route::put('bio', [BusinessBioPageController::class, 'update'])->name('bio.update');
+        // Step GTM-3.2: the creator's own hostnames for that page. Adding one claims it;
+        // only verifying it against DNS makes it serve anything.
+        Route::post('bio/domains', [BusinessBioPageController::class, 'storeDomain'])->name('bio.domains.store');
+        Route::post('bio/domains/{domain}/verify', [BusinessBioPageController::class, 'verifyDomain'])->name('bio.domains.verify');
+        Route::delete('bio/domains/{domain}', [BusinessBioPageController::class, 'destroyDomain'])->name('bio.domains.destroy');
 
         // Phase CG-4: the creator store. One page for products, orders, codes and earnings; every
         // mutation needs the brand-update ability (Owner/Manager), because this is money.
@@ -931,6 +994,16 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
     // business workspace gets its own single-brand insights (Phase B-8) instead.
     Route::middleware('workspace:agency')->group(function () {
         Route::get('clients/{client}/analytics', [OrganizationAnalyticsController::class, 'client'])->name('clients.analytics');
+        // Step GTM-4.1: the competitor profiles this brand is measured against. Writes need the
+        // client-update ability (see `BenchmarkController`); the plan checks are in the Action.
+        Route::post('clients/{client}/benchmarks', [BenchmarkController::class, 'store'])->name('clients.benchmarks.store');
+        Route::post('clients/{client}/benchmarks/{profile}/sync', [BenchmarkController::class, 'sync'])->name('clients.benchmarks.sync');
+        Route::delete('clients/{client}/benchmarks/{profile}', [BenchmarkController::class, 'destroy'])->name('clients.benchmarks.destroy');
+        // Step GTM-5.2: the ad accounts this brand's spend is reported from. Read-only: these
+        // routes record what to read, read it now, or stop reading it. Nothing writes to Meta.
+        Route::post('clients/{client}/ad-accounts', [AdAccountController::class, 'store'])->name('clients.ad-accounts.store');
+        Route::post('clients/{client}/ad-accounts/{adAccount}/sync', [AdAccountController::class, 'sync'])->name('clients.ad-accounts.sync');
+        Route::delete('clients/{client}/ad-accounts/{adAccount}', [AdAccountController::class, 'destroy'])->name('clients.ad-accounts.destroy');
         // Step M-3.3: monthly client reports (studio side).
         Route::get('clients/{client}/reports', [ClientReportController::class, 'index'])->name('clients.reports.index');
         Route::post('clients/{client}/reports', [ClientReportController::class, 'store'])->name('clients.reports.store');
@@ -1029,6 +1102,13 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     // feedback inbox.
     Route::get('partners', [SuperAdminPartnerController::class, 'index'])->name('partners.index');
     Route::get('feedback', [SuperAdminPartnerController::class, 'feedback'])->name('feedback.index');
+
+    // Step GTM-7.3: the affiliate programme. A payout here records a transfer that has already
+    // happened — there is no payment integration behind it, on purpose.
+    Route::get('referrals', [SuperAdminReferralController::class, 'index'])->name('referrals.index');
+    Route::post('referrals', [SuperAdminReferralController::class, 'store'])->name('referrals.store');
+    Route::post('referrals/{partner}/payouts', [SuperAdminReferralController::class, 'storePayout'])->name('referrals.payouts.store');
+    Route::post('referrals/{partner}/end', [SuperAdminReferralController::class, 'end'])->name('referrals.end');
 
     Route::resource('reports', ReportController::class);
     Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('reports.export');

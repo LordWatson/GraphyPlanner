@@ -4,18 +4,22 @@ namespace Tests\Feature\Business;
 
 use App\Actions\Business\BuildMediaKitAction;
 use App\Enums\DealStatus;
+use App\Enums\InvoiceStatus;
 use App\Enums\OrganizationType;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Mail\InvoiceSentMail;
 use App\Models\BrandDeal;
 use App\Models\Client;
+use App\Models\Invoice;
 use App\Models\MediaKit;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /**
@@ -206,6 +210,78 @@ class BrandDealTest extends TestCase
             ->get(route('business.deals.index'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('deals.0.deliverables.0.published', 1));
+    }
+
+    public function test_a_deal_with_a_fee_and_an_address_is_invoiced_once(): void
+    {
+        Mail::fake();
+
+        [$org, $brand, $owner] = $this->creatorBrand();
+        $deal = $this->deal($brand, ['fee_minor' => 120000, 'contact_email' => 'ads@yorkshiretea.test']);
+
+        $this->actingAs($owner)->post(route('business.deals.invoice', $deal))->assertRedirect();
+
+        $invoice = Invoice::query()->withoutOrgScope()->where('org_id', $org->id)->sole();
+        $this->assertSame($invoice->id, $deal->refresh()->invoice_id);
+        $this->assertSame('1200.00', $invoice->amount);
+        $this->assertSame('GBP', $invoice->currency);
+        $this->assertSame(InvoiceStatus::Sent, $invoice->status);
+        $this->assertSame('ads@yorkshiretea.test', $invoice->sent_to_email);
+        Mail::assertQueued(InvoiceSentMail::class, fn (InvoiceSentMail $mail) => $mail->hasTo('ads@yorkshiretea.test'));
+
+        // Billing is not delivery: the deal's own status is the owner's to set.
+        $this->assertSame(DealStatus::Agreed, $deal->status);
+
+        // Step GTM-1.2: a second attempt is refused rather than billing the sponsor twice.
+        $this->actingAs($owner)
+            ->post(route('business.deals.invoice', $deal))
+            ->assertSessionHasErrors('deal');
+        $this->assertSame(1, Invoice::query()->withoutOrgScope()->where('org_id', $org->id)->count());
+    }
+
+    public function test_a_deal_without_a_fee_or_an_address_cannot_be_invoiced(): void
+    {
+        Mail::fake();
+
+        [$org, $brand, $owner] = $this->creatorBrand();
+
+        $noFee = $this->deal($brand, ['fee_minor' => null, 'contact_email' => 'ads@yorkshiretea.test']);
+        $this->actingAs($owner)
+            ->post(route('business.deals.invoice', $noFee))
+            ->assertSessionHasErrors('fee_minor');
+
+        $noEmail = $this->deal($brand, ['fee_minor' => 50000]);
+        $this->actingAs($owner)
+            ->post(route('business.deals.invoice', $noEmail))
+            ->assertSessionHasErrors('contact_email');
+
+        // A refused issue leaves nothing behind — no invoice, no link on the deal.
+        $this->assertSame(0, Invoice::query()->withoutOrgScope()->where('org_id', $org->id)->count());
+        $this->assertNull($noFee->refresh()->invoice_id);
+        $this->assertNull($noEmail->refresh()->invoice_id);
+        Mail::assertNothingQueued();
+    }
+
+    public function test_invoicing_a_deal_needs_the_plan_and_another_brands_deal_404s(): void
+    {
+        Mail::fake();
+
+        [, $freeBrand, $freeOwner] = $this->creatorBrand('business_free');
+        $theirs = $this->deal($freeBrand, ['fee_minor' => 50000, 'contact_email' => 'ads@yorkshiretea.test']);
+
+        $this->actingAs($freeOwner)->post(route('business.deals.invoice', $theirs));
+        $this->assertNull($theirs->refresh()->invoice_id);
+
+        // Another brand's deal 404s before the plan gate or the Action is ever reached.
+        [, $otherBrand] = $this->creatorBrand();
+        $mine = $this->deal($otherBrand, ['fee_minor' => 50000, 'contact_email' => 'ads@yorkshiretea.test']);
+
+        $this->actingAs($freeOwner)
+            ->post(route('business.deals.invoice', $mine))
+            ->assertNotFound();
+
+        $this->assertSame(0, Invoice::query()->withoutOrgScope()->count());
+        $this->assertNull($mine->refresh()->invoice_id);
     }
 
     public function test_the_media_kit_names_only_opted_in_deals_that_happened(): void

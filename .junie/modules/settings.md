@@ -80,6 +80,25 @@ Profile/Security/Appearance settings pages.
   via `RevokeMcpTokenAction` (org-guarded binding), `PUT …` (`update`) toggles the switch. Owner-only
   via `OrganizationPolicy::update`. Full detail lives in `.junie/modules/mcp.md`.
 
+## Step GTM-3.1 — white-label branding
+
+Six nullable columns on `organizations` (`2026_12_12_100100_add_white_label_branding_to_organizations`):
+`brand_logo_disk`, `brand_logo_path`, `brand_accent` (`#RRGGBB`, validated), `brand_sender_name`,
+`brand_reply_to`, `brand_footer`. Null everywhere means Alima's own chrome, which is what every
+existing org already has.
+
+- **Resolved in one place**: `App\Services\Branding\BrandingResolver` →
+  `App\Support\Branding\Branding`. The client portal, the monthly report PDF and the client-facing
+  mailables all read it, so no two surfaces can disagree about who the client is dealing with.
+- **Saved whatever the plan says, resolved only with `Feature::WhiteLabel`.** The settings form
+  stores what the agency types on any plan; the resolver returns `Branding::alima()` without the
+  gate. So a downgrade takes the branding off every client surface at once, with no migration and
+  nothing to clean up, and an upgrade doesn't ask them to type it again.
+- **The logo** goes through `AssetStorage` (private disk, signed URLs) on its own endpoint
+  (`POST`/`DELETE settings/organization/logo`), so the settings `PUT` stays a plain JSON submit.
+  `UpdateBrandLogoAction` deletes the replaced file **after** the new columns commit.
+- Both logo routes sit behind `RequirePassword` like the rest of this page.
+
 ## Business Rules
 - Owner-only, scoped to the acting user's own org: enforced by `App\Policies\OrganizationPolicy::update`
   (`$user->org_id === $organization->id && $user->isOwner()`), checked both in
@@ -105,6 +124,13 @@ Profile/Security/Appearance settings pages.
   plan's "Done when" criterion.
 
 ## Known Gaps / Open Questions
+- **No per-agency sending domain** (Step GTM-3.1). A white-label email carries the agency's display
+  name and reply-to, but the envelope from-address stays our own verified domain, because SPF and
+  DKIM are signed for it and spoofing the from-address would land their mail in spam. A real
+  `mail.youragency.com` needs per-domain DKIM records and a sending-identity record per org.
+- **The logo is not in email.** The portal and the report PDF show it; the emails show the accent
+  and the agency's name instead. Most clients block remote images by default, and a signed URL
+  lapses, so a logo there would be unreliable either way.
 - `upload_post_key` / `upload_post_webhook_secret` are consumed by the Upload-Post adapter, webhook
   verification and webhook auto-registration (see `publishing.md`). `xai_key` is stored but still has
   no provider behind it (AI text runs on DeepSeek from app config). (Corrected 2026-10-19, I-16.5.)

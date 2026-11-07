@@ -61,6 +61,16 @@ class LocalAssetStorage implements AssetStorage
     }
 
     /**
+     * @return resource|null
+     */
+    public function readStream(string $disk, string $path)
+    {
+        $stream = Storage::disk($disk)->readStream($path);
+
+        return is_resource($stream) ? $stream : null;
+    }
+
+    /**
      * A plain URL for a public disk; a signed URL valid for `assets.url_ttl_minutes` otherwise.
      */
     public function url(string $disk, string $path): string

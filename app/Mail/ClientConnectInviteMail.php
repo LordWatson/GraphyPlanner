@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\BrandedForClient;
 use App\Models\ConnectInvite;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -16,7 +17,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class ClientConnectInviteMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use BrandedForClient, Queueable, SerializesModels;
 
     public function __construct(
         public ConnectInvite $invite,
@@ -30,6 +31,6 @@ class ClientConnectInviteMail extends Mailable implements ShouldQueue
     {
         return $this
             ->subject("Connect your social accounts for {$this->invite->client->name} — Alima")
-            ->view('emails.client-connect-invite');
+            ->view('emails.client-connect-invite', $this->brandingFor($this->invite->client->organization));
     }
 }

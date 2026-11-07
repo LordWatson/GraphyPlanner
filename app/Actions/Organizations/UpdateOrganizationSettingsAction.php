@@ -65,6 +65,15 @@ class UpdateOrganizationSettingsAction
                 $organization->xai_key = $data['xai_key'];
             }
 
+            // Step GTM-3.1: white-label branding. Saved whether or not the plan includes it —
+            // `BrandingResolver` decides whether it reaches a client, so a downgrade hides the
+            // branding without throwing away what the agency typed.
+            foreach (['brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $organization->{$field} = $data[$field] ?: null;
+                }
+            }
+
             $organization->save();
 
             // Step I-3.6 / M-2.5: a new Upload-Post key registers the publish webhook and stores

@@ -20,11 +20,7 @@
         <tr>
             <td align="center">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#FBFAF6; border-radius:12px; overflow:hidden; border:1px solid #E1DDD0;">
-                    <tr>
-                        <td style="background-color:#205557; padding:24px 32px;">
-                            <img src="{{ asset('brand/alima_logo_cream@2x.png') }}" width="120" height="36" alt="Alima" style="display:block; border:0; width:120px; height:36px;">
-                        </td>
-                    </tr>
+                    @include('emails.partials.brand-header')
                     <tr>
                         <td style="padding:32px;">
                             <p style="margin:0 0 8px; font-family:'DM Mono', 'Courier New', monospace; font-size:11px; letter-spacing:1.4px; text-transform:uppercase; color:#6B6977;">

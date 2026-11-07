@@ -71,6 +71,17 @@ class BioPage extends Model
     }
 
     /**
+     * Step GTM-3.2 — hostnames pointed at this page. Only a verified one serves anything, and the
+     * `@{handle}` address stays canonical whatever is here.
+     *
+     * @return HasMany<BioPageDomain, $this>
+     */
+    public function domains(): HasMany
+    {
+        return $this->hasMany(BioPageDomain::class);
+    }
+
+    /**
      * @return HasMany<BioBlock, $this>
      */
     public function blocks(): HasMany

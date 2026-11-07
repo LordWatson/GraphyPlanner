@@ -24,6 +24,14 @@ use Laravel\Cashier\Billable;
  * @property int $id
  * @property string $name
  * @property string $slug
+ * @property int|null $referral_partner_id
+ * @property Carbon|null $referred_at
+ * @property string|null $brand_logo_disk
+ * @property string|null $brand_logo_path
+ * @property string|null $brand_accent
+ * @property string|null $brand_sender_name
+ * @property string|null $brand_reply_to
+ * @property string|null $brand_footer
  * @property OrganizationType $type
  * @property bool $is_design_partner
  * @property Carbon|null $onboarding_completed_at
@@ -54,6 +62,7 @@ use Laravel\Cashier\Billable;
  * @property Carbon|null $trial_ends_at
  * @property int $bonus_ai_text_credits
  * @property Carbon|null $bonus_ai_credits_expires_at
+ * @property Carbon|null $plan_grandfathered_until
  * @property bool $mcp_enabled
  * @property array<string, bool>|null $campaign_features
  * @property Carbon|null $suspended_at
@@ -63,7 +72,7 @@ use Laravel\Cashier\Billable;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'type', 'is_design_partner', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features'])]
+#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
 #[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'xai_key'])]
 class Organization extends Model
 {
@@ -121,6 +130,8 @@ class Organization extends Model
             'trial_ends_at' => 'datetime',
             'bonus_ai_text_credits' => 'integer',
             'bonus_ai_credits_expires_at' => 'datetime',
+            'plan_grandfathered_until' => 'datetime',
+            'referred_at' => 'datetime',
         ];
     }
 
@@ -172,6 +183,40 @@ class Organization extends Model
     public function taxRates(): HasMany
     {
         return $this->hasMany(TaxRate::class, 'org_id');
+    }
+
+    /**
+     * Step GTM-4.1 — the competitor profiles this org tracks. Used to queue the nightly sweep
+     * only for orgs that actually have any.
+     *
+     * @return HasMany<TrackedProfile, $this>
+     */
+    /**
+     * Step GTM-7.3 — who sent us this customer, when anybody did. Null for the overwhelming
+     * majority, and `nullOnDelete` so removing a partner never takes their customers with them.
+     *
+     * @return BelongsTo<ReferralPartner, $this>
+     */
+    public function referralPartner(): BelongsTo
+    {
+        return $this->belongsTo(ReferralPartner::class, 'referral_partner_id');
+    }
+
+    public function trackedProfiles(): HasMany
+    {
+        return $this->hasMany(TrackedProfile::class, 'org_id');
+    }
+
+    /**
+     * Step GTM-5.1 — the paid-ads accounts this org reports on (read-only by construction; see
+     * `App\Contracts\AdsSource`). Used to queue the nightly sweep only where there is something
+     * to sweep.
+     *
+     * @return HasMany<AdAccount, $this>
+     */
+    public function adAccounts(): HasMany
+    {
+        return $this->hasMany(AdAccount::class, 'org_id');
     }
 
     /**

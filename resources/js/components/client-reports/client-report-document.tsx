@@ -7,6 +7,7 @@ import {
     Medal,
     Megaphone,
     Share2,
+    Swords,
     UsersRound,
 } from 'lucide-react';
 import {
@@ -24,6 +25,7 @@ import type {
 import { EmptyState, Panel, StatStrip } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/currency';
 import { formatDate } from '@/lib/dates';
 
 /** `BuildClientReportSnapshotAction` — client-safe by construction (no billing). */
@@ -73,6 +75,32 @@ export type ClientReportSnapshot = {
         shared_at: string | null;
         summary: string | null;
     }[];
+    /**
+     * Step GTM-4.2 — absent (not empty) when the plan has no benchmarks or the brand tracks
+     * nothing, so the section simply isn't rendered. Every figure is nullable: a dash means the
+     * platform didn't report it, never zero.
+     */
+    benchmarks?: {
+        window_days: number;
+        us: { name: string; followers: number | null };
+        profiles: { id: number; name: string; followers: number | null }[];
+        takeaway: string | null;
+    } | null;
+    /**
+     * Step GTM-5.2 — read-only ad spend. Absent when the plan has no ads reporting or the brand
+     * has no ad accounts. Every figure is nullable: a dash, never a zero.
+     */
+    ads?: {
+        window_days: number;
+        default_currency: string;
+        totals: {
+            spend_minor: number | null;
+            conversions: number | null;
+            cpa_minor: number | null;
+            currency: string | null;
+        };
+        organic: { posts: number; engagement: number | null };
+    } | null;
     generated_at: string;
 };
 
@@ -231,6 +259,88 @@ export function ClientReportDocument({
                         />
                     )}
                 </Panel>
+
+                {snapshot.ads && (
+                    <Panel
+                        eyebrow={`Last ${snapshot.ads.window_days} days`}
+                        title="Paid and organic"
+                        icon={Megaphone}
+                    >
+                        <StatStrip
+                            items={[
+                                {
+                                    label: 'Ad spend',
+                                    value:
+                                        snapshot.ads.totals.spend_minor === null
+                                            ? '\u2014'
+                                            : formatCurrency(
+                                                  snapshot.ads.totals
+                                                      .spend_minor / 100,
+                                                  snapshot.ads.totals
+                                                      .currency ??
+                                                      snapshot.ads
+                                                          .default_currency,
+                                              ),
+                                },
+                                {
+                                    label: 'Results',
+                                    value: reported(
+                                        snapshot.ads.totals.conversions,
+                                    ),
+                                },
+                                {
+                                    label: 'Posts (organic)',
+                                    value: pad(snapshot.ads.organic.posts),
+                                },
+                            ]}
+                        />
+                        <p className="text-muted-foreground text-[13px]">
+                            Read from the ad platform. A dash means it did not
+                            report that figure. Alima reports on spend and never
+                            changes it.
+                        </p>
+                    </Panel>
+                )}
+
+                {snapshot.benchmarks && (
+                    <Panel
+                        eyebrow={`Last ${snapshot.benchmarks.window_days} days`}
+                        title="How you compare"
+                        icon={Swords}
+                    >
+                        <ul className="flex flex-col gap-3">
+                            <li className="flex items-center justify-between gap-3 text-sm">
+                                <span className="truncate font-semibold">
+                                    {snapshot.benchmarks.us.name}
+                                </span>
+                                <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                                    {reported(snapshot.benchmarks.us.followers)}{' '}
+                                    followers
+                                </span>
+                            </li>
+                            {snapshot.benchmarks.profiles.map((row) => (
+                                <li
+                                    key={row.id}
+                                    className="flex items-center justify-between gap-3 text-sm"
+                                >
+                                    <span className="truncate">{row.name}</span>
+                                    <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                                        {reported(row.followers)} followers
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                        {snapshot.benchmarks.takeaway && (
+                            <p className="text-muted-foreground text-sm">
+                                {snapshot.benchmarks.takeaway}
+                            </p>
+                        )}
+                        <p className="text-muted-foreground text-[13px]">
+                            Public figures only. A dash means the platform did
+                            not report one.
+                        </p>
+                    </Panel>
+                )}
 
                 <Panel eyebrow="This month" title="By platform" icon={Share2}>
                     {engagement.by_platform.length === 0 ? (

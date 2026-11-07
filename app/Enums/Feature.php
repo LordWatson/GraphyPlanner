@@ -10,7 +10,8 @@ use App\Contracts\Entitlements;
  *  - **Limits** carry a numeric cap per org (`?int`, `null` = unlimited): how many social accounts,
  *    scheduled posts a month, team seats, AI credits, brands, days of analytics history, MB of media.
  *  - **Gates** are booleans: whether the plan includes the grid planner, the comment inbox, a public
- *    bio page, a creator store, the public media kit, the brand-deals tracker or email automation.
+ *    bio page, a creator store, the public media kit, the brand-deals tracker, email automation,
+ *    white labelling or custom domains.
  *
  * Every plan in `config/plans.php` must define every feature (asserted by `PlanDefinitionsTest`), so
  * a new feature can never silently default to "unlimited"/"granted" for a plan nobody updated.
@@ -27,6 +28,9 @@ enum Feature: string
     case Brands = 'brands';
     case AnalyticsHistoryDays = 'analytics_history_days';
     case MediaStorageMb = 'media_storage_mb';
+    // Phase GTM-4: how many competitor profiles a plan may track. Each one is a nightly read of
+    // somebody else's public profile, so it is a capacity limit, not a switch.
+    case TrackedProfiles = 'tracked_profiles';
 
     // Boolean gates.
     case GridPlanner = 'grid_planner';
@@ -36,6 +40,12 @@ enum Feature: string
     case PublicMediaKit = 'public_media_kit';
     case BrandDeals = 'brand_deals';
     case EmailAutomation = 'email_automation';
+    // Phase GTM-3: an agency puts its own name on the surfaces its clients see, and a creator
+    // serves their bio page on their own hostname.
+    case WhiteLabel = 'white_label';
+    case CustomDomain = 'custom_domain';
+    case CompetitorBenchmarks = 'competitor_benchmarks';
+    case AdsReporting = 'ads_reporting';
 
     /**
      * A numeric-capped feature (stored under a plan's `limits`).
@@ -50,7 +60,8 @@ enum Feature: string
             self::AiImageCredits,
             self::Brands,
             self::AnalyticsHistoryDays,
-            self::MediaStorageMb => true,
+            self::MediaStorageMb,
+            self::TrackedProfiles => true,
             default => false,
         };
     }
@@ -93,6 +104,7 @@ enum Feature: string
             self::Brands => 'Brands',
             self::AnalyticsHistoryDays => 'Analytics history',
             self::MediaStorageMb => 'Media storage',
+            self::TrackedProfiles => 'Tracked competitor profiles',
             self::GridPlanner => 'Grid planner',
             self::Inbox => 'Comment inbox',
             self::BioPage => 'Link in bio',
@@ -100,6 +112,10 @@ enum Feature: string
             self::PublicMediaKit => 'Public media kit',
             self::BrandDeals => 'Brand deals tracker',
             self::EmailAutomation => 'Email automation',
+            self::WhiteLabel => 'White label',
+            self::CustomDomain => 'Custom domain',
+            self::CompetitorBenchmarks => 'Competitor benchmarks',
+            self::AdsReporting => 'Paid ads reporting',
         };
     }
 }

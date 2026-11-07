@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use App\Contracts\AdsSource;
 use App\Contracts\AiProvider;
 use App\Contracts\AssetStorage;
 use App\Contracts\CaptionRepurposer;
 use App\Contracts\ChatNotifier;
 use App\Contracts\CommentSource;
+use App\Contracts\CompetitorProfileSource;
+use App\Contracts\DnsResolver;
 use App\Contracts\EngagementSource;
 use App\Contracts\Entitlements;
 use App\Contracts\EventCalendar;
@@ -75,8 +78,12 @@ use App\Services\AI\Images\OpenAiImageProvider;
 use App\Services\AI\NullAiProvider;
 use App\Services\AI\NullVisionProvider;
 use App\Services\AI\Trends\TopPostsTrendSource;
+use App\Services\Analytics\Ads\MetaAdsSource;
+use App\Services\Analytics\Ads\NullAdsSource;
 use App\Services\Analytics\AnalyticsCache;
+use App\Services\Analytics\Benchmarks\CompositeCompetitorProfileSource;
 use App\Services\Analytics\Engagement\UploadPostEngagementSource;
+use App\Services\Dns\SystemDnsResolver;
 use App\Services\Events\StaticEventCalendar;
 use App\Services\Grids\CompositeProfileFeedSource;
 use App\Services\Inbox\UploadPostCommentSource;
@@ -173,6 +180,19 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(VirusScanner::class, fn () => config('security.uploads.virus_scanner') === 'clamav'
             ? $this->app->make(ClamAvVirusScanner::class)
             : $this->app->make(NullVirusScanner::class));
+
+        // Step GTM-5.1: read-only paid-ads figures. Null unless a provider is configured, so an
+        // agency sees honest gaps rather than wrong numbers until Meta grants `ads_read`.
+        $this->app->bind(AdsSource::class, fn () => config('ads.provider') === 'meta'
+            ? $this->app->make(MetaAdsSource::class)
+            : $this->app->make(NullAdsSource::class));
+
+        // Step GTM-4.1: competitor profile figures — Instagram through Meta's Business Discovery,
+        // nothing for the platforms with no legitimate public read.
+        $this->app->bind(CompetitorProfileSource::class, CompositeCompetitorProfileSource::class);
+
+        // Step GTM-3.2: public DNS lookups for bio-page custom domains (tests bind a fake).
+        $this->app->bind(DnsResolver::class, SystemDnsResolver::class);
 
         // Upload-Post adapter (Step 1.2) bound against the PublishAdapter contract (Step 1.1).
         // No caller of App\Contracts\PublishAdapter needs to change; the connect flow, schedule

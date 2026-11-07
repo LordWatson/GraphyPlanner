@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Business;
 
 use App\Actions\Deals\GetBrandDealsAction;
+use App\Actions\Deals\IssueDealInvoiceAction;
 use App\Actions\Deals\SaveBrandDealAction;
 use App\Contracts\Entitlements;
 use App\Enums\DealStatus;
@@ -80,6 +81,25 @@ class BrandDealController extends Controller
         $action($brand, $request->validated(), $deal);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Deal saved.')]);
+
+        return back();
+    }
+
+    /**
+     * Step GTM-1.2 — raise, PDF and email the sponsor's invoice for one deal.
+     */
+    public function invoice(BrandDeal $deal, CurrentWorkspace $workspace, IssueDealInvoiceAction $action): RedirectResponse
+    {
+        $brand = $workspace->brand();
+        $this->authorize('update', $brand);
+        abort_unless($deal->client_id === $brand->id, 404);
+
+        $invoice = $action($deal);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Invoice :number emailed to :email.', [
+            'number' => $invoice->invoice_number,
+            'email' => (string) $deal->contact_email,
+        ])]);
 
         return back();
     }

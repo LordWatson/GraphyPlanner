@@ -2,8 +2,12 @@
 
 namespace App\Actions\Store;
 
+use App\Actions\Audience\CaptureAudienceContactAction;
+use App\Enums\AudienceSource;
+use App\Enums\AudienceTrigger;
 use App\Enums\OrderStatus;
 use App\Enums\ProductType;
+use App\Jobs\SendAudienceTriggerJob;
 use App\Mail\OrderReceiptMail;
 use App\Models\Order;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +29,10 @@ use Illuminate\Support\Facades\URL;
  */
 class FulfilOrderAction
 {
-    public function __construct(private readonly TransitionOrderStatusAction $transition) {}
+    public function __construct(
+        private readonly TransitionOrderStatusAction $transition,
+        private readonly CaptureAudienceContactAction $capture,
+    ) {}
 
     public function __invoke(Order $order): Order
     {
@@ -48,6 +55,14 @@ class FulfilOrderAction
             'org_id' => $order->org_id,
             'type' => $product->type->value,
         ]);
+
+        // Step GTM-2.2: the follow-up, a day later so it isn't a second email in the same minute.
+        // The job re-checks consent and the unsubscribe at delivery time, not now.
+        SendAudienceTriggerJob::dispatch(
+            ($this->capture)($product->client, $order->buyer_email, $order->buyer_name, AudienceSource::Order)->id,
+            AudienceTrigger::Purchase,
+            (string) $order->id,
+        )->delay(now()->addDay());
 
         // A paid question stays `paid` (authorised) until the creator answers.
         if ($product->type->isAuthorisedThenCaptured()) {

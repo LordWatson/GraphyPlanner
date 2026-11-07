@@ -5,7 +5,9 @@ namespace App\Http\Requests\Business;
 use App\Enums\ProductStatus;
 use App\Enums\ProductType;
 use App\Http\Controllers\Business\ProductController;
+use App\Models\Asset;
 use App\Models\Product;
+use App\Services\Workspace\CurrentWorkspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -59,6 +61,42 @@ class SaveProductRequest extends FormRequest
         ];
     }
 
+    /**
+     * Step GTM-1.1 — a download can only go live behind a file we are willing to charge for:
+     * present, on a private disk, and virus-scanned on the way in
+     * ({@see Asset::downloadRefusalReason()}). The creator finds out here rather than a buyer
+     * finding out at the download route, which refuses the same three cases.
+     */
+    private function validateDownloadFile(Validator $validator): void
+    {
+        $assetId = $this->input('download_asset_id');
+
+        if ($assetId === null) {
+            $validator->errors()->add('download_asset_id', __('Pick the file buyers will get.'));
+
+            return;
+        }
+
+        // Scoped to this brand like SaveProductAction, which drops a foreign asset id and would
+        // otherwise leave a live download with no file at all.
+        $asset = Asset::query()
+            ->withoutOrgScope()
+            ->where('client_id', app(CurrentWorkspace::class)->brandId())
+            ->whereKey((int) $assetId)
+            ->first();
+
+        $message = match ($asset === null ? 'missing_file' : $asset->downloadRefusalReason()) {
+            null => null,
+            'public_disk' => __('That file is in public media, so anyone could download it without paying. Upload it again from this page.'),
+            'unscanned' => __('That file was imported from another service and has not been virus-checked, so it cannot be sold. Upload the file here instead.'),
+            default => __('Pick the file buyers will get.'),
+        };
+
+        if ($message !== null) {
+            $validator->errors()->add('download_asset_id', $message);
+        }
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -71,8 +109,8 @@ class SaveProductRequest extends FormRequest
             }
 
             // Only what would actually break a live sale is enforced; a draft can be half-finished.
-            if ($type === ProductType::Download && $this->input('download_asset_id') === null) {
-                $validator->errors()->add('download_asset_id', __('Pick the file buyers will get.'));
+            if ($type === ProductType::Download) {
+                $this->validateDownloadFile($validator);
             }
 
             if (! $type->buyerSetsAmount() && $price < Product::MIN_CHARGE_MINOR) {

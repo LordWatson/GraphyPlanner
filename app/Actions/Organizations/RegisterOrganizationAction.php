@@ -10,7 +10,9 @@ use App\Enums\OrganizationType;
 use App\Enums\Role;
 use App\Mail\OrganizationWelcomeMail;
 use App\Models\Organization;
+use App\Models\ReferralPartner;
 use App\Models\User;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -57,13 +59,27 @@ class RegisterOrganizationAction
         $brandKind = $this->resolveBrandKind($data['brand_kind'] ?? null);
 
         $owner = DB::transaction(function () use ($data, $password, $selfServe, $type, $brandKind) {
+            // Step GTM-7.3: attribution is only ever read from a cookie the referral middleware
+            // has already validated, so an unknown or ended code simply isn't there. Inside the
+            // transaction, so an org can never exist with a half-written attribution.
+            $partner = ReferralPartner::findByCode((string) Cookie::get(ReferralPartner::COOKIE, ''));
+
             $organization = Organization::create([
                 'name' => trim($data['organization_name']),
                 'slug' => $this->uniqueSlug($data['organization_name']),
                 'type' => $type,
                 'default_timezone' => $data['default_timezone'],
                 'default_currency' => strtoupper($data['default_currency']),
+                'referral_partner_id' => $partner?->id,
+                'referred_at' => $partner === null ? null : now(),
             ]);
+
+            if ($partner !== null) {
+                Log::info('Organization attributed to a referral partner', [
+                    'org_id' => $organization->id,
+                    'referral_partner_id' => $partner->id,
+                ]);
+            }
 
             $owner = User::create([
                 'name' => trim($data['name']),

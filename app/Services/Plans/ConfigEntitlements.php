@@ -13,7 +13,10 @@ use Illuminate\Support\Facades\Log;
 /**
  * Step CG-2.2 / B-9.1 — reads a plan's caps and gates from `config/plans.php` (via {@see PlanCatalog})
  * and enforces them. The org's effective plan is `organizations.plan`, falling back to the default
- * for its workspace type, so an agency org (whose plan is unlimited by default) is never capped.
+ * for its workspace type.
+ *
+ * Since Step GTM-0.1 an agency is capped like anything else: the tiers differ on brands, seats and
+ * connected accounts. Only `agency_legacy` (the grandfathered pre-GTM-0.1 plan) is still unlimited.
  */
 class ConfigEntitlements implements Entitlements
 {
@@ -91,7 +94,14 @@ class ConfigEntitlements implements Entitlements
     private function suggestUpgrade(Plan $current, Feature $feature): ?Plan
     {
         foreach ($this->catalog->public() as $plan) {
-            if ($plan->key === $current->key || $plan->isAgency()) {
+            // Step GTM-0.1: agency tiers are public and sellable now, so an agency that hits its
+            // brand or seat cap is offered the next agency tier. A solo workspace is still never
+            // pointed at an agency plan — that's a different product, not an upgrade.
+            if ($plan->key === $current->key || ($plan->isAgency() && ! $current->isAgency())) {
+                continue;
+            }
+
+            if ($current->isAgency() && ! $plan->isAgency()) {
                 continue;
             }
 

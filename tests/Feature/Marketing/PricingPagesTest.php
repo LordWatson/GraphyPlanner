@@ -20,8 +20,15 @@ class PricingPagesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('marketing/pricing')
-                ->has('pricing.plans', 3) // business_free, business_pro, creator_pro — agency is not public
+                // Step GTM-0.1: the three agency tiers are public too; `agency_legacy` never is.
+                ->has('pricing.plans', 6)
                 ->where('pricing.plans.0.key', 'business_free')
+                ->where('pricing.plans.3.key', 'agency_starter')
+                ->where('pricing.plans.3.prices.gbp.monthly', 49)
+                ->where('pricing.plans.4.key', 'agency_standard')
+                ->where('pricing.plans.4.prices.gbp.monthly', 99)
+                ->where('pricing.plans.5.key', 'agency_scale')
+                ->where('pricing.plans.5.prices.gbp.monthly', 199)
                 ->has('pricing.currencies.gbp')
                 ->has('pricing.currencies.usd'));
     }

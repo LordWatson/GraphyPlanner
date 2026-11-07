@@ -10,11 +10,7 @@
         <tr>
             <td align="center">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#FBFAF6; border-radius:12px; overflow:hidden; border:1px solid #E1DDD0;">
-                    <tr>
-                        <td style="background-color:#205557; padding:24px 32px;">
-                            <img src="{{ asset('brand/alima_logo_cream@2x.png') }}" width="120" height="36" alt="Alima" style="display:block; border:0; width:120px; height:36px;">
-                        </td>
-                    </tr>
+                    @include('emails.partials.brand-header')
                     <tr>
                         <td style="padding:32px;">
                             <h1 style="margin:0 0 12px; font-family:'Poppins', Arial, sans-serif; font-size:22px; line-height:1.3; color:#181723; font-weight:600;">
@@ -42,7 +38,7 @@
                             <p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#6B6977;">
                                 Or copy and paste this link into your browser:
                             </p>
-                            <p style="margin:0 0 24px; font-size:13px; line-height:1.6; color:#205557; word-break:break-all;">
+                            <p style="margin:0 0 24px; font-size:13px; line-height:1.6; color:{{ $branding->accent }}; word-break:break-all;">
                                 {{ $connectUrl }}
                             </p>
 
@@ -51,14 +47,7 @@
                             </p>
                         </td>
                     </tr>
-                    <tr>
-                        <td style="padding:20px 32px; background-color:#F5F2E8; border-top:1px solid #E1DDD0;">
-                            <p style="margin:0; font-size:12px; color:#6B6977;">
-                                &copy; {{ now()->year }} Alima. Marketing brighter together. This is an automated message, please don't reply
-                                directly to this email.
-                            </p>
-                        </td>
-                    </tr>
+                    @include('emails.partials.brand-footer')
                 </table>
             </td>
         </tr>

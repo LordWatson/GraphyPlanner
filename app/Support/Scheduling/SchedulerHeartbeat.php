@@ -56,6 +56,16 @@ final class SchedulerHeartbeat
         'inbox:send-overdue-reminders' => ['label' => 'Overdue inbox reminders', 'interval_minutes' => 1440],
         // Step CG-4.5: releases abandoned checkouts and uncaptured question authorisations, hourly.
         'store:expire-orders' => ['label' => 'Store order expiry', 'interval_minutes' => 60],
+        // Step GTM-0.1: ends the 12-month agency grandfather on the day it expires, daily.
+        'plans:end-grandfather' => ['label' => 'Agency grandfather sweep', 'interval_minutes' => 1440],
+        // Step GTM-3.2: nightly DNS re-check of bio-page custom domains.
+        'bio-domains:reverify' => ['label' => 'Bio domain re-verification', 'interval_minutes' => 1440],
+        // Step GTM-4.1: nightly competitor profile readings.
+        'benchmarks:sync' => ['label' => 'Competitor benchmark sync', 'interval_minutes' => 1440],
+        // Step GTM-5.1: nightly read-only ad spend.
+        'ads:sync' => ['label' => 'Paid ads sync', 'interval_minutes' => 1440],
+        // Step GTM-7.2: daily check, quarterly alert, on the competitor figures.
+        'competitors:review-due' => ['label' => 'Competitor review check', 'interval_minutes' => 1440],
     ];
 
     public static function record(string $command): void

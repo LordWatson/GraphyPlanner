@@ -1,6 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { Handshake, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import {
+    Handshake,
+    Pencil,
+    Plus,
+    Receipt,
+    Sparkles,
+    Trash2,
+} from 'lucide-react';
 import { ChapterHero, EmptyState, Page, Panel } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
@@ -19,6 +26,7 @@ import { formatCurrency } from '@/lib/currency';
 import {
     destroy as destroyDeal,
     index as dealsIndex,
+    invoice as invoiceDeal,
     store as storeDeal,
     update as updateDeal,
 } from '@/routes/business/deals';
@@ -50,6 +58,12 @@ type Deal = {
     show_on_media_kit: boolean;
     posts_count: number;
     deliverables: Deliverable[];
+    invoice: {
+        number: string;
+        status: string;
+        status_label: string;
+        sent_to: string | null;
+    } | null;
 };
 
 /**
@@ -241,6 +255,42 @@ export default function BusinessDealsPage({
                                             {deal.contact_email}
                                         </a>
                                     </p>
+                                )}
+
+                                {/* Step GTM-1.2: billing the sponsor needs a fee and an address. */}
+                                {deal.invoice ? (
+                                    <p className="text-muted-foreground text-sm">
+                                        Invoiced as {deal.invoice.number} (
+                                        {deal.invoice.status_label})
+                                        {deal.invoice.sent_to &&
+                                            ` — emailed to ${deal.invoice.sent_to}`}
+                                    </p>
+                                ) : (
+                                    canManage &&
+                                    deal.fee_minor !== null &&
+                                    deal.fee_minor > 0 &&
+                                    deal.contact_email && (
+                                        <div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    router.post(
+                                                        invoiceDeal({
+                                                            deal: deal.id,
+                                                        }).url,
+                                                        {},
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
+                                                    )
+                                                }
+                                            >
+                                                <Receipt className="size-4" />
+                                                Invoice the sponsor
+                                            </Button>
+                                        </div>
+                                    )
                                 )}
 
                                 {deal.notes && (

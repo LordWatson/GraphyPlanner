@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\BrandedForClient;
 use App\Models\Invoice;
 use App\Support\MoneyFormatter;
 use App\Support\Queues;
@@ -17,7 +18,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class InvoiceSentMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use BrandedForClient, Queueable, SerializesModels;
 
     public function __construct(
         public Invoice $invoice,
@@ -47,6 +48,7 @@ class InvoiceSentMail extends Mailable implements ShouldQueue
                 'personalMessage' => $this->personalMessage,
                 'isReminder' => $this->isReminder,
                 'portalUrl' => route('portal.invoices.show', $invoice),
+                ...$this->brandingFor($invoice->organization),
             ]);
 
         if ($invoice->hasPdf()) {

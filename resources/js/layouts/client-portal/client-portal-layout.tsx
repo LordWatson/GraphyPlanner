@@ -53,6 +53,17 @@ type PortalSharedProps = {
         pendingApprovals: number;
         /** The managing agency (the reviewer's organization) — shown on every page. */
         agency?: { name: string } | null;
+        /**
+         * Step GTM-3.1 — the agency's own branding for this, the surface its client sees. Resolved
+         * server-side and gate-aware, so `is_white_label` false means Alima's chrome.
+         */
+        branding?: {
+            is_white_label: boolean;
+            name: string;
+            accent: string;
+            logo_url: string | null;
+            footer: string | null;
+        } | null;
         grids?: { visible: number; waiting: number };
     } | null;
 };
@@ -85,6 +96,8 @@ export default function ClientPortalLayout({
     const currentPath = page.url.split('?')[0];
     const pending = portal?.pendingApprovals ?? 0;
     const agencyName = portal?.agency?.name ?? null;
+    const branding = portal?.branding ?? null;
+    const whiteLabel = branding?.is_white_label === true;
     const [moreOpen, setMoreOpen] = useState(false);
 
     const navItems: NavItem[] = [
@@ -141,23 +154,45 @@ export default function ClientPortalLayout({
         <div className="bg-background text-foreground relative flex min-h-screen flex-col">
             <PreviewBanner />
             <header className="border-border/70 bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-30 border-b backdrop-blur-md">
-                {/* Alima brand accent — the spectrum as a hairline band (§3.8: transitions only). */}
-                <div aria-hidden className="bg-spectrum h-1 w-full" />
+                {/* Alima brand accent — the spectrum as a hairline band (§3.8: transitions only).
+                    Step GTM-3.1: a white-label portal gets the agency's single accent instead; the
+                    spectrum and Signal Orange stay ours. */}
+                <div
+                    aria-hidden
+                    className={cn('h-1 w-full', !whiteLabel && 'bg-spectrum')}
+                    style={
+                        whiteLabel
+                            ? { backgroundColor: branding?.accent }
+                            : undefined
+                    }
+                />
                 <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 pt-3.5 pb-3 sm:px-6">
                     <Link
                         href={portalDashboard()}
                         aria-label="Portal home"
                         className="group flex min-w-0 items-center gap-3"
                     >
-                        <BrandMark size="sm" />
-                        <span className="flex min-w-0 flex-col leading-tight">
-                            <span className="eyebrow text-muted-foreground text-[9.5px] whitespace-nowrap">
-                                {agencyName ? 'Your agency' : 'Client portal'}
+                        {whiteLabel && branding?.logo_url ? (
+                            <img
+                                src={branding.logo_url}
+                                alt={branding.name}
+                                className="h-8 w-auto max-w-[180px] object-contain"
+                            />
+                        ) : (
+                            <BrandMark size="sm" />
+                        )}
+                        {!(whiteLabel && branding?.logo_url) && (
+                            <span className="flex min-w-0 flex-col leading-tight">
+                                <span className="eyebrow text-muted-foreground text-[9.5px] whitespace-nowrap">
+                                    {agencyName
+                                        ? 'Your agency'
+                                        : 'Client portal'}
+                                </span>
+                                <span className="group-hover:text-primary truncate text-[15px] font-semibold tracking-[-0.01em] transition-colors">
+                                    {branding?.name ?? agencyName ?? 'Alima'}
+                                </span>
                             </span>
-                            <span className="group-hover:text-primary truncate text-[15px] font-semibold tracking-[-0.01em] transition-colors">
-                                {agencyName ?? 'Alima'}
-                            </span>
-                        </span>
+                        )}
                     </Link>
 
                     <div className="flex shrink-0 items-center gap-2">
@@ -221,7 +256,13 @@ export default function ClientPortalLayout({
                         ? `${agencyName} · client portal`
                         : 'Your client portal'}
                 </span>
-                <span>Powered by Alima — marketing brighter together.</span>
+                {/* Step GTM-3.1: a white-label portal says what the agency wrote, and drops the
+                    Alima credit — that is what the agency is paying for. */}
+                <span>
+                    {whiteLabel
+                        ? (branding?.footer ?? '')
+                        : 'Powered by Alima — marketing brighter together.'}
+                </span>
             </footer>
 
             {/* Phones: a fixed, thumb-friendly bottom tab bar — the four core destinations plus a

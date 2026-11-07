@@ -7,6 +7,7 @@ import { calendar, dashboard } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { today as businessToday } from '@/routes/business';
 import { index as businessAccounts } from '@/routes/business/accounts';
+import { index as businessAudience } from '@/routes/business/audience';
 import { edit as businessBio } from '@/routes/business/bio';
 import { edit as businessBrand } from '@/routes/business/brand';
 import { index as businessDeals } from '@/routes/business/deals';
@@ -30,6 +31,7 @@ import { dashboard as superAdminDashboard } from '@/routes/super-admin';
 import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
 import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
 import { index as superAdminPartners } from '@/routes/super-admin/partners';
+import { index as superAdminReferrals } from '@/routes/super-admin/referrals';
 import { index as superAdminReports } from '@/routes/super-admin/reports';
 import { edit as superAdminSettings } from '@/routes/super-admin/settings';
 import type { Auth, NavItem } from '@/types';
@@ -95,10 +97,21 @@ export function useNavGroups(): NavModel {
                             superAdminAnalytics(),
                         ),
                         navItem(platformChapters.reports, superAdminReports()),
-                        navItem(
-                            platformChapters.partners,
-                            superAdminPartners(),
-                        ),
+                        {
+                            ...navItem(
+                                platformChapters.partners,
+                                superAdminPartners(),
+                            ),
+                            // Step GTM-7.3: the affiliate programme lives under the partners
+                            // chapter — both answer "who is helping us grow" — rather than taking
+                            // a platform chapter number of its own.
+                            subItems: [
+                                {
+                                    title: 'Referrals',
+                                    href: superAdminReferrals(),
+                                },
+                            ],
+                        },
                         navItem(
                             platformChapters.platformBilling,
                             superAdminSettings(),
@@ -194,6 +207,7 @@ function businessGroups(auth: Auth, onSettings: boolean): NavGroup[] {
                     subItems: [
                         { title: 'Link in bio', href: businessBio() },
                         { title: 'Media kit', href: businessMediaKit() },
+                        { title: 'Audience', href: businessAudience() },
                         { title: 'Deals', href: businessDeals() },
                     ],
                 },

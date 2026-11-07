@@ -3,7 +3,10 @@
 namespace App\Actions\Store;
 
 use App\Contracts\PaymentProvider;
+use App\Enums\AudienceTrigger;
 use App\Enums\OrderStatus;
+use App\Jobs\SendAudienceTriggerJob;
+use App\Models\AudienceContact;
 use App\Models\Order;
 use App\Models\PaymentAccount;
 use Illuminate\Support\Facades\Log;
@@ -55,15 +58,35 @@ class ExpireStaleOrdersAction
             ->withoutOrgScope()
             ->where('status', OrderStatus::Pending)
             ->where('created_at', '<', now()->subMinutes(self::PENDING_TTL_MINUTES))
+            ->with('product')
             ->limit(500)
             ->get();
 
         foreach ($orders as $order) {
             ($this->transition)($order, OrderStatus::Cancelled, ['reason' => 'abandoned']);
             $order->booking?->delete();
+            $this->nudgeAbandoned($order);
         }
 
         return $orders->count();
+    }
+
+    /**
+     * Step GTM-2.2 — the abandoned-checkout email. Sent only once the order is actually cancelled,
+     * which is also why there is nothing to cancel if the buyer completes: a completed order never
+     * reaches this sweep. The job's own checks run at delivery.
+     */
+    private function nudgeAbandoned(Order $order): void
+    {
+        $contact = AudienceContact::query()
+            ->withoutOrgScope()
+            ->where('client_id', $order->product->client_id)
+            ->where('email', $order->buyer_email)
+            ->first();
+
+        if ($contact !== null) {
+            SendAudienceTriggerJob::dispatch($contact->id, AudienceTrigger::Abandoned, (string) $order->id);
+        }
     }
 
     private function releaseUnanswered(): int

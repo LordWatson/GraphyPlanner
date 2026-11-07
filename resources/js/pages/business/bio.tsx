@@ -17,6 +17,7 @@ import {
     type BioPagePayload,
 } from '@/components/bio/bio-page-view';
 import { ChapterHero, EmptyState, Page, Panel } from '@/components/page';
+import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +30,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { edit as editBio, update } from '@/routes/business/bio';
+import {
+    destroy as destroyDomain,
+    store as storeDomain,
+    verify as verifyDomain,
+} from '@/routes/business/bio/domains';
 import { edit as editPlan } from '@/routes/plan';
 
 type Option = { value: string; label: string };
@@ -62,6 +68,16 @@ type PageForm = {
  * Reorder is up/down buttons rather than drag: this shell is phone-first, where HTML5 drag doesn't
  * work, and arrows are also the keyboard-accessible path.
  */
+type Domain = {
+    id: number;
+    hostname: string;
+    verified: boolean;
+    ssl_status: string;
+    last_error: string | null;
+    verification_token: string;
+    last_checked_at: string | null;
+};
+
 export default function BusinessBioPage({
     page,
     publicPreview,
@@ -69,7 +85,11 @@ export default function BusinessBioPage({
     themes,
     blockTypes,
     products,
+    domains,
+    domainTarget,
+    maxDomains,
     entitled,
+    domainsEntitled,
     canManage,
 }: {
     page: (PageForm & { public_url: string }) | null;
@@ -78,7 +98,11 @@ export default function BusinessBioPage({
     themes: Option[];
     blockTypes: Option[];
     products: { id: number; title: string }[];
+    domains: Domain[];
+    domainTarget: string;
+    maxDomains: number;
     entitled: boolean;
+    domainsEntitled: boolean;
     canManage: boolean;
 }) {
     const [form, setForm] = useState<PageForm>({
@@ -91,6 +115,7 @@ export default function BusinessBioPage({
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
+    const [newDomain, setNewDomain] = useState('');
 
     const set = <K extends keyof PageForm>(key: K, value: PageForm[K]) =>
         setForm((current) => ({ ...current, [key]: value }));
@@ -149,6 +174,17 @@ export default function BusinessBioPage({
                                       block.settings.limit ?? 3,
                                   ),
                               };
+                    }
+
+                    // Step GTM-2.1: the sign-up block previews as the real form, inert (the
+                    // `isPreview` flag below), so the owner sees what a visitor will see.
+                    if (block.type === 'email_capture') {
+                        return {
+                            id: index,
+                            type: 'email_capture',
+                            label: block.settings.label || 'Get my emails',
+                            url: '',
+                        };
                     }
 
                     const label =
@@ -284,6 +320,157 @@ export default function BusinessBioPage({
                             </Field>
                         </div>
                     </Panel>
+
+                    {/* Step GTM-3.2: the creator's own hostname. The @handle address stays the
+                        canonical one and keeps working whatever is set up here. */}
+                    {page && (
+                        <Panel
+                            eyebrow="Your domain"
+                            title="Use your own address"
+                        >
+                            {!domainsEntitled ? (
+                                <p className="text-muted-foreground text-sm">
+                                    Serving your page on your own domain is on
+                                    Creator Pro.
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-muted-foreground text-sm">
+                                        Add a <code>CNAME</code> record pointing
+                                        at <code>{domainTarget}</code>, then
+                                        check it below. Your{' '}
+                                        <code>@{form.handle}</code> address
+                                        keeps working either way.
+                                    </p>
+
+                                    {domains.length > 0 && (
+                                        <ul className="flex flex-col gap-3">
+                                            {domains.map((domain) => (
+                                                <li
+                                                    key={domain.id}
+                                                    className="border-border/70 flex flex-col gap-2 rounded-xl border p-3"
+                                                >
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        <span className="font-medium">
+                                                            {domain.hostname}
+                                                        </span>
+                                                        <StatusPill
+                                                            kind="bioDomain"
+                                                            value={
+                                                                domain.verified
+                                                                    ? 'verified'
+                                                                    : 'pending'
+                                                            }
+                                                        />
+                                                        <span className="flex-1" />
+                                                        {canManage && (
+                                                            <>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            verifyDomain(
+                                                                                {
+                                                                                    domain: domain.id,
+                                                                                },
+                                                                            )
+                                                                                .url,
+                                                                            {},
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Check now
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    aria-label={`Remove ${domain.hostname}`}
+                                                                    onClick={() =>
+                                                                        router.delete(
+                                                                            destroyDomain(
+                                                                                {
+                                                                                    domain: domain.id,
+                                                                                },
+                                                                            )
+                                                                                .url,
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="size-4" />
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    {!domain.verified && (
+                                                        <p className="text-muted-foreground text-[13px]">
+                                                            {domain.last_error ??
+                                                                'Waiting on DNS.'}{' '}
+                                                            An apex domain can
+                                                            instead carry a TXT
+                                                            record of{' '}
+                                                            <code>
+                                                                {
+                                                                    domain.verification_token
+                                                                }
+                                                            </code>
+                                                            .
+                                                        </p>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+
+                                    {canManage &&
+                                        domains.length < maxDomains && (
+                                            <div className="flex flex-wrap items-end gap-2">
+                                                <Input
+                                                    value={newDomain}
+                                                    onChange={(event) =>
+                                                        setNewDomain(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="links.yourname.com"
+                                                    className="w-full sm:w-80"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    disabled={
+                                                        newDomain.trim() === ''
+                                                    }
+                                                    onClick={() =>
+                                                        router.post(
+                                                            storeDomain().url,
+                                                            {
+                                                                hostname:
+                                                                    newDomain,
+                                                            },
+                                                            {
+                                                                preserveScroll: true,
+                                                                onSuccess: () =>
+                                                                    setNewDomain(
+                                                                        '',
+                                                                    ),
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    Add domain
+                                                </Button>
+                                            </div>
+                                        )}
+                                </>
+                            )}
+                        </Panel>
+                    )}
 
                     <Panel
                         eyebrow="Blocks"
@@ -549,7 +736,7 @@ export default function BusinessBioPage({
 
                 <Panel eyebrow="Preview" title="On a phone">
                     <div className="border-ink/90 mx-auto w-full max-w-[320px] overflow-hidden rounded-[2.25rem] border-8 shadow-md">
-                        <BioPageView page={previewPage} />
+                        <BioPageView page={previewPage} isPreview />
                     </div>
                 </Panel>
             </div>
