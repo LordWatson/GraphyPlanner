@@ -11,11 +11,13 @@ use App\Models\SocialAccount;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Step B-5.1 — the credentials seam: byo orgs use their own key/secret and a per-account profile;
- * managed orgs use Alima's platform key/secret and their own isolated profile.
+ * Step B-5.1 — the credentials seam: byo orgs use their own key/secret, managed orgs use Alima's
+ * platform key/secret. The publish profile is the client's in both modes (grouping rules live in
+ * `EnsurePublishProfileActionTest`).
  */
 class OrganizationOrPlatformCredentialsTest extends TestCase
 {
@@ -39,7 +41,7 @@ class OrganizationOrPlatformCredentialsTest extends TestCase
         $this->assertInstanceOf(OrganizationOrPlatformCredentials::class, app(PublishCredentials::class));
     }
 
-    public function test_agency_org_is_byo_and_uses_its_own_key_secret_and_per_account_profile(): void
+    public function test_agency_org_is_byo_and_uses_its_own_key_secret_and_its_clients_profile(): void
     {
         $org = Organization::factory()->create([
             'type' => OrganizationType::Agency,
@@ -57,7 +59,8 @@ class OrganizationOrPlatformCredentialsTest extends TestCase
         $this->assertSame('agency-own-key', $credentials->apiKeyForOrganization($org));
         $this->assertSame('agency-own-key', $credentials->apiKeyFor($account));
         $this->assertSame('agency-own-secret', $credentials->webhookSecretFor($org));
-        $this->assertSame('ext-acct-1', $credentials->profileFor($account));
+        // Not the vendor's own account id: that is what burned one plan profile per network.
+        $this->assertSame("alima-client-{$account->client_id}", Str::beforeLast($credentials->profileFor($account), '-'));
     }
 
     public function test_business_org_is_managed_and_uses_the_platform_key_secret(): void
@@ -74,11 +77,11 @@ class OrganizationOrPlatformCredentialsTest extends TestCase
         $this->assertSame('platform-key-xyz', $credentials->apiKeyForOrganization($org));
         $this->assertSame('platform-key-xyz', $credentials->apiKeyFor($account));
         $this->assertSame('platform-webhook-secret', $credentials->webhookSecretFor($org));
-        // The managed profile is the org's own, never the per-account identifier.
-        $this->assertStringStartsWith("alima-org-{$org->id}-", $credentials->profileFor($account));
+        // The managed profile is the brand's own, never the per-account identifier.
+        $this->assertStringStartsWith("alima-client-{$account->client_id}-", $credentials->profileFor($account));
     }
 
-    public function test_managed_profile_is_persisted_and_stable_across_calls(): void
+    public function test_the_profile_is_persisted_and_stable_across_calls(): void
     {
         $org = Organization::factory()->create(['type' => OrganizationType::Business]);
         $account = SocialAccount::factory()->for($org, 'organization')->create(['platform' => Platform::Instagram]);
@@ -88,7 +91,7 @@ class OrganizationOrPlatformCredentialsTest extends TestCase
 
         $this->assertNotEmpty($first);
         $this->assertSame($first, $second);
-        $this->assertSame($first, $org->fresh()->upload_post_profile);
+        $this->assertSame($first, $account->fresh()->upload_post_profile);
     }
 
     public function test_a_managed_org_can_never_see_another_orgs_profile(): void
@@ -104,8 +107,8 @@ class OrganizationOrPlatformCredentialsTest extends TestCase
         $profileB = $credentials->profileFor($accountB);
 
         $this->assertNotSame($profileA, $profileB);
-        $this->assertStringContainsString("org-{$orgA->id}-", $profileA);
-        $this->assertStringContainsString("org-{$orgB->id}-", $profileB);
+        $this->assertStringContainsString("client-{$accountA->client_id}-", $profileA);
+        $this->assertStringContainsString("client-{$accountB->client_id}-", $profileB);
     }
 
     public function test_explicit_publish_mode_override_flips_an_agency_to_managed(): void

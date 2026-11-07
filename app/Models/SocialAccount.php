@@ -35,6 +35,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $provider
  * @property string|null $external_profile_id
  * @property string|null $external_account_id
+ * @property string|null $upload_post_profile
  * @property string|null $meta_access_token
  * @property Carbon|null $meta_access_token_expires_at
  * @property string|null $meta_instagram_user_id
@@ -58,7 +59,7 @@ use Illuminate\Support\Carbon;
 ])]
 // Step I-1.6: never serialized — a `toArray()`/Inertia prop of an account can't leak the Meta
 // token or the vendor profile id.
-#[Hidden(['meta_access_token', 'external_profile_id'])]
+#[Hidden(['meta_access_token', 'external_profile_id', 'upload_post_profile'])]
 class SocialAccount extends Model
 {
     /** @use HasFactory<SocialAccountFactory> */

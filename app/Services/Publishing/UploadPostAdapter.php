@@ -22,6 +22,7 @@ use App\Support\Publishing\TargetResult;
 use App\Support\Publishing\VendorHttp;
 use App\Support\Publishing\VendorPostRef;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -32,10 +33,10 @@ use Throwable;
 /**
  * PublishAdapter implementation for Upload-Post (spec §7/§7.1). Every request's API key and
  * publish profile ("user") are resolved through `App\Contracts\PublishCredentials` (Step B-5.1):
- * byo orgs authenticate with their own `upload_post_key` and publish under a per-account profile
+ * byo orgs authenticate with their own `upload_post_key` and publish under their client's profile
  * (today's agency behaviour); managed orgs (business workspaces) authenticate with Alima's shared
- * platform key and publish under their own single isolated profile. The adapter never reads the
- * key or profile from the model directly, so neither mode leaks into the vendor code.
+ * platform key. Either way the profile is the client's, shared by its accounts. The adapter never
+ * reads the key or profile from the model directly, so neither mode leaks into the vendor code.
  *
  * `connectAccount()`/`handleCallback()` implement the Step 1.3 account connect flow against
  * Upload-Post's JWT-based hosted linking page. `cancel()`/`health()` remain interim/partial —
@@ -58,9 +59,9 @@ class UploadPostAdapter implements PublishAdapter
      */
     public function connectAccount(SocialAccount $account, ?string $state = null): string
     {
-        // Step B-5.1: the profile is the per-account identifier (byo) or the org's single managed
-        // profile — resolved through the credentials contract so managed orgs stay isolated.
-        $username = $this->credentials->profileFor($account);
+        // One profile per client, shared by its accounts (one slot per platform). `...ForConnect`
+        // is the only resolution allowed to move an account, because this call re-links it anyway.
+        $username = $this->credentials->profileForConnect($account);
 
         $this->ensureProfileExists($account, $username);
 
@@ -94,7 +95,7 @@ class UploadPostAdapter implements PublishAdapter
                 'body' => $response->body(),
             ]);
 
-            throw new RuntimeException('Upload-Post rejected the connect request: '.($response->json('error') ?? $response->body()));
+            throw new RuntimeException('Upload-Post rejected the connect request: '.$this->vendorMessage($response));
         }
 
         return (string) ($response->json('access_url') ?? $response->json('url'));
@@ -104,7 +105,9 @@ class UploadPostAdapter implements PublishAdapter
      * Upload-Post's `generate-jwt` endpoint only issues a linking token for a profile that
      * already exists — it doesn't implicitly create one, so `connectAccount()` must create the
      * profile via `POST /uploadposts/users` first (spec §7, Step 1.3 bugfix). A response
-     * indicating the profile already exists is treated as success (idempotent).
+     * indicating the profile already exists is treated as success (idempotent), which is the
+     * normal case now that a client's accounts share one profile: only the first connect creates
+     * it, every one after that is told the username is taken — by us.
      */
     private function ensureProfileExists(SocialAccount $account, string $username): void
     {
@@ -125,10 +128,16 @@ class UploadPostAdapter implements PublishAdapter
             return;
         }
 
-        $alreadyExists = str_contains(strtolower((string) $response->json('error_code')), 'exist')
-            || str_contains(strtolower((string) ($response->json('error') ?? $response->body())), 'already exist');
+        // The vendor words this at least three ways across endpoints and versions: an
+        // `error_code` containing "exists", "already exists" in `error`, and `{"success": false,
+        // "message": "Username already in use"}`. All three mean the same thing, so match on the
+        // whole payload rather than one field.
+        $reason = strtolower(implode(' ', array_map(
+            fn (mixed $value): string => is_scalar($value) ? (string) $value : '',
+            [$response->json('error_code'), $response->json('error'), $response->json('message'), $response->body()],
+        )));
 
-        if ($alreadyExists) {
+        if (str_contains($reason, 'exist') || str_contains($reason, 'already in use')) {
             return;
         }
 
@@ -138,7 +147,22 @@ class UploadPostAdapter implements PublishAdapter
             'body' => $response->body(),
         ]);
 
-        throw new RuntimeException('Upload-Post rejected the profile creation request: '.($response->json('error') ?? $response->body()));
+        throw new RuntimeException('Upload-Post rejected the profile creation request: '.$this->vendorMessage($response));
+    }
+
+    /**
+     * The human-readable half of a rejected connect-flow response. The user-profile endpoints
+     * report failures in `message`, older/other ones in `error`; neither is guaranteed.
+     */
+    private function vendorMessage(Response $response): string
+    {
+        foreach (['message', 'error'] as $field) {
+            if (is_scalar($value = $response->json($field)) && (string) $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return $response->body();
     }
 
     /**

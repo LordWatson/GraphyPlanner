@@ -49,7 +49,7 @@ use Laravel\Cashier\Billable;
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
  * @property PublishMode|null $publish_mode
- * @property string|null $upload_post_profile
+ * @property string|null $upload_post_profile Legacy: the pre-per-client managed profile (see `EnsurePublishProfileAction`).
  * @property string|null $xai_key
  * @property int|null $ai_monthly_image_quota
  * @property bool $ai_enabled

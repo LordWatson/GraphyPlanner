@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
- * Step B-5.1 — a managed (business) org publishes with Alima's platform key and its own isolated
- * Upload-Post profile, never a per-org key, and the key never reaches the logs.
+ * Step B-5.1 — a managed (business) org publishes with Alima's platform key and the brand's own
+ * isolated Upload-Post profile, never a per-org key, and the key never reaches the logs.
  */
 class UploadPostAdapterManagedModeTest extends TestCase
 {
@@ -74,12 +74,12 @@ class UploadPostAdapterManagedModeTest extends TestCase
 
         (new UploadPostAdapter)->publish($post, new Collection([$account]));
 
-        Http::assertSent(function ($request) use ($organization) {
+        Http::assertSent(function ($request) use ($account) {
             $fields = self::multipartFieldsByName($request);
 
             return $request->hasHeader('Authorization', 'Apikey PLATFORM-KEY-SECRET')
-                && $fields['user'][0] === $organization->fresh()->upload_post_profile
-                && str_starts_with($fields['user'][0], "alima-org-{$organization->id}-")
+                && $fields['user'][0] === $account->fresh()->upload_post_profile
+                && str_starts_with($fields['user'][0], "alima-client-{$account->client_id}-")
                 && $fields['user'][0] !== 'ext-acct-should-not-be-used';
         });
     }

@@ -61,8 +61,9 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
   workspace makes posts pass through an internal review step before they can be approved/scheduled
   (`BusinessPostWorkflow` reads it); agency orgs ignore it. **B-5.1:** `publish_mode`
   (`App\Enums\PublishMode`, nullable — an explicit override of the type-based default; null = use
-  the default) and `upload_post_profile` (nullable string — the org's isolated managed Upload-Post
-  profile username; not a secret). Both resolved only through `App\Contracts\PublishCredentials`.
+  the default) and `upload_post_profile` (nullable string — **legacy**: the pre-2026-11-07 managed
+  profile username, now only the backfill source for links made before profiles became per client;
+  not a secret). `publish_mode` is resolved only through `App\Contracts\PublishCredentials`.
   **B-8.2:** `insights_digest_opt_out` (boolean, default false) — the Owner's opt-out of the weekly
   Insights email digest (`wantsInsightsDigest()` = business + onboarded + not opted out).
 - `MediaKit` (`media_kits`) — **B-8.4:** one per primary brand (`client_id` unique; `org_id` FK +
@@ -157,11 +158,11 @@ agency→business downgrade = out of scope, inactive-data retention) are resolve
 - **Phase B-5 publishing without vendor keys:**
   - `App\Contracts\PublishCredentials` + `App\Services\Publishing\OrganizationOrPlatformCredentials`
     (B-5.1) — the single seam for Upload-Post keys/secrets and the publish profile; byo (agency key)
-    vs managed (Alima platform key + the org's `upload_post_profile`). Full detail in
+    vs managed (Alima platform key). The publish profile is per client in both modes. Full detail in
     `.junie/modules/publishing.md`.
-  - `App\Actions\Workspace\EnsureManagedPublishProfileAction` (B-5.1) — lazily mints + persists the
-    managed org's `upload_post_profile` (DB only; the vendor profile is created by the adapter on
-    first connect).
+  - `App\Actions\SocialAccounts\EnsurePublishProfileAction` — mints + persists the brand's
+    `social_accounts.upload_post_profile` (DB only; the vendor profile is created by the adapter on
+    first connect). Replaced `EnsureManagedPublishProfileAction` on 2026-11-07.
   - `App\Actions\SocialAccounts\ConnectManagedAccountAction` (B-5.2) — one-tap connect: find-or-create
     the brand's account for a platform with defaults from the brand/org, then return the hosted
     connect URL via `ConnectSocialAccountAction`. The find-or-create is transactional; the vendor
@@ -531,7 +532,8 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
   `UPLOAD_POST_PLATFORM_WEBHOOK_SECRET`) in the environment; until set, a managed org's publish calls
   go out with an empty key and the vendor rejects them (surfaced as a plain-language failure).
   One Upload-Post profile per org holds every network, so all of a brand's connected accounts share
-  the org's `upload_post_profile`.
+  the brand's `social_accounts.upload_post_profile` (per client since the 2026-11-07 bugfix — see
+  `publishing.md`; `organizations.upload_post_profile` is legacy).
 - `DraftBrandProfileAction` records usage in `ai_usage_logs` but there is no allowance *enforcement*
   yet — that lands with the `Entitlements` metering in B-9.2.
 - The agency campaign *workspace* (`campaigns.show` and its tabs) remains a shared, unguarded

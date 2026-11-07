@@ -89,7 +89,7 @@ class ManagedAccountConnectTest extends TestCase
 
         $response = $this->get(route('social-accounts.callback', [
             'social_account_id' => $account->id,
-            'profile' => 'alima-org-'.$org->id,
+            'profile' => 'alima-client-'.$brand->id,
             'state' => $state,
         ]));
 
@@ -139,7 +139,7 @@ class ManagedAccountConnectTest extends TestCase
         $state = app(ConnectStateStore::class)->issue($expired, $owner, ConnectSocialAccountAction::STATE_FLOW);
         $this->get(route('social-accounts.callback', [
             'social_account_id' => $expired->id,
-            'profile' => 'alima-org-'.$org->id,
+            'profile' => 'alima-client-'.$brand->id,
             'state' => $state,
         ]))->assertOk();
 

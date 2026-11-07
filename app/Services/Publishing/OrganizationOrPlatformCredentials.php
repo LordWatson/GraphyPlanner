@@ -2,7 +2,7 @@
 
 namespace App\Services\Publishing;
 
-use App\Actions\Workspace\EnsureManagedPublishProfileAction;
+use App\Actions\SocialAccounts\EnsurePublishProfileAction;
 use App\Contracts\PublishCredentials;
 use App\Enums\PublishMode;
 use App\Models\Organization;
@@ -11,15 +11,15 @@ use App\Models\SocialAccount;
 /**
  * Step B-5.1 — the default `PublishCredentials`: byo orgs use their own stored Upload-Post key and
  * webhook secret (unchanged agency behaviour); managed orgs (every business workspace, plus any
- * agency a super admin flips via `organizations.publish_mode`) use Alima's single platform key and
- * their own isolated Upload-Post profile.
+ * agency a super admin flips via `organizations.publish_mode`) use Alima's single platform key.
+ * The publish profile is per client in both modes (see `profileFor()`).
  *
  * No key or secret is ever logged here — this class only resolves and returns them.
  */
 class OrganizationOrPlatformCredentials implements PublishCredentials
 {
     public function __construct(
-        private readonly EnsureManagedPublishProfileAction $ensureProfile = new EnsureManagedPublishProfileAction,
+        private readonly EnsurePublishProfileAction $ensureProfile = new EnsurePublishProfileAction,
     ) {}
 
     public function mode(Organization $organization): PublishMode
@@ -54,16 +54,19 @@ class OrganizationOrPlatformCredentials implements PublishCredentials
         return (string) ($organization->upload_post_webhook_secret ?? '');
     }
 
+    /**
+     * One profile per *client*, in both modes: Upload-Post charges per profile and a profile holds
+     * one account per platform, so neither a per-account profile (five networks, five profiles)
+     * nor a per-org one (two brands, one Instagram slot) is right. Client ids are global, so this
+     * is still a profile no other organization can name.
+     */
     public function profileFor(SocialAccount $account): string
     {
-        $organization = $account->loadMissing('organization')->organization;
+        return ($this->ensureProfile)($account);
+    }
 
-        if ($organization !== null && $this->mode($organization) === PublishMode::Managed) {
-            // One isolated profile per managed org — never another org's, never a per-account one.
-            return ($this->ensureProfile)($organization);
-        }
-
-        // byo: the account's own vendor identifier, preserving the Step 1.2/1.3 behaviour.
-        return $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id;
+    public function profileForConnect(SocialAccount $account): string
+    {
+        return ($this->ensureProfile)($account, relinking: true);
     }
 }

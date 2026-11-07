@@ -45,9 +45,17 @@ interface PublishCredentials
     public function webhookSecretFor(Organization $organization): string;
 
     /**
-     * The Upload-Post profile ("user") this account publishes under. In managed mode this is the
-     * org's single isolated profile (so no managed org can ever touch another's profile); in byo
-     * mode it is the account's own vendor identifier, preserving today's per-account behaviour.
+     * The Upload-Post profile ("user") this account publishes and reports under: the profile
+     * shared by its client's accounts, assigned on first use and stable afterwards. Never moves an
+     * account that already has one — see `App\Actions\SocialAccounts\EnsurePublishProfileAction`.
      */
     public function profileFor(SocialAccount $account): string;
+
+    /**
+     * The profile to link this account into when the hosted connect flow runs. Same as
+     * `profileFor()` for an account that has never been linked; for one carrying a profile of its
+     * own it folds the account into a sibling's profile where the platform slot is free, which is
+     * how a client's accounts spread over several profiles are consolidated onto one.
+     */
+    public function profileForConnect(SocialAccount $account): string;
 }

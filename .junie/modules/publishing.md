@@ -448,22 +448,50 @@ $15 to $115. Uploads are unlimited on paid plans.
   in `AppServiceProvider`) is now the **single seam** for vendor credentials — nothing reads
   `organizations.upload_post_key` / `upload_post_webhook_secret` directly any more. Methods:
   `mode(Organization): App\Enums\PublishMode` (`byo`|`managed`), `apiKeyFor(SocialAccount)`,
-  `apiKeyForOrganization(Organization)`, `webhookSecretFor(Organization)`, `profileFor(SocialAccount)`.
-- **byo** (the agency default, unchanged): the org's own `upload_post_key`/`upload_post_webhook_secret`,
-  a per-account vendor profile (`external_account_id ?? external_profile_id ?? id`). **managed**
-  (every business workspace, plus any agency a super admin flips via `organizations.publish_mode`):
-  Alima's single `config('services.upload_post.platform_key')` / `platform_webhook_secret`
-  (env `UPLOAD_POST_PLATFORM_KEY` / `UPLOAD_POST_PLATFORM_WEBHOOK_SECRET`), and the org's own isolated
-  profile `organizations.upload_post_profile`, minted lazily by
-  `App\Actions\Workspace\EnsureManagedPublishProfileAction` (DB only — the vendor-side profile is still
-  created idempotently by `UploadPostAdapter::ensureProfileExists()` on first connect). No managed org
-  can ever resolve another org's profile. Keys/secrets are never logged.
+  `apiKeyForOrganization(Organization)`, `webhookSecretFor(Organization)`, `profileFor(SocialAccount)`,
+  `profileForConnect(SocialAccount)`.
+- **byo** (the agency default, unchanged): the org's own `upload_post_key`/`upload_post_webhook_secret`.
+  **managed** (every business workspace, plus any agency a super admin flips via
+  `organizations.publish_mode`): Alima's single `config('services.upload_post.platform_key')` /
+  `platform_webhook_secret` (env `UPLOAD_POST_PLATFORM_KEY` / `UPLOAD_POST_PLATFORM_WEBHOOK_SECRET`).
+  The mode decides **the key and the webhook secret only** — the publish profile is per client in
+  both modes (below). Keys/secrets are never logged.
 - `UploadPostAdapter` resolves the key (`baseRequest`/`verifyCredentials`/`registerWebhook`) and the
   publish profile (connect `username`, publish `user` field) through the contract;
   `UploadPostWebhookController` resolves the signing secret through it (managed deliveries route to the
   right org by their unique `job_id`, then verify with the platform secret);
   `UploadPostMusicProvider` and `UploadPostEngagementSource` resolve the key through it.
   `RegisterUploadPostWebhookAction` stays byo-only (a managed org has no per-org key to save).
+
+### One vendor profile per client (bugfix)
+**Upload-Post plans are counted in profiles, and a profile holds at most one connected account per
+platform** (publishing addresses `user` + `platform`; the Facebook/LinkedIn/Google-Business pins are
+single-valued). A profile per *account* therefore burned five plan profiles on one client with five
+networks; a profile per *organization* broke as soon as a second brand wanted the same network.
+
+- `social_accounts.upload_post_profile` (nullable, `#[Hidden]`) holds the account's vendor profile.
+- `App\Actions\SocialAccounts\EnsurePublishProfileAction` resolves it: the stored value if there is
+  one, else a sibling account's profile **of the same client** that has no live account on this
+  platform, else a newly minted `alima-client-{client_id}-{random8}`. Idempotent, and the only
+  writer of the column.
+- A client with two accounts on the *same* platform genuinely needs two profiles — the vendor
+  cannot address both under one `user`.
+- A deleted account counts as holding a profile but **not** a platform slot, so deleting and
+  re-adding an account reclaims its old profile instead of burning another one.
+- `profileFor()` (publish, analytics, inbox, music) never moves an account that already has a
+  profile — its vendor link lives there. `profileForConnect()`, used only by
+  `UploadPostAdapter::connectAccount()`, is allowed to fold a stray account into a sibling's
+  profile, because that call re-links it at the vendor anyway. **That reconnect is how a client's
+  accounts spread over several profiles get consolidated onto one.**
+- `UploadPostEngagementSource`, `UploadPostCommentSource` and `UploadPostMusicProvider` all resolve
+  the vendor `user`/`profile` param through the contract now; each used to re-derive it per account,
+  which was also wrong in managed mode.
+- **`POST /uploadposts/users` now fails on every connect after a client's first**, which is normal:
+  `UploadPostAdapter::ensureProfileExists()` treats "the profile already exists" as success. The
+  vendor words it at least three ways — an `error_code` containing `EXISTS`, `already exists` in
+  `error`, and `{"success": false, "message": "Username already in use"}` — so the check matches
+  `exist` / `already in use` anywhere in the payload rather than one field. Narrowing it back to a
+  single field breaks the second account of every client.
 
 ### Plain-language publish failures (B-5.3)
 - `App\Enums\PublishFailureReason`: `classify(?string $error, ?Platform): self` maps a raw vendor
@@ -767,6 +795,17 @@ $15 to $115. Uploads are unlimited on paid plans.
   against the real API docs/sandbox if this proves too loose or too strict.
 
 ## Changelog
+- 2026-11-07: Bugfix — `ensureProfileExists()` accepts `{"message": "Username already in use"}`
+  as "already exists". Found immediately after the change below, because a shared client profile
+  makes that response the normal path. Regression test:
+  `UploadPostAdapterTest::test_connect_account_treats_a_username_already_in_use_as_success`.
+- 2026-11-07: **Bugfix — one Upload-Post profile per client, not per account.** New
+  `social_accounts.upload_post_profile` + `App\Actions\SocialAccounts\EnsurePublishProfileAction`;
+  `PublishCredentials::profileForConnect()` added and `profileFor()` now client-scoped in both
+  modes; the engagement, inbox and music readers resolve the vendor profile through the contract
+  instead of re-deriving it; `EnsureManagedPublishProfileAction` deleted and
+  `organizations.upload_post_profile` reduced to the backfill source for pre-existing links. Tests:
+  `tests/Unit/Actions/SocialAccounts/EnsurePublishProfileActionTest.php`.
 - 2026-10-21: Step M-3.1 — confirmed targets record `published_at`, `vendor_request_id`, `platform_post_id`, `post_url` (webhook + poll); registry `account_metrics` / `post_metrics`; analytics calls via the new `EngagementSource` contract.
 - 2026-10-20: Phase 18 (grid planner) — grid sequences: `PlanGridScheduleAction` dates tiles in publish order (last position first) and writes each post's Instagram target through `UpdatePostAction`, so vendor-held channels are recalled and re-sent; `GridSequenceValidator` enforces `grids.min_gap_minutes` (default 10) as a warning; "Schedule approved posts" moves only approved posts, each through its own checklist; "Hold the rest" (`HoldGridPostsAction`) moves later scheduled grid posts back to `approved` when an earlier one fails or leaves the schedule (`GridOrderRiskService`). See `grid-planner.md`.
 - 2026-10-19: Step M-0.2 — vendor capability audit: analytics / comments per platform with the source

@@ -65,7 +65,7 @@ class UploadPostMusicProviderTest extends TestCase
             ], 200),
         ]);
 
-        $this->actingOrgWithConnectedTikTok();
+        $account = $this->actingOrgWithConnectedTikTok();
 
         $results = (new UploadPostMusicProvider)->search('milky chance', Platform::TikTok);
 
@@ -77,10 +77,11 @@ class UploadPostMusicProviderTest extends TestCase
         $this->assertSame('Milky Chance', $track->artist);
         $this->assertSame(Platform::TikTok, $track->platform);
 
-        Http::assertSent(function ($request) {
+        Http::assertSent(function ($request) use ($account) {
             return str_starts_with($request->url(), 'https://api.upload-post.com/api/uploadposts/tiktok/music/search')
                 && $request->hasHeader('Authorization', 'Apikey org-secret-key')
-                && $request['profile'] === 'tiktok-profile-1'
+                // The client's publish profile — the catalog is scoped to the linked TikTok account.
+                && $request['profile'] === $account->fresh()->upload_post_profile
                 && $request['q'] === 'milky chance';
         });
     }

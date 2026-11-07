@@ -253,7 +253,8 @@ class UploadPostCommentSource implements CommentSource
 
     private function username(SocialAccount $account): string
     {
-        return (string) ($account->external_account_id ?? $account->external_profile_id ?? $account->id);
+        // The account's client profile — the same `user` the post was published under.
+        return app(PublishCredentials::class)->profileFor($account);
     }
 
     private function client(SocialAccount $account): PendingRequest

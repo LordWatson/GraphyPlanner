@@ -14,7 +14,9 @@ vendor is wired up yet.
   `{day, start, end}`), `persona_override` (text, overrides `BrandBrain` persona for this account),
   `connection_status` (enum: not_connected/connected/token_expired, default `not_connected`).
   Publisher/vendor fields present but unused until Phase 1: `provider`, `external_profile_id`,
-  `external_account_id`, `connected_at`. Step 1.9.2 added `meta_access_token` (`encrypted` cast,
+  `external_account_id`, `connected_at`. `upload_post_profile` (nullable, `#[Hidden]`) is the
+  **vendor profile this account publishes under, shared with its client's other accounts** — see
+  `publishing.md` ("One vendor profile per client"); Upload-Post bills per profile. Step 1.9.2 added `meta_access_token` (`encrypted` cast,
   never stored/logged in plaintext), `meta_access_token_expires_at`, `meta_instagram_user_id` —
   populated only for Instagram accounts via the additive Facebook Login connect flow (Step 1.9.3),
   purely to grant Meta Graph API access for Instagram audio search (Step 1.9.4); they never affect
@@ -183,6 +185,8 @@ vendor is wired up yet.
   revisit if this proves confusing in practice (e.g. show a manual "Refresh status" affordance).
 
 ## Changelog
+- 2026-11-07: Bugfix — `upload_post_profile` added; one vendor profile per client instead of one
+  per account (which exhausted the Upload-Post plan). Detail in `publishing.md`.
 - 2026-10-20: Phase 18 (grid planner) — `App\Contracts\ProfileFeedSource` reads an Instagram account's recent feed for the grid preview: `MetaGraphProfileFeedSource` uses the Step 1.9 `meta_access_token` (`/{ig-user-id}` + `/media`, cached 15 min per account, never logs the token or media URLs), falling back to `PublishedPostsProfileFeedSource` (posts sent from the app). A grid plan belongs to one Instagram account of its client. Tests: `ProfileFeedSourceTest`.
 - 2026-10-20: Phase M-2 — platform settings, new platforms, token lifecycle + health recording, client
   self-connect links. Tests: `SocialAccountTokenLifecycleTest`, `ConnectInviteTest`,

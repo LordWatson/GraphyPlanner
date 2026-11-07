@@ -82,7 +82,7 @@ class UploadPostEngagementSourceTest extends TestCase
         $this->assertSame(2, $reading?->comments);
         $this->assertSame(1, $reading?->shares);
         Http::assertSent(fn (Request $request) => str_contains($request->url(), 'platform_post_id=tweet-9')
-            && str_contains($request->url(), 'user=profile-'));
+            && str_contains($request->url(), 'user=alima-client-'));
     }
 
     public function test_google_business_posts_are_never_requested(): void

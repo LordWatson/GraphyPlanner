@@ -18,6 +18,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use RuntimeException;
 use Tests\TestCase;
@@ -83,7 +84,7 @@ class UploadPostAdapterTest extends TestCase
 
         $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
 
-        Http::assertSent(function ($request) {
+        Http::assertSent(function ($request) use ($account) {
             $fields = self::multipartFieldsByName($request);
 
             // `title` itself now carries the appended hashtag text (per
@@ -93,7 +94,7 @@ class UploadPostAdapterTest extends TestCase
             return $request->url() === 'https://api.upload-post.com/api/upload_photos'
                 && $request->hasHeader('Authorization', 'Apikey org-secret-key')
                 && $request->isMultipart()
-                && $fields['user'] === ['ext-acct-1']
+                && $fields['user'] === [$account->fresh()->upload_post_profile]
                 && $fields['title'] === ["Hello world\n{$spacer}\n#graphy"]
                 && $fields['platform[]'] === [Platform::LinkedIn->value]
                 && $fields['photos[]'] === ['https://cdn.test/media.jpg']
@@ -372,15 +373,20 @@ class UploadPostAdapterTest extends TestCase
         $url = (new UploadPostAdapter)->connectAccount($account);
 
         $this->assertSame('https://upload-post.test/connect/abc', $url);
-        Http::assertSent(function ($request) {
+        // The profile is the client's, not the vendor's own account id (which cost a plan
+        // profile per network until `EnsurePublishProfileAction`).
+        $profile = $account->fresh()->upload_post_profile;
+        $this->assertSame("alima-client-{$account->client_id}", Str::beforeLast((string) $profile, '-'));
+
+        Http::assertSent(function ($request) use ($profile) {
             return $request->url() === 'https://api.upload-post.com/api/uploadposts/users'
                 && $request->hasHeader('Authorization', 'Apikey org-secret-key')
-                && $request['username'] === 'ext-acct-1';
+                && $request['username'] === $profile;
         });
-        Http::assertSent(function ($request) use ($account) {
+        Http::assertSent(function ($request) use ($account, $profile) {
             return $request->url() === 'https://api.upload-post.com/api/uploadposts/users/generate-jwt'
                 && $request->hasHeader('Authorization', 'Apikey org-secret-key')
-                && $request['username'] === 'ext-acct-1'
+                && $request['username'] === $profile
                 && str_contains((string) $request['redirect_url'], (string) $account->id);
         });
     }
@@ -417,6 +423,37 @@ class UploadPostAdapterTest extends TestCase
         $url = (new UploadPostAdapter)->connectAccount($account);
 
         $this->assertSame('https://upload-post.test/connect/abc', $url);
+    }
+
+    /**
+     * Regression: the vendor reports this as `{"success": false, "message": "Username already in
+     * use"}`, which matched none of the fields we were checking — so the *second* account of a
+     * client, the first one to reuse its shared profile, could never be connected.
+     */
+    public function test_connect_account_treats_a_username_already_in_use_as_success(): void
+    {
+        Http::fake([
+            '*/uploadposts/users/generate-jwt' => Http::response(['access_url' => 'https://upload-post.test/connect/abc'], 200),
+            '*/uploadposts/users' => Http::response(['success' => false, 'message' => 'Username already in use'], 400),
+        ]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $instagram = SocialAccount::factory()->for($organization, 'organization')->create([
+            'platform' => Platform::Instagram,
+        ]);
+        $tiktok = SocialAccount::factory()->create([
+            'client_id' => $instagram->client_id,
+            'org_id' => $instagram->org_id,
+            'platform' => Platform::TikTok,
+        ]);
+
+        $adapter = new UploadPostAdapter;
+
+        $this->assertSame('https://upload-post.test/connect/abc', $adapter->connectAccount($instagram));
+        $this->assertSame('https://upload-post.test/connect/abc', $adapter->connectAccount($tiktok));
+
+        // Both linked into the one profile the first connect created.
+        $this->assertSame($instagram->fresh()->upload_post_profile, $tiktok->fresh()->upload_post_profile);
     }
 
     public function test_connect_account_throws_when_profile_creation_fails_for_another_reason(): void

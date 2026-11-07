@@ -102,7 +102,7 @@ class UploadPostMusicProvider implements MusicProvider
      */
     private function fetchTracks(SocialAccount $account, array $params): Collection
     {
-        $username = $account->external_account_id ?? $account->external_profile_id ?? (string) $account->id;
+        $username = app(PublishCredentials::class)->profileFor($account);
 
         Log::info('Searching Upload-Post TikTok music catalog', [
             'social_account_id' => $account->id,
