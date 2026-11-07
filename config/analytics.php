@@ -70,4 +70,21 @@ return [
         'send_hour' => (int) env('ANALYTICS_INSIGHTS_DIGEST_HOUR', 8),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Engagement sweep spread (minutes)
+    |--------------------------------------------------------------------------
+    |
+    | `analytics:sync-engagement` runs every 30 minutes and queues one job per organization. Rather
+    | than dropping them all on the queue at once, each organization is delayed by
+    | `id % spread` minutes, so the sweep arrives as a stream and anything user-facing sharing the
+    | reports queue is not stuck behind the whole roster. The offset is stable per organization, so
+    | each one is read at about the same moment every cycle.
+    |
+    | Set to 0 to queue everything immediately (what it did before).
+    |
+    */
+
+    'sync_spread_minutes' => (int) env('ANALYTICS_SYNC_SPREAD_MINUTES', 20),
+
 ];

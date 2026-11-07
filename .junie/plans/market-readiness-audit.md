@@ -16,14 +16,25 @@
 > **Also closed on the way:** the MySQL CI gap, which was the most important item carried over from
 > phase one — and then finding 29, the 14 failures it exposed.
 >
+> **Phase four — partly done.** Every carried-over "should fix" and "nice to have" is now closed:
+> findings 6 (booking race), 8 (broadcast scale), 13 (test chunk in the build), 14 (callback
+> throttle), 16 (duplicate docs row), and 12 instrumented and spread. **Items 18, 19 and 23 — the
+> public API, client onboarding templates and retainer profitability — are not started**; they are
+> the three features of the first-quarter group and each deserves its own run.
+>
+> **New finding:** 30 — `npm run check` has been failing CI on three oversized editor components,
+> independently of any change here. It also means my earlier claim that every CI gate passes was
+> wrong: I had checked `composer audit`, Pint, PHPStan, `tsc` and the suite, but not the frontend
+> guards.
+>
 > **Phase three — done.** The leftovers (findings 27, 28 and the webhook-secret banner), 7 (AI
 > credit claims), 10 (team chat), 9 (per-client staff access), and the code half of item 17 (email
 > suppression plus an SPF/DKIM/DMARC check). Item 17's DNS records and the two-domain split are not
 > code and remain outstanding.
 >
-> **Verification as of 2026-11-07:** **2,385 tests, all passing on SQLite *and* MySQL 8.0.46**
-> (14,488 assertions, identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
-> errors with nothing new. `composer audit` is **clean** — every CI gate now passes.
+> **Verification as of 2026-11-07:** **2,397 tests, all passing on SQLite *and* MySQL 8.0.46**
+> (14,517 assertions, identical on both). Pint green, `tsc` green, PHPStan at its pre-existing 87
+> errors with nothing new. `composer audit` is clean. `npm run check` is **not** — see finding 30.
 >
 > **New findings raised by this phase:** 17 (org purge leaves the brand logo behind), 18
 > (`composer audit` already fails CI) and 19 (fourteen pre-existing failures that only happen on
@@ -346,7 +357,7 @@ does.
 
 ## Should fix
 
-### 6. Two buyers racing for the last booking slot: one gets a 500
+### 6. Two buyers racing for the last booking slot: one gets a 500 — ✅ fixed 2026-11-07
 
 **Where:** `app/Actions/Store/CreateCheckoutAction.php:86-94`,
 `app/Http/Controllers/Store/CheckoutController.php:65-80`
@@ -421,7 +432,7 @@ and bill for 2.
 
 ---
 
-### 8. An audience broadcast queues one email per recipient inside the web request
+### 8. An audience broadcast queues one email per recipient inside the web request — ✅ fixed 2026-11-07
 
 **Where:** `app/Actions/Audience/SendAudienceBroadcastAction.php:80-83`
 
@@ -586,7 +597,7 @@ the error message points them at the wrong file.
 
 ---
 
-### 12. Load-test the engagement and comment sweeps before launch, not after
+### 12. Load-test the engagement and comment sweeps before launch, not after — ◐ instrumented and spread 2026-11-07
 
 **Where:** `routes/console.php` (`analytics:sync-engagement` every 30 min, `inbox:sync-comments`
 hourly, `benchmarks:sync`, `ads:sync`), `config/horizon.php` (reports supervisor)
@@ -619,7 +630,7 @@ behind it, including user-facing exports.
 
 ## Nice to have
 
-### 13. 425 KB of test code is in the production build
+### 13. 425 KB of test code is in the production build — ✅ fixed 2026-11-07
 
 **Where:** `resources/js/pages/inbox/composer.test.tsx` → `public/build/assets/composer.test-*.js`
 
@@ -643,7 +654,7 @@ not leak into the shared chunks, so the damage is contained.
 
 ---
 
-### 14. The social connect callback is the one public route with no rate limit
+### 14. The social connect callback is the one public route with no rate limit — ✅ fixed 2026-11-07
 
 **Where:** `routes/web.php:264` (`social-accounts/callback`)
 
@@ -679,7 +690,7 @@ would have been the odd choice.
 
 ---
 
-### 16. One stale row in the module docs index
+### 16. One stale row in the module docs index — ✅ fixed 2026-11-07
 
 **Where:** `.junie/modules/README.md`
 
@@ -868,6 +879,41 @@ asks to be deleted is not deleted.
    order-sensitive, but it is only ever computed from a freshly built array and only ever compared
    against the stored string, so the brief approval check is sound. No production change needed.
 5. ✅ `continue-on-error` removed from the `mysql` job.
+
+---
+
+### 30. `npm run check` has been failing CI
+
+**Where:** `scripts/frontend-guards.mjs`, `resources/js/components/post-editor/*`
+
+**What this is:** `composer ci:check` runs `npm run check`, which is `vp check` plus the project's
+own frontend guards. One guard caps editor files at 300 lines.
+
+**Problem:** Three files are over it and have been for some time:
+`channel-schedule.tsx` (309), `editor/settings-section.tsx` (338), `media-picker.tsx` (385). The
+guard exits non-zero, so `npm run check` fails, so `composer ci:check` fails. I verified this
+against a clean tree with every change of mine stashed — identical — so it is pre-existing.
+
+It also corrects something I said earlier in this document: after phase three I wrote that every
+CI gate passes. I had run `composer audit`, Pint, PHPStan, `tsc` and the full suite, and had not
+run the frontend guards. That claim was wrong.
+
+**Fix — step by step:**
+1. Split each of the three by **job**, not by line count. `media-picker.tsx` at 385 lines almost
+   certainly contains a browse-library concern and an upload concern that can stand apart; the
+   guard is a smell detector, and satisfying it by extracting helpers that exist only to shorten a
+   file would leave the smell and lose the signal.
+2. Run `npm run check` and `npx vp test run` after each split, one file per commit, so a
+   regression in the editor is easy to bisect.
+3. If a file genuinely has one job and is simply long, raise the cap deliberately in
+   `frontend-guards.mjs` with a comment saying which file forced it and why — a threshold edited
+   down to pass is the thing to avoid, but a threshold that was always wrong is worth correcting
+   openly rather than carrying three permanent failures.
+4. Do not do this inside a feature phase. It is a refactor of the most-used screen in the product
+   and wants its own change and its own review.
+
+**If we skip it:** The command developers and CI both run stays red, which trains everyone to
+ignore its output — and the next real failure it reports goes unnoticed.
 
 ---
 

@@ -367,6 +367,14 @@ report *page* is branded by the portal shell (`client-portal.md`).
   throttled) — check manually.
 
 ## Changelog
+- 2026-11-07: **The engagement sweep is spread across its window and reports how long it took.**
+  `analytics:sync-engagement` runs every 30 minutes and queued one job per organization all at
+  once; each is now delayed by `id % analytics.sync_spread_minutes` minutes (20 by default, 0 to
+  disable, and `--org` is never delayed because a person is waiting), so the roster arrives as a
+  stream rather than contending with itself and with anything user-facing on the reports queue. The
+  job logs its duration and query count, which is the number that decides whether the cycle can
+  keep up — `orgs × seconds ÷ (processes × 1800)` above 1 means it cannot. Audit finding 12; the
+  measurement itself still needs production data, since vendor latency is what dominates.
 - 2026-10-23: Phase B-8 (business insights) reuses this core — `GetBusinessInsightsAction` reads
   `EngagementMetrics::summary()` scoped to the primary brand (reach/engagement, top posts, follower
   growth), and `App\Services\Business\BestTimeService` wraps `Analytics\BestTimeService::forAccounts()`

@@ -262,7 +262,11 @@ Route::middleware(['signed', 'throttle:public-token'])->group(function () {
 
 // Step 1.3: Upload-Post redirects the browser back here once the user finishes the hosted
 // connect flow, so this must be reachable without a session, just like the review portal above.
-Route::get('social-accounts/callback', [SocialAccountController::class, 'callback'])->name('social-accounts.callback');
+// Throttled like every other public route: the signed single-use state is the authorisation, but
+// each attempt still costs a state-store read, and this was the one public route without a limit.
+Route::get('social-accounts/callback', [SocialAccountController::class, 'callback'])
+    ->middleware('throttle:public-token')
+    ->name('social-accounts.callback');
 
 // Step 1.5: Upload-Post posts its publish-outcome webhook here — no session/CSRF token is
 // available from a server-to-server vendor call, so this is public (verified instead via the

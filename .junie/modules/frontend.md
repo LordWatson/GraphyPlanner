@@ -99,6 +99,13 @@ search pickers, the one JSON `http` helper, the CI guard rails, and the frontend
 - Playwright runs Chromium only; mobile viewports and axe checks come with M-6.6 / M-11.1.
 
 ## Changelog
+- 2026-11-07: **425KB of test code removed from the production build.**
+  `resources/js/pages/inbox/composer.test.tsx` sat inside the Inertia page glob
+  (`pages/**/*.tsx`), so it was compiled into the build as if it were a page — a 425KB chunk of
+  @testing-library, 11% of the deployed JavaScript, that no user could ever load. Moved to
+  `resources/js/tests/`. A `__tests__` subfolder is **not** enough: the glob matches that too.
+  `scripts/frontend-guards.mjs` now fails on any `.test.tsx` under `pages/`. Total JS dropped from
+  3.98MB to 3.53MB; Vitest still finds all 13 files / 132 tests. Audit finding 13.
 - 2026-10-24: `ChapterHero` consistency — the campaigns hub (`pages/campaigns/index.tsx`), the grids
   hub (`pages/grids/index.tsx`) and the settings area (`layouts/settings/layout.tsx`, which opens
   every settings sub-page) now open with the Ink `ChapterHero` instead of `PageHeader`, matching every

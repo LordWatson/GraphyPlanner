@@ -15,6 +15,7 @@ use App\Models\PaymentAccount;
 use App\Models\Product;
 use App\Services\Store\BookingSlotService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -88,12 +89,24 @@ class CreateCheckoutAction
             if ($slot !== null) {
                 // The unique index on (product_id, starts_at) is the real guard; this insert is what
                 // claims the slot for this buyer.
-                Booking::create([
-                    'order_id' => $order->id,
-                    'product_id' => $product->id,
-                    'starts_at' => $slot,
-                    'ends_at' => $slot->addMinutes($this->slots->availability($product)['slot_minutes']),
-                ]);
+                //
+                // Catching the violation is what turns winning-the-race-by-a-moment into the
+                // sentence `resolveSlot()` already wrote for it. Without this the loser of the race
+                // got Laravel's error page, mid-purchase, on a public page — the `isBookable()`
+                // check above closes the common case but never the race, which is the whole reason
+                // the index exists.
+                try {
+                    Booking::create([
+                        'order_id' => $order->id,
+                        'product_id' => $product->id,
+                        'starts_at' => $slot,
+                        'ends_at' => $slot->addMinutes($this->slots->availability($product)['slot_minutes']),
+                    ]);
+                } catch (UniqueConstraintViolationException) {
+                    // Thrown out of the transaction on purpose: it rolls back the order *and* the
+                    // coupon redemption claimed above, so a lost race costs the buyer nothing.
+                    throw new CheckoutUnavailableException(__('That time has just gone — pick another.'));
+                }
             }
 
             $order->recordEvent('checkout.started', array_filter([

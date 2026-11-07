@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -46,7 +47,20 @@ class SyncOrganizationEngagementJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $startedAt = microtime(true);
+        $queriesBefore = count(DB::getQueryLog());
+
         $sync($organization, $this->force);
+
+        // How long one organization's sweep actually takes, which is the number that decides
+        // whether the 30-minute cycle can keep up: `orgs × seconds ÷ (processes × 1800)` above 1
+        // means it cannot, and everything else on the reports queue waits behind it. Logged rather
+        // than guessed — the guess in the original audit was the weakest part of it.
+        Log::info('Engagement sync finished', [
+            'org_id' => $organization->id,
+            'duration_ms' => (int) ((microtime(true) - $startedAt) * 1000),
+            'queries' => count(DB::getQueryLog()) - $queriesBefore,
+        ]);
     }
 
     public function failed(Throwable $exception): void

@@ -179,6 +179,52 @@ class EngagementSyncTest extends TestCase
         Queue::assertPushed(SyncOrganizationEngagementJob::class, fn ($job) => $job->organizationId === $active->id && $job->queue === 'reports');
     }
 
+    /**
+     * The sweep runs every 30 minutes and queues one job per organization. Dropping them all on
+     * the queue at once means the whole roster contends with itself and anything user-facing
+     * sharing the reports queue waits behind it, so each organization gets a stable offset.
+     */
+    public function test_the_sweep_is_spread_across_the_window_rather_than_queued_all_at_once(): void
+    {
+        Queue::fake();
+        config(['analytics.sync_spread_minutes' => 20]);
+
+        $this->engagementOrg();
+        $this->engagementOrg();
+        $this->engagementOrg();
+
+        $this->artisan('analytics:sync-engagement')->assertSuccessful();
+
+        Queue::assertPushed(SyncOrganizationEngagementJob::class, 3);
+        Queue::assertPushed(
+            SyncOrganizationEngagementJob::class,
+            fn ($job) => $job->delay !== null,
+        );
+    }
+
+    public function test_one_organization_asked_for_by_name_is_not_delayed(): void
+    {
+        Queue::fake();
+        config(['analytics.sync_spread_minutes' => 20]);
+        $org = $this->engagementOrg();
+
+        // A person pressed refresh; making them wait up to 20 minutes would be absurd.
+        $this->artisan('analytics:sync-engagement', ['--org' => $org->id])->assertSuccessful();
+
+        Queue::assertPushed(SyncOrganizationEngagementJob::class, fn ($job) => $job->delay === null);
+    }
+
+    public function test_spreading_can_be_turned_off(): void
+    {
+        Queue::fake();
+        config(['analytics.sync_spread_minutes' => 0]);
+        $this->engagementOrg();
+
+        $this->artisan('analytics:sync-engagement')->assertSuccessful();
+
+        Queue::assertPushed(SyncOrganizationEngagementJob::class, fn ($job) => $job->delay === null);
+    }
+
     public function test_the_webhook_records_the_live_post_and_when_it_went_out(): void
     {
         $this->travelTo('2026-10-20 10:00:00');

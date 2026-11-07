@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Throwable;
 
 /**
  * Step CG-4.2 / CG-4.3 / CG-4.5 — the buyer's side of the store, on the creator's bio handle:
@@ -73,6 +74,15 @@ class CheckoutController extends Controller
             report($e);
 
             return back()->with('toast', ['type' => 'error', 'message' => $e->friendlyMessage()]);
+        } catch (Throwable $e) {
+            // A public money page must never render Laravel's error page. Anything unforeseen is
+            // reported for us and shown to the buyer as a sentence they can act on.
+            report($e);
+
+            return back()->with('toast', [
+                'type' => 'error',
+                'message' => __('We could not start that checkout. Nothing has been charged — please try again.'),
+            ]);
         }
 
         // A full-page visit: the card form is the provider's own hosted page, never ours.

@@ -4,18 +4,15 @@ namespace App\Actions\Audience;
 
 use App\Contracts\Entitlements;
 use App\Enums\Feature;
-use App\Enums\OrderStatus;
-use App\Mail\AudienceMessageMail;
+use App\Jobs\SendAudienceBroadcastJob;
 use App\Models\AudienceBroadcast;
 use App\Models\AudienceContact;
 use App\Models\Client;
-use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Collection;
+use App\Support\Audience\BroadcastRecipients;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -56,9 +53,10 @@ class SendAudienceBroadcastAction
             ]);
         }
 
-        $recipients = $this->recipients($brand, $segment, $product);
+        $recipients = BroadcastRecipients::query($brand->id, $segment, $product?->id);
+        $recipientCount = $recipients->count();
 
-        if ($recipients->isEmpty()) {
+        if ($recipientCount === 0) {
             throw ValidationException::withMessages([
                 'segment' => __('Nobody in that segment has confirmed their email yet.'),
             ]);
@@ -73,16 +71,20 @@ class SendAudienceBroadcastAction
             'segment' => $segment,
             'product_id' => $product?->id,
             'sent_at' => now(),
-            'recipients' => $recipients->count(),
+            'recipients' => $recipientCount,
         ]));
 
-        // After the commit: the broadcast is a record of what went out, and a mail failure on one
-        // address must not roll back the others or lose the record of them.
-        foreach ($recipients as $contact) {
-            Mail::to($contact->email)->send(new AudienceMessageMail($contact, null, $broadcast));
-        }
+        // One job, not one queue push per contact inside the request. That loop meant a
+        // 5,000-contact list was 5,000 sequential writes before the response, and a bigger one hit
+        // `max_execution_time` part-way through with no record of how far it got.
+        // `SendAudienceBroadcastJob` pages through the same segment query, paces the chunks so the
+        // mail provider is not handed thousands at once, and records progress as it goes.
+        //
+        // Dispatched after the commit, so the job can never read a broadcast row that is not there
+        // yet.
+        DB::afterCommit(fn () => SendAudienceBroadcastJob::dispatch($broadcast->id));
 
-        Log::info('Audience broadcast sent', [
+        Log::info('Audience broadcast queued', [
             'org_id' => $brand->org_id,
             'client_id' => $brand->id,
             'broadcast_id' => $broadcast->id,
@@ -92,29 +94,5 @@ class SendAudienceBroadcastAction
         ]);
 
         return $broadcast;
-    }
-
-    /**
-     * Who the segment resolves to, right now. An unsubscribed or unconfirmed contact is in no
-     * segment, so there is no way to compose one that reaches them.
-     *
-     * @return Collection<int, AudienceContact>
-     */
-    private function recipients(Client $brand, string $segment, ?Product $product): Collection
-    {
-        $query = AudienceContact::query()
-            ->withoutOrgScope()
-            ->where('client_id', $brand->id)
-            ->marketable();
-
-        if ($product !== null) {
-            $query->whereIn('email', Order::query()
-                ->withoutOrgScope()
-                ->where('product_id', $product->id)
-                ->whereIn('status', [OrderStatus::Paid, OrderStatus::Fulfilled])
-                ->select('buyer_email'));
-        }
-
-        return $query->orderBy('id')->get();
     }
 }

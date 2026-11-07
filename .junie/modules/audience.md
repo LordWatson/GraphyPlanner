@@ -182,6 +182,17 @@ Frontend: `pages/business/audience.tsx`, `pages/public/audience.tsx`, the `Email
   disables submit — without it the owner would subscribe themselves while editing.
 
 ## Changelog
+- 2026-11-07: **A broadcast is handed to one job instead of sent in a loop.** Sending used to be a
+  `foreach` in the web request pushing one queued mail per contact — a 5,000-contact list meant
+  5,000 sequential writes before the response, and a bigger one hit `max_execution_time` with no
+  record of how far it got. New `SendAudienceBroadcastJob` (unique per broadcast) pages through the
+  segment with `chunkById`, delays each chunk further than the last so the mail provider sees a
+  stream rather than a burst, and records `sent_count` / `failed_count` / `last_contact_id` /
+  `finished_at` as it goes — so progress is sayable and a retry resumes instead of re-sending the
+  first chunks. Segment resolution moved to `App\Support\Audience\BroadcastRecipients` so the
+  Action (which counts) and the job (which sends, minutes later) cannot drift. Consent is re-read at
+  send time, not frozen when the owner pressed the button. Tests: `BroadcastScaleTest` (7). Audit
+  finding 8.
 - 2026-11-07: Phase GTM-2 (GTM-2.1–2.3) built, closing CG-6.1–6.3: `audience_contacts`,
   `audience_sends` and `audience_broadcasts`; the `email_capture` bio block with double opt-in;
   buyer capture at checkout with an explicit marketing opt-in; a pasted-CSV import that invites;

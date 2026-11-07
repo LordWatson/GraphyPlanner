@@ -33,6 +33,19 @@ function check(path) {
     const source = readFileSync(path, 'utf8');
     const lines = source.split('\n');
 
+    // Inertia resolves pages with a glob over `pages/**`, so a test file anywhere under there is
+    // compiled into the production build as if it were a page. One was: a 425KB chunk of
+    // @testing-library, 11% of the deployed JavaScript, that no user could ever load.
+    //
+    // A `__tests__` subfolder does *not* get you out of it — the glob is `pages/**/*.tsx` and
+    // matches that too (I tried). The test has to live outside `pages/`, so page tests go in
+    // `resources/js/tests/`.
+    if (/^resources\/js\/pages\/.*\.test\.tsx?$/.test(file)) {
+        failures.push(
+            `${file} is a test under pages/ — the Inertia glob would bundle it into the build as a page. Move it to resources/js/tests/.`,
+        );
+    }
+
     if (file !== 'resources/js/lib/http.ts') {
         lines.forEach((line, index) => {
             const code = line.replace(/\/\/.*$/, '').trim();

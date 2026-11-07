@@ -20,6 +20,7 @@ use App\Models\Organization;
 use App\Models\PaymentAccount;
 use App\Models\Product;
 use App\Services\Store\BookingSlotService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -325,6 +326,63 @@ class CheckoutTest extends TestCase
             ->assertSessionHas('toast.type', 'error');
 
         $this->assertSame(1, Booking::query()->where('product_id', $product->id)->count());
+    }
+
+    /**
+     * Losing the race by a moment, which is the case the unique index exists for.
+     *
+     * `isBookable()` closes the common case — a slot that was already taken when the page loaded —
+     * but not two buyers submitting inside the same instant. That one reaches the insert, and it
+     * used to answer with Laravel's error page on a public page, mid-purchase. The loser now gets
+     * the same sentence as everyone else, and nothing is left behind: no order, and no coupon
+     * redemption claimed on the way.
+     */
+    public function test_losing_the_booking_race_is_a_message_not_an_error_page(): void
+    {
+        $product = $this->product([
+            'type' => ProductType::Booking,
+            'settings' => ['availability' => ['start' => '09:00', 'end' => '12:00', 'slot_minutes' => 60, 'lead_hours' => 0]],
+        ]);
+
+        $slot = app(BookingSlotService::class)->slots($product)[0]['starts_at'];
+        Coupon::create(['org_id' => $this->org->id, 'code' => 'HALF', 'percent_off' => 50, 'max_redemptions' => 5]);
+
+        // The other buyer, a moment earlier.
+        $theirOrder = Order::create([
+            'org_id' => $this->org->id,
+            'product_id' => $product->id,
+            'buyer_email' => 'first@example.test',
+            'amount_minor' => $product->price_minor,
+            'currency' => $product->currency,
+            'status' => OrderStatus::Pending,
+        ]);
+        Booking::create([
+            'order_id' => $theirOrder->id,
+            'product_id' => $product->id,
+            'starts_at' => $slot,
+            'ends_at' => CarbonImmutable::parse($slot)->addHour(),
+        ]);
+
+        // `isBookable()` answering true with the slot already taken *is* the race: the check and
+        // the insert cannot be one atomic step, so the index has to be what decides. Forcing the
+        // check to pass is the only way to reach the insert from a single-threaded test.
+        $this->partialMock(BookingSlotService::class, function ($mock) {
+            $mock->shouldReceive('isBookable')->andReturn(true);
+        });
+
+        $before = Order::query()->withoutOrgScope()->count();
+
+        $this->post("/@jessbakery/p/{$product->id}/checkout", $this->buyer([
+            'slot' => $slot,
+            'coupon_code' => 'HALF',
+        ]))
+            ->assertRedirect()
+            ->assertSessionHas('toast.type', 'error')
+            ->assertSessionHas('toast.message', 'That time has just gone — pick another.');
+
+        // The transaction rolled back, so the race cost the buyer nothing.
+        $this->assertSame($before, Order::query()->withoutOrgScope()->count());
+        $this->assertSame(0, Coupon::query()->withoutOrgScope()->where('code', 'HALF')->value('redemptions'));
     }
 
     public function test_a_product_block_on_the_bio_page_links_to_the_product_and_only_while_it_is_live(): void

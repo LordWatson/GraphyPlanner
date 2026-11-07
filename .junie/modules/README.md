@@ -20,7 +20,6 @@ accurate context without re-deriving it from the whole codebase.
 | `benchmarks.md` | Competitor benchmarks: tracked public profiles, nightly readings, the compare panel and report block (`.junie/plans/go-to-market.md`) | Done (Phase GTM-4; GTM-4.3 dropped) |
 | `audience.md` | Email list: double opt-in capture (bio block, checkout, CSV import), automated triggers, human-only broadcasts (`.junie/plans/go-to-market.md`) | Done (Phase GTM-2, closes CG-6.1–6.3) |
 | `billing.md` | Client billing: invoices (line items, branded PDFs, email/reminders, void, ledger & CSV export) | Done (ad-hoc) |
-| `plans.md` | Plans, entitlements & subscriptions: plan config, limit/gate enforcement, Cashier (Stripe) self-serve billing, super-admin plan controls + global/per-org Stripe switch, pricing pages | In progress (Phase CG-2) |
 | `plans.md` | Plans, entitlements, AI allowance, Stripe subscriptions (Cashier), plan page & super-admin plan/billing controls | Done (Phase CG-2) |
 | `social-accounts.md` | SocialAccount model & connection status | Done (Step 0.6); token lifecycle + client self-connect (Phase M-2) |
 | `campaigns.md` | Campaigns: workspace, brief, plan, board, approvals, results (`.junie/plans/campaigns-enhancement.md`) | Done (Step 0.7); enhancement Done (Steps C-0.1 to C-9.4) |

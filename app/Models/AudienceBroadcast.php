@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'org_id', 'client_id', 'created_by', 'subject', 'body', 'segment', 'product_id',
-    'sent_at', 'recipients',
+    'sent_at', 'recipients', 'sent_count', 'failed_count', 'last_contact_id', 'finished_at',
 ])]
 class AudienceBroadcast extends Model
 {
@@ -45,7 +45,14 @@ class AudienceBroadcast extends Model
      */
     protected function casts(): array
     {
-        return ['sent_at' => 'datetime', 'recipients' => 'integer'];
+        return [
+            'sent_at' => 'datetime',
+            'recipients' => 'integer',
+            'sent_count' => 'integer',
+            'failed_count' => 'integer',
+            'last_contact_id' => 'integer',
+            'finished_at' => 'datetime',
+        ];
     }
 
     /**

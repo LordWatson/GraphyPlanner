@@ -272,6 +272,14 @@ an answer changes them.
   claiming the sale, and the email is the real delivery.
 
 ## Changelog
+- 2026-11-07: **Losing the booking race is a message, not an error page.** The unique index on
+  `(product_id, starts_at)` is what decides the last slot, and the losing insert threw a
+  `QueryException` nothing caught — so the second buyer got Laravel's error page on a public page,
+  mid-purchase. The violation is now caught and rethrown as the `CheckoutUnavailableException` the
+  code already had the sentence for, out of the transaction so the order *and* any coupon
+  redemption roll back. `CheckoutController::checkout()` also has a catch-all now: a public money
+  page must never render an error page. Tests: `CheckoutTest::test_losing_the_booking_race_is_a_message_not_an_error_page`.
+  Audit finding 6.
 - 2026-11-07: **Bugfix — a failed Connect webhook handler no longer loses a paid order.** The claim
   row was written with `processed_at = now()` *before* the event was handled, so a handler that
   threw returned a 500, Stripe's retry was dismissed as a replay, and the card stayed charged

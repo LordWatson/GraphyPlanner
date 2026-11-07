@@ -30,6 +30,19 @@ class ModuleDocsTest extends TestCase
         $this->assertSame([], array_values($missing), 'README lists module files that don\'t exist.');
     }
 
+    /**
+     * One row per module. `plans.md` had two for a year — an "In progress" row left behind when the
+     * "Done" one was added — which meant the index said a finished module was unfinished. Both the
+     * checks above pass happily with a duplicate, so this is what catches it.
+     */
+    public function test_no_module_is_listed_twice(): void
+    {
+        $listed = $this->listedModules();
+        $duplicates = array_keys(array_filter(array_count_values($listed), fn (int $count) => $count > 1));
+
+        $this->assertSame([], $duplicates, 'These modules have more than one row in the README table.');
+    }
+
     public function test_every_module_file_is_listed_in_the_readme(): void
     {
         $files = array_map('basename', glob(base_path('.junie/modules/*.md')) ?: []);
