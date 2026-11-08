@@ -222,7 +222,8 @@ allowedFor()` — a `client_required` post can't go `internal_review → approve
       mirrors the active step to `sessionStorage`, reading it back as the initial step on remount, so
       the user stays on the step they were working on (e.g. Media). `initialTab`/`needsFeedback` is the
       fallback when nothing is stored (first load).
-    - **Media reordering (Media step).** `media-picker.tsx` lets attached tiles be reordered the way
+    - **Media reordering (Media step).** `use-media-reorder.ts` (used by `media-picker.tsx`, and
+      tested in `use-media-reorder.test.ts`) lets attached tiles be reordered the way
       `grid-board.tsx` does: drag a tile onto another (mouse) or focus a tile's grip handle and press
       space to lift, the arrow keys to move, space to drop (escape cancels), announced via an
       `aria-live` region. A keyboard drag stages its order (`lifted`) until dropped; the numbered badge

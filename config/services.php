@@ -63,6 +63,25 @@ return [
     // (confirmed in Step 1.8.2). This is a separate Facebook App (Facebook Login for Business,
     // `instagram_basic` + `instagram_content_publish`) from Upload-Post; the client secret is
     // never logged, mirroring the `upload_post_key` handling convention.
+    // WhatsApp Business Cloud API (Step W-0.1 of `.junie/plans/whatsapp-notifications.md`). A
+    // separate Meta app from `facebook` above: Cloud API messaging has its own business account,
+    // its own sending number and its own permanent system-user token. Today one platform number
+    // sends for every organization; Step W-4.1 gives an organization its own number and token,
+    // stored like `upload_post_key`. All of it is resolved through
+    // `App\Services\WhatsApp\WhatsAppCredentials`, never read in a caller, and never logged.
+    // `app_secret`/`verify_token` belong to the inbound webhook (Step W-3.1), not to sending.
+    // `WHATSAPP_CLIENT=null` binds the no-op client and turns WhatsApp off entirely; leaving the
+    // token unset is already safe (every send reports not-configured without calling anyone).
+    'whatsapp' => [
+        'client' => env('WHATSAPP_CLIENT', 'cloud_api'),
+        'base_url' => env('WHATSAPP_BASE_URL') ?: 'https://graph.facebook.com',
+        'graph_version' => env('WHATSAPP_GRAPH_VERSION') ?: 'v21.0',
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+    ],
+
     'facebook' => [
         'client_id' => env('FACEBOOK_CLIENT_ID'),
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),

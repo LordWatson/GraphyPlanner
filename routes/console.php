@@ -57,6 +57,10 @@ $safely(Schedule::command('ai-images:prune')->dailyAt('03:30'), 'ai-images:prune
 // nothing else uses) — see PruneGridPlansAction.
 $safely(Schedule::command('grids:prune')->weeklyOn(0, '03:45'), 'grids:prune');
 
+// Item 18: drops public-API idempotency keys past their 24h retention window. One row per
+// idempotent write, kept only long enough to answer a client's retry.
+$safely(Schedule::command('api:prune-idempotency-keys')->dailyAt('04:10'), 'api:prune-idempotency-keys');
+
 // Step 17.8: emails saved organization reports on their weekly (Monday) / monthly (1st) schedule,
 // at most once per period per report, skipping suspended orgs — see
 // SendScheduledOrganizationReportsAction.

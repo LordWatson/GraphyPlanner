@@ -80,8 +80,8 @@ product feature rather than a support ticket.
   expired, with `row_count`, `size_bytes`, `failure_reason` and `expires_at`. The row **outlives the
   file** on purpose: once purged it is the receipt that the export happened and is gone.
 - `App\Services\Security\OrganizationDataExport` writes the archive: one CSV per set, plus a
-  `README.txt` that says what is _not_ in it. `BuildOrganizationDataExportJob` (reports queue,
-  `ShouldBeUnique`, 900s) streams it to the private assets disk and notifies the requester
+  `README.txt` that says what is _not_ in it. `BuildOrganizationDataExportJob` (`exports` queue — its own
+  supervisor, so a backed-up analytics sweep never makes the owner wait; `ShouldBeUnique`, 900s) streams it to the private assets disk and notifies the requester
   (`DataExportReady`, database channel only — a link to an organisation's whole record does not go
   in an email).
 - **What is exported** is declarative: `OrganizationDataExport::SETS` maps each table to how it

@@ -78,6 +78,11 @@ message, errors, aborted }` with readable messages (422 first error, 413, 419, 4
 
 - No raw `fetch(` outside `lib/http.ts`.
 - No post-editor file (`pages/posts/edit.tsx`, `components/post-editor/**`) over 300 lines.
+- The formatter and linter both skip `.agents/**`, `.claude/**` and `.cursor/**`
+  (`vite.config.ts`). Installed agent tooling is not project source, and sweeping `.claude/**` is
+  what had `npm run check` failing (market-readiness finding 30): 323 files the formatter wanted to
+  rewrite, plus 21 lint warnings that `lint.options.denyWarnings` turned into a hard failure.
+  `.junie/**` is deliberately **not** skipped — those are our own docs.
 
 ## Tests
 
@@ -86,7 +91,8 @@ message, errors, aborted }` with readable messages (422 first error, 413, 419, 4
   `lib/post-workflow.test.ts`, `lib/grid-layout.test.ts`, `components/data-table.test.tsx`,
   `components/date-time-picker.test.tsx`, `components/post-editor/readiness-checklist.test.tsx`,
   `components/post-editor/editor/editor-state.test.ts`,
-  `components/post-editor/editor/editor-stepper.test.ts` (the guided-stepper step helpers).
+  `components/post-editor/editor/editor-stepper.test.ts` (the guided-stepper step helpers),
+  `components/post-editor/use-media-reorder.test.ts` (the media reorder lift/move/drop rules).
 - **Playwright** (`npm run test:e2e` after `npm run build`; `playwright.config.ts`, specs in
   `tests/e2e`): `signup-to-scheduled.spec.ts` — sign up → verify email (link read from the JSON
   mail log) → client → LinkedIn channel → post with a date/time → start drafting → internal

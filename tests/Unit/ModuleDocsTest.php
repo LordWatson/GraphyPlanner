@@ -58,7 +58,11 @@ class ModuleDocsTest extends TestCase
     {
         $readme = (string) file_get_contents(base_path('.junie/modules/README.md'));
 
-        preg_match_all('/^\| `([a-z0-9-]+\.md)` \|/m', $readme, $matches);
+        // Whitespace-tolerant: the markdown formatter pads table cells so the columns line up in
+        // the source, and the original pattern required exactly one space after the backtick. It
+        // then matched nothing and reported every module as unlisted — a parser failure dressed up
+        // as 33 missing files.
+        preg_match_all('/^\|\s*`([a-z0-9-]+\.md)`\s*\|/m', $readme, $matches);
 
         return $matches[1];
     }

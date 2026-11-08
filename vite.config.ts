@@ -86,17 +86,14 @@ export default defineConfig({
             'resources/js/components/ui/*',
             'resources/views/mail/*',
             // Finding 30: the formatter's default scope swept 323 installed skill files under
-            // `.claude/` and 51 hand-written docs under `.junie/`, which is why `npm run check`
-            // had been red. Neither is project source. Reformatting `.claude/**` churns
-            // third-party content that churns again on the next skill update, and on `.junie/**`
-            // the markdown formatter de-indents bullet continuation lines, which breaks inline
-            // code spans that wrap across lines (e.g. a `resources/views/...blade.php` path split
-            // over two lines ends up at column 0, out of its bullet). Same set the dev server's
-            // watcher already ignores above.
+            // `.claude/`, which is most of why `npm run check` had been red. That tree is
+            // third-party content, so formatting it churns files that churn again on the next
+            // skill update. `.junie/**` is deliberately NOT here — those are our own docs and
+            // the formatter is right about them. Same agent-tool dirs the dev server's watcher
+            // already ignores above.
             '.agents/**',
             '.claude/**',
             '.cursor/**',
-            '.junie/**',
         ],
         sortTailwindcss: {
             functions: ['clsx', 'cn', 'cva'],

@@ -3,16 +3,34 @@
     "info": {
         "title": "Alima API",
         "version": "1.0.0",
-        "description": "Read access to an agency's clients, posts and connected channels, plus outgoing webhooks so another system can be told the moment something happens.\n\n**Authentication.** Every request needs `Authorization: Bearer <token>`. Tokens are created in Settings → Agent access and are the same tokens the MCP server uses. A token belongs to exactly one organization and that organization is never taken from request input, so there is no parameter that widens what a token can see.\n\n**Pagination.** Lists are cursor-paginated: read `meta.next_cursor` and pass it back as `?cursor=`. A null cursor means that was the last page. There is deliberately no total count — a reporting client walking the list while people are still creating posts would get rows skipped and repeated by offset paging, and could not tell.\n\n**Rate limit.** 300 requests a minute per token.\n\n**Errors.** Always `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`, except validation failures, which use Laravel's `{\"message\": ..., \"errors\": {...}}`.\n\n**Read-only in v1**, on purpose: reading is where the demand is and it cannot damage a customer's data while the shape of this API is still settling. Writes will come with idempotency keys designed in rather than bolted on."
+        "description": "Read access to an agency's clients, posts and connected channels, plus outgoing webhooks so another system can be told the moment something happens.\n\n**Authentication.** Every request needs `Authorization: Bearer <token>`. Tokens are created in Settings → Agent access and are the same tokens the MCP server uses. A token belongs to exactly one organization and that organization is never taken from request input, so there is no parameter that widens what a token can see.\n\n**Pagination.** Lists are cursor-paginated: read `meta.next_cursor` and pass it back as `?cursor=`. A null cursor means that was the last page. There is deliberately no total count — a reporting client walking the list while people are still creating posts would get rows skipped and repeated by offset paging, and could not tell.\n\n**Rate limit.** 300 requests a minute per token.\n\n**Errors.** Always `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`, except validation failures, which use Laravel's `{\"message\": ..., \"errors\": {...}}`.\n\n**Writes stop at a draft.** You can create and edit drafts and schedule an already approved post. Nothing can be created already scheduled, and scheduling re-runs the full pre-publish checklist server-side, so an integration cannot route around the approval step.\n\n**Idempotency.** Send an `Idempotency-Key` header (a UUID per operation) on every write. If your request times out you cannot tell whether it worked — retry with the same key and you get the original response back, marked `Idempotency-Replayed: true`, instead of creating a second post. Keys are honoured for 24 hours. Reusing one key for a *different* request body is a `409`, because answering it with the old response would hide a bug in your client.\n\n**Scopes.** `read` for every GET, `write:drafts` to create or edit a draft and to manage webhooks, `write:schedule` to schedule a post — the one write that reaches real audiences."
     },
-    "servers": [{ "url": "/api/v1" }],
-    "security": [{ "bearerAuth": [] }],
+    "servers": [
+        {
+            "url": "/api/v1"
+        }
+    ],
+    "security": [
+        {
+            "bearerAuth": []
+        }
+    ],
     "tags": [
-        { "name": "Identity" },
-        { "name": "Clients" },
-        { "name": "Posts" },
-        { "name": "Channels" },
-        { "name": "Webhooks" }
+        {
+            "name": "Identity"
+        },
+        {
+            "name": "Clients"
+        },
+        {
+            "name": "Posts"
+        },
+        {
+            "name": "Channels"
+        },
+        {
+            "name": "Webhooks"
+        }
     ],
     "paths": {
         "/me": {
@@ -25,7 +43,9 @@
                     "200": {
                         "description": "The token's organization and granted scopes."
                     },
-                    "401": { "$ref": "#/components/responses/Unauthenticated" }
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    }
                 }
             }
         },
@@ -35,24 +55,36 @@
                 "tags": ["Clients"],
                 "summary": "The roster this token can see",
                 "parameters": [
-                    { "$ref": "#/components/parameters/PerPage" },
-                    { "$ref": "#/components/parameters/Cursor" },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Cursor"
+                    },
                     {
                         "name": "status",
                         "in": "query",
-                        "schema": { "type": "string" },
+                        "schema": {
+                            "type": "string"
+                        },
                         "description": "Only clients with this status."
                     },
                     {
                         "name": "archived",
                         "in": "query",
-                        "schema": { "type": "boolean" },
+                        "schema": {
+                            "type": "boolean"
+                        },
                         "description": "Archived clients instead of active ones. They are kept, not deleted."
                     }
                 ],
                 "responses": {
-                    "200": { "description": "A page of clients." },
-                    "401": { "$ref": "#/components/responses/Unauthenticated" },
+                    "200": {
+                        "description": "A page of clients."
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
                     "403": {
                         "$ref": "#/components/responses/InsufficientScope"
                     }
@@ -64,13 +96,21 @@
                 "operationId": "getClient",
                 "tags": ["Clients"],
                 "summary": "One client",
-                "parameters": [{ "$ref": "#/components/parameters/ClientId" }],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/ClientId"
+                    }
+                ],
                 "responses": {
-                    "200": { "description": "The client." },
+                    "200": {
+                        "description": "The client."
+                    },
                     "403": {
                         "description": "The client belongs to another organization, or to a client this token's member is not assigned to."
                     },
-                    "404": { "description": "No such client." }
+                    "404": {
+                        "description": "No such client."
+                    }
                 }
             }
         },
@@ -81,23 +121,34 @@
                 "summary": "What is planned and what went out",
                 "description": "Each post carries its channels inline, because \"where did this go and did it work\" is the question being asked and fetching targets separately would be N+1 over HTTP.\n\nFor an incremental sync, pass `updated_since` and keep the highest `updated_at` you saw.",
                 "parameters": [
-                    { "$ref": "#/components/parameters/PerPage" },
-                    { "$ref": "#/components/parameters/Cursor" },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Cursor"
+                    },
                     {
                         "name": "client_id",
                         "in": "query",
-                        "schema": { "type": "integer" }
+                        "schema": {
+                            "type": "integer"
+                        }
                     },
                     {
                         "name": "status",
                         "in": "query",
-                        "schema": { "type": "string" },
+                        "schema": {
+                            "type": "string"
+                        },
                         "description": "Archived posts are excluded unless you ask for `status=archived` by name."
                     },
                     {
                         "name": "updated_since",
                         "in": "query",
-                        "schema": { "type": "string", "format": "date-time" },
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
                         "description": "ISO 8601. Remember to URL-encode the `+` in an offset."
                     }
                 ],
@@ -109,6 +160,99 @@
                         "description": "A filter was malformed — the body names which one."
                     }
                 }
+            },
+            "post": {
+                "operationId": "createDraftPost",
+                "tags": ["Posts"],
+                "summary": "Create a draft post",
+                "description": "Needs the `write:drafts` scope. Always creates a **draft** — there is no parameter that creates something already approved or scheduled.\n\n`campaign_id`, `asset_ids` and every `channels[].social_account_id` must belong to the same client, so a token cannot borrow another client's campaign or media.\n\nEach channel carries its own local date and time; they are never shared implicitly. Attach media in the order you want it to publish — `asset_ids` is the carousel order.",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "description": "A unique value per operation, e.g. a UUID. Retry with the same key to get the original response instead of repeating the work."
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["client_id"],
+                                "properties": {
+                                    "client_id": {
+                                        "type": "integer"
+                                    },
+                                    "caption": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The master caption. Per-channel overrides are edited in Graphy."
+                                    },
+                                    "hashtags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Without the leading #."
+                                    },
+                                    "campaign_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "asset_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "description": "Media to attach, in publish order."
+                                    },
+                                    "channels": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": ["social_account_id"],
+                                            "properties": {
+                                                "social_account_id": {
+                                                    "type": "integer"
+                                                },
+                                                "scheduled_local_date": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "nullable": true
+                                                },
+                                                "scheduled_local_time": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "HH:MM on that channel’s own clock."
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The created draft, with its channels."
+                    },
+                    "404": {
+                        "description": "No such client for this token."
+                    },
+                    "409": {
+                        "description": "The Idempotency-Key was reused for a different request, or one is still in flight."
+                    },
+                    "422": {
+                        "description": "Validation failed — the body names the field."
+                    }
+                }
             }
         },
         "/posts/{post}": {
@@ -118,15 +262,84 @@
                 "summary": "One post with its channels",
                 "parameters": [
                     {
-                        "name": "post",
-                        "in": "path",
-                        "required": true,
-                        "schema": { "type": "integer" }
+                        "$ref": "#/components/parameters/PostId"
                     }
                 ],
                 "responses": {
-                    "200": { "description": "The post." },
-                    "403": { "description": "Not this organization's post." }
+                    "200": {
+                        "description": "The post."
+                    },
+                    "403": {
+                        "description": "Not this organization's post."
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "updateDraftPost",
+                "tags": ["Posts"],
+                "summary": "Edit a draft post",
+                "description": "Needs the `write:drafts` scope. Only ideas and drafts are editable; anything further along answers `409`, because a scheduled or published post being rewritten by an integration is a surprise nobody asked for.\n\nOnly the fields you send are changed. Sending `asset_ids` replaces the whole attachment list, in the order given.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/PostId"
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "description": "A unique value per operation, e.g. a UUID. Retry with the same key to get the original response instead of repeating the work."
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "description": "At least one of these.",
+                                "properties": {
+                                    "caption": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "hashtags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "campaign_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "asset_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The updated post."
+                    },
+                    "403": {
+                        "description": "Not this organization's post."
+                    },
+                    "409": {
+                        "description": "The post is past draft, so it is not editable here."
+                    },
+                    "422": {
+                        "description": "Nothing to update, or a field was invalid."
+                    }
                 }
             }
         },
@@ -137,21 +350,31 @@
                 "summary": "Connected channels and whether they are working",
                 "description": "`connection_status` is the field to watch: \"why did nothing publish yesterday\" is almost always an expired token. No credentials of any kind are returned.",
                 "parameters": [
-                    { "$ref": "#/components/parameters/PerPage" },
-                    { "$ref": "#/components/parameters/Cursor" },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Cursor"
+                    },
                     {
                         "name": "client_id",
                         "in": "query",
-                        "schema": { "type": "integer" }
+                        "schema": {
+                            "type": "integer"
+                        }
                     },
                     {
                         "name": "platform",
                         "in": "query",
-                        "schema": { "type": "string" }
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
-                    "200": { "description": "A page of connected channels." }
+                    "200": {
+                        "description": "A page of connected channels."
+                    }
                 }
             }
         },
@@ -161,8 +384,12 @@
                 "tags": ["Webhooks"],
                 "summary": "This organization's webhook subscriptions",
                 "parameters": [
-                    { "$ref": "#/components/parameters/PerPage" },
-                    { "$ref": "#/components/parameters/Cursor" }
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Cursor"
+                    }
                 ],
                 "responses": {
                     "200": {
@@ -202,7 +429,9 @@
                                             ]
                                         }
                                     },
-                                    "description": { "type": "string" }
+                                    "description": {
+                                        "type": "string"
+                                    }
                                 }
                             }
                         }
@@ -227,7 +456,9 @@
                 "tags": ["Webhooks"],
                 "summary": "One subscription",
                 "parameters": [
-                    { "$ref": "#/components/parameters/EndpointId" }
+                    {
+                        "$ref": "#/components/parameters/EndpointId"
+                    }
                 ],
                 "responses": {
                     "200": {
@@ -244,10 +475,14 @@
                 "summary": "Unsubscribe",
                 "description": "Needs the `write:drafts` scope. Its delivery history goes with it.",
                 "parameters": [
-                    { "$ref": "#/components/parameters/EndpointId" }
+                    {
+                        "$ref": "#/components/parameters/EndpointId"
+                    }
                 ],
                 "responses": {
-                    "204": { "description": "Gone." },
+                    "204": {
+                        "description": "Gone."
+                    },
                     "403": {
                         "$ref": "#/components/responses/InsufficientScope"
                     },
@@ -256,11 +491,131 @@
                     }
                 }
             }
+        },
+        "/posts/{post}/schedule": {
+            "post": {
+                "operationId": "schedulePost",
+                "tags": ["Posts"],
+                "summary": "Schedule an approved post",
+                "description": "Needs the `write:schedule` scope — its own scope because this is the only write that reaches real audiences, and it cannot be undone by another call.\n\nThe post must already be **approved**. The full pre-publish checklist is re-run here, not trusted from earlier: if it does not pass you get a `409` whose `outstanding` array names every item still to fix.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/PostId"
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "description": "A unique value per operation, e.g. a UUID. Retry with the same key to get the original response instead of repeating the work."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scheduled. `scheduled_at` is the earliest channel’s instant."
+                    },
+                    "403": {
+                        "description": "This token’s member may not schedule this post."
+                    },
+                    "409": {
+                        "description": "Not approved yet, or the checklist did not pass (see `outstanding`)."
+                    }
+                }
+            }
+        },
+        "/webhooks/{endpoint}/deliveries": {
+            "get": {
+                "operationId": "listWebhookDeliveries",
+                "tags": ["Webhooks"],
+                "summary": "What we tried to send you, and how it went",
+                "description": "The dead-letter list. Every attempt is kept with its payload, response status, error and attempt count, newest first — so “did it arrive, and if not why” has an answer you can read without asking us.\n\nEach row carries the `payload` exactly as sent, which means you can reprocess a missed event straight from here without a replay at all.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/EndpointId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Cursor"
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["pending", "delivered", "failed"]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of delivery attempts."
+                    },
+                    "404": {
+                        "description": "No such endpoint for this token."
+                    }
+                }
+            }
+        },
+        "/webhooks/{endpoint}/deliveries/{delivery}/replay": {
+            "post": {
+                "operationId": "replayWebhookDelivery",
+                "tags": ["Webhooks"],
+                "summary": "Send a failed delivery again",
+                "description": "Needs the `write:drafts` scope. Queues the delivery again with its **original** payload, `occurred_at` included: you are being told about something that happened then, not now.\n\nOnly a finished delivery can be replayed — one still working through its own retries answers `409`. So does a replay into a switched-off endpoint, which would fail immediately; re-enable it first.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/EndpointId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/DeliveryId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Queued. The row is pending again."
+                    },
+                    "404": {
+                        "description": "No such endpoint or delivery for this token."
+                    },
+                    "409": {
+                        "description": "Still pending, or the endpoint is switched off."
+                    }
+                }
+            }
+        },
+        "/webhooks/{endpoint}/enable": {
+            "post": {
+                "operationId": "enableWebhookEndpoint",
+                "tags": ["Webhooks"],
+                "summary": "Switch a disabled endpoint back on",
+                "description": "Needs the `write:drafts` scope. An endpoint is switched off automatically after repeated consecutive failures, so a dead URL does not keep a queue busy forever. Once the URL works again, call this and then replay what was missed — your existing signing secret still applies, so there is nothing to reconfigure.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/EndpointId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Active again."
+                    },
+                    "404": {
+                        "description": "No such endpoint for this token."
+                    }
+                }
+            }
         }
     },
     "components": {
         "securitySchemes": {
-            "bearerAuth": { "type": "http", "scheme": "bearer" }
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
+            }
         },
         "parameters": {
             "PerPage": {
@@ -276,20 +631,42 @@
             "Cursor": {
                 "name": "cursor",
                 "in": "query",
-                "schema": { "type": "string" },
+                "schema": {
+                    "type": "string"
+                },
                 "description": "From the previous page's `meta.next_cursor`."
             },
             "ClientId": {
                 "name": "client",
                 "in": "path",
                 "required": true,
-                "schema": { "type": "integer" }
+                "schema": {
+                    "type": "integer"
+                }
             },
             "EndpointId": {
                 "name": "endpoint",
                 "in": "path",
                 "required": true,
-                "schema": { "type": "integer" }
+                "schema": {
+                    "type": "integer"
+                }
+            },
+            "DeliveryId": {
+                "name": "delivery",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "type": "integer"
+                }
+            },
+            "PostId": {
+                "name": "post",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "type": "integer"
+                }
             }
         },
         "responses": {

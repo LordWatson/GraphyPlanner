@@ -270,6 +270,15 @@ attribution. See `marketing.md`.
   scope for this change.
 - 2026-10-18: Step I-2.8 — Laravel Horizon installed; `/horizon` is gated to super admins in every
   environment (`App\Providers\HorizonServiceProvider`, `viewHorizon` gate). See `ops.md`.
+- 2026-11-08: Finding 12 step 5 — the System health panel also lists organizations whose
+  engagement metrics have stopped arriving (`GetSuperAdminOverviewAction::staleMetricSyncs()` →
+  `health.syncs`): the stalest five, with **last read** and **last good read** side by side.
+  They differ because a rejected or rate-limited read still stamps `metrics_synced_at`, so an
+  organization can look synced a minute ago while nothing has actually come back for days. Only
+  organizations the sweep should be reading are counted — active, not the preview fixture, holding
+  an Upload-Post key, with a connected account on a live client — so nothing the sweep deliberately
+  skips sits there as permanent noise. Covered by
+  `EngagementSyncTest::test_the_super_admin_console_names_an_organization_whose_reads_stopped_working`.
 - 2026-10-18: Step I-1.8 — "System health" panel on the super admin dashboard
   (`GetSuperAdminOverviewAction` → `health`): one row per scheduled command from
   `App\Support\Scheduling\SchedulerHeartbeat::COMMANDS` with its last successful run and a

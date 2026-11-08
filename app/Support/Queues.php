@@ -24,7 +24,14 @@ final class Queues
     /** Text AI work; AI Image Studio jobs keep their own `config('ai.images.queue')`. */
     public const AI = 'ai';
 
-    /** Report generation and delivery. */
+    /**
+     * Audit finding 12 step 4 — work somebody is sitting and waiting for: a requested data
+     * export, and anything else a person clicked a button for. Its own queue and its own
+     * supervisor, so a backed-up engagement sweep on `reports` never makes that person wait.
+     */
+    public const EXPORTS = 'exports';
+
+    /** Report generation and the background vendor sweeps that feed it. */
     public const REPORTS = 'reports';
 
     public const DEFAULT = 'default';
@@ -46,6 +53,7 @@ final class Queues
             self::MAIL,
             self::AI,
             (string) config('ai.images.queue', 'ai-images'),
+            self::EXPORTS,
             self::REPORTS,
             self::DEFAULT,
         ]));

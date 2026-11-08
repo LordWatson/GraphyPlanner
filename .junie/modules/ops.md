@@ -25,9 +25,13 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
 ## Actions / Services / Contracts
 
 - `App\Support\Queues`: the queue names — `publishing`, `webhooks` (reserved for Step I-16),
-  `notifications`, `mail`, `ai`, `reports`, `default`. AI Image Studio jobs keep
-  `config('ai.images.queue')` (`ai-images`). `Queues::all()` lists every one, highest priority
-  first (`publishing` first, `default` last).
+  `notifications`, `mail`, `ai`, `exports`, `reports`, `default`.
+  AI Image Studio jobs keep `config('ai.images.queue')` (`ai-images`). `Queues::all()` lists every
+  one, highest priority first (`publishing` first, `default` last).
+    - `exports` is work somebody is sitting and waiting for (`BuildOrganizationDataExportJob`), and
+      it has its own supervisor: everything else on `reports` is a background vendor sweep nobody
+      is waiting on, and the engagement sweep can fill `background` for a whole cycle (finding 12
+      step 4).
     - `PublishPostJob`, `PublishPostTargetJob` → `publishing` (set in their constructors).
     - Every mailable (they all implement `ShouldQueue`) → `mail`; every notification's
       `viaQueues()` → `database: notifications`, `mail: mail`.
@@ -45,9 +49,14 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
     | `publishing` | `publishing`                        | 200 s   | 3     | 8                 |
     | `messaging`  | `webhooks`, `notifications`, `mail` | 90 s    | 3     | 4                 |
     | `ai`         | `ai`, `ai-images`                   | 150 s   | 2     | 4                 |
+    | `exports`    | `exports`                           | 620 s   | 2     | 2                 |
     | `background` | `reports`, `default`                | 620 s   | 3     | 2                 |
 
-    A long-wait alert fires when `redis:publishing` waits more than 30 s.
+    `horizon.waits` thresholds: `publishing` 30 s, `default` 60 s, `exports` 120 s (somebody is
+    watching a spinner), `reports` 1800 s — a wait past one whole sweep cycle means the engagement
+    sweep is no longer keeping up. `AlertOnLongQueueWait` turns Horizon's `LongWaitDetected` into
+    an `OpsAlerter` alert, because Horizon's own notification needs a mail/Slack route registered
+    on Horizon itself and nobody watches the dashboard at 3am (finding 12 step 5).
 
 - `config/queue.php`: default `redis`; `redis.retry_after` 660 s (must stay above the longest
   supervisor timeout, or a slow job runs twice).
@@ -55,7 +64,7 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
   limiters count in. `config/session.php`: default `redis`.
 - `.env.example` is production-shaped (MySQL, Redis everywhere). For a local box without Redis set
   `QUEUE_CONNECTION`, `CACHE_STORE`, `SESSION_DRIVER` to `database` and run
-  `php artisan queue:work --queue=publishing,webhooks,notifications,mail,ai,ai-images,reports,default`
+  `php artisan queue:work --queue=publishing,webhooks,notifications,mail,ai,ai-images,exports,reports,default`
   instead of Horizon. A worker without `--queue` only works `default`: scheduled posts never reach
   Upload-Post and mail/notifications never send, with nothing in the log.
 - `php artisan dev`: Horizon swaps the framework's `queue` dev command for `php artisan horizon`.
@@ -100,8 +109,9 @@ schedule:work` or a cron for `schedule:run`, and `php artisan horizon:terminate`
   `OPS_ALERT_LOG_CHANNEL` (e.g. `slack`) and emails `OPS_ALERT_MAIL_TO` (`OpsAlertMail`, sent
   inline because the alert may be about the queue). One alert per key per
   `OPS_ALERT_THROTTLE_MINUTES` (repeats log at `warning`). Fired by
-  `AlertOnFailedPublishingJob` (any job on the `publishing` queue that fails for good) and by the
-  Upload-Post webhook on a bad signature.
+  `AlertOnFailedPublishingJob` (any job on the `publishing` queue that fails for good),
+  `AlertOnLongQueueWait` (a queue past its `horizon.waits` threshold) and by the Upload-Post
+  webhook on a bad signature.
 - **Structured logs.** New `json` log channel (Monolog `JsonFormatter`, `LOG_JSON_PATH`);
   production uses `LOG_STACK=json`. `Context` lands under `extra`.
 - **Pulse.** `laravel/pulse` at `/pulse` — slow queries, jobs, outgoing requests, exceptions.
@@ -274,6 +284,12 @@ committed):
 
 ## Changelog
 
+- 2026-11-08: **Exports no longer queue behind the engagement sweep, and a long queue wait pages
+  somebody** (audit finding 12, steps 4 and 5). New `exports` queue and supervisor, with
+  `BuildOrganizationDataExportJob` moved onto it; `horizon.waits` thresholds for `exports` and
+  `reports`; `AlertOnLongQueueWait` wires `LongWaitDetected` into `OpsAlerter`. The super-admin
+  System health panel now also lists organizations whose engagement metrics have stopped arriving
+  — see `super-admin.md`.
 - 2026-11-07: Added the data-export retention sweep (`exports:purge-expired`, daily 02:30) and the
   "Data retention" section above. See `settings.md` for the export feature itself.
 - 2026-11-07: **The dependency audit gate passes again, and email deliverability can be checked.**

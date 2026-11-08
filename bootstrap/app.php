@@ -14,6 +14,7 @@ use App\Http\Middleware\EnsureUserIsSuperAdmin;
 use App\Http\Middleware\EnsureWorkspaceType;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\IdempotentApiRequest;
 use App\Http\Middleware\RedirectClientReviewersToPortal;
 use App\Http\Middleware\RejectPreviewUserOutsidePreview;
 use App\Http\Middleware\SecurityHeaders;
@@ -93,6 +94,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // The public REST API's bearer-token auth. Takes the scope the route needs:
             // `api.token:read`.
             'api.token' => AuthenticateApiToken::class,
+            // Item 18: makes an API write safe to retry. Must come *after* `api.token`, which is
+            // what resolves the organization the key is scoped to.
+            'api.idempotent' => IdempotentApiRequest::class,
         ]);
 
         // Per token, not per IP: an integration and the agency's own browser traffic should not

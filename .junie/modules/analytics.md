@@ -179,6 +179,22 @@ edit,show}`; `super-admin/organizations/analytics` renders the org view (`links=
   given post is re-read, so the frequent sweep doesn't hammer the vendor; set
   `ANALYTICS_ENGAGEMENT_MIN_INTERVAL_HOURS=0` for maximum freshness.
   Failures are stored on the row (`metrics_error`) and logged, never thrown.
+- **How far the sweep scales (measured 2026-11-07, `EngagementSweepCeilingTest`):** about **70
+  organisations** before one sweep stops finishing before the next starts — 412 vendor calls per
+  org per hour (12 accounts + 400 in-window channels, each read once per `min_interval_hours`) at
+  an assumed 250 ms round trip, against the `background` supervisor's two production processes,
+  which serve `reports` **and** `default`. Two known gaps, both in audit finding 12: nothing paces
+  a run against the vendor's documented 100-requests-per-5-minutes key limit, and a rate-limited
+  read still stamps `metrics_synced_at`, so those channels go stale silently for the interval
+  instead of being retried. Raising `min_interval_hours` from 1 to 4 is the free lever — it divides
+  the standing load by four.
+- **When it stops working, somebody is told (finding 12 steps 4 and 5).** The `reports` queue has a
+  `horizon.waits` threshold of one whole sweep cycle, which alerts through `OpsAlerter`
+  (`AlertOnLongQueueWait`), and the super-admin System health panel lists the organizations whose
+  **last good read** has gone stale next to their last read attempt — the pair is what makes a
+  silently failing sync visible. User-facing exports moved off `reports` onto their own `exports`
+  queue and supervisor, so a sweep that is behind no longer makes somebody wait for a download.
+  See `ops.md` and `super-admin.md`.
 - **Read layer:** `App\Services\Analytics\EngagementMetrics` — `channels()` (published channels in
   scope + range, latest reading each), `totals()`, `rate()` (interactions ÷ reach, else impressions,
   else views — summed, not averaged), `followers()` (start vs end of range per account, carried

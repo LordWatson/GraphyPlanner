@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Posts\CreatePostAction;
+use App\Actions\Posts\UpdatePostAction;
 use App\Enums\PostStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Support\Api\ApiResponse;
@@ -21,6 +24,13 @@ use Illuminate\Validation\Rule;
  *
  * `updated_at` filtering is what makes an incremental pull possible: fetch once, then ask for
  * everything changed since. Without it every sync is a full scan.
+ *
+ * **Writes (item 18 step 2)** create and edit **drafts only**. They go through the same
+ * `CreatePostAction`/`UpdatePostAction` the web editor uses, so per-target local-time rules,
+ * carousel ordering, the activity log and org scoping all behave identically — an integration
+ * cannot reach a path the UI does not have. Moving a post onward is a separate, scoped endpoint
+ * (`PostScheduleController`), because scheduling is outward-facing and irreversible while editing
+ * a draft is neither.
  */
 class PostController extends Controller
 {
@@ -54,6 +64,118 @@ class PostController extends Controller
     {
         $this->authorize('view', $post);
 
+        $post->load(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')]);
+
+        return ApiResponse::item(self::present($post));
+    }
+
+    /**
+     * Create a draft. Never anything further along: a post that could be created already
+     * scheduled would skip approval, which is the one thing this product promises not to do.
+     */
+    public function store(Request $request, CreatePostAction $createPost, UpdatePostAction $updatePost): JsonResponse
+    {
+        // Which client comes first and on its own: the rest of the rules are scoped to it (a
+        // campaign or asset must be *this* client's), so they cannot be written until it resolves.
+        // A missing or malformed `client_id` is therefore a 422 that names the field, not a 404.
+        $request->validate(['client_id' => ['required', 'integer']]);
+
+        $client = Client::query()->find($request->integer('client_id'));
+
+        // 404 rather than 403: `OrganizationScope` already pinned the org, so "no such client" and
+        // "not your client" are the same answer, and distinguishing them would leak the difference.
+        if ($client === null) {
+            return ApiResponse::error('not_found', 'No client with that id exists for this token.', 404);
+        }
+
+        $this->authorize('create', [Post::class, $client]);
+
+        // The same rules as `StorePostRequest` and `CreateDraftPostTool`: every id must belong to
+        // this client, so a valid token cannot borrow another client's campaign or asset.
+        $validated = $request->validate([
+            'caption' => ['nullable', 'string', 'max:65000'],
+            'hashtags' => ['nullable', 'array'],
+            'hashtags.*' => ['string', 'max:150'],
+            'campaign_id' => ['nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $client->id)->whereNull('deleted_at')],
+            'asset_ids' => ['nullable', 'array'],
+            'asset_ids.*' => ['integer', 'distinct', Rule::exists('assets', 'id')->where('client_id', $client->id)->whereNull('deleted_at')],
+            'channels' => ['nullable', 'array'],
+            'channels.*.social_account_id' => ['required', 'integer', Rule::exists('social_accounts', 'id')->where('client_id', $client->id)->whereNull('deleted_at')],
+            'channels.*.scheduled_local_date' => ['nullable', 'date_format:Y-m-d'],
+            'channels.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
+        ]);
+
+        $post = $createPost($client, [
+            'status' => PostStatus::Draft->value,
+            'master_caption' => $validated['caption'] ?? null,
+            'hashtags' => $validated['hashtags'] ?? null,
+            'campaign_id' => $validated['campaign_id'] ?? null,
+            'targets' => $validated['channels'] ?? [],
+        ]);
+
+        // Media goes through UpdatePostAction so carousel order and the checklist stay on one path.
+        if (! empty($validated['asset_ids'])) {
+            $post = $updatePost($post, [
+                'asset_ids' => array_values(array_map('intval', $validated['asset_ids'])),
+            ], $request->user());
+        }
+
+        $post->load(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')]);
+
+        return response()->json(['data' => self::present($post)], 201);
+    }
+
+    /**
+     * Edit a draft. Only the fields sent are touched, so a caller that knows about three fields
+     * cannot blank the two it has never heard of.
+     */
+    public function update(Request $request, Post $post, UpdatePostAction $updatePost): JsonResponse
+    {
+        $this->authorize('update', $post);
+
+        // `PostPolicy::update` has already refused a scheduled or published post with a 403. This
+        // narrows the API further than the UI on purpose: once a post is in front of a client for
+        // approval, an integration quietly rewriting it is a surprise nobody consented to.
+        if (! in_array($post->status, [PostStatus::Idea, PostStatus::Draft], true)) {
+            return ApiResponse::error(
+                'not_editable',
+                sprintf('A post in "%s" cannot be edited over the API. Only ideas and drafts can — move it back to draft in Graphy first.', $post->status->value),
+                409,
+            );
+        }
+
+        $validated = $request->validate([
+            'caption' => ['sometimes', 'nullable', 'string', 'max:65000'],
+            'hashtags' => ['sometimes', 'nullable', 'array'],
+            'hashtags.*' => ['string', 'max:150'],
+            'campaign_id' => ['sometimes', 'nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $post->client_id)->whereNull('deleted_at')],
+            'asset_ids' => ['sometimes', 'array'],
+            'asset_ids.*' => ['integer', 'distinct', Rule::exists('assets', 'id')->where('client_id', $post->client_id)->whereNull('deleted_at')],
+        ]);
+
+        $changes = [];
+
+        if (array_key_exists('caption', $validated)) {
+            $changes['master_caption'] = $validated['caption'];
+        }
+
+        if (array_key_exists('hashtags', $validated)) {
+            $changes['hashtags'] = $validated['hashtags'];
+        }
+
+        if (array_key_exists('campaign_id', $validated)) {
+            $changes['campaign_id'] = $validated['campaign_id'];
+        }
+
+        if (array_key_exists('asset_ids', $validated)) {
+            $changes['asset_ids'] = array_values(array_map('intval', $validated['asset_ids']));
+        }
+
+        if ($changes === []) {
+            return ApiResponse::error('nothing_to_update', 'Send at least one of caption, hashtags, campaign_id or asset_ids.', 422);
+        }
+
+        $post = $updatePost($post, $changes, $request->user());
         $post->load(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')]);
 
         return ApiResponse::item(self::present($post));

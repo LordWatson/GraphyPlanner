@@ -46,6 +46,13 @@ type SchedulerRow = {
     stale: boolean;
 };
 
+type SyncRow = {
+    org_id: number;
+    name: string;
+    last_read_at: string | null;
+    last_success_at: string | null;
+};
+
 type Props = {
     summary: PlatformSummary;
     recentOrganizations: OrganizationRow[];
@@ -54,21 +61,28 @@ type Props = {
     health: {
         schedulers: SchedulerRow[];
         queue: { pending: number | null; failed: number };
+        syncs: SyncRow[];
     };
 };
 
 /**
  * Step I-1.8 — scheduler heartbeats (stale when a command hasn't run within two of its intervals)
  * and the queue backlog, so a stopped cron or worker is visible before customers notice.
+ *
+ * Finding 12 step 5 — plus any organization whose engagement metrics have stopped arriving. The
+ * read time and the last *good* read are both shown: a rejected read still stamps the account, so
+ * "read a minute ago, nothing good for three days" is the shape of the failure to look for.
  */
 function SystemHealthPanel({ health }: { health: Props['health'] }) {
-    const staleCount = health.schedulers.filter((row) => row.stale).length;
+    const staleCount =
+        health.schedulers.filter((row) => row.stale).length +
+        health.syncs.length;
 
     return (
         <Panel
             eyebrow={
                 staleCount === 0
-                    ? 'All schedulers running'
+                    ? 'Schedulers and syncs current'
                     : `${staleCount} stale`
             }
             title="System health"
@@ -95,6 +109,27 @@ function SystemHealthPanel({ health }: { health: Props['health'] }) {
                             kind="scheduler"
                             value={row.stale ? 'stale' : 'ok'}
                         />
+                    </li>
+                ))}
+                {health.syncs.map((row) => (
+                    <li
+                        key={row.org_id}
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3"
+                    >
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">
+                                {row.name} — metrics sync
+                            </span>
+                            <span className="text-muted-foreground font-mono text-xs">
+                                {row.last_success_at
+                                    ? `Last good read ${formatDateTime(row.last_success_at)}`
+                                    : 'No good read on record'}
+                                {row.last_read_at
+                                    ? ` · tried ${formatDateTime(row.last_read_at)}`
+                                    : ' · never tried'}
+                            </span>
+                        </span>
+                        <StatusPill kind="scheduler" value="stale" />
                     </li>
                 ))}
                 <li className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">

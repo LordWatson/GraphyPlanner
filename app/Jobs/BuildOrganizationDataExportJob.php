@@ -23,8 +23,10 @@ use Throwable;
 /**
  * Builds one organisation's data export and tells the person who asked for it.
  *
- * Unique per export row, so a double-click cannot run the same archive twice. On the reports queue
- * with a long timeout: this reads most of an organisation's tables, and nothing is waiting on it.
+ * Unique per export row, so a double-click cannot run the same archive twice. On the `exports`
+ * queue with a long timeout: this reads most of an organisation's tables, and the owner who asked
+ * for it is waiting — finding 12 step 4 moved it off `reports`, where it had been queueing behind
+ * the half-hourly engagement sweep.
  *
  * A failure is recorded on the row in words an owner can act on — an export that silently never
  * arrives is worse than one that says it failed.
@@ -39,7 +41,7 @@ class BuildOrganizationDataExportJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(public readonly int $dataExportId)
     {
-        $this->onQueue(Queues::REPORTS);
+        $this->onQueue(Queues::EXPORTS);
     }
 
     public function uniqueId(): string

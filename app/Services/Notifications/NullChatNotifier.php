@@ -6,14 +6,14 @@ use App\Contracts\ChatNotifier;
 use App\Models\Organization;
 
 /**
- * Step M-6.7 — the MVP's `ChatNotifier`: a no-op. Team-chat delivery is a planned WhatsApp
- * integration; until it lands, this keeps every caller working (and testable) with nothing sent.
+ * Step M-6.7 — the off switch for team chat (`CHAT_NOTIFIER=null`): keeps every caller working,
+ * and testable, with nothing sent. `SlackChatNotifier` is what is bound by default.
  */
 class NullChatNotifier implements ChatNotifier
 {
     public function notifyOrganization(Organization $organization, string $title, string $body, ?string $url = null): void
     {
-        // Intentionally does nothing — no chat channel is wired up yet.
+        // Intentionally does nothing — team chat is switched off.
     }
 
     public function isConfiguredFor(Organization $organization): bool

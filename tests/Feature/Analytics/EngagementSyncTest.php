@@ -10,11 +10,13 @@ use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Jobs\SyncOrganizationEngagementJob;
+use App\Models\Organization;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\PostTargetMetric;
 use App\Models\SocialAccount;
 use App\Models\SocialAccountMetric;
+use App\Models\User;
 use App\Services\Analytics\Engagement\NullEngagementSource;
 use App\Support\Analytics\Engagement\AccountMetricsReading;
 use App\Support\Analytics\Engagement\PostMetricsReading;
@@ -265,6 +267,39 @@ class EngagementSyncTest extends TestCase
         ])->assertOk();
 
         $this->assertNull($target->fresh()?->post_url);
+    }
+
+    /**
+     * Audit finding 12 step 5 — the console has to show an organization whose reads keep failing,
+     * because the failure mode is silent: a rejected read still stamps `metrics_synced_at`, so by
+     * the only timestamp the app had, that organization looked synced a minute ago.
+     */
+    public function test_the_super_admin_console_names_an_organization_whose_reads_stopped_working(): void
+    {
+        $failing = $this->engagementOrg();
+        $failing->update(['name' => 'Stuck & Co']);
+        $this->engagementAccount($this->engagementClient($failing))
+            ->forceFill(['metrics_synced_at' => now()->subMinute(), 'metrics_error' => 'Too many requests.'])
+            ->saveQuietly();
+
+        $healthy = $this->engagementOrg();
+        $this->engagementAccount($this->engagementClient($healthy))
+            ->forceFill(['metrics_synced_at' => now()->subMinutes(10), 'metrics_error' => null])
+            ->saveQuietly();
+
+        // Connected, but the sweep skips it for want of a vendor key, so it must not sit in the
+        // list forever as something nobody can fix.
+        $keyless = Organization::factory()->create(['upload_post_key' => null]);
+        $this->engagementAccount($this->engagementClient($keyless));
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('super-admin.dashboard'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('health.syncs', 1)
+                ->where('health.syncs.0.name', 'Stuck & Co')
+                ->where('health.syncs.0.last_success_at', null)
+                ->whereNot('health.syncs.0.last_read_at', null));
     }
 
     /**

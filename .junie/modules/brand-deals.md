@@ -93,7 +93,8 @@ The post editor's own fields ride on the existing `posts.update` / `posts.store`
 post's own brand).
 
 Frontend: `pages/business/deals.tsx`, the Paid-partnership panel in
-`components/post-editor/editor/settings-section.tsx` (+ state in `editor-state.ts`, submission in
+`components/post-editor/editor/paid-partnership-panel.tsx` (rendered by `settings-section.tsx`;
+state in `editor-state.ts`, submission in
 `editor-form-fields.tsx`, `partnership_disclosure` → the Settings step in `checkSection`), the rate
 card and enquiry switch in `pages/business/media-kit.tsx`, the rates/partners sections in
 `components/media-kit/media-kit-view.tsx`, the enquiry form in `pages/share/media-kit.tsx`, and

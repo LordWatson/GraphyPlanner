@@ -178,6 +178,10 @@ class OrganizationDataExport
         'staff_invitations' => self::TRANSIENT,
         'connect_invites' => self::TRANSIENT,
         'mcp_upload_sessions' => self::TRANSIENT,
+        // Item 18: a 24h record of which Idempotency-Key answered which API retry. The stored
+        // response body is a copy of a post that *is* in the archive, so exporting it would hand
+        // the same content over twice, labelled as plumbing.
+        'api_idempotency_keys' => self::TRANSIENT,
 
         // Metrics and derived figures. Every one is recomputed from the posts, accounts and
         // profiles that *are* in the archive.

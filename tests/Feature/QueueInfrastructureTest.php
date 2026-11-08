@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\OpsAlerter;
 use App\Enums\Role;
+use App\Jobs\BuildOrganizationDataExportJob;
 use App\Jobs\PublishPostJob;
 use App\Jobs\PublishPostTargetJob;
+use App\Jobs\SyncOrganizationEngagementJob;
+use App\Listeners\AlertOnLongQueueWait;
 use App\Mail\StaffInvitationMail;
 use App\Models\Post;
 use App\Models\StaffInvitation;
@@ -13,6 +17,8 @@ use App\Notifications\PostPublishFailed;
 use App\Support\Queues;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use Laravel\Horizon\Events\LongWaitDetected;
 use Tests\TestCase;
 
 /**
@@ -26,6 +32,58 @@ class QueueInfrastructureTest extends TestCase
     {
         $this->assertSame(Queues::PUBLISHING, (new PublishPostJob(1, 'dispatch'))->queue);
         $this->assertSame(Queues::PUBLISHING, (new PublishPostTargetJob(1, 'attempt'))->queue);
+    }
+
+    /**
+     * Audit finding 12 step 4 — an export is work somebody is sitting and waiting for, and it used
+     * to queue behind the half-hourly engagement sweep on `reports`.
+     */
+    public function test_exports_do_not_share_a_queue_or_a_worker_with_the_background_sweeps(): void
+    {
+        $this->assertSame(Queues::EXPORTS, (new BuildOrganizationDataExportJob(1))->queue);
+        $this->assertSame(Queues::REPORTS, (new SyncOrganizationEngagementJob(1))->queue);
+
+        $supervisors = config('horizon.defaults');
+
+        $this->assertSame([Queues::EXPORTS], $supervisors['exports']['queue']);
+        $this->assertNotContains(Queues::EXPORTS, $supervisors['background']['queue']);
+        $this->assertGreaterThanOrEqual(1, $supervisors['exports']['minProcesses']);
+    }
+
+    /**
+     * Audit finding 12 step 5 — the thresholds are useless unless something tells somebody.
+     * Horizon's own notification needs a mail/Slack route registered on Horizon itself; this goes
+     * through the alerter the rest of the app already uses.
+     */
+    public function test_a_long_queue_wait_raises_an_ops_alert(): void
+    {
+        $alerts = [];
+        $this->app->instance(OpsAlerter::class, new class($alerts) implements OpsAlerter
+        {
+            /**
+             * @param  array<int, string>  $alerts
+             */
+            public function __construct(public array &$alerts) {}
+
+            public function alert(string $key, string $message, array $context = []): void
+            {
+                $this->alerts[] = $key.': '.$message;
+            }
+        });
+
+        $this->assertArrayHasKey('redis:reports', config('horizon.waits'));
+        $this->assertArrayHasKey('redis:exports', config('horizon.waits'));
+
+        // Registered by listener discovery, then called directly: dispatching the event for real
+        // also runs Horizon's own listener, which talks to Redis.
+        $this->assertContains(
+            AlertOnLongQueueWait::class.'@handle',
+            Event::getRawListeners()[LongWaitDetected::class] ?? [],
+        );
+
+        app(AlertOnLongQueueWait::class)->handle(new LongWaitDetected('redis', Queues::REPORTS, 2400));
+
+        $this->assertSame(['queue.long_wait:reports: Jobs on the reports queue have been waiting 2400 seconds.'], $alerts);
     }
 
     public function test_notifications_and_mail_have_their_own_queues(): void

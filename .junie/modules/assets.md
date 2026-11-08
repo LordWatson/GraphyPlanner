@@ -136,7 +136,7 @@ campaign_name, created_at, can: {delete}}], meta: {current_page, last_page, per_
 - `DELETE /assets/{asset}` → `assets.destroy` (`AssetController::destroy`) — delegates to
   `DeleteAssetAction`. Redirects to `clients.media`, or returns `204` for JSON callers.
 - `resources/js/pages/clients/tabs/media.tsx`: the client Assets tab — `UploadTile` and
-  `BrowseLibraryTile` (from `components/post-editor/media-picker.tsx`) and `AssetLibraryDialog` in
+  `BrowseLibraryTile` (from `components/post-editor/media-tiles.tsx`) and `AssetLibraryDialog` in
   `manage` mode.
 
 ## Business Rules

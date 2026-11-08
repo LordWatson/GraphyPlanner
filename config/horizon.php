@@ -99,6 +99,12 @@ return [
     'waits' => [
         'redis:publishing' => 30,
         'redis:default' => 60,
+        // Finding 12 step 5. `exports`: somebody is watching a spinner, so two minutes of queue
+        // is already bad. `reports`: the engagement sweep runs every 30 minutes, so a wait past a
+        // whole cycle means it is no longer keeping up and analytics are going stale.
+        // `AlertOnLongQueueWait` turns these into ops alerts.
+        'redis:exports' => 120,
+        'redis:reports' => 1800,
     ],
 
     /*
@@ -247,6 +253,25 @@ return [
             'timeout' => 150,
             'nice' => 5,
         ],
+        /*
+         * Finding 12 step 4 — user-facing work gets its own workers. Everything else on `reports`
+         * is a background vendor sweep that nobody is waiting on, and at `maxProcesses: 2` the
+         * sweep can fill `background` for a whole cycle.
+         */
+        'exports' => [
+            'connection' => 'redis',
+            'queue' => ['exports'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 2,
+            'timeout' => 620,
+            'nice' => 5,
+        ],
         'background' => [
             'connection' => 'redis',
             'queue' => ['reports', 'default'],
@@ -268,6 +293,7 @@ return [
             'publishing' => ['maxProcesses' => 8, 'balanceMaxShift' => 2, 'balanceCooldown' => 3],
             'messaging' => ['maxProcesses' => 4, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
             'ai' => ['maxProcesses' => 4, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
+            'exports' => ['maxProcesses' => 2],
             'background' => ['maxProcesses' => 2],
         ],
 
@@ -275,6 +301,7 @@ return [
             'publishing' => ['maxProcesses' => 1],
             'messaging' => ['maxProcesses' => 1],
             'ai' => ['maxProcesses' => 1],
+            'exports' => ['maxProcesses' => 1],
             'background' => ['maxProcesses' => 1],
         ],
     ],

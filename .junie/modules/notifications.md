@@ -31,9 +31,44 @@ can be viewed/acted on.
 - **Notification centre**: `NotificationController::index` is paginated — `?before=<id>` (compound
   `(created_at, id)` cursor) + `?filter=unread`, returning `next_before` / `has_more`. The bell has
   All/Unread tabs and "Load more".
-- **`ChatNotifier` contract** (`App\Contracts\ChatNotifier`) + `NullChatNotifier` (bound in
-  `AppServiceProvider`) — the swappable team-chat seam. **No Slack**; a WhatsApp implementation drops
-  in later. Tests `tests/Feature/Notifications/NotificationPreferencesTest`.
+- **`ChatNotifier` contract** (`App\Contracts\ChatNotifier`) — the swappable team-chat seam, one
+  message to a team's channel. `SlackChatNotifier` is the bound default (`CHAT_NOTIFIER=slack`, safe
+  with no webhook URL configured); `CHAT_NOTIFIER=null` binds `NullChatNotifier` and switches it off.
+  Tests `tests/Feature/Notifications/NotificationPreferencesTest`.
+
+## Phase W-0 — WhatsApp delivery foundations (steps W-0.1, W-0.2)
+
+The first two steps of `.junie/plans/whatsapp-notifications.md`: a message can reach a real WhatsApp
+number through a swappable, testable seam. **Nothing is wired to a notification yet** — no `via()`
+sends WhatsApp, there is no preference channel and no consent, so this can be configured in
+production without a single message going out.
+
+- **`App\Contracts\WhatsAppClient`** — `sendTemplate()`, `sendSessionText()` (replies only: valid
+  inside the 24-hour window Meta opens when the recipient writes first), `verifyCredentials()`.
+  Nothing throws: every method returns a `WhatsAppSendResult`, so a WhatsApp failure can never break
+  the thing that triggered it. A different seam from `ChatNotifier` — this messages a named person.
+- **`App\Services\WhatsApp\CloudApiWhatsAppClient`** — Meta's Business Cloud API
+  (`POST /{phone_number_id}/messages`). Retries like a _publish_, not a read: `VendorHttp::forPublish()`
+  retries a 429 only, because Meta has no idempotency key for a message and a 5xx may already have
+  delivered it. Bound by default and **safe unconfigured** — with no token every send reports
+  not-configured without calling Meta. `WHATSAPP_CLIENT=null` binds `NullWhatsAppClient` instead.
+- **`App\Services\WhatsApp\WhatsAppCredentials`** — the one place credentials come from. Today the
+  platform's own number from `config/services.php`; Step W-4.1 gives each organization its own, and
+  only this class changes because every call already asks per organization.
+- **`App\Support\WhatsApp\`** — `WhatsAppTemplateMessage` (template name, locale, positional body
+  variables; collapses whitespace because Meta refuses a variable containing a newline),
+  `WhatsAppSendResult` (ok / message id / error code + reason, and **no vendor payload**, which would
+  echo the number and body back into a log row), `PhoneNumber` (E.164, and the masked last-4 that is
+  the most a log may say about someone's number).
+- **What the log does not contain**: the access token, the message body, Meta's own error text
+  (131030 quotes the recipient's full number back at us), or more than four digits of a number. The
+  boundary logs the org id, what was sent, the masked number, and Meta's error code + subcode.
+- **A number without a country code is refused, not guessed** — `07700 900123` is a real subscriber
+  number in a dozen countries. Verification (W-1.1) is where the full number gets asked for.
+- Config: `services.whatsapp.*` (`WHATSAPP_CLIENT`, `WHATSAPP_PHONE_NUMBER_ID`,
+  `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_BASE_URL`, `WHATSAPP_GRAPH_VERSION`, plus `WHATSAPP_APP_SECRET`
+  / `WHATSAPP_VERIFY_TOKEN` for the inbound webhook in W-3.1). Tests
+  `tests/Unit/Services/WhatsApp/WhatsAppClientTest` and `tests/Unit/Support/WhatsApp/PhoneNumberTest`.
 
 ## Phase M-6.5 (Phase 9) — overdue approval reminders
 

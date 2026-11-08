@@ -41,6 +41,8 @@ final class SchedulerHeartbeat
         'analytics:send-client-reports' => ['label' => 'Monthly client reports', 'interval_minutes' => 60],
         // Phase 18: weekly.
         'grids:prune' => ['label' => 'Grid plan prune', 'interval_minutes' => 10080],
+        // Item 18: daily idempotency-key prune for the public API.
+        'api:prune-idempotency-keys' => ['label' => 'API idempotency prune', 'interval_minutes' => 1440],
         // Phase M-4.3: daily retainer draft generation.
         'invoices:generate-retainer-drafts' => ['label' => 'Retainer drafts', 'interval_minutes' => 1440],
         // Step M-5.8: daily recurring-post draft generation.

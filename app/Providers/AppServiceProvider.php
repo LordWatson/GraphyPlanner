@@ -29,6 +29,7 @@ use App\Contracts\TrendSource;
 use App\Contracts\VirusScanner;
 use App\Contracts\VisionProvider;
 use App\Contracts\WebsiteSummarizer;
+use App\Contracts\WhatsAppClient;
 use App\Contracts\WritingAssistant;
 use App\Models\AiImageGeneration;
 use App\Models\Asset;
@@ -108,6 +109,8 @@ use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
 use App\Services\Web\HttpWebsiteSummarizer;
+use App\Services\WhatsApp\CloudApiWhatsAppClient;
+use App\Services\WhatsApp\NullWhatsAppClient;
 use App\Services\Workspace\CurrentWorkspace;
 use App\Support\Queues;
 use App\Support\RateLimits;
@@ -171,15 +174,22 @@ class AppServiceProvider extends ServiceProvider
                 : $app->make(WebPushNotifier::class),
         );
 
-        // Step M-6.7 (I-12.1): team-chat notifications behind a contract. The MVP is a no-op; a
-        // WhatsApp implementation (not Slack) drops in here later without touching callers.
-        // Team chat. Slack by default and safe unconfigured — an org with no webhook URL is simply
-        // never notified. `CHAT_NOTIFIER=null` turns it off entirely. Bound by config like
+        // Step M-6.7 (I-12.1): team chat behind a contract. Slack by default and safe
+        // unconfigured — an org with no webhook URL is simply never notified, and
+        // `CHAT_NOTIFIER=null` turns it off entirely. Bound by config like
         // `AdsSource` and `VirusScanner`, so swapping in Teams-specific formatting later touches
         // one line.
         $this->app->bind(ChatNotifier::class, fn () => config('notifications.chat') === 'slack'
             ? $this->app->make(SlackChatNotifier::class)
             : $this->app->make(NullChatNotifier::class));
+
+        // Step W-0.2: WhatsApp behind its own contract (`.junie/plans/whatsapp-notifications.md`).
+        // The Cloud API client is bound by default because it is safe unconfigured — with no token
+        // every send reports not-configured without calling Meta — so an organization that gets its
+        // own credentials in W-4.1 works without a redeploy. `WHATSAPP_CLIENT=null` turns it off.
+        $this->app->bind(WhatsAppClient::class, fn () => config('services.whatsapp.client') === 'cloud_api'
+            ? $this->app->make(CloudApiWhatsAppClient::class)
+            : $this->app->make(NullWhatsAppClient::class));
 
         // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
         // contract; the HTTP implementation is SSRF-guarded (never follows a URL to a private

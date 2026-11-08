@@ -23,7 +23,7 @@ use Tests\TestCase;
 
 /**
  * Step M-6.7 (I-12.1) — per-user notification preferences, the daily digest, the paginated centre,
- * and the swappable chat notifier (WhatsApp later; no Slack).
+ * and the swappable chat notifier (Slack by default, `CHAT_NOTIFIER=null` to switch it off).
  */
 class NotificationPreferencesTest extends TestCase
 {

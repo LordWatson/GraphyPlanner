@@ -5,9 +5,13 @@ namespace App\Contracts;
 use App\Models\Organization;
 
 /**
- * Step M-6.7 (I-12.1) — a swappable team-chat notifier. The MVP binds a no-op `NullChatNotifier`;
- * a WhatsApp implementation (the chosen chat integration) drops in behind this contract later
- * without touching callers. Deliberately not Slack.
+ * Step M-6.7 (I-12.1) — a swappable team-chat notifier. `SlackChatNotifier` is the bound default
+ * (`NullChatNotifier` when `CHAT_NOTIFIER=null`); Teams or anything else drops in behind this
+ * contract without touching callers.
+ *
+ * Not the same seam as WhatsApp: this posts one message to a team's channel, where
+ * `App\Contracts\WhatsAppClient` messages a named person who opted in. The WhatsApp digest in
+ * Step W-2.6 may fulfil this one too.
  */
 interface ChatNotifier
 {

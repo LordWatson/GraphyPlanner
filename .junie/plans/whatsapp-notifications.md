@@ -109,7 +109,9 @@ opt out available to each member", as requested.
   START) and delivery receipts. Two-way client chat is the separate Inbox module (Phase 3 / M-9).
 - **Approving a post by replying "yes" in WhatsApp.** The link takes them to the review screen; we do
   not parse approval decisions out of chat (auditability, and it needs the Inbox module).
-- **SMS / Telegram / Slack.** WhatsApp only. The `ChatNotifier` seam stays "deliberately not Slack".
+- **SMS / Telegram / Slack.** WhatsApp only. (Correction, 2026-11-08: `ChatNotifier` is **already**
+  Slack — `SlackChatNotifier` is the bound default. That seam posts to a team channel and is not this
+  one; W-2.6 may still fulfil it with a WhatsApp digest.)
 - **Per-message billing/pricing analytics.** Meta charges per conversation; surfacing that cost is a
   Stretch reporting item (W-4.4), not core.
 
@@ -136,7 +138,7 @@ a clearly named seam.
 Goal: a message can reach a real WhatsApp number through a swappable, testable seam — with nothing
 yet wired to a notification.
 
-### Step W-0.1 — WhatsApp client contract + null implementation + config [MVP]
+### Step W-0.1 — WhatsApp client contract + null implementation + config [MVP] — ✅ Done 2026-11-08
 
 - `App\Contracts\WhatsAppClient`: the swappable provider seam, mirroring `PublishAdapter`.
     - `sendTemplate(Organization $org, string $toPhone, WhatsAppTemplateMessage $message): WhatsAppSendResult`
@@ -158,7 +160,7 @@ yet wired to a notification.
   null client never "sends" and reports not-configured; PHPStan level 7 is clean. See
   `.junie/modules/notifications.md` and `settings.md`.
 
-### Step W-0.2 — Cloud API client implementation [MVP]
+### Step W-0.2 — Cloud API client implementation [MVP] — ✅ Done 2026-11-08
 
 - `App\Services\WhatsApp\CloudApiWhatsAppClient implements WhatsAppClient`: talks to the Meta WhatsApp
   Business Cloud API (`POST /{phone_number_id}/messages`) via Laravel's `Http` client with a timeout
@@ -174,6 +176,38 @@ yet wired to a notification.
 - **Done when**: tests with `Http::fake()` cover a successful template send, a 24h-window rejection,
   an undeliverable number, and a 429 retried once; no test performs a real network call; the token
   never appears in any logged context (assert on the fake log). See `.junie/modules/notifications.md`.
+
+**Implemented via (2026-11-08):** `App\Contracts\WhatsAppClient`,
+`App\Services\WhatsApp\{CloudApiWhatsAppClient, NullWhatsAppClient, WhatsAppCredentials}`,
+`App\Support\WhatsApp\{WhatsAppTemplateMessage, WhatsAppSendResult, PhoneNumber}`, the
+`services.whatsapp` config block, the binding in `AppServiceProvider`, and 19 tests across
+`tests/Unit/Services/WhatsApp/WhatsAppClientTest` + `tests/Unit/Support/WhatsApp/PhoneNumberTest`.
+
+**Four decisions worth knowing, three of them departures from the step as written.**
+
+1. **A send retries a 429 only, not a 5xx.** The step asked for "a single retry on 5xx/429", but
+   Meta has no idempotency key for a message, so a retried 5xx can deliver twice — and the client
+   therefore reuses `VendorHttp::forPublish()`, whose comment already makes exactly this argument
+   for the publish POST. A duplicate WhatsApp to a client is worse than a failure somebody retries.
+2. **Meta's own error text is never logged.** Principle 6 says no full phone numbers in logs, and
+   Meta's 131030 message is literally `Recipient phone number not in allowed list: Add +44…`. So the
+   boundary logs the error **code and subcode** plus our own sentence, never the vendor message.
+   Cost: a 132xxx template rejection says "check name, locale and variable count" rather than naming
+   the offending variable. If that becomes a real debugging problem, log `error_data.details` for
+   132xxx codes only — those do not carry a number.
+3. **A number with no country code is refused rather than guessed.** `PhoneNumber::e164()` returns
+   null for `07700 900123`, because that is a valid subscriber number in a dozen countries and the
+   wrong guess messages a stranger. Consequence to expect: many existing `client_contacts.phone`
+   values are national and will produce no route at all, which W-1.1/W-1.2 verification has to
+   collect properly. A bracketed trunk zero (`+44 (0) 7700 …`) _is_ handled.
+4. **`WhatsAppCredentials` reads config, not the organization, until W-4.1.** One platform number
+   sends for every org today. The resolver's methods already take an `Organization`, so W-4.1 changes
+   one class body and no caller. No columns were added here.
+
+**Not done, and not needed yet:** `business_account_id` (template management, W-1.4) and the
+`app_secret`/`verify_token` _use_ (the inbound webhook, W-3.1) — the config keys exist, nothing reads
+the latter two. No settings UI (W-4.1 owns it), so `settings.md` was not touched. `graph_version`
+defaults to `v21.0`; it is pinned in config precisely so a Graph deprecation is a one-line change.
 
 ### Step W-0.3 — The `whatsapp` notification channel [MVP]
 
