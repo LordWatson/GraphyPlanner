@@ -2,7 +2,11 @@
 
 namespace App\Notifications\Campaigns;
 
+use App\Models\User;
 use App\Support\Queues;
+use App\Support\WhatsApp\MessageTemplate;
+use App\Support\WhatsApp\WhatsAppRouting;
+use App\Support\WhatsApp\WhatsAppTemplateMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -28,7 +32,7 @@ abstract class CampaignNotification extends Notification implements ShouldQueue
      */
     public function viaQueues(): array
     {
-        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL, 'whatsapp' => Queues::WHATSAPP];
     }
 
     /**
@@ -36,7 +40,23 @@ abstract class CampaignNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        $channels = $notifiable instanceof User ? ['database'] : [];
+
+        return WhatsAppRouting::with($channels, $notifiable, static::class);
+    }
+
+    /**
+     * Step W-2.5 — every campaign notification can reach WhatsApp through the generic template,
+     * built from the same `title`/`body`/`url` it puts in the bell. A subclass with copy worth
+     * approving of its own (`CampaignBriefReady`) overrides this.
+     */
+    public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
+    {
+        return MessageTemplate::Notification->fill([
+            'title' => $this->title(),
+            'body' => $this->body(),
+            'url' => $this->url($notifiable),
+        ]);
     }
 
     /**

@@ -130,7 +130,7 @@ publish-blocking disclosure and a media kit built from real metrics.
       tracker, ASA/FTC disclosure enforcement, media kit with real data and sponsor share-preview.
       Store and bio become supporting bullets, not the headline.
     - **(b) Cut to £19/$24 and add email.** Matches the mid-market and makes GTM-2 the thing that
-    justifies the price, as it does at Stan ($29 with email marketing).
+      justifies the price, as it does at Stan ($29 with email marketing).
 - Rewrite `creator_pro.tagline` and `highlights` in `config/plans.php` to match the chosen route.
   The current tagline ("a storefront that pays you 100%") is the Planoly-overlapping claim.
 - Update the "How we compare" table from CG-2.7 with November figures, or delete it. An out-of-date

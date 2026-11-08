@@ -31,6 +31,13 @@ final class Queues
      */
     public const EXPORTS = 'exports';
 
+    /**
+     * Step W-2.2 — WhatsApp sends. Its own queue because each one is an HTTP round trip to
+     * Twilio, and a slow one must not sit in front of the bell notification or the email that
+     * carry the same news.
+     */
+    public const WHATSAPP = 'whatsapp';
+
     /** Report generation and the background vendor sweeps that feed it. */
     public const REPORTS = 'reports';
 
@@ -51,6 +58,7 @@ final class Queues
             self::WEBHOOKS,
             self::NOTIFICATIONS,
             self::MAIL,
+            self::WHATSAPP,
             self::AI,
             (string) config('ai.images.queue', 'ai-images'),
             self::EXPORTS,

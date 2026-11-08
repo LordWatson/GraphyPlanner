@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Settings;
 
+use App\Rules\SendableWhatsAppNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -75,6 +76,13 @@ class OrganizationSettingsUpdateRequest extends FormRequest
             // A queue worker posts to whatever is stored here, so it has to be an https URL and
             // nothing else — `http://` would put the credential on the wire in plaintext.
             'chat_webhook_url' => ['nullable', 'string', 'url:https', 'max:2048'],
+            // Step W-4.1: the organization's own Twilio sender. The token follows the same rule as
+            // every other credential here — a blank submit keeps what is stored.
+            'whatsapp_enabled' => ['nullable', 'boolean'],
+            'whatsapp_account_sid' => ['nullable', 'string', 'max:64', 'starts_with:AC'],
+            'whatsapp_auth_token' => ['nullable', 'string', 'max:255'],
+            'whatsapp_from' => ['nullable', 'string', 'max:32', new SendableWhatsAppNumber],
+            'whatsapp_messaging_service_sid' => ['nullable', 'string', 'max:64', 'starts_with:MG'],
             'xai_key' => ['nullable', 'string', 'max:2048'],
 
             // Step GTM-3.1: white-label branding. Stored whatever the plan says (it is the org's

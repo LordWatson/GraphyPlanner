@@ -72,7 +72,11 @@ class ConfigEntitlementsTest extends TestCase
         // one is an agency putting its name on surfaces its own clients see, the other is
         // reporting a client's media spend — so creator_pro doesn't grant either. Every agency
         // tier grants both. Every other gate is on creator_pro.
-        $agencyOnly = [Feature::WhiteLabel, Feature::AdsReporting];
+        // Step W-4.3: WhatsApp joins them. "Your client approves from their phone" is an agency
+        // sentence, and `config/plans.php` grants every gate on every agency tier while business
+        // and creator plans list their exceptions — so this is the existing shape, not a new rule.
+        // Putting it on creator_pro is a pricing decision.
+        $agencyOnly = [Feature::WhiteLabel, Feature::AdsReporting, Feature::WhatsApp];
 
         foreach (Feature::gates() as $feature) {
             $granting = in_array($feature, $agencyOnly, true) ? $agency : $creator;

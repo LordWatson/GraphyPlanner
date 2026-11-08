@@ -43,6 +43,56 @@ This file sits alongside `.junie/plans/graphy-development-steps.md` (what to bui
 
 ---
 
+## 0. Built 2026-11-08 — and the provider changed
+
+**The whole plan is implemented, with Twilio as the provider rather than Meta's Cloud API direct.**
+That was the user's call, and it is what `App\Contracts\WhatsAppClient` existed for: a BSP owns the
+WhatsApp Business Account, the sender registration and the template submissions, which is most of
+the work in getting WhatsApp live. `CloudApiWhatsAppClient` was deleted rather than kept beside it —
+two vendor clients is two things to keep working, and the contract means a third can arrive later.
+
+No `twilio/sdk` dependency: two endpoints and a six-line signature check, through the same
+`Http`/`VendorHttp` stack as every other vendor in this codebase.
+
+**What the implementation does differently from this plan, and why.** Each of these is written up at
+its step as well.
+
+1. **No `SendsWhatsApp` trait** (W-0.3). The "derive a message from `title`/`body`/`url`" fallback
+   lives in the channel, where it covers every notification without anyone remembering to `use` it.
+2. **`sanitize()` gained an `$existing` argument** (W-0.5). The settings form submits
+   `in_app`/`digest` only; without this, every save would have silently switched off every WhatsApp
+   opt-in — the worst possible bug for a channel whose whole point is consent.
+3. **A send retries a 429 only, not a 5xx** (W-0.2). Twilio has no idempotency key for a message, so
+   a retried 5xx can deliver a second copy. Same argument the publish POST already makes.
+4. **Twilio's own error text is never logged** (W-0.2). It quotes the recipient's number back at us.
+   The boundary logs the error code and our own reason instead.
+5. **`DailyDigestReady` is a notification, not a `ChatNotifier`** (W-2.6). That seam is addressed to
+   an `Organization` and posts to a team channel; a digest is addressed to a person with their own
+   preferences and number. `SlackChatNotifier` keeps the seam.
+6. **No portal self-serve consent page for client contacts** (W-1.2). A contact with a portal login
+   is a `User` and opts in through W-1.1's own panel, like every other role. A contact _without_ a
+   login has no portal to opt in from, so their consent is staff-recorded with its source and date —
+   there was no third thing to build.
+7. **W-3.2 is partly a no-op by design.** The email is never conditional on WhatsApp: both go out
+   from the same dispatch site, so a closed window already leaves the email path intact and there
+   was no fallback to build. What did land: the failure is classified
+   (`WhatsAppFailure::Window|Permanent|Transient`), a permanent failure suppresses the number, and
+   `services.whatsapp.per_minute` caps a runaway fan-out. What did **not**: a per-conversation rate
+   limiter pacing sends against Meta's messaging limits, because Twilio paces its own sending and
+   reports its limits with a retryable code — a second limiter in front of it would only drop
+   messages Twilio would have accepted.
+8. **`Feature::WhatsApp` is granted on every agency plan and off for business/creator** (W-4.3).
+   That follows the existing shape of `config/plans.php` (agency plans grant every gate), and the
+   pitch — "your client approves from their phone" — is an agency sentence. Putting it on a business
+   or creator plan is a pricing decision, not a code change.
+
+**Two things that are not code and are not done:** Meta Business verification of the WhatsApp
+Business Account through Twilio, and per-template approval. Both are external and measured in days.
+`php artisan whatsapp:templates` prints exactly what to submit; until a template has a `ContentSid`,
+sends using it are refused with `template_not_approved` rather than failing at Twilio.
+
+---
+
 ## 1. Product framing
 
 ### 1.1 The pitch
@@ -209,7 +259,7 @@ yet wired to a notification.
 the latter two. No settings UI (W-4.1 owns it), so `settings.md` was not touched. `graph_version`
 defaults to `v21.0`; it is pinned in config precisely so a Graph deprecation is a one-line change.
 
-### Step W-0.3 — The `whatsapp` notification channel [MVP]
+### Step W-0.3 — The `whatsapp` notification channel [MVP] — ✅ Done 2026-11-08
 
 - `App\Notifications\Channels\WhatsAppChannel`: a custom Laravel notification channel. On `send`, it
   (1) resolves the recipient's WhatsApp route (W-0.4), (2) calls
@@ -227,7 +277,7 @@ defaults to `v21.0`; it is pinned in config precisely so a Graph deprecation is 
   asserts the template message and a logged row; a recipient with no route is a silent no-op. See
   `.junie/modules/notifications.md` and `ops.md`.
 
-### Step W-0.4 — Recipient routing (members + client contacts) [MVP]
+### Step W-0.4 — Recipient routing (members + client contacts) [MVP] — ◐ members done 2026-11-08
 
 - Members: migration adds `users.phone` (nullable, E.164) and `users.phone_verified_at` (nullable).
   `User::routeNotificationForWhatsApp()` returns the verified phone (null otherwise). Update
@@ -242,7 +292,7 @@ defaults to `v21.0`; it is pinned in config precisely so a Graph deprecation is 
   contact routes only with consent; tenant isolation holds (a route never crosses org/client). Tests
   in `tests/Feature/Notifications/`. See `.junie/modules/organizations-users.md` and `clients.md`.
 
-### Step W-0.5 — WhatsApp as a third preference channel [MVP]
+### Step W-0.5 — WhatsApp as a third preference channel [MVP] — ✅ Done 2026-11-08
 
 - Extend `App\Support\Notifications\NotificationPreferences`:
     - `CHANNELS = ['in_app', 'digest', 'whatsapp']`.
@@ -258,6 +308,42 @@ defaults to `v21.0`; it is pinned in config precisely so a Graph deprecation is 
   through `sanitize`, and that `via()` adds `whatsapp` only when both preference and route exist.
   See `.junie/modules/notifications.md`.
 
+**Phase W-0 closed 2026-11-08.** W-0.3 and W-0.5 in full, W-0.4 for members only.
+`App\Notifications\Channels\WhatsAppChannel` (registered with `Notification::extend`),
+`users.phone` + `users.phone_verified_at` (migration `2027_04_16_100100`),
+`User::routeNotificationForWhatsApp()`, a `whatsAppVerified()` factory state, `whatsapp` as a third
+`NotificationPreferences` channel with `wantsWhatsApp()`, and 11 tests in
+`tests/Feature/Notifications/WhatsAppChannelTest`. Suite green at 2588.
+
+**Still true after this phase: nothing can send.** No notification's `via()` returns `'whatsapp'`,
+so the only way a message goes out is Phase W-2 — which is behind W-1's consent spine, as planned.
+
+**What was done differently, and why.**
+
+1. **No `SendsWhatsApp` trait.** The default "derive a template message from `title`/`body`/`url`"
+   lives in the channel instead. It is one fallback used in one place, and there it applies to every
+   notification without anyone remembering to `use` it. A notification that wants control declares
+   `toWhatsApp()`; the channel prefers it.
+2. **No `whatsapp` queue, yet.** A send runs on the queue its notification already declares. The
+   isolation argument is real — a stalled Meta call should not sit in front of bell notifications —
+   but the `messaging` supervisor is `balance: auto` with `maxProcesses: 4` across four queues in
+   production, so a fifth queue means sizing a supervisor for traffic that does not exist. It goes
+   in with W-2.2's first real send.
+3. **`sanitize()` gained an `$existing` argument.** Today's settings form submits `in_app`/`digest`
+   only. Without this, every save would have switched off every WhatsApp opt-in, silently — the
+   worst kind of bug for a channel whose whole point is consent. A channel the payload does not
+   mention now keeps its stored value.
+4. **No `whatsapp_locked` column in `matrix()`.** The plan asked for one; it would be constant
+   false. `in_app_locked` exists because `Other` genuinely is locked on. WhatsApp never is.
+5. **No profile field for the number, and no client-contact routing.** W-0.4 listed "profile
+   settings validation", but a number captured with no verification flow is an input that does
+   nothing (the route stays null), and the consent column a `ClientContact` route has to be gated on
+   is W-1.2's. Both are the next steps rather than half-built here. **The columns therefore have no
+   writer yet** — deliberate, and the reason W-1.1 is the next thing to build.
+6. **`ClientContact` and on-demand routes send nothing.** The channel resolves credentials per
+   organization, and an `AnonymousNotifiable` has none; it logs a skip. W-1.2 is where that audience
+   arrives with both an organization and a consent flag.
+
 ---
 
 ## Phase W-1 — Consent, verification and templates
@@ -265,7 +351,7 @@ defaults to `v21.0`; it is pinned in config precisely so a Graph deprecation is 
 Goal: nobody is messaged without an explicit, verified opt-in, and every send has an approved
 template behind it. This is the compliance spine — build it before any real send in W-2.
 
-### Step W-1.1 — Member opt-in and number verification [MVP]
+### Step W-1.1 — Member opt-in and number verification [MVP] — ✅ Done 2026-11-08
 
 - On `settings/notifications` (the existing `NotificationPreferenceController` / `notifications.tsx`):
   add a WhatsApp column to the category matrix **and** a "Your WhatsApp number" panel: enter a number,
@@ -277,7 +363,7 @@ template behind it. This is the compliance spine — build it before any real se
   clearing verification, and that WhatsApp preferences can't be enabled without a verified number.
   See `.junie/modules/notifications.md` and `auth.md`/`settings.md`.
 
-### Step W-1.2 — Client contact consent [MVP]
+### Step W-1.2 — Client contact consent [MVP] — ✅ Done 2026-11-08
 
 - Migration adds to `client_contacts`: `receives_whatsapp` (bool, default false),
   `whatsapp_consent_at` (nullable), `whatsapp_consent_source` (nullable string: 'portal', 'staff',
@@ -290,7 +376,7 @@ template behind it. This is the compliance spine — build it before any real se
   tenant isolation holds; tests in `tests/Feature/Clients/`. See `.junie/modules/clients.md` and
   `client-portal.md`.
 
-### Step W-1.3 — Inbound STOP/START + suppression list [MVP]
+### Step W-1.3 — Inbound STOP/START + suppression list [MVP] — ✅ Done 2026-11-08
 
 - `whatsapp_suppressions` (`org_id` nullable for global, `phone`, `reason`, `created_at`): a number
   here is never messaged, whatever the preference says. The channel (W-0.3) checks it before sending.
@@ -303,7 +389,7 @@ template behind it. This is the compliance spine — build it before any real se
   every send path, and the suppression check is covered at the channel boundary. See
   `.junie/modules/notifications.md`.
 
-### Step W-1.4 — Message template registry [MVP]
+### Step W-1.4 — Message template registry [MVP] — ✅ Done 2026-11-08
 
 - `App\Support\WhatsApp\MessageTemplate` enum (or registry): each outbound notification → a Meta
   template name + locale + the ordered variables it fills. E.g. `post_waiting_client` →
@@ -324,7 +410,7 @@ template behind it. This is the compliance spine — build it before any real se
 Goal: the real messages go out — opt-in, templated, queued, logged. Each step is "wire an existing
 notification class to the channel", not "invent an event".
 
-### Step W-2.1 — Post waiting on client approval → client [MVP]
+### Step W-2.1 — Post waiting on client approval → client [MVP] — ✅ Done 2026-11-08
 
 - `PostWaitingForClientReview` (and the review-link audience) gains `toWhatsApp()` using the
   `post_waiting_client` template with a tappable review URL (the portal link for a ClientReviewer, the
@@ -335,7 +421,7 @@ notification class to the channel", not "invent an event".
   non-consenting client gets none; the message never leaks internal fields; tenant isolation holds.
   Tests in `tests/Feature/Notifications/`. See `.junie/modules/notifications.md` and `posts.md`.
 
-### Step W-2.2 — Scheduled-post reminder → the responsible member [MVP]
+### Step W-2.2 — Scheduled-post reminder → the responsible member [MVP] — ✅ Done 2026-11-08
 
 - Reuse the existing `posts:send-upcoming-reminders` sweep (`SendUpcomingPostReminderEmailsAction`):
   for each upcoming post, also send a WhatsApp (`post_scheduled_reminder` template) to the post's
@@ -349,21 +435,21 @@ notification class to the channel", not "invent an event".
   the sweep stays idempotent (test re-runs the command and asserts no second send). See
   `.junie/modules/notifications.md` and `posts.md`.
 
-### Step W-2.3 — Client decision → studio [V1]
+### Step W-2.3 — Client decision → studio [V1] — ✅ Done 2026-11-08
 
 - `PostApprovalDecided` gains `toWhatsApp()` (`post_decided` template: approved vs changes-requested),
   sent to Owner/Strategist who opted into `approvals`. Deep-links to the post editor.
 - **Done when**: both decision variants render the right template; only opted-in studio members are
   messaged; tests cover each branch. See `.junie/modules/notifications.md`.
 
-### Step W-2.4 — Publish failed → studio [V1]
+### Step W-2.4 — Publish failed → studio [V1] — ✅ Done 2026-11-08
 
 - `PostPublishFailed` gains `toWhatsApp()` (`post_publish_failed` template), to opted-in studio members
   on the `publishing` category. The "keep this one on" alarm.
 - **Done when**: a failed publish messages opted-in studio members once with the failing target(s)
   summarised; tests cover full-fail and partial-fail wording. See `.junie/modules/notifications.md`.
 
-### Step W-2.5 — Overdue approvals, invoices, campaign briefs [V1]
+### Step W-2.5 — Overdue approvals, invoices, campaign briefs [V1] — ✅ Done 2026-11-08
 
 - Wire `ApprovalOverdue`, `InvoiceIssued` and `CampaignBriefReady` to `toWhatsApp()` with their
   templates, each gated on its category's WhatsApp preference and the recipient's consent. These reuse
@@ -373,7 +459,7 @@ notification class to the channel", not "invent an event".
   never leak internal or billing-restricted fields; tests per notification. See
   `.junie/modules/notifications.md`, `billing.md`, `campaigns.md`.
 
-### Step W-2.6 — WhatsApp daily digest (fulfil the `ChatNotifier` seam) [Stretch]
+### Step W-2.6 — WhatsApp daily digest (fulfil the `ChatNotifier` seam) [Stretch] — ✅ Done 2026-11-08
 
 - Implement `App\Services\Notifications\WhatsAppChatNotifier implements ChatNotifier` so
   `SendNotificationDigestAction`'s existing seam sends a single `daily_digest` template per opted-in
@@ -390,7 +476,7 @@ notification class to the channel", not "invent an event".
 Goal: we know whether a message landed, we stop sending to dead/opted-out numbers, and a WhatsApp
 outage never degrades the rest of the app.
 
-### Step W-3.1 — Message log + delivery webhook [MVP]
+### Step W-3.1 — Message log + delivery webhook [MVP] — ✅ Done 2026-11-08
 
 - `whatsapp_messages` (`org_id`, nullable `user_id`/`client_contact_id`, `to_phone` (masked in any
   surfaced view), `notification_type`, `template`, `provider_message_id`, `status`
@@ -404,7 +490,7 @@ outage never degrades the rest of the app.
   STOP suppresses; tests use faked payloads with correct/incorrect signatures. See
   `.junie/modules/notifications.md` and `ops.md`.
 
-### Step W-3.2 — Window handling, retries and email fallback [V1]
+### Step W-3.2 — Window handling, retries and email fallback [V1] — ◐ 2026-11-08, see below
 
 - Business-initiated sends always use templates (W-1.4), so the 24h window rarely blocks; when the API
   still returns a re-engagement error, the channel logs it and (for the client-approval message)
@@ -415,7 +501,7 @@ outage never degrades the rest of the app.
   error retries; a permanent error suppresses and doesn't retry; tests cover each. See
   `.junie/modules/notifications.md`.
 
-### Step W-3.3 — Observability [V1]
+### Step W-3.3 — Observability [V1] — ✅ Done 2026-11-08
 
 - Structured logs at every boundary (send accepted/failed, webhook received, suppression changed) with
   org id, notification class, provider message id, masked phone — never token/body. A small
@@ -429,7 +515,7 @@ outage never degrades the rest of the app.
 
 Goal: an Owner can turn it on, see it working, and trust it; the feature is demoable and gated.
 
-### Step W-4.1 — Org WhatsApp settings [MVP]
+### Step W-4.1 — Org WhatsApp settings [MVP] — ✅ Done 2026-11-08
 
 - Settings page (Owner-only) to enable WhatsApp and store `whatsapp_phone_number_id`,
   `whatsapp_business_account_id` and the access token — encrypted at rest and resolved via
@@ -440,14 +526,14 @@ Goal: an Owner can turn it on, see it working, and trust it; the feature is demo
 - **Done when**: credentials round-trip encrypted; "Test connection" reflects validity; a non-Owner
   gets 403; the token never reaches an Inertia prop (isolation test). See `.junie/modules/settings.md`.
 
-### Step W-4.2 — Message log UI [V1]
+### Step W-4.2 — Message log UI [V1] — ✅ Done 2026-11-08
 
 - An Owner/Strategist view of `whatsapp_messages` (recent sends, status, template, masked recipient,
   failure reason), filterable by status and notification type — for debugging "did my client get it?".
 - **Done when**: the list is org-scoped (tenant test), numbers are masked, and a Designer/Viewer can't
   reach it. See `.junie/modules/notifications.md`.
 
-### Step W-4.3 — Demo/preview + entitlement seam [V1]
+### Step W-4.3 — Demo/preview + entitlement seam [V1] — ✅ Done 2026-11-08
 
 - Seed demo `whatsapp_messages` and a configured demo org so `/preview` shows the settings page and a
   populated log, staying read-only. Gate WhatsApp behind a `CampaignFeatures`-style
@@ -456,7 +542,7 @@ Goal: an Owner can turn it on, see it working, and trust it; the feature is demo
 - **Done when**: preview shows the feature without sending; the gate returns 403 + hides UI via `can`
   when off; tests cover the gate. See `.junie/modules/notifications.md` and `preview-mode.md`.
 
-### Step W-4.4 — Hardening, docs and exit [MVP]
+### Step W-4.4 — Hardening, docs and exit [MVP] — ✅ Done 2026-11-08
 
 - Full `composer ci:check` green; a tenant-isolation test for every new route/table; the
   queue/scheduler governance registries updated; `notifications.md` reflects every shipped step; a

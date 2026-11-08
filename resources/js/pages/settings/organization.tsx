@@ -15,8 +15,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { edit, testChat, testUploadPost } from '@/routes/organization';
+import {
+    edit,
+    testChat,
+    testUploadPost,
+    testWhatsapp,
+} from '@/routes/organization';
 import { destroy as removeChat } from '@/routes/organization/chat';
+import { destroy as removeWhatsApp } from '@/routes/organization/whatsapp';
 import {
     store as storeTaxRate,
     update as updateTaxRate,
@@ -65,6 +71,13 @@ type OrganizationProps = {
         webhook_secret_missing: boolean;
         has_chat_webhook_url: boolean;
         has_xai_key: boolean;
+        whatsapp_enabled: boolean;
+        whatsapp_account_sid: string | null;
+        whatsapp_from: string | null;
+        whatsapp_messaging_service_sid: string | null;
+        has_whatsapp_auth_token: boolean;
+        whatsapp_auth_token_last4: string | null;
+        whatsapp_configured: boolean;
         upload_post_key_last4: string | null;
         upload_post_webhook_secret_last4: string | null;
         xai_key_last4: string | null;
@@ -98,6 +111,9 @@ export default function Organization({
     );
     const [requireTwoFactor, setRequireTwoFactor] = useState(
         organization.require_two_factor,
+    );
+    const [whatsappEnabled, setWhatsappEnabled] = useState(
+        organization.whatsapp_enabled,
     );
 
     return (
@@ -614,6 +630,124 @@ export default function Organization({
                                 />
                             </div>
 
+                            <div className="border-border grid gap-4 rounded-xl border p-4">
+                                <div className="space-y-1">
+                                    <h3 className="text-sm font-medium">
+                                        WhatsApp (Twilio)
+                                    </h3>
+                                    <p className="text-muted-foreground text-sm">
+                                        Approvals, reminders and publish
+                                        failures on WhatsApp. Each person opts
+                                        in for themselves, and a client contact
+                                        needs their own recorded consent —
+                                        turning this on sends nothing by itself.
+                                    </p>
+                                </div>
+
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="hidden"
+                                        name="whatsapp_enabled"
+                                        value={whatsappEnabled ? '1' : '0'}
+                                    />
+                                    <Checkbox
+                                        checked={whatsappEnabled}
+                                        onCheckedChange={(value) =>
+                                            setWhatsappEnabled(value === true)
+                                        }
+                                    />
+                                    Send WhatsApp messages for this workspace
+                                </label>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="whatsapp_account_sid">
+                                        Twilio Account SID
+                                    </Label>
+                                    <Input
+                                        id="whatsapp_account_sid"
+                                        name="whatsapp_account_sid"
+                                        className="mt-1 block w-full"
+                                        autoComplete="off"
+                                        defaultValue={
+                                            organization.whatsapp_account_sid ??
+                                            ''
+                                        }
+                                        placeholder="AC…"
+                                    />
+                                    <InputError
+                                        message={errors.whatsapp_account_sid}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="whatsapp_auth_token">
+                                        Twilio Auth Token
+                                    </Label>
+                                    <Input
+                                        id="whatsapp_auth_token"
+                                        type="password"
+                                        name="whatsapp_auth_token"
+                                        className="mt-1 block w-full"
+                                        autoComplete="off"
+                                        placeholder={storedHint(
+                                            organization.has_whatsapp_auth_token,
+                                            organization.whatsapp_auth_token_last4,
+                                            'Token',
+                                        )}
+                                    />
+                                    <InputError
+                                        message={errors.whatsapp_auth_token}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="whatsapp_from">
+                                        WhatsApp sender number
+                                    </Label>
+                                    <Input
+                                        id="whatsapp_from"
+                                        name="whatsapp_from"
+                                        className="mt-1 block w-full"
+                                        autoComplete="off"
+                                        defaultValue={
+                                            organization.whatsapp_from ?? ''
+                                        }
+                                        placeholder="+44 20 7946 0000"
+                                    />
+                                    <p className="text-muted-foreground text-sm">
+                                        The number Twilio registered with
+                                        WhatsApp, with its country code. Leave
+                                        blank if you use a Messaging Service
+                                        instead.
+                                    </p>
+                                    <InputError
+                                        message={errors.whatsapp_from}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="whatsapp_messaging_service_sid">
+                                        Messaging Service SID (optional)
+                                    </Label>
+                                    <Input
+                                        id="whatsapp_messaging_service_sid"
+                                        name="whatsapp_messaging_service_sid"
+                                        className="mt-1 block w-full"
+                                        autoComplete="off"
+                                        defaultValue={
+                                            organization.whatsapp_messaging_service_sid ??
+                                            ''
+                                        }
+                                        placeholder="MG…"
+                                    />
+                                    <InputError
+                                        message={
+                                            errors.whatsapp_messaging_service_sid
+                                        }
+                                    />
+                                </div>
+                            </div>
+
                             <div className="grid gap-2">
                                 <Label htmlFor="xai_key">
                                     xAI (Grok) API key
@@ -678,6 +812,49 @@ export default function Organization({
                             </>
                         )}
                     </Form>
+                )}
+
+                {organization.whatsapp_configured && (
+                    <div className="border-border flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+                        <p className="text-muted-foreground text-sm">
+                            Check that Twilio accepts these credentials. Nothing
+                            is sent to anybody.
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                            <Form
+                                {...testWhatsapp.form()}
+                                options={{ preserveScroll: true }}
+                            >
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
+                                        {processing
+                                            ? 'Testing…'
+                                            : 'Test connection'}
+                                    </Button>
+                                )}
+                            </Form>
+
+                            <Form
+                                {...removeWhatsApp.form()}
+                                options={{ preserveScroll: true }}
+                            >
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        variant="ghost"
+                                        disabled={processing}
+                                    >
+                                        Remove credentials
+                                    </Button>
+                                )}
+                            </Form>
+                        </div>
+                    </div>
                 )}
 
                 {organization.has_chat_webhook_url && (

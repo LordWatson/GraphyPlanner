@@ -63,23 +63,49 @@ return [
     // (confirmed in Step 1.8.2). This is a separate Facebook App (Facebook Login for Business,
     // `instagram_basic` + `instagram_content_publish`) from Upload-Post; the client secret is
     // never logged, mirroring the `upload_post_key` handling convention.
-    // WhatsApp Business Cloud API (Step W-0.1 of `.junie/plans/whatsapp-notifications.md`). A
-    // separate Meta app from `facebook` above: Cloud API messaging has its own business account,
-    // its own sending number and its own permanent system-user token. Today one platform number
-    // sends for every organization; Step W-4.1 gives an organization its own number and token,
-    // stored like `upload_post_key`. All of it is resolved through
-    // `App\Services\WhatsApp\WhatsAppCredentials`, never read in a caller, and never logged.
-    // `app_secret`/`verify_token` belong to the inbound webhook (Step W-3.1), not to sending.
-    // `WHATSAPP_CLIENT=null` binds the no-op client and turns WhatsApp off entirely; leaving the
-    // token unset is already safe (every send reports not-configured without calling anyone).
+    // WhatsApp through Twilio (`.junie/plans/whatsapp-notifications.md`). Twilio is the BSP: it
+    // owns the WhatsApp Business Account, the sender registration and the template submissions.
+    //
+    // The values here are the *platform* fallback — a shared sandbox sender in development, or a
+    // single-tenant deployment. An organization's own credentials (Step W-4.1) win over them, and
+    // everything is resolved through `App\Services\WhatsApp\WhatsAppCredentials`: never read in a
+    // caller, never logged, and the auth token is encrypted at rest on the organization.
+    //
+    // `templates` maps each `App\Support\WhatsApp\MessageTemplate` to the `ContentSid` (`HX…`)
+    // Twilio returns once WhatsApp has approved that copy. They are per-account, which is why they
+    // are config and not code; `php artisan whatsapp:templates` prints what to submit. A template
+    // with no SID is refused before anything is sent, rather than failing at Twilio.
+    //
+    // `WHATSAPP_CLIENT=null` binds the no-op client and turns WhatsApp off everywhere; leaving the
+    // credentials unset is already safe (every send reports not-configured without calling anyone).
     'whatsapp' => [
-        'client' => env('WHATSAPP_CLIENT', 'cloud_api'),
-        'base_url' => env('WHATSAPP_BASE_URL') ?: 'https://graph.facebook.com',
-        'graph_version' => env('WHATSAPP_GRAPH_VERSION') ?: 'v21.0',
-        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
-        'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
-        'app_secret' => env('WHATSAPP_APP_SECRET'),
-        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+        'client' => env('WHATSAPP_CLIENT', 'twilio'),
+        'base_url' => env('WHATSAPP_BASE_URL') ?: 'https://api.twilio.com',
+        'account_sid' => env('TWILIO_ACCOUNT_SID'),
+        'auth_token' => env('TWILIO_AUTH_TOKEN'),
+        // The WhatsApp-enabled sender, E.164 and without Twilio's `whatsapp:` prefix.
+        'from' => env('TWILIO_WHATSAPP_FROM'),
+        'messaging_service_sid' => env('TWILIO_MESSAGING_SERVICE_SID'),
+        // Where Twilio reports delivery (Step W-3.1). Must be https and publicly reachable, so it
+        // stays unset in local development — a callback URL Twilio cannot reach fails the send.
+        'status_callback_url' => env('TWILIO_STATUS_CALLBACK_URL'),
+        // Step W-1.1: how long somebody must wait before asking for another verification code.
+        'verification' => ['resend_seconds' => env('WHATSAPP_VERIFY_RESEND_SECONDS', 60)],
+        // Step W-3.2: a ceiling per organization per minute, so a fan-out bug cannot become a few
+        // thousand WhatsApp messages. High enough that normal traffic never reaches it.
+        'per_minute' => env('WHATSAPP_PER_MINUTE', 60),
+        'templates' => [
+            'wa_verify_code' => env('TWILIO_TEMPLATE_VERIFY_CODE'),
+            'post_waiting_client' => env('TWILIO_TEMPLATE_POST_WAITING_CLIENT'),
+            'post_scheduled_reminder' => env('TWILIO_TEMPLATE_POST_SCHEDULED_REMINDER'),
+            'post_decided' => env('TWILIO_TEMPLATE_POST_DECIDED'),
+            'post_publish_failed' => env('TWILIO_TEMPLATE_POST_PUBLISH_FAILED'),
+            'approval_overdue' => env('TWILIO_TEMPLATE_APPROVAL_OVERDUE'),
+            'invoice_issued' => env('TWILIO_TEMPLATE_INVOICE_ISSUED'),
+            'campaign_brief_ready' => env('TWILIO_TEMPLATE_CAMPAIGN_BRIEF_READY'),
+            'daily_digest' => env('TWILIO_TEMPLATE_DAILY_DIGEST'),
+            'alima_notification' => env('TWILIO_TEMPLATE_NOTIFICATION'),
+        ],
     ],
 
     'facebook' => [

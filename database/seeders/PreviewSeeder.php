@@ -5,18 +5,24 @@ namespace Database\Seeders;
 use App\Enums\ApprovalMode;
 use App\Enums\BillingCycle;
 use App\Enums\CampaignStatus;
+use App\Enums\ClientContactRole;
 use App\Enums\ClientStatus;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Enums\WhatsAppMessageStatus;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\ClientContact;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Models\WhatsAppMessage;
+use App\Notifications\PostWaitingForClientReview;
+use App\Support\WhatsApp\MessageTemplate;
 use Database\Seeders\Concerns\SeedsCampaignShowcase;
 use Database\Seeders\Concerns\SeedsGridShowcase;
 use Illuminate\Database\Seeder;
@@ -126,5 +132,45 @@ class PreviewSeeder extends Seeder
 
         // Step 18.13: an approved nine-tile grid so `/preview` shows the grid planner off.
         $this->seedApprovedGrid($client, $owner, $socialAccount, 'Fixture');
+
+        // Step W-4.3: a populated WhatsApp log, so the demo shows the feature working — including
+        // the row that says a message was *not* sent, which is the honest half of it. No
+        // credentials are seeded, so preview can never send anything.
+        $contact = ClientContact::updateOrCreate(
+            ['client_id' => $client->id, 'email' => 'approvals@fixtureandco.test'],
+            [
+                'org_id' => $organization->id,
+                'name' => 'Frankie Fixture',
+                'phone' => '+15550100',
+                'role' => ClientContactRole::Approver,
+                'receives_review_emails' => true,
+                'receives_whatsapp' => true,
+                'whatsapp_consent_at' => now()->subMonth(),
+                'whatsapp_consent_source' => 'staff',
+            ]
+        );
+
+        $log = [
+            [MessageTemplate::PostWaitingClient, WhatsAppMessageStatus::Read, null, 2],
+            [MessageTemplate::PostScheduledReminder, WhatsAppMessageStatus::Delivered, null, 26],
+            [MessageTemplate::PostPublishFailed, WhatsAppMessageStatus::Failed, 'WhatsApp cannot deliver to that number.', 50],
+            [MessageTemplate::PostWaitingClient, WhatsAppMessageStatus::Skipped, 'no WhatsApp route', 74],
+        ];
+
+        foreach ($log as [$template, $status, $reason, $hoursAgo]) {
+            WhatsAppMessage::updateOrCreate(
+                ['org_id' => $organization->id, 'provider_message_id' => 'SMpreview'.$hoursAgo],
+                [
+                    'client_contact_id' => $contact->id,
+                    'to_phone' => '+15550100',
+                    'notification_type' => PostWaitingForClientReview::class,
+                    'template' => $template->value,
+                    'status' => $status,
+                    'error_reason' => $reason,
+                    'delivered_at' => $status === WhatsAppMessageStatus::Skipped ? null : now()->subHours($hoursAgo),
+                    'created_at' => now()->subHours($hoursAgo),
+                ]
+            );
+        }
     }
 }

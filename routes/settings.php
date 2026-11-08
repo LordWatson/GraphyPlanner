@@ -10,6 +10,8 @@ use App\Http\Controllers\Settings\PlanController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\TaxRateController;
+use App\Http\Controllers\Settings\WhatsAppLogController;
+use App\Http\Controllers\Settings\WhatsAppNumberController;
 use App\Http\Controllers\Settings\WorkspaceController;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
@@ -34,9 +36,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
-    // Step M-6.7 (I-12.1): per-user notification preferences (in-app + daily digest, per category).
+    // Step M-6.7 (I-12.1): per-user notification preferences (in-app + daily digest + WhatsApp,
+    // per category).
     Route::get('settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('notifications.edit');
     Route::put('settings/notifications', [NotificationPreferenceController::class, 'update'])->name('notifications.update');
+
+    // Step W-1.1: the member's own WhatsApp number. Throttled because asking for a code sends a
+    // real WhatsApp message, and confirming one is a six-digit guess.
+    Route::post('settings/whatsapp-number', [WhatsAppNumberController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('whatsapp-number.store');
+    Route::put('settings/whatsapp-number', [WhatsAppNumberController::class, 'update'])
+        ->middleware('throttle:10,1')
+        ->name('whatsapp-number.update');
+    Route::delete('settings/whatsapp-number', [WhatsAppNumberController::class, 'destroy'])
+        ->name('whatsapp-number.destroy');
 
 });
 
@@ -85,6 +99,17 @@ Route::middleware(['auth', 'verified', 'org.member'])->group(function () {
 
     // Posts a message to the org's team-chat channel so the owner can watch it arrive. Throttled
     // like the connection test above — it makes an outbound call on request.
+    // Step W-4.2: the WhatsApp message log (Owner/Strategist — the controller authorizes).
+    Route::get('settings/whatsapp-log', [WhatsAppLogController::class, 'index'])
+        ->name('whatsapp-log.index');
+
+    // Step W-4.1: the organization's WhatsApp sender — check it, or remove it.
+    Route::post('settings/organization/test-whatsapp', [OrganizationController::class, 'testWhatsApp'])
+        ->middleware('throttle:6,1')
+        ->name('organization.test-whatsapp');
+    Route::delete('settings/organization/whatsapp', [OrganizationController::class, 'removeWhatsApp'])
+        ->name('organization.whatsapp.destroy');
+
     Route::post('settings/organization/test-chat', [OrganizationController::class, 'testChatWebhook'])
         ->middleware('throttle:6,1')
         ->name('organization.test-chat');

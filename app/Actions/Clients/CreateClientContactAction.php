@@ -5,6 +5,7 @@ namespace App\Actions\Clients;
 use App\Enums\ClientContactRole;
 use App\Models\Client;
 use App\Models\ClientContact;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 class CreateClientContactAction
 {
     /**
-     * @param  array{name?: ?string, email: string, phone?: ?string, role: ClientContactRole, receives_review_emails?: ?bool, receives_invoices?: ?bool}  $data
+     * @param  array{name?: ?string, email: string, phone?: ?string, role: ClientContactRole, receives_review_emails?: ?bool, receives_invoices?: ?bool, receives_whatsapp?: bool}  $data
      */
     public function __invoke(Client $client, array $data): ClientContact
     {
@@ -28,6 +29,13 @@ class CreateClientContactAction
             'receives_invoices' => $data['receives_invoices'] ?? $data['role']->defaultReceivesInvoices(),
         ]);
 
+        // Step W-1.2: consent is recorded with its evidence — when, and that a member of staff
+        // set it rather than the contact themselves.
+        if ($data['receives_whatsapp'] ?? false) {
+            $contact->setWhatsAppConsent(true, 'staff', $this->actingUserId());
+            $contact->save();
+        }
+
         Log::info('Client contact created', [
             'org_id' => $client->org_id,
             'client_id' => $client->id,
@@ -36,5 +44,17 @@ class CreateClientContactAction
         ]);
 
         return $contact;
+    }
+
+    /**
+     * The member recording the consent, or null when nothing is acting as a user (a job, a
+     * command). `auth()->id()` is typed loosely enough to allow a string key; a user's id is an
+     * int.
+     */
+    private function actingUserId(): ?int
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user->id : null;
     }
 }

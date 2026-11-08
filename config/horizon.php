@@ -103,6 +103,9 @@ return [
         // is already bad. `reports`: the engagement sweep runs every 30 minutes, so a wait past a
         // whole cycle means it is no longer keeping up and analytics are going stale.
         // `AlertOnLongQueueWait` turns these into ops alerts.
+        // Step W-2.2: somebody's phone is the point of this queue — a WhatsApp approval ping
+        // that arrives five minutes late has lost most of its value.
+        'redis:whatsapp' => 120,
         'redis:exports' => 120,
         'redis:reports' => 1800,
     ],
@@ -227,7 +230,7 @@ return [
         ],
         'messaging' => [
             'connection' => 'redis',
-            'queue' => ['webhooks', 'notifications', 'mail'],
+            'queue' => ['webhooks', 'notifications', 'mail', 'whatsapp'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'minProcesses' => 1,
@@ -291,7 +294,9 @@ return [
     'environments' => [
         'production' => [
             'publishing' => ['maxProcesses' => 8, 'balanceMaxShift' => 2, 'balanceCooldown' => 3],
-            'messaging' => ['maxProcesses' => 4, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
+            // Four queues, so at least one process each: `balance: auto` treats
+            // `minProcesses` as a floor per queue and `maxProcesses` as the pool.
+            'messaging' => ['maxProcesses' => 5, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
             'ai' => ['maxProcesses' => 4, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
             'exports' => ['maxProcesses' => 2],
             'background' => ['maxProcesses' => 2],

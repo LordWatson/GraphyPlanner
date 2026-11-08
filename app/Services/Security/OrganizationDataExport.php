@@ -58,6 +58,13 @@ class OrganizationDataExport
         // Clients and everything that describes one.
         'clients' => ['scope' => 'org'],
         'client_contacts' => ['scope' => 'org'],
+
+        // Step W-3.1: the WhatsApp delivery record, and the numbers this organization must not
+        // message. Both are the organization's own data; a *global* suppression (`org_id` null)
+        // belongs to the person who sent STOP rather than to any one organization, and the `org`
+        // scope leaves those out by construction.
+        'whatsapp_messages' => ['scope' => 'org'],
+        'whatsapp_suppressions' => ['scope' => 'org'],
         'client_user' => ['scope' => 'parent', 'column' => 'client_id', 'parent' => 'clients'],
         'brand_brains' => ['scope' => 'parent', 'column' => 'client_id', 'parent' => 'clients'],
         'client_hashtags' => ['scope' => 'parent', 'column' => 'client_id', 'parent' => 'clients'],
@@ -249,7 +256,7 @@ class OrganizationDataExport
      * @var array<string, list<string>>
      */
     public const REDACTED = [
-        'organizations' => ['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key'],
+        'organizations' => ['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key', 'whatsapp_auth_token'],
         'users' => ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'],
         'social_accounts' => ['meta_access_token'],
         'media_kits' => ['share_token'],

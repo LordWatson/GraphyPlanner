@@ -97,6 +97,16 @@ content, complete}`. `brandBrain` is true once any core Brand Brain field (voice
   indexes (`org_id`; `client_id,role`). Live `(client, email)` uniqueness is enforced in the Form
   Requests, not the DB (a UNIQUE including nullable `deleted_at` would not constrain live rows on
   MySQL or SQLite). `ClientContact` uses `BelongsToOrganization` (org scope + policy-guarded binding).
+- Step W-1.2 adds WhatsApp consent (migration `2027_04_23_100300`): `receives_whatsapp` (default
+  **false** for every existing row — nobody is opted in by a migration), `whatsapp_consent_at`,
+  `whatsapp_consent_source` (`portal` / `staff` / `import` / `inbound`) and `whatsapp_consent_by`.
+  Three columns rather than one boolean because consent is something an agency may have to
+  _evidence_. Set through `ClientContact::setWhatsAppConsent()`, which is also what clears it, and
+  only re-stamped when the answer changes — editing somebody's name does not rewrite the date they
+  agreed. `scopeReceivingWhatsApp()` requires the flag **and** a number;
+  `routeNotificationForWhatsApp()` returns null without consent, and the suppression list
+  (`notifications.md` › WhatsApp) outranks even that. Owner/Strategist only, via the existing
+  `ClientContactPolicy`; the number must be dialable (`SendableWhatsAppNumber`) when consent is on.
 - Backfill `2026_11_04_100200` migrates the legacy single-address columns into contacts: a client's
   `approval_email` → an Approver contact receiving review emails, its `billing_email` → a Billing
   contact receiving invoices, merged into one row when both addresses are equal. Idempotent. The

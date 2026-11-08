@@ -14,6 +14,19 @@ Step 0.2 of the plan.
   and `client_id` (nullable FK to `clients`, used only for the `client_reviewer` role to scope a
   reviewer to exactly one client). `belongsTo` `Organization` (`organization()`) and `Client`
   (`client()`).
+- Step W-0.4: `users.phone` (E.164, nullable) + `users.phone_verified_at` (nullable) — the WhatsApp
+  number. `User::routeNotificationForWhatsApp()` returns it **only** once verified, and only if it
+  carries a country code; anything else is no route at all, so an unconfirmed or national number
+  cannot be messaged. Written by Step W-1.1's panel on `settings/notifications`, with
+  `phone_verification_code` (hashed), `phone_verification_sent_at` and
+  `phone_verification_attempts` (migration `2027_04_23_100200`) carrying the one-time code: five
+  wrong guesses discard it, ten minutes expire it, and changing the number clears the verification.
+  See `notifications.md` › WhatsApp.
+- Step W-4.1: `organizations.whatsapp_enabled`, `whatsapp_account_sid`, `whatsapp_auth_token`
+  (encrypted + `Hidden`), `whatsapp_from`, `whatsapp_messaging_service_sid` (migration
+  `2027_04_23_100100`) — the organization's own Twilio sender, resolved through
+  `WhatsAppCredentials` and never read directly. `whatsapp_enabled` is the off switch that leaves
+  the credentials in place.
 - `App\Enums\Role`: `Owner`, `Strategist`, `Designer`, `ClientReviewer`, `Viewer` — string-backed enum
   with a `label()` helper.
 - Step M-8.1: `organizations.is_design_partner` (boolean, default false, indexed) — the
@@ -134,6 +147,11 @@ Step 0.2 of the plan.
 
 ## Changelog
 
+- 2026-11-08: **WhatsApp number on the user (Step W-0.4).** `users.phone` +
+  `users.phone_verified_at` (migration `2027_04_16_100100`), `phone_verified_at` cast,
+  `routeNotificationForWhatsApp()`, and a `whatsAppVerified()` factory state. Verification and the
+  profile field itself are W-1.1; these columns exist so the `whatsapp` channel has somewhere to
+  route to. Tests: `tests/Feature/Notifications/WhatsAppChannelTest`.
 - 2026-11-07: **Per-client staff access.** New `client_user` pivot and
   `organizations.restrict_staff_to_assigned_clients` (default false, so existing orgs are
   unchanged), `User::assignedClients()` / `accessibleClientIds()` (null = unrestricted),

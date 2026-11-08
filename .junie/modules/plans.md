@@ -230,7 +230,12 @@ $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLi
 - Every gate now has a surface: `bio_page` (CG-3), `store` (CG-4), `public_media_kit` (B-8.4),
   `brand_deals` (CG-5), `email_automation` (GTM-2), `white_label` (GTM-3.1, agency tiers only),
   `custom_domain` (GTM-3.2, Creator Pro and up), `competitor_benchmarks` (GTM-4, Pro and up) and
-  `ads_reporting` (GTM-5, agency tiers only).
+  `ads_reporting` (GTM-5, agency tiers only) and `whatsapp` (Phase W, agency tiers only — see
+  `notifications.md`). A gate rather than a limit because Twilio bills the conversations: what a
+  plan grants is the capability, not an allowance. Checked once, in
+  `WhatsAppCredentials::isConfiguredFor()`, so a downgrade switches WhatsApp off without touching a
+  notification or throwing the credentials away. Moving it onto a business or creator plan is a
+  pricing decision.
 - **A new limit defaults to _unlimited_.** `$limitDefaults` is all nulls, so a limit case added to
   `Feature` without a value on every plan is given away for free. `Feature::TrackedProfiles`
   (GTM-4.1) is set explicitly on all seven plans for that reason, including **0** on Free — which
@@ -254,6 +259,8 @@ $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLi
 
 ## Changelog
 
+- 2026-11-08: Phase W added `Feature::WhatsApp` (agency tiers only, by virtue of their
+  `array_fill_keys(gates(), true)`; `$gateDefaults` leaves it off for business and creator).
 - 2026-11-07: Phase GTM-5 added `Feature::AdsReporting` (agency tiers only; read-only paid-ads
   reporting — see `ads.md`). Phase GTM-7.1 added agency cap utilisation to the super-admin funnel,
   so the next change to these limits has evidence behind it.

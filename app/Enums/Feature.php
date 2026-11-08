@@ -46,6 +46,14 @@ enum Feature: string
     case CustomDomain = 'custom_domain';
     case CompetitorBenchmarks = 'competitor_benchmarks';
     case AdsReporting = 'ads_reporting';
+    /**
+     * Step W-4.3 — WhatsApp notifications. A gate rather than a limit: Twilio bills the
+     * conversations, so what a plan grants is the capability, not an allowance. Granted on every
+     * agency plan (they all grant every gate) and off for business/creator, which is where the
+     * pitch lives — "your client approves from their phone" is an agency sentence. Moving it onto
+     * a business or creator plan is a pricing decision, not a code change.
+     */
+    case WhatsApp = 'whatsapp';
 
     /**
      * A numeric-capped feature (stored under a plan's `limits`).
@@ -116,6 +124,7 @@ enum Feature: string
             self::CustomDomain => 'Custom domain',
             self::CompetitorBenchmarks => 'Competitor benchmarks',
             self::AdsReporting => 'Paid ads reporting',
+            self::WhatsApp => 'WhatsApp notifications',
         };
     }
 }

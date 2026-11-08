@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\Role;
 use App\Models\Scopes\ClientAccessScope;
 use App\Models\Scopes\OrganizationScope;
+use App\Support\WhatsApp\PhoneNumber;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -29,6 +30,11 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
+ * @property string|null $phone
+ * @property Carbon|null $phone_verified_at
+ * @property string|null $phone_verification_code
+ * @property Carbon|null $phone_verification_sent_at
+ * @property int $phone_verification_attempts
  * @property Carbon|null $last_active_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -65,6 +71,9 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
+            'phone_verification_sent_at' => 'datetime',
+            'phone_verification_attempts' => 'integer',
             'last_active_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
@@ -166,6 +175,18 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function pushSubscriptions(): HasMany
     {
         return $this->hasMany(PushSubscription::class);
+    }
+
+    /**
+     * Step W-0.4 — where the `whatsapp` notification channel sends, or null if nowhere.
+     *
+     * Null unless the number has been verified (Step W-1.1): an unconfirmed number may belong to
+     * somebody else entirely, and the one thing WhatsApp must never do is message a stranger. A
+     * number saved without a country code is unroutable for the same reason — see `PhoneNumber`.
+     */
+    public function routeNotificationForWhatsApp(): ?string
+    {
+        return $this->phone_verified_at === null ? null : PhoneNumber::e164($this->phone);
     }
 
     public function isOwner(): bool

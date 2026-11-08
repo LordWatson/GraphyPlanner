@@ -91,7 +91,9 @@ class QueueInfrastructureTest extends TestCase
         $notification = new PostPublishFailed(Post::factory()->create());
 
         $this->assertSame(
-            ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL],
+            // Step W-2.4: a WhatsApp send is an HTTP round trip to Twilio, so it gets its own
+            // queue rather than sitting in front of the bell notification carrying the same news.
+            ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL, 'whatsapp' => Queues::WHATSAPP],
             $notification->viaQueues(),
         );
 

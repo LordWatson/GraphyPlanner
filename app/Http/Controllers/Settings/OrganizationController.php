@@ -9,11 +9,13 @@ use App\Contracts\AssetStorage;
 use App\Contracts\ChatNotifier;
 use App\Contracts\Entitlements;
 use App\Contracts\PublishCredentials;
+use App\Contracts\WhatsAppClient;
 use App\Enums\Feature;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\OrganizationSettingsUpdateRequest;
 use App\Models\TaxRate;
 use App\Rules\SafeUpload;
+use App\Services\WhatsApp\WhatsAppCredentials;
 use App\Support\Options\CurrencyOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,6 +55,16 @@ class OrganizationController extends Controller
                 // can fix it is standing.
                 'webhook_secret_missing' => app(PublishCredentials::class)->webhookSecretFor($organization) === '',
                 'has_chat_webhook_url' => filled($organization->chat_webhook_url),
+                // Step W-4.1. The SID and sender number are identifiers, not secrets, so they are
+                // shown; the auth token never leaves the server — only its last four digits, which
+                // is enough to recognise which token is stored.
+                'whatsapp_enabled' => (bool) $organization->whatsapp_enabled,
+                'whatsapp_account_sid' => $organization->whatsapp_account_sid,
+                'whatsapp_from' => $organization->whatsapp_from,
+                'whatsapp_messaging_service_sid' => $organization->whatsapp_messaging_service_sid,
+                'has_whatsapp_auth_token' => filled($organization->whatsapp_auth_token),
+                'whatsapp_auth_token_last4' => self::lastFour($organization->whatsapp_auth_token),
+                'whatsapp_configured' => app(WhatsAppCredentials::class)->isConfiguredFor($organization),
                 'restrict_staff_to_assigned_clients' => (bool) $organization->restrict_staff_to_assigned_clients,
                 'require_two_factor' => (bool) $organization->require_two_factor,
                 'has_xai_key' => filled($organization->xai_key),
@@ -171,6 +183,47 @@ class OrganizationController extends Controller
         // Delivery is best-effort by contract (it never throws), so this says "sent", not
         // "delivered" — the honest claim, and the channel itself is the confirmation.
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Test message sent. Check the channel.')]);
+
+        return to_route('organization.edit');
+    }
+
+    /**
+     * Step W-4.1 — "Test connection" for WhatsApp: does Twilio accept this organization's
+     * credentials? Reads the account; messages nobody.
+     */
+    public function testWhatsApp(Request $request, WhatsAppClient $client): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+
+        $this->authorize('update', $organization);
+
+        Inertia::flash('toast', $client->verifyCredentials($organization)
+            ? ['type' => 'success', 'message' => __('Twilio accepted your credentials.')]
+            : ['type' => 'error', 'message' => __('Twilio didn’t accept those credentials. Check the SID, token and sender, then save.')]);
+
+        return to_route('organization.edit');
+    }
+
+    /**
+     * Step W-4.1 — remove the organization's WhatsApp credentials entirely. Its own endpoint for
+     * the same reason as the chat webhook: a blank field keeps what is stored, so deleting has to
+     * be something somebody asked for. Switching WhatsApp *off* without deleting is the checkbox.
+     */
+    public function removeWhatsApp(Request $request): RedirectResponse
+    {
+        $organization = $request->user()->organization;
+
+        $this->authorize('update', $organization);
+
+        $organization->update([
+            'whatsapp_enabled' => false,
+            'whatsapp_account_sid' => null,
+            'whatsapp_auth_token' => null,
+            'whatsapp_from' => null,
+            'whatsapp_messaging_service_sid' => null,
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('WhatsApp credentials removed.')]);
 
         return to_route('organization.edit');
     }

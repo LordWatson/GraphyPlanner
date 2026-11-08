@@ -2,52 +2,79 @@
 
 namespace App\Support\WhatsApp;
 
+use InvalidArgumentException;
+
 /**
- * Step W-0.1 — one outbound message template send: which approved template, in which locale, with
- * the ordered variables that fill it.
+ * Step W-0.1 / W-1.4 — one outbound template send: which approved template, and the values that
+ * fill it.
  *
- * Meta approves a template per language, and `{{1}}`, `{{2}}` … are positional — so the order of
- * `$parameters` is the contract with the approved copy, not a detail. The template registry
- * (Step W-1.4) is what will name them; until then a caller passes the name it registered by hand.
- *
- * shortcut: body variables only. A template with a dynamic header or a URL-button suffix needs its
- * own component, which is worth adding when W-1.4 registers the first template that uses one.
+ * The constructor is the guard W-1.4 asked for. Keys must match the template's `variables()`
+ * exactly, so a notification cannot send a message with a hole in it (`{{2}}` showing through to a
+ * client) or quietly pass a variable the approved copy has no slot for. Wrong keys are a
+ * programming error, not a delivery failure, so this throws where it can be seen in a test rather
+ * than failing at Meta hours later.
  */
 final readonly class WhatsAppTemplateMessage
 {
-    /**
-     * @param  list<string>  $parameters  in `{{1}}`-first order
-     */
-    public function __construct(
-        public string $name,
-        public array $parameters = [],
-        public string $locale = 'en_GB',
-    ) {}
+    /** @var array<string, string> */
+    public array $values;
 
     /**
-     * The `template` object of a Cloud API message payload.
-     *
-     * @return array<string, mixed>
+     * @param  array<string, string|int|float|null>  $values  keyed by the template's variable names
      */
-    public function toPayload(): array
+    public function __construct(public MessageTemplate $template, array $values = [])
     {
-        $payload = [
-            'name' => $this->name,
-            'language' => ['code' => $this->locale],
-        ];
+        $expected = $template->variables();
+        $given = array_keys($values);
 
-        if ($this->parameters !== []) {
-            $payload['components'] = [[
-                'type' => 'body',
-                'parameters' => array_map(
-                    // Meta rejects a variable containing a newline or four consecutive spaces
-                    // (error 132000), and a post title pasted from a brief will contain both.
-                    fn (string $value) => ['type' => 'text', 'text' => (string) preg_replace('/\s+/u', ' ', trim($value))],
-                    $this->parameters,
-                ),
-            ]];
+        sort($expected);
+        sort($given);
+
+        if ($expected !== $given) {
+            throw new InvalidArgumentException(sprintf(
+                'Template %s takes [%s], got [%s].',
+                $template->value,
+                implode(', ', $template->variables()),
+                implode(', ', array_keys($values)),
+            ));
         }
 
-        return $payload;
+        $this->values = array_map(
+            // Meta refuses a variable containing a newline or four consecutive spaces, and a post
+            // title pasted out of a brief contains both. An empty variable is refused too, so a
+            // missing value becomes a dash rather than nothing.
+            fn (mixed $value) => trim((string) preg_replace('/\s+/u', ' ', (string) $value)) ?: '-',
+            $values,
+        );
+    }
+
+    /**
+     * Twilio's `ContentVariables`: a JSON object keyed by the placeholder's position, which is why
+     * the order in `variables()` is part of the approved copy's contract.
+     */
+    public function contentVariables(): string
+    {
+        $positional = [];
+
+        foreach ($this->template->variables() as $index => $name) {
+            $positional[(string) ($index + 1)] = $this->values[$name];
+        }
+
+        return (string) json_encode($positional);
+    }
+
+    /**
+     * What the recipient will actually read, used for the message log and for previewing copy in
+     * tests. Not what is sent — Twilio renders the approved template itself.
+     */
+    public function preview(): string
+    {
+        $body = $this->template->sampleBody();
+
+        foreach ($this->template->variables() as $index => $name) {
+            $body = str_replace('{{'.($index + 1).'}}', $this->values[$name], $body);
+        }
+
+        return $body;
     }
 }

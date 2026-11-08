@@ -25,7 +25,17 @@ Profile/Security/Appearance settings pages.
 
 - `settings/notifications` (`NotificationPreferenceController`, `settings/notifications.tsx`, in the
   settings sidebar) — per-user `users.notification_preferences`: for each `NotificationCategory`,
-  toggle in-app and daily-digest. See `notifications.md` › Phase M-6.7.
+  toggle in-app, daily-digest and WhatsApp. The WhatsApp column is disabled until a number is
+  verified in the "Your WhatsApp number" panel below it (Step W-1.1: enter a number → a code
+  arrives by WhatsApp → confirm). Changing the number un-verifies it; removing it also switches
+  every WhatsApp opt-in off. `sanitize()` is passed the stored preferences, so a channel a payload
+  does not mention keeps its value rather than being switched off by omission. The page shows the
+  masked last four digits, never the number. See `notifications.md` › Phase M-6.7 and › WhatsApp.
+- `settings/whatsapp-log` (`WhatsAppLogController`, `settings/whatsapp-log.tsx`, Owner/Strategist
+  via `WhatsAppMessagePolicy`) — Step W-4.2: every WhatsApp message this workspace tried to send,
+  filterable by status, numbers masked. **Skipped** rows are listed beside delivered ones on
+  purpose: "nothing was sent, because they never consented" is the answer most of the time and is
+  invisible anywhere else.
 
 ## Phase M-6.5 (Phase 9) — approval SLA
 

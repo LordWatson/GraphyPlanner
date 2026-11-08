@@ -7,6 +7,7 @@ use App\Mail\UpcomingPostReminderMail;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Notifications\UpcomingPublishReminder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -82,9 +83,19 @@ class SendUpcomingPostReminderEmailsAction
 
             $users = $organization->users()->get();
 
-            DB::transaction(function () use ($organization, $occurrences, $users, $orgTargets, $days) {
+            // Step W-2.2: the same digest, for whoever asked for it on their phone. One message
+            // per member, not one per post, and only for members who opted into `publishing` and
+            // verified a number — `WhatsAppRouting` decides, in `via()`.
+            $reminder = new UpcomingPublishReminder(
+                count($occurrences),
+                $occurrences[0]['master_caption'] ?? null,
+                $occurrences[0]['scheduled_at_utc'] ?? null,
+            );
+
+            DB::transaction(function () use ($organization, $occurrences, $users, $orgTargets, $days, $reminder) {
                 foreach ($users as $user) {
                     Mail::to($user)->send(new UpcomingPostReminderMail($organization, $occurrences, $days));
+                    $user->notify($reminder);
                 }
 
                 PostTarget::query()

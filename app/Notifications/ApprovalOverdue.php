@@ -4,6 +4,9 @@ namespace App\Notifications;
 
 use App\Models\Post;
 use App\Support\Queues;
+use App\Support\WhatsApp\MessageTemplate;
+use App\Support\WhatsApp\WhatsAppRouting;
+use App\Support\WhatsApp\WhatsAppTemplateMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -23,7 +26,7 @@ class ApprovalOverdue extends Notification implements ShouldQueue
      */
     public function viaQueues(): array
     {
-        return ['database' => Queues::NOTIFICATIONS];
+        return ['database' => Queues::NOTIFICATIONS, 'whatsapp' => Queues::WHATSAPP];
     }
 
     /**
@@ -31,7 +34,21 @@ class ApprovalOverdue extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return WhatsAppRouting::with(['database'], $notifiable, static::class);
+    }
+
+    /**
+     * Step W-2.5 — the nudge that stops an approval sitting for a week.
+     */
+    public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
+    {
+        $data = $this->toArray($notifiable);
+
+        return MessageTemplate::ApprovalOverdue->fill([
+            'post_summary' => $this->post->title ?? 'a post',
+            'waiting_for' => (string) $data['body'],
+            'url' => (string) $data['url'],
+        ]);
     }
 
     /**

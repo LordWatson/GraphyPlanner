@@ -58,6 +58,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // validation, and only ingests a file (no state change beyond creating an asset).
         $middleware->validateCsrfTokens(except: ['webhooks/*', 'posts/quick/share']);
 
+        // Step W-3.1: Twilio signs the exact bytes of its form parameters, so trimming them or
+        // turning "" into null makes a valid signature fail. Only this one path is exempt — the
+        // request is authenticated by that signature and nothing else.
+        $middleware->trimStrings(except: ['webhooks/whatsapp']);
+        $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request) => $request->is('webhooks/whatsapp'),
+        ]);
+
         $middleware->web(append: [
             // Step I-1.1: the preview owner is never a real session outside `/preview/*`.
             RejectPreviewUserOutsidePreview::class,

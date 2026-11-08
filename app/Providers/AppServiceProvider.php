@@ -53,6 +53,7 @@ use App\Models\StaffInvitation;
 use App\Models\SuperAdminReport;
 use App\Models\TaxRate;
 use App\Models\User;
+use App\Notifications\Channels\WhatsAppChannel;
 use App\Policies\AiImageGenerationPolicy;
 use App\Policies\AssetPolicy;
 use App\Policies\BrandBrainPolicy;
@@ -109,8 +110,8 @@ use App\Services\Security\ClamAvVirusScanner;
 use App\Services\Security\NullVirusScanner;
 use App\Services\SharedPropsCache;
 use App\Services\Web\HttpWebsiteSummarizer;
-use App\Services\WhatsApp\CloudApiWhatsAppClient;
 use App\Services\WhatsApp\NullWhatsAppClient;
+use App\Services\WhatsApp\TwilioWhatsAppClient;
 use App\Services\Workspace\CurrentWorkspace;
 use App\Support\Queues;
 use App\Support\RateLimits;
@@ -122,6 +123,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -183,12 +185,12 @@ class AppServiceProvider extends ServiceProvider
             ? $this->app->make(SlackChatNotifier::class)
             : $this->app->make(NullChatNotifier::class));
 
-        // Step W-0.2: WhatsApp behind its own contract (`.junie/plans/whatsapp-notifications.md`).
-        // The Cloud API client is bound by default because it is safe unconfigured — with no token
-        // every send reports not-configured without calling Meta — so an organization that gets its
-        // own credentials in W-4.1 works without a redeploy. `WHATSAPP_CLIENT=null` turns it off.
-        $this->app->bind(WhatsAppClient::class, fn () => config('services.whatsapp.client') === 'cloud_api'
-            ? $this->app->make(CloudApiWhatsAppClient::class)
+        // WhatsApp behind its own contract (`.junie/plans/whatsapp-notifications.md`), Twilio as
+        // the provider. Bound by default because it is safe unconfigured — with no credentials
+        // every send reports not-configured without calling anyone — so an organization that adds
+        // its own in W-4.1 works without a redeploy. `WHATSAPP_CLIENT=null` turns it off entirely.
+        $this->app->bind(WhatsAppClient::class, fn () => config('services.whatsapp.client') === 'twilio'
+            ? $this->app->make(TwilioWhatsAppClient::class)
             : $this->app->make(NullWhatsAppClient::class));
 
         // Step B-2.4: the brand-profile quick-start fetches a brand's own website behind this
@@ -354,6 +356,11 @@ class AppServiceProvider extends ServiceProvider
                 SharedPropsCache::forgetUnreadNotifications($event->notifiable->id);
             }
         });
+
+        // Step W-0.3: the `whatsapp` notification channel. Registered unconditionally — a
+        // notification only reaches it by returning `'whatsapp'` from `via()`, and the channel
+        // no-ops for a recipient with no verified number.
+        Notification::extend('whatsapp', fn ($app) => $app->make(WhatsAppChannel::class));
 
         // Step I-2.7: writes that change an org's analytics orphan its cached summaries.
         AnalyticsCache::registerInvalidation();

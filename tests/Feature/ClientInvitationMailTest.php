@@ -27,6 +27,8 @@ class ClientInvitationMailTest extends TestCase
 
         $rendered = $mailable->render();
 
-        $this->assertStringContainsString($client->name, $rendered);
+        // Escaped, not raw: the factory's company names sometimes contain an apostrophe, and Blade
+        // renders that as `&#039;` — which used to fail this assertion on roughly one run in ten.
+        $this->assertStringContainsString(e($client->name), $rendered);
     }
 }

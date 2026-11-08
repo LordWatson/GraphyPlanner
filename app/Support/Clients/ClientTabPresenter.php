@@ -171,6 +171,10 @@ final class ClientTabPresenter
             'role_label' => $contact->role->label(),
             'receives_review_emails' => $contact->receives_review_emails,
             'receives_invoices' => $contact->receives_invoices,
+            // Step W-1.2: the flag and when it was given — a staff member about to rely on it
+            // should be able to see that it is recorded, not just on.
+            'receives_whatsapp' => $contact->receives_whatsapp,
+            'whatsapp_consent_at' => $contact->whatsapp_consent_at?->toIso8601String(),
             'can' => [
                 'update' => $user->can('update', $contact),
                 'delete' => $user->can('delete', $contact),

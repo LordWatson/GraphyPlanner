@@ -48,6 +48,11 @@ use Laravel\Cashier\Billable;
  * @property string|null $tax_registration_number
  * @property string|null $tax_registration_label
  * @property int $invoice_payment_terms_days
+ * @property bool $whatsapp_enabled
+ * @property string|null $whatsapp_account_sid
+ * @property string|null $whatsapp_auth_token
+ * @property string|null $whatsapp_from
+ * @property string|null $whatsapp_messaging_service_sid
  * @property string|null $upload_post_key
  * @property string|null $upload_post_webhook_secret
  * @property string|null $chat_webhook_url
@@ -75,8 +80,8 @@ use Laravel\Cashier\Billable;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'restrict_staff_to_assigned_clients', 'require_two_factor', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'blended_hourly_rate_minor', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
-#[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key'])]
+#[Fillable(['name', 'slug', 'referral_partner_id', 'referred_at', 'type', 'is_design_partner', 'require_post_review', 'restrict_staff_to_assigned_clients', 'require_two_factor', 'insights_digest_opt_out', 'default_timezone', 'default_currency', 'blended_hourly_rate_minor', 'approval_sla_hours', 'inbox_sla_hours', 'billing_details', 'payment_instructions', 'tax_registration_number', 'tax_registration_label', 'invoice_payment_terms_days', 'upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'whatsapp_enabled', 'whatsapp_account_sid', 'whatsapp_auth_token', 'whatsapp_from', 'whatsapp_messaging_service_sid', 'publish_mode', 'upload_post_profile', 'xai_key', 'ai_monthly_image_quota', 'ai_enabled', 'ai_monthly_token_budget', 'mcp_enabled', 'campaign_features', 'brand_logo_disk', 'brand_logo_path', 'brand_accent', 'brand_sender_name', 'brand_reply_to', 'brand_footer'])]
+#[Hidden(['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key', 'whatsapp_auth_token'])]
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
@@ -125,6 +130,10 @@ class Organization extends Model
             // A Slack/Teams incoming-webhook URL *is* the credential — anyone holding it can post
             // into the channel — so it is encrypted and hidden like the keys above it.
             'chat_webhook_url' => 'encrypted',
+            'whatsapp_enabled' => 'boolean',
+            // Step W-4.1: the Twilio auth token is the credential — anyone holding it can send as
+            // this organization — so it is encrypted and hidden like the keys above it.
+            'whatsapp_auth_token' => 'encrypted',
             'publish_mode' => PublishMode::class,
             'xai_key' => 'encrypted',
             'invoice_payment_terms_days' => 'integer',

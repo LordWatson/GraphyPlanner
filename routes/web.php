@@ -116,6 +116,7 @@ use App\Http\Controllers\SuperAdmin\PlatformSettingController;
 use App\Http\Controllers\SuperAdmin\ReferralController as SuperAdminReferralController;
 use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
+use App\Http\Controllers\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Step GTM-3.2: the marketing page on our own host, the creator's bio page on a verified custom
@@ -278,6 +279,15 @@ Route::get('social-accounts/callback', [SocialAccountController::class, 'callbac
 Route::post('webhooks/upload-post', [UploadPostWebhookController::class, 'handle'])
     ->middleware('throttle:webhooks')
     ->name('webhooks.upload-post');
+
+// Step W-3.1: Twilio posts WhatsApp delivery statuses and inbound messages here. Public (no
+// session exists for a server-to-server call) and CSRF-exempt via the `webhooks/*` pattern in
+// bootstrap/app.php, which also keeps this one path out of `TrimStrings` and
+// `ConvertEmptyStringsToNull` — both edit the parameters that Twilio's signature covers. Verified
+// by `X-Twilio-Signature` and fails closed (see `WhatsAppWebhookController`).
+Route::post('webhooks/whatsapp', [WhatsAppWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.whatsapp');
 
 // Step CG-4.1: Stripe Connect posts the creator-store events here. Its own endpoint and its own
 // signing secret, separate from Cashier's subscription webhook (Principle 4) -- a delivery signed

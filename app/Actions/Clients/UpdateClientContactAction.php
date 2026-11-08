@@ -4,6 +4,7 @@ namespace App\Actions\Clients;
 
 use App\Enums\ClientContactRole;
 use App\Models\ClientContact;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class UpdateClientContactAction
 {
     /**
-     * @param  array{name?: ?string, email: string, phone?: ?string, role: ClientContactRole, receives_review_emails: bool, receives_invoices: bool}  $data
+     * @param  array{name?: ?string, email: string, phone?: ?string, role: ClientContactRole, receives_review_emails: bool, receives_invoices: bool, receives_whatsapp?: bool}  $data
      */
     public function __invoke(ClientContact $contact, array $data): ClientContact
     {
@@ -25,6 +26,15 @@ class UpdateClientContactAction
             'receives_invoices' => $data['receives_invoices'],
         ]);
 
+        // Step W-1.2: only ever re-stamped when the answer changes, so an edit to somebody's
+        // name does not rewrite the date they consented.
+        $consented = $data['receives_whatsapp'] ?? $contact->receives_whatsapp;
+
+        if ($consented !== $contact->receives_whatsapp) {
+            $contact->setWhatsAppConsent($consented, 'staff', $this->actingUserId());
+            $contact->save();
+        }
+
         Log::info('Client contact updated', [
             'org_id' => $contact->org_id,
             'client_id' => $contact->client_id,
@@ -32,5 +42,17 @@ class UpdateClientContactAction
         ]);
 
         return $contact;
+    }
+
+    /**
+     * The member recording the consent, or null when nothing is acting as a user (a job, a
+     * command). `auth()->id()` is typed loosely enough to allow a string key; a user's id is an
+     * int.
+     */
+    private function actingUserId(): ?int
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user->id : null;
     }
 }

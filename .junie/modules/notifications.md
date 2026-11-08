@@ -36,39 +36,137 @@ can be viewed/acted on.
   with no webhook URL configured); `CHAT_NOTIFIER=null` binds `NullChatNotifier` and switches it off.
   Tests `tests/Feature/Notifications/NotificationPreferencesTest`.
 
-## Phase W-0 — WhatsApp delivery foundations (steps W-0.1, W-0.2)
+## WhatsApp notifications (Phase W — Twilio)
 
-The first two steps of `.junie/plans/whatsapp-notifications.md`: a message can reach a real WhatsApp
-number through a swappable, testable seam. **Nothing is wired to a notification yet** — no `via()`
-sends WhatsApp, there is no preference channel and no consent, so this can be configured in
-production without a single message going out.
+`.junie/plans/whatsapp-notifications.md` in full. **Twilio is the provider**, not Meta's Cloud API
+direct: a BSP owns the WhatsApp Business Account, the sender registration and the template
+submissions, which is most of the work in getting WhatsApp live at all.
 
-- **`App\Contracts\WhatsAppClient`** — `sendTemplate()`, `sendSessionText()` (replies only: valid
-  inside the 24-hour window Meta opens when the recipient writes first), `verifyCredentials()`.
-  Nothing throws: every method returns a `WhatsAppSendResult`, so a WhatsApp failure can never break
-  the thing that triggered it. A different seam from `ChatNotifier` — this messages a named person.
-- **`App\Services\WhatsApp\CloudApiWhatsAppClient`** — Meta's Business Cloud API
-  (`POST /{phone_number_id}/messages`). Retries like a _publish_, not a read: `VendorHttp::forPublish()`
-  retries a 429 only, because Meta has no idempotency key for a message and a 5xx may already have
-  delivered it. Bound by default and **safe unconfigured** — with no token every send reports
-  not-configured without calling Meta. `WHATSAPP_CLIENT=null` binds `NullWhatsAppClient` instead.
-- **`App\Services\WhatsApp\WhatsAppCredentials`** — the one place credentials come from. Today the
-  platform's own number from `config/services.php`; Step W-4.1 gives each organization its own, and
-  only this class changes because every call already asks per organization.
-- **`App\Support\WhatsApp\`** — `WhatsAppTemplateMessage` (template name, locale, positional body
-  variables; collapses whitespace because Meta refuses a variable containing a newline),
-  `WhatsAppSendResult` (ok / message id / error code + reason, and **no vendor payload**, which would
-  echo the number and body back into a log row), `PhoneNumber` (E.164, and the masked last-4 that is
-  the most a log may say about someone's number).
-- **What the log does not contain**: the access token, the message body, Meta's own error text
-  (131030 quotes the recipient's full number back at us), or more than four digits of a number. The
-  boundary logs the org id, what was sent, the masked number, and Meta's error code + subcode.
-- **A number without a country code is refused, not guessed** — `07700 900123` is a real subscriber
-  number in a dozen countries. Verification (W-1.1) is where the full number gets asked for.
-- Config: `services.whatsapp.*` (`WHATSAPP_CLIENT`, `WHATSAPP_PHONE_NUMBER_ID`,
-  `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_BASE_URL`, `WHATSAPP_GRAPH_VERSION`, plus `WHATSAPP_APP_SECRET`
-  / `WHATSAPP_VERIFY_TOKEN` for the inbound webhook in W-3.1). Tests
-  `tests/Unit/Services/WhatsApp/WhatsAppClientTest` and `tests/Unit/Support/WhatsApp/PhoneNumberTest`.
+### The seam
+
+- `App\Contracts\WhatsAppClient` — `sendTemplate()`, `sendSessionText()` (replies only: valid
+  inside the 24-hour window the recipient opened), `verifyCredentials()`. Nothing throws; every call
+  returns a `WhatsAppSendResult`, so a WhatsApp failure can never break the thing that triggered it.
+- `TwilioWhatsAppClient` is bound by default and **safe unconfigured** — with no credentials every
+  send reports not-configured without calling anyone. `WHATSAPP_CLIENT=null` binds
+  `NullWhatsAppClient` and switches WhatsApp off everywhere.
+- `WhatsAppCredentials` is the one place credentials come from: the organization's own (Step W-4.1,
+  encrypted at rest) over the platform's in `config/services.php`. It also holds the two gates —
+  `organizations.whatsapp_enabled` and the `Feature::WhatsApp` plan entitlement (W-4.3) — so a
+  downgrade or an off switch stops every send without touching a notification.
+- `App\Support\WhatsApp\` — `MessageTemplate` (the closed list of messages, below),
+  `WhatsAppTemplateMessage` (fills one, and **throws** if the variables do not match the approved
+  copy), `WhatsAppSendResult` + `WhatsAppFailure` (transient / permanent / window / not-configured),
+  `PhoneNumber` (E.164, and the masked last-4 that is the most any log may say), `TwilioSignature`,
+  `WhatsAppRouting` (the single check a `via()` makes).
+
+### Templates (Step W-1.4)
+
+Business-initiated WhatsApp is templates only, so the set of messages is an enum —
+`App\Support\WhatsApp\MessageTemplate` — carrying the exact copy submitted for approval next to the
+code that fills it. `php artisan whatsapp:templates` prints the submission list and the env var each
+approved `ContentSid` goes into (`services.whatsapp.templates.*`). Two guards: a template with no
+SID is refused before anything is called, and filling one with the wrong variables is an exception
+in a test rather than a `{{2}}` showing through to a client.
+
+### Who can be messaged, and how they consent
+
+| Audience                            | Consent                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| A member (any role, incl. reviewer) | Per-category opt-in, **off by default**, plus a verified number (W-1.1)    |
+| A client contact (no login)         | One consent flag with its source and date, set by Owner/Strategist (W-1.2) |
+| Anyone on the suppression list      | Never, whatever the above says (W-1.3)                                     |
+
+- **Preferences** — `NotificationPreferences::CHANNELS` is `in_app`, `digest`, `whatsapp`, with
+  `whatsapp` off for every category for everybody and never forced on. `wantsWhatsApp()` requires
+  the opt-in **and** a verified number, so neither half can ship alone. `sanitize()` takes the
+  stored preferences as a second argument and keeps any channel the payload does not mention —
+  without that a save from the settings form would wipe every WhatsApp opt-in.
+- **Verification (W-1.1)** — `RequestWhatsAppVerificationAction` sends a six-digit code (hashed at
+  rest, ten-minute expiry, five attempts) and `ConfirmWhatsAppNumberAction` checks it.
+  `->forget()` removes the number and switches every WhatsApp preference back off, so verifying a
+  new number later cannot quietly resume messaging.
+- **Suppressions (W-1.3)** — `whatsapp_suppressions` (`org_id` nullable = global). A STOP suppresses
+  globally and withdraws every consent held against that number; a START releases the suppression
+  and **does not** re-grant consent — that is a decision made in the portal or with the agency, not
+  a word in a chat window. A permanently undeliverable send suppresses itself.
+
+### The channel
+
+`App\Notifications\Channels\WhatsAppChannel` (registered with `Notification::extend`) is where every
+precondition is checked once, so a new notification cannot forget any of them: a route, an
+organization to send as, no suppression, and the organization is not flooding
+(`services.whatsapp.per_minute`, default 60 — a ceiling for a fan-out bug, since Twilio paces its
+own sending and reports its limits with a retryable code). Every failed check is a silent no-op,
+logged at `info` **and** recorded as a `Skipped` `whatsapp_messages` row with the reason.
+
+A notification may declare `toWhatsApp()`; otherwise the channel builds the generic
+`MessageTemplate::Notification` message from the `title`/`body`/`url` it already puts in the bell.
+(The plan proposed a `SendsWhatsApp` trait for that; it is one fallback in one place, and in the
+channel it covers every notification without anyone remembering to `use` it.)
+
+### What can arrive on WhatsApp (Phase W-2)
+
+| Notification                    | Template                  | Audience                           |
+| ------------------------------- | ------------------------- | ---------------------------------- |
+| `PostWaitingForClientReview`    | `post_waiting_client`     | Client contacts + portal reviewers |
+| `UpcomingPublishReminder`       | `post_scheduled_reminder` | Members (`publishing`)             |
+| `PostApprovalDecided`           | `post_decided`            | Studio (`approvals`)               |
+| `PostPublishFailed`             | `post_publish_failed`     | Studio (`publishing`)              |
+| `ApprovalOverdue`               | `approval_overdue`        | Studio (`approvals`)               |
+| `InvoiceIssued`                 | `invoice_issued`          | Client contacts (`invoices`)       |
+| `CampaignBriefReady`            | `campaign_brief_ready`    | Client contacts (`campaigns`)      |
+| Any other campaign notification | `alima_notification`      | Members (`campaigns`)              |
+| `DailyDigestReady`              | `daily_digest`            | Members (`other`)                  |
+
+- The client-approval message carries the **same link the email would have given them**: a magic
+  portal link for a contact with a login, the token-only `/review/:token` otherwise
+  (`SendClientReviewRequestedEmailAction`).
+- The scheduled reminder reuses the existing `posts:send-upcoming-reminders` sweep and its
+  `reminder_sent_at` guard, so a re-run never double-sends. No new scheduled command.
+- `DailyDigestReady` is **not** a `ChatNotifier` implementation, which is what the plan proposed:
+  that seam posts one message to an organization's team channel and is addressed to an
+  `Organization`, while a digest is addressed to a person with their own preferences and number.
+  `SlackChatNotifier` keeps the seam.
+
+### The message log and the webhook (Step W-3.1)
+
+- `whatsapp_messages` — one row per attempt, including the ones that never left the building
+  (`Skipped`, with the reason). `to_phone` is stored in full because that is how Twilio's callback
+  matches the row, and is `Hidden` on the model so it cannot reach a prop; `maskedPhone()` is what
+  any view shows. The body is not stored — the template plus its variables is a better record and
+  does not duplicate client content.
+- `POST /webhooks/whatsapp` — status callbacks (`MessageSid` + `MessageStatus`) and inbound messages
+  (`From` + `Body`). Fails closed on `X-Twilio-Signature`; out-of-order callbacks cannot walk a
+  status backwards; Twilio's 21610 ("recipient opted out") suppresses. See `ops.md` › WhatsApp for
+  the middleware exclusions the signature needs.
+- Statuses: `WhatsAppMessageStatus` — sent / delivered / read / failed / **skipped**.
+
+### Runbook — switching WhatsApp on for an organization
+
+1. In Twilio: a WhatsApp sender (or a Messaging Service containing one), registered and approved.
+2. `php artisan whatsapp:templates` → create each template in the Content Template Builder as a
+   `twilio/text` template with the exact copy printed, submit it for WhatsApp approval (hours to
+   days), then put each `HX…` id in its env var.
+3. Set `TWILIO_STATUS_CALLBACK_URL` to the public `https://…/webhooks/whatsapp`, and point the
+   sender's inbound webhook at the same URL (that is what carries STOP).
+4. On `settings/organization` (Owner): the Account SID, Auth Token and sender, then **Test
+   connection**. Tick "Send WhatsApp messages for this workspace".
+5. Each person opts themselves in on `settings/notifications` and verifies their number. Each client
+   contact's consent is recorded by an Owner or Strategist — **only** where they actually said yes.
+6. `settings/whatsapp-log` is where to look when somebody asks whether a message arrived.
+
+Nothing in steps 1–4 sends a message to anybody: with no opt-in and no consent, every send is a
+`Skipped` row.
+
+### Tests
+
+`tests/Unit/Services/WhatsApp/TwilioWhatsAppClientTest`,
+`tests/Unit/Support/WhatsApp/PhoneNumberTest`,
+`tests/Feature/Notifications/WhatsAppChannelTest`,
+`tests/Feature/Notifications/WhatsAppVerificationTest`,
+`tests/Feature/Notifications/WhatsAppWebhookTest`,
+`tests/Feature/Notifications/WhatsAppSettingsTest`.
 
 ## Phase M-6.5 (Phase 9) — overdue approval reminders
 

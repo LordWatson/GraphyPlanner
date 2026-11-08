@@ -8,6 +8,9 @@ use App\Enums\PublishFailureReason;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Support\Queues;
+use App\Support\WhatsApp\MessageTemplate;
+use App\Support\WhatsApp\WhatsAppRouting;
+use App\Support\WhatsApp\WhatsAppTemplateMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -34,7 +37,7 @@ class PostPublishFailed extends Notification implements ShouldQueue
      */
     public function viaQueues(): array
     {
-        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL, 'whatsapp' => Queues::WHATSAPP];
     }
 
     /**
@@ -48,9 +51,40 @@ class PostPublishFailed extends Notification implements ShouldQueue
 
         // Business workspaces also get an email (Step B-5.3, "no failure is silent"); agencies keep
         // the in-app bell notification they've always had.
-        return $this->post->organization?->isBusiness()
+        $channels = $this->post->organization?->isBusiness()
             ? ['database', 'mail']
             : ['database'];
+
+        return WhatsAppRouting::with($channels, $notifiable, static::class);
+    }
+
+    /**
+     * Step W-2.4 — the alarm. The one somebody should leave switched on.
+     */
+    public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
+    {
+        $data = $this->toArray($notifiable);
+
+        return MessageTemplate::PostPublishFailed->fill([
+            'post_summary' => $this->post->title ?? 'a post',
+            'targets' => $this->failedTargetSummary(),
+            'url' => (string) $data['url'],
+        ]);
+    }
+
+    /**
+     * Which networks refused it — the first thing anybody asks.
+     */
+    private function failedTargetSummary(): string
+    {
+        $failed = $this->post->targets
+            ->where('status', PostTargetStatus::Failed)
+            ->map(fn ($target) => $target->socialAccount?->platform->label())
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $failed->isEmpty() ? 'one or more networks' : $failed->join(', ', ' and ');
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Mail\ClientReviewRequestedMail;
 use App\Models\Post;
 use App\Models\ReviewToken;
 use App\Models\User;
+use App\Notifications\PostWaitingForClientReview;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -82,9 +83,22 @@ class SendClientReviewRequestedEmailAction
                 $deliveries[] = ['email' => $recipient['email'], 'url' => $url];
             }
 
-            DB::afterCommit(function () use ($deliveries, $post, $client, $token) {
+            // Step W-2.1 — the headline WhatsApp message. Only contacts who have consented, and
+            // each gets the same link the email would have given them: a magic portal link if they
+            // have a login, the token-only review link otherwise.
+            $whatsAppContacts = $client->contacts()->receivingWhatsApp()->get();
+            $urlByEmail = collect($deliveries)->keyBy(fn (array $delivery) => strtolower($delivery['email']));
+
+            DB::afterCommit(function () use ($deliveries, $post, $client, $token, $whatsAppContacts, $urlByEmail) {
                 foreach ($deliveries as $delivery) {
                     Mail::to($delivery['email'])->send(new ClientReviewRequestedMail($post, $delivery['url']));
+                }
+
+                foreach ($whatsAppContacts as $contact) {
+                    $contact->notify(new PostWaitingForClientReview(
+                        $post,
+                        $urlByEmail->get(strtolower($contact->email))['url'] ?? null,
+                    ));
                 }
 
                 Log::info('Client review requested email queued', [
@@ -92,6 +106,7 @@ class SendClientReviewRequestedEmailAction
                     'post_id' => $post->id,
                     'review_token_id' => $token->id,
                     'recipient_count' => count($deliveries),
+                    'whatsapp_recipient_count' => $whatsAppContacts->count(),
                 ]);
             });
 

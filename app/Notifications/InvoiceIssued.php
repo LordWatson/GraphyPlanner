@@ -3,8 +3,12 @@
 namespace App\Notifications;
 
 use App\Models\Invoice;
+use App\Models\User;
 use App\Support\MoneyFormatter;
 use App\Support\Queues;
+use App\Support\WhatsApp\MessageTemplate;
+use App\Support\WhatsApp\WhatsAppRouting;
+use App\Support\WhatsApp\WhatsAppTemplateMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -30,7 +34,7 @@ class InvoiceIssued extends Notification implements ShouldQueue
      */
     public function viaQueues(): array
     {
-        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL, 'whatsapp' => Queues::WHATSAPP];
     }
 
     /**
@@ -38,7 +42,23 @@ class InvoiceIssued extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        $channels = $notifiable instanceof User ? ['database'] : [];
+
+        return WhatsAppRouting::with($channels, $notifiable, static::class);
+    }
+
+    /**
+     * Step W-2.5 — the amount and the due date, and nothing else: an invoice message that says
+     * more than that is a billing record in somebody's chat history.
+     */
+    public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
+    {
+        return MessageTemplate::InvoiceIssued->fill([
+            'client_name' => $notifiable->name ?? 'there',
+            'amount' => MoneyFormatter::format((float) $this->invoice->amount, $this->invoice->currency),
+            'due_date' => $this->invoice->due_date?->toFormattedDateString() ?? 'on receipt',
+            'url' => route('portal.invoices.show', $this->invoice),
+        ]);
     }
 
     /**

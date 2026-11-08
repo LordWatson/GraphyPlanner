@@ -5,6 +5,9 @@ namespace App\Notifications;
 use App\Enums\ApprovalDecision;
 use App\Models\Post;
 use App\Support\Queues;
+use App\Support\WhatsApp\MessageTemplate;
+use App\Support\WhatsApp\WhatsAppRouting;
+use App\Support\WhatsApp\WhatsAppTemplateMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -31,7 +34,7 @@ class PostApprovalDecided extends Notification implements ShouldQueue
      */
     public function viaQueues(): array
     {
-        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL];
+        return ['database' => Queues::NOTIFICATIONS, 'mail' => Queues::MAIL, 'whatsapp' => Queues::WHATSAPP];
     }
 
     /**
@@ -39,7 +42,23 @@ class PostApprovalDecided extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return WhatsAppRouting::with(['database'], $notifiable, static::class);
+    }
+
+    /**
+     * Step W-2.3 — the studio hears the answer without opening the app.
+     */
+    public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
+    {
+        $data = $this->toArray($notifiable);
+
+        return MessageTemplate::PostDecided->fill([
+            // No nullsafe chain: `posts.client_id` is not nullable, so a post always has one.
+            'client_name' => $this->post->client->name,
+            'decision' => $this->decision === ApprovalDecision::Approved ? 'approved' : 'asked for changes on',
+            'post_summary' => $this->post->title ?? 'a post',
+            'url' => (string) $data['url'],
+        ]);
     }
 
     /**

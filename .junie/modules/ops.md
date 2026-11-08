@@ -25,16 +25,19 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
 ## Actions / Services / Contracts
 
 - `App\Support\Queues`: the queue names — `publishing`, `webhooks` (reserved for Step I-16),
-  `notifications`, `mail`, `ai`, `exports`, `reports`, `default`.
+  `notifications`, `mail`, `whatsapp`, `ai`, `exports`, `reports`, `default`.
   AI Image Studio jobs keep `config('ai.images.queue')` (`ai-images`). `Queues::all()` lists every
   one, highest priority first (`publishing` first, `default` last).
     - `exports` is work somebody is sitting and waiting for (`BuildOrganizationDataExportJob`), and
       it has its own supervisor: everything else on `reports` is a background vendor sweep nobody
       is waiting on, and the engagement sweep can fill `background` for a whole cycle (finding 12
       step 4).
+    - `whatsapp` is every WhatsApp send (Step W-2.2). Its own queue because each one is an HTTP
+      round trip to Twilio, and a slow one must not sit in front of the bell notification or the
+      email carrying the same news.
     - `PublishPostJob`, `PublishPostTargetJob` → `publishing` (set in their constructors).
     - Every mailable (they all implement `ShouldQueue`) → `mail`; every notification's
-      `viaQueues()` → `database: notifications`, `mail: mail`.
+      `viaQueues()` → `database: notifications`, `mail: mail`, `whatsapp: whatsapp`.
     - `PurgeOrganizationJob` → `default`.
 - `App\Providers\HorizonServiceProvider`: `/horizon` is for super admins only, in every environment
   (Horizon's default lets anyone in on `local`).
@@ -44,15 +47,20 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
 - `config/horizon.php` — one supervisor per workload, each with its own timeout and retries
   (a job's own `$tries`/`$timeout` win):
 
-    | Supervisor   | Queues                              | timeout | tries | prod maxProcesses |
-    | ------------ | ----------------------------------- | ------- | ----- | ----------------- |
-    | `publishing` | `publishing`                        | 200 s   | 3     | 8                 |
-    | `messaging`  | `webhooks`, `notifications`, `mail` | 90 s    | 3     | 4                 |
-    | `ai`         | `ai`, `ai-images`                   | 150 s   | 2     | 4                 |
-    | `exports`    | `exports`                           | 620 s   | 2     | 2                 |
-    | `background` | `reports`, `default`                | 620 s   | 3     | 2                 |
+    | Supervisor   | Queues                                          | timeout | tries | prod maxProcesses |
+    | ------------ | ----------------------------------------------- | ------- | ----- | ----------------- |
+    | `publishing` | `publishing`                                    | 200 s   | 3     | 8                 |
+    | `messaging`  | `webhooks`, `notifications`, `mail`, `whatsapp` | 90 s    | 3     | 5                 |
+    | `ai`         | `ai`, `ai-images`                               | 150 s   | 2     | 4                 |
+    | `exports`    | `exports`                                       | 620 s   | 2     | 2                 |
+    | `background` | `reports`, `default`                            | 620 s   | 3     | 2                 |
 
-    `horizon.waits` thresholds: `publishing` 30 s, `default` 60 s, `exports` 120 s (somebody is
+    `messaging` is 5 processes in production for 4 queues: `balance: auto` treats `minProcesses`
+    as a floor **per queue** and `maxProcesses` as the pool, so a queue added to a balanced
+    supervisor without raising the pool can be starved of workers.
+
+    `horizon.waits` thresholds: `publishing` 30 s, `whatsapp` 120 s (somebody's phone is the point
+    of it), `default` 60 s, `exports` 120 s (somebody is
     watching a spinner), `reports` 1800 s — a wait past one whole sweep cycle means the engagement
     sweep is no longer keeping up. `AlertOnLongQueueWait` turns Horizon's `LongWaitDetected` into
     an `OpsAlerter` alert, because Horizon's own notification needs a mail/Slack route registered
@@ -77,6 +85,26 @@ the app depends on. Covers Steps I-2.1 (indexes) and I-2.8 (infrastructure drive
   can't run there.
 - Production runs: `php artisan horizon` (supervised, e.g. systemd/Supervisor), `php artisan
 schedule:work` or a cron for `schedule:run`, and `php artisan horizon:terminate` on deploy.
+
+## WhatsApp (Twilio) — Phase W
+
+- **Outbound**: `App\Contracts\WhatsAppClient` → `TwilioWhatsAppClient`
+  (`POST /2010-04-01/Accounts/{sid}/Messages.json`, basic auth, form-encoded). No `twilio/sdk`:
+  two endpoints and a six-line signature check, through the same `Http`/`VendorHttp` stack as every
+  other vendor here. Retries **429 only** (`VendorHttp::forPublish`) — Twilio has no idempotency
+  key for a message, so a retried 5xx can deliver a second copy.
+- **Inbound**: `POST /webhooks/whatsapp` (`WhatsAppWebhookController` → `HandleWhatsAppWebhookAction`),
+  CSRF-exempt via the `webhooks/*` pattern and **fails closed** on `X-Twilio-Signature`. The
+  organization is resolved first (from `MessageSid` for a status callback, from `To` for an inbound
+  message) so its own auth token is tried before the platform's.
+    - That path is excluded from `TrimStrings` **and** `ConvertEmptyStringsToNull` in
+      `bootstrap/app.php`: Twilio signs the exact bytes of its form parameters, so editing them
+      makes a valid signature fail.
+- **Templates**: `php artisan whatsapp:templates` prints the copy to submit to Twilio's Content
+  Template Builder and the env var each approved `ContentSid` goes into. A template with no SID is
+  refused before anything is called, so a missing approval is a configuration error, not a 400.
+- **Never logged**: the auth token, the message body, Twilio's own error text (it quotes the
+  recipient's number back), or more than the last four digits of any number.
 
 ## PHP limits (video uploads)
 

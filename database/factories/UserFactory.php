@@ -42,6 +42,18 @@ class UserFactory extends Factory
     }
 
     /**
+     * Step W-0.4 — a member who can actually be reached on WhatsApp: a number *and* the
+     * verification that makes it routable. Without the second one there is no route at all.
+     */
+    public function whatsAppVerified(string $phone = '+447700900123'): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'phone' => $phone,
+            'phone_verified_at' => now(),
+        ]);
+    }
+
+    /**
      * Assign a specific role to the user.
      */
     public function role(Role $role): static

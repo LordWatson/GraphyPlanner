@@ -13,6 +13,7 @@ import { edit as editNotifications } from '@/routes/notifications';
 import { edit as editPlan } from '@/routes/plan';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
+import { index as whatsappLog } from '@/routes/whatsapp-log';
 import { edit as editWorkspace } from '@/routes/workspace-settings';
 import type { Auth, NavItem } from '@/types';
 
@@ -49,6 +50,10 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     }>().props;
 
     const isOwner = auth.user.role === 'owner';
+    // Step W-4.2: the WhatsApp log is Owner/Strategist, matching who may record a client's
+    // consent in the first place — the log holds the same information.
+    const canReadWhatsAppLog =
+        auth.user.role === 'owner' || auth.user.role === 'strategist';
     const isBusiness = workspace?.type === 'business';
 
     // Step B-3.3: a business owner edits the workspace's own settings (the review switch) in place
@@ -95,6 +100,14 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
               },
           ]
         : sidebarNavItems;
+
+    if (canReadWhatsAppLog && !isBusiness) {
+        navItems.push({
+            title: 'WhatsApp log',
+            href: whatsappLog(),
+            icon: null,
+        });
+    }
 
     return (
         <Page>

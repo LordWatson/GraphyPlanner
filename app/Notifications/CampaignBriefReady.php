@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use App\Models\Campaign;
 use App\Notifications\Campaigns\CampaignNotification;
+use App\Support\WhatsApp\MessageTemplate;
+use App\Support\WhatsApp\WhatsAppTemplateMessage;
 
 /**
  * Step C-2.3 — a portal contact's bell: a campaign brief is waiting for their sign-off.
@@ -30,5 +32,17 @@ class CampaignBriefReady extends CampaignNotification
     protected function url(object $notifiable): string
     {
         return route('portal.campaigns.show', $this->campaign).'#brief';
+    }
+
+    /**
+     * Step W-2.5 — its own approved copy, because "your brief is ready" is a message a client
+     * reads differently from a generic update.
+     */
+    public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
+    {
+        return MessageTemplate::CampaignBriefReady->fill([
+            'campaign_name' => $this->campaign->name,
+            'url' => $this->url($notifiable),
+        ]);
     }
 }

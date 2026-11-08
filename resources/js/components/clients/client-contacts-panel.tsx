@@ -37,6 +37,8 @@ export type ContactData = {
     role_label: string;
     receives_review_emails: boolean;
     receives_invoices: boolean;
+    receives_whatsapp: boolean;
+    whatsapp_consent_at: string | null;
     can: { update: boolean; delete: boolean };
 };
 
@@ -124,6 +126,11 @@ export function ClientContactsPanel({
                                                 Invoices
                                             </Badge>
                                         )}
+                                        {contact.receives_whatsapp && (
+                                            <Badge variant="outline">
+                                                WhatsApp
+                                            </Badge>
+                                        )}
                                     </div>
                                     <span className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
                                         <span className="inline-flex items-center gap-1">
@@ -201,11 +208,14 @@ function AddContactForm({
     const [role, setRole] = useState('approver');
     const [reviewEmails, setReviewEmails] = useState(true);
     const [invoices, setInvoices] = useState(false);
+    // Off by default, always: WhatsApp consent is something they said yes to.
+    const [whatsapp, setWhatsapp] = useState(false);
 
     const reset = () => {
         setRole('approver');
         setReviewEmails(true);
         setInvoices(false);
+        setWhatsapp(false);
     };
 
     // Role drives sensible defaults until the user overrides a box.
@@ -279,6 +289,12 @@ function AddContactForm({
                             checked={invoices}
                             onChange={setInvoices}
                         />
+                        <BooleanField
+                            name="receives_whatsapp"
+                            label="Has agreed to WhatsApp messages"
+                            checked={whatsapp}
+                            onChange={setWhatsapp}
+                        />
                     </div>
                     <div className="col-span-full">
                         <Button type="submit" size="sm" disabled={processing}>
@@ -341,6 +357,7 @@ function EditContactFields({
         contact.receives_review_emails,
     );
     const [invoices, setInvoices] = useState(contact.receives_invoices);
+    const [whatsapp, setWhatsapp] = useState(contact.receives_whatsapp);
 
     return (
         <Form
@@ -410,7 +427,26 @@ function EditContactFields({
                             checked={invoices}
                             onChange={setInvoices}
                         />
+                        <BooleanField
+                            name="receives_whatsapp"
+                            label="Has agreed to WhatsApp messages"
+                            checked={whatsapp}
+                            onChange={setWhatsapp}
+                        />
                     </div>
+                    {whatsapp && (
+                        <p className="text-muted-foreground text-xs">
+                            Only tick this if they have actually said yes —
+                            WhatsApp requires it, and they can reply STOP at any
+                            time.
+                            {contact.whatsapp_consent_at
+                                ? ' Recorded on ' +
+                                  new Date(
+                                      contact.whatsapp_consent_at,
+                                  ).toLocaleDateString()
+                                : ''}
+                        </p>
+                    )}
                     <DialogFooter>
                         <Button
                             type="button"

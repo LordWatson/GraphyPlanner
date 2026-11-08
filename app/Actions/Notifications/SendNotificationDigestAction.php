@@ -6,6 +6,7 @@ use App\Contracts\ChatNotifier;
 use App\Enums\NotificationCategory;
 use App\Mail\NotificationDigestMail;
 use App\Models\User;
+use App\Notifications\DailyDigestReady;
 use App\Services\Notifications\NullChatNotifier;
 use App\Support\Notifications\NotificationPreferences;
 use Carbon\CarbonInterface;
@@ -41,10 +42,14 @@ class SendNotificationDigestAction
 
                     Mail::to($user->email)->queue(new NotificationDigestMail($user->name, $items));
 
-                    // Step M-6.7: the WhatsApp seam — a no-op today (NullChatNotifier).
+                    // Step M-6.7: the team-chat seam (Slack by default).
                     if ($user->organization !== null) {
                         $this->chat->notifyOrganization($user->organization, 'Daily digest', count($items).' updates', null);
                     }
+
+                    // Step W-2.6: and the same count on WhatsApp, for whoever opted in. The
+                    // notification decides: no verified number or no opt-in means no message.
+                    $user->notify(new DailyDigestReady(count($items)));
 
                     $sent++;
                 }

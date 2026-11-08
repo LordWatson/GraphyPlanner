@@ -17,7 +17,7 @@ class UpdateOrganizationSettingsAction
      * to "keep" it). Saving a new Upload-Post key also registers the publish webhook with the
      * vendor and stores its secret (Step I-3.6 / M-2.5).
      *
-     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, require_two_factor?: bool|int|string|null, blended_hourly_rate_minor?: int|string|null, xai_key?: string|null}  $data
+     * @param  array{default_timezone: string, default_currency: string, approval_sla_hours?: int|string|null, billing_details?: string|null, payment_instructions?: string|null, tax_registration_number?: string|null, tax_registration_label?: string|null, invoice_payment_terms_days?: int|string|null, upload_post_key?: string|null, upload_post_webhook_secret?: string|null, chat_webhook_url?: string|null, restrict_staff_to_assigned_clients?: bool|int|string|null, require_two_factor?: bool|int|string|null, blended_hourly_rate_minor?: int|string|null, xai_key?: string|null, whatsapp_enabled?: bool|int|string|null, whatsapp_account_sid?: string|null, whatsapp_auth_token?: string|null, whatsapp_from?: string|null, whatsapp_messaging_service_sid?: string|null}  $data
      */
     public function __invoke(Organization $organization, array $data): Organization
     {
@@ -99,6 +99,24 @@ class UpdateOrganizationSettingsAction
                 $organization->chat_webhook_url = $data['chat_webhook_url'];
             }
 
+            // Step W-4.1: the Twilio auth token is a credential and follows the rule above — a
+            // blank submit keeps it. The identifiers beside it are not secrets, so they clear
+            // normally, and `whatsapp_enabled` is the off switch that leaves the credentials in
+            // place (`WhatsAppCredentials::isConfiguredFor()` reads it first).
+            if (! empty($data['whatsapp_auth_token'])) {
+                $organization->whatsapp_auth_token = $data['whatsapp_auth_token'];
+            }
+
+            foreach (['whatsapp_account_sid', 'whatsapp_from', 'whatsapp_messaging_service_sid'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $organization->{$field} = $data[$field] ?: null;
+                }
+            }
+
+            if (array_key_exists('whatsapp_enabled', $data)) {
+                $organization->whatsapp_enabled = (bool) $data['whatsapp_enabled'];
+            }
+
             // Step GTM-3.1: white-label branding. Saved whether or not the plan includes it —
             // `BrandingResolver` decides whether it reaches a client, so a downgrade hides the
             // branding without throwing away what the agency typed.
@@ -121,6 +139,7 @@ class UpdateOrganizationSettingsAction
                 'upload_post_key_updated' => ! empty($data['upload_post_key']),
                 'upload_post_webhook_secret_updated' => ! empty($data['upload_post_webhook_secret']),
                 'xai_key_updated' => ! empty($data['xai_key']),
+                'whatsapp_token_updated' => ! empty($data['whatsapp_auth_token']),
             ]);
 
             return $organization;
