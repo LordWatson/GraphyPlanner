@@ -316,3 +316,408 @@
         }
     }
 }
+
+/*
+ * Homepage (marketing) motion — the expressive front-page build only (welcome.tsx and its
+ * `components/marketing/home/*`). Namespaced `hm-*` so it never leaks into the calm app surfaces,
+ * and every animation is disabled under prefers-reduced-motion (§11). Colours still come from the
+ * brand tokens; these are motion keyframes, not new palette.
+ */
+@layer utilities {
+    .hm-screen {
+        animation: hm-fade-up 380ms var(--ease-brand);
+    }
+
+    .hm-word {
+        display: inline-block;
+        animation: hm-word-in 500ms var(--ease-brand);
+    }
+
+    .hm-drawer {
+        animation: hm-slide-in 260ms var(--ease-brand);
+    }
+
+    .hm-marquee {
+        animation: hm-marquee 34s linear infinite;
+    }
+
+    .hm-pulse {
+        animation: hm-pulse 1.8s ease-in-out infinite;
+    }
+
+    .hm-pulse-red {
+        animation: hm-pulse-red 1.6s ease-in-out infinite;
+    }
+
+    .hm-tourbar {
+        transform-origin: left;
+        animation: hm-grow 5500ms linear;
+    }
+
+    .hm-toast {
+        animation:
+            hm-pop-in 600ms both var(--ease-brand),
+            hm-floaty 5.5s 1s ease-in-out infinite;
+    }
+    .hm-toast-1 {
+        animation-delay: 0ms, 0.9s;
+    }
+    .hm-toast-2 {
+        animation-delay: 400ms, 1.3s;
+    }
+    .hm-toast-3 {
+        animation-delay: 800ms, 1.7s;
+    }
+    .hm-toast-4 {
+        animation-delay: 1200ms, 2.1s;
+    }
+
+    .hm-confetti {
+        position: absolute;
+        top: 0;
+        width: 9px;
+        height: 14px;
+        border-radius: 2px;
+        animation: hm-confetti 2.2s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+    }
+
+    .hm-app-toast {
+        animation: hm-toast-up 300ms var(--ease-brand);
+    }
+
+    .hm-shimmer {
+        background: linear-gradient(
+            90deg,
+            var(--secondary) 0%,
+            var(--card) 50%,
+            var(--secondary) 100%
+        );
+        background-size: 800px 100%;
+        animation: hm-shimmer 1.1s linear infinite;
+        border-radius: 8px;
+    }
+
+    .hm-dot-1 {
+        animation: hm-dots 1s infinite;
+    }
+    .hm-dot-2 {
+        animation: hm-dots 1s 0.2s infinite;
+    }
+    .hm-dot-3 {
+        animation: hm-dots 1s 0.4s infinite;
+    }
+
+    .hm-typed {
+        display: inline-block;
+        overflow: hidden;
+        white-space: nowrap;
+        vertical-align: bottom;
+        animation: hm-typing 5s steps(15) infinite;
+    }
+    .hm-caret {
+        animation: hm-blink 1s step-end infinite;
+    }
+
+    .hm-reveal {
+        animation: hm-fade-up 700ms var(--ease-brand) both;
+    }
+    @supports (animation-timeline: view()) {
+        .hm-reveal {
+            animation-timeline: view();
+            animation-range: entry 0% cover 25%;
+        }
+    }
+
+    /* Range slider thumb (the calculator + before/after handle). */
+    .hm-range {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--input);
+        outline: none;
+    }
+    .hm-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--lime);
+        border: 4px solid var(--ink);
+        cursor: pointer;
+    }
+    .hm-range::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--lime);
+        border: 4px solid var(--ink);
+        cursor: pointer;
+    }
+
+    @keyframes hm-fade-up {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @keyframes hm-word-in {
+        from {
+            opacity: 0;
+            transform: translateY(40%) rotate(2deg);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @keyframes hm-slide-in {
+        from {
+            transform: translateX(24px);
+            opacity: 0;
+        }
+        to {
+            transform: none;
+            opacity: 1;
+        }
+    }
+    @keyframes hm-marquee {
+        from {
+            transform: translateX(0);
+        }
+        to {
+            transform: translateX(-50%);
+        }
+    }
+    @keyframes hm-pulse {
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgb(91 189 127 / 0.6);
+        }
+        50% {
+            box-shadow: 0 0 0 6px rgb(91 189 127 / 0);
+        }
+    }
+    @keyframes hm-pulse-red {
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgb(240 61 42 / 0.6);
+        }
+        50% {
+            box-shadow: 0 0 0 8px rgb(240 61 42 / 0);
+        }
+    }
+    @keyframes hm-grow {
+        from {
+            transform: scaleX(0);
+        }
+        to {
+            transform: scaleX(1);
+        }
+    }
+    @keyframes hm-floaty {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+    @keyframes hm-pop-in {
+        0% {
+            opacity: 0;
+            transform: scale(0.8) translateY(20px);
+        }
+        100% {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @keyframes hm-confetti {
+        0% {
+            transform: translateY(-30px) rotate(0);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(560px) rotate(600deg);
+            opacity: 0;
+        }
+    }
+    @keyframes hm-toast-up {
+        from {
+            opacity: 0;
+            transform: translate(-50%, 16px);
+        }
+        to {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+    }
+    @keyframes hm-shimmer {
+        0% {
+            background-position: -400px 0;
+        }
+        100% {
+            background-position: 400px 0;
+        }
+    }
+    @keyframes hm-dots {
+        0%,
+        20% {
+            opacity: 0.2;
+        }
+        50% {
+            opacity: 1;
+        }
+        100% {
+            opacity: 0.2;
+        }
+    }
+    @keyframes hm-typing {
+        0%,
+        10% {
+            width: 0;
+        }
+        45%,
+        80% {
+            width: 15ch;
+        }
+        100% {
+            width: 0;
+        }
+    }
+    @keyframes hm-blink {
+        50% {
+            opacity: 0;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .hm-screen,
+        .hm-word,
+        .hm-drawer,
+        .hm-marquee,
+        .hm-pulse,
+        .hm-pulse-red,
+        .hm-tourbar,
+        .hm-toast,
+        .hm-confetti,
+        .hm-app-toast,
+        .hm-shimmer,
+        .hm-dot-1,
+        .hm-dot-2,
+        .hm-dot-3,
+        .hm-typed,
+        .hm-caret,
+        .hm-reveal {
+            animation: none !important;
+        }
+    }
+}
+
+/*
+ * Homepage hover reveals — the feature bento tiles and the card lift. Hover-only so they sit quiet
+ * until a pointer is over them; disabled under prefers-reduced-motion. Homepage marketing only.
+ */
+@layer utilities {
+    .hm-tile {
+        transition:
+            transform 300ms var(--ease-brand),
+            box-shadow 300ms var(--ease-brand);
+    }
+    @media (hover: hover) {
+        .hm-tile:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 18px 40px -20px rgb(24 23 35 / 0.45);
+        }
+    }
+
+    /* Campaign tile: progress bars fill from a stub to their real value on hover. */
+    .hm-bar {
+        display: block;
+        height: 100%;
+        width: 14%;
+        border-radius: 999px;
+        transition: width 900ms var(--ease-brand);
+    }
+    .hm-tile-camp:hover .hm-bar {
+        width: var(--w);
+    }
+
+    /* Grids tile: the swatch grid reshuffles. */
+    .hm-sq {
+        transition: transform 500ms var(--ease-brand);
+    }
+    .hm-tile-grid:hover .hm-sq:nth-child(3n + 1) {
+        transform: translateX(100%);
+    }
+    .hm-tile-grid:hover .hm-sq:nth-child(3n + 2) {
+        transform: translateY(100%);
+    }
+    .hm-tile-grid:hover .hm-sq:nth-child(3n) {
+        transform: translate(-200%, -100%);
+    }
+
+    /* AI image tile: the stacked cards fan out. */
+    .hm-card {
+        transition: transform 500ms var(--ease-brand);
+    }
+    .hm-tile-img:hover .hm-c1 {
+        transform: rotate(-14deg) translate(-46px, 6px);
+    }
+    .hm-tile-img:hover .hm-c3 {
+        transform: rotate(14deg) translate(46px, 6px);
+    }
+    .hm-tile-img:hover .hm-c2 {
+        transform: translateY(-10px);
+    }
+
+    /* Inbox tile: the third reply slides in. */
+    .hm-msg3 {
+        opacity: 0;
+        transform: translateY(12px);
+        transition:
+            opacity 450ms var(--ease-brand),
+            transform 450ms var(--ease-brand);
+    }
+    .hm-tile-inbox:hover .hm-msg3 {
+        opacity: 1;
+        transform: none;
+    }
+
+    /* Final CTA: the peek rises when the panel is hovered. */
+    .hm-peek {
+        transition: transform 400ms var(--ease-brand);
+    }
+    .hm-cta-box:hover .hm-peek {
+        transform: translateY(-36px) rotate(-4deg);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .hm-tile,
+        .hm-bar,
+        .hm-sq,
+        .hm-card,
+        .hm-msg3,
+        .hm-peek {
+            transition: none !important;
+        }
+        .hm-tile:hover {
+            transform: none;
+        }
+        .hm-bar {
+            width: var(--w);
+        }
+        .hm-msg3 {
+            opacity: 1;
+            transform: none;
+        }
+    }
+}

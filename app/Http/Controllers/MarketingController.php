@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReferralPartner;
-use App\Support\Plans\Plan;
 use App\Support\Plans\PlanCatalog;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -55,10 +54,10 @@ class MarketingController extends Controller
 
         return Inertia::render('marketing/compare', [
             'rival' => ['slug' => $rival, ...$rivals[$rival]],
-            'others' => array_values(array_map(
+            'others' => array_map(
                 fn (string $slug) => ['slug' => $slug, 'name' => $rivals[$slug]['name']],
                 array_values(array_diff(array_keys($rivals), [$rival])),
-            )),
+            ),
             'lastChecked' => (string) config('competitors.last_checked'),
             'pricing' => $this->pricingData(),
         ]);
@@ -102,13 +101,6 @@ class MarketingController extends Controller
      */
     private function pricingData(): array
     {
-        return [
-            'plans' => array_map(
-                fn (Plan $plan) => $plan->toArray(['gbp', 'usd']),
-                $this->catalog->public(),
-            ),
-            'currencies' => (array) config('plans.currencies'),
-            'annual_discount_label' => (string) config('plans.annual_discount_label'),
-        ];
+        return $this->catalog->publicPricing(['gbp', 'usd']);
     }
 }

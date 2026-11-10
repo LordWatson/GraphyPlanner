@@ -1,246 +1,541 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import {
-    ArrowRight,
-    ArrowUpRight,
-    CalendarDays,
-    CheckCheck,
-    UsersRound,
-} from 'lucide-react';
+import { ArrowRight, CirclePlay, Menu, Star, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { BrandMark } from '@/components/brand-mark';
-import { CampaignsSection } from '@/components/marketing/campaigns-section';
-import { Peek } from '@/components/brand-poster';
-import { Eyebrow } from '@/components/page';
-import { StatusPill } from '@/components/status-pill';
+import { ArtworkSvg, BrandMark } from '@/components/brand-mark';
+import { markArtwork } from '@/components/brand/artwork';
+import { Audiences } from '@/components/marketing/home/audiences';
+import { BrandBrain } from '@/components/marketing/home/brand-brain';
+import { ChaosCalm } from '@/components/marketing/home/chaos-calm';
+import { Faq } from '@/components/marketing/home/faq';
+import { FeatureBento } from '@/components/marketing/home/feature-bento';
+import { Pricing } from '@/components/marketing/home/pricing';
+import { ProductDemo } from '@/components/marketing/home/product-demo';
+import { TimeCalculator } from '@/components/marketing/home/time-calculator';
+import type { PricingData } from '@/components/marketing/pricing-table';
 import { Button } from '@/components/ui/button';
-import { about, dashboard, login, register } from '@/routes';
+import type { Auth } from '@/types';
+import { dashboard, login, register } from '@/routes';
 
-const features = [
-    {
-        icon: UsersRound,
-        title: 'Every client, one roster',
-        description:
-            'Clients, brands, campaigns and retainers side by side — with health you can read at a glance.',
-    },
-    {
-        icon: CalendarDays,
-        title: 'A calendar the team trusts',
-        description:
-            'Draft, review and schedule across every platform and timezone on one shared calendar.',
-    },
-    {
-        icon: CheckCheck,
-        title: 'Approvals without the chase',
-        description:
-            'Clients approve from a clean, branded link. Everyone always knows where a post stands.',
-    },
+const NAV_LINKS: [string, string][] = [
+    ['#tour', 'Product tour'],
+    ['#features', 'Features'],
+    ['#ai', 'AI'],
+    ['#pricing', 'Pricing'],
 ];
 
-const weekStrip = [
-    {
-        day: 'Mon',
-        date: '12',
-        posts: [
-            { client: 'Northwind', status: 'published' },
-            { client: 'Fable & Co', status: 'published' },
-        ],
-    },
-    {
-        day: 'Tue',
-        date: '13',
-        posts: [{ client: 'Lumen Studio', status: 'scheduled' }],
-    },
-    {
-        day: 'Wed',
-        date: '14',
-        posts: [
-            { client: 'Northwind', status: 'waiting_client' },
-            { client: 'Oro Coffee', status: 'scheduled' },
-        ],
-    },
-    {
-        day: 'Thu',
-        date: '15',
-        posts: [{ client: 'Fable & Co', status: 'changes_requested' }],
-    },
-    {
-        day: 'Fri',
-        date: '16',
-        posts: [{ client: 'Oro Coffee', status: 'approved' }],
-    },
-];
+const WORDS = ['post', 'client', 'campaign', 'approval', 'invoice'];
 
-export default function Welcome() {
-    const { auth } = usePage().props;
+/**
+ * The public homepage (served at `/` for the app host). A long, expressive marketing page that runs
+ * from a live product demo through the Brand Brain, a time calculator, the feature bento, audiences,
+ * pricing and FAQ. Interactivity is client-side React state; motion lives in `hm-*` utilities.
+ */
+export default function Welcome({ pricing }: { pricing: PricingData }) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [word, setWord] = useState(0);
+
+    useEffect(() => {
+        const t = setInterval(
+            () => setWord((w) => (w + 1) % WORDS.length),
+            2200,
+        );
+        return () => clearInterval(t);
+    }, []);
+
+    const scrollTo = (id: string) => () =>
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
     return (
         <>
-            <Head title="Welcome" />
-            <div className="bg-background text-foreground relative flex min-h-screen flex-col">
-                <header className="relative mx-auto flex h-[88px] w-full max-w-[1280px] items-center justify-between px-5 md:px-10 lg:px-20">
-                    <BrandMark size="md" wordmark />
-                    <nav className="flex items-center gap-1.5">
-                        <Button
-                            variant="ghost"
-                            asChild
-                            className="hidden sm:inline-flex"
+            <Head title="Alima Planner — one calm planner for every post" />
+            <div
+                id="top"
+                className="bg-background text-foreground relative overflow-x-clip"
+            >
+                {/* ===== HEADER ===== */}
+                <header className="bg-background/90 sticky top-0 z-40 border-b backdrop-blur-xl">
+                    <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-6 px-5 md:h-20 md:px-10 lg:px-20">
+                        <Link
+                            href="/"
+                            aria-label="Alima Planner home"
+                            className="flex items-center gap-3.5"
                         >
-                            <Link href={about()}>About</Link>
-                        </Button>
-                        {auth.user ? (
-                            <Button asChild>
-                                <Link href={dashboard()}>
-                                    Open planner
-                                    <ArrowRight />
-                                </Link>
-                            </Button>
-                        ) : (
-                            <>
-                                <Button variant="ghost" asChild>
+                            <BrandMark size="md" wordmark />
+                            <span className="eyebrow text-primary hidden sm:inline">
+                                PLANNER
+                            </span>
+                        </Link>
+                        <nav
+                            aria-label="Main"
+                            className="hidden items-center gap-9 lg:flex"
+                        >
+                            {NAV_LINKS.map(([href, label]) => (
+                                <a
+                                    key={href}
+                                    href={href}
+                                    className="hover:text-primary text-base transition-colors"
+                                >
+                                    {label}
+                                </a>
+                            ))}
+                        </nav>
+                        <div className="flex items-center gap-2">
+                            {auth.user ? (
+                                <Button
+                                    asChild
+                                    className="hidden lg:inline-flex"
+                                >
+                                    <Link href={dashboard()}>
+                                        Open planner
+                                        <ArrowRight />
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        asChild
+                                        className="hidden lg:inline-flex"
+                                    >
+                                        <Link href={login()}>Log in</Link>
+                                    </Button>
+                                    <Button
+                                        asChild
+                                        className="hidden lg:inline-flex"
+                                    >
+                                        <Link href={register()}>
+                                            Let&apos;s talk
+                                        </Link>
+                                    </Button>
+                                </>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setMenuOpen((o) => !o)}
+                                aria-label={
+                                    menuOpen ? 'Close menu' : 'Open menu'
+                                }
+                                aria-expanded={menuOpen}
+                                className="bg-ink text-cream flex size-11 items-center justify-center rounded-full lg:hidden"
+                            >
+                                {menuOpen ? (
+                                    <X className="size-5" />
+                                ) : (
+                                    <Menu className="size-5" />
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                    {menuOpen && (
+                        <nav
+                            aria-label="Mobile"
+                            className="hm-screen border-border flex flex-col border-t px-5 pt-2 pb-6 lg:hidden"
+                        >
+                            {NAV_LINKS.map(([href, label]) => (
+                                <a
+                                    key={href}
+                                    href={href}
+                                    onClick={() => setMenuOpen(false)}
+                                    className="border-border border-b py-3 text-[28px] font-bold tracking-tight"
+                                >
+                                    {label}
+                                </a>
+                            ))}
+                            <div className="mt-5 flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="flex-1"
+                                >
                                     <Link href={login()}>Log in</Link>
                                 </Button>
-                                <Button asChild>
+                                <Button asChild className="flex-1">
                                     <Link href={register()}>
                                         Let&apos;s talk
                                     </Link>
                                 </Button>
-                            </>
-                        )}
-                    </nav>
+                            </div>
+                        </nav>
+                    )}
                 </header>
 
-                <main className="relative mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-24 px-5 pb-24 md:px-10 lg:px-20">
-                    <section className="animate-rise border-foreground relative flex min-h-[560px] flex-col justify-center gap-8 overflow-hidden border-b-2 pt-10 pb-56 sm:pb-64 lg:pb-24">
-                        <Eyebrow dash className="text-primary">
-                            Alima Planner
-                        </Eyebrow>
-                        <h1 className="font-display max-w-4xl text-[clamp(3.5rem,8vw,6rem)] leading-[1.02]">
-                            Every post, planned{' '}
-                            <span className="text-signal">brighter.</span>
-                        </h1>
-                        <p className="text-muted-foreground max-w-xl text-lg leading-relaxed text-pretty">
-                            Clients, brands, campaigns and scheduled posts in
-                            one bright workspace — so the team spends its time
-                            on the work, not on tracking it.
-                        </p>
-                        {!auth.user && (
-                            <div className="flex flex-wrap items-center gap-3">
-                                <Button size="lg" variant="spark" asChild>
+                {/* ===== HERO ===== */}
+                <section className="mx-auto flex max-w-[1280px] flex-col gap-6 px-5 pt-12 pb-10 md:gap-8 md:px-10 md:pt-20 lg:px-20">
+                    <span className="eyebrow text-primary flex items-center gap-3.5 tracking-[0.24em]">
+                        <span aria-hidden className="bg-signal h-0.5 w-7" />
+                        BOLD IDEAS. CALM PLANNING.
+                    </span>
+                    <h1
+                        className="font-display text-[clamp(48px,8.4vw,120px)] leading-[1.04] font-bold tracking-tight"
+                        aria-label="One calm planner for every post, client, campaign, approval and invoice."
+                    >
+                        <span aria-hidden>
+                            One calm planner
+                            <br />
+                            for every{' '}
+                            <span className="inline-grid text-left">
+                                <span
+                                    aria-hidden
+                                    className="invisible col-start-1 row-start-1 px-[0.06em] whitespace-nowrap"
+                                >
+                                    campaign.
+                                </span>
+                                <span
+                                    key={word}
+                                    className="hm-word col-start-1 row-start-1 justify-self-start whitespace-nowrap"
+                                >
+                                    <span className="text-primary bg-[linear-gradient(transparent_56%,var(--lime)_56%,var(--lime)_90%,transparent_90%)] px-[0.06em]">
+                                        {WORDS[word]}
+                                    </span>
+                                    <span className="text-signal">.</span>
+                                </span>
+                            </span>
+                        </span>
+                    </h1>
+                    <div className="flex flex-wrap items-end justify-between gap-8">
+                        <div className="flex max-w-[600px] flex-1 basis-[460px] flex-col gap-6.5">
+                            <p
+                                className="text-[clamp(18px,1.5vw,21px)] leading-relaxed"
+                                style={{ color: '#4A4857' }}
+                            >
+                                Briefs, calendars, client approvals, publishing
+                                to nine networks, reports and invoices — run
+                                from one workspace, with AI that knows every
+                                brand you manage.
+                            </p>
+                            <div className="flex flex-wrap gap-2.5">
+                                <Button size="xl" variant="spark" asChild>
                                     <Link href={register()}>
                                         Let&apos;s grow
                                         <ArrowRight />
                                     </Link>
                                 </Button>
-                                <Button size="lg" variant="outline" asChild>
-                                    <Link href={about()}>See the work</Link>
+                                <Button
+                                    size="xl"
+                                    variant="outline"
+                                    onClick={scrollTo('tour')}
+                                >
+                                    <CirclePlay />
+                                    Play with the demo
                                 </Button>
                             </div>
-                        )}
-                        <Peek className="text-lilac right-0 w-[min(92%,30rem)] lg:-right-4" />
-                    </section>
-
-                    <section
-                        aria-label="A week in Alima Planner"
-                        className="animate-rise border-border/70 bg-card rounded-2xl border p-3 shadow-md [animation-delay:80ms]"
-                    >
-                        <div className="flex items-center justify-between px-3 pt-2 pb-4">
-                            <span className="font-display text-xl">
-                                This <span className="text-primary">week</span>.
-                            </span>
-                            <span className="eyebrow text-muted-foreground">
-                                5 clients · 8 posts
-                            </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                            {weekStrip.map((day) => (
-                                <div
-                                    key={day.day}
-                                    className="border-border/70 bg-background flex min-h-40 flex-col gap-2 rounded-xl border p-3"
+                        {/* floating live notifications */}
+                        <div
+                            aria-hidden
+                            className="relative hidden h-[230px] flex-[0_0_470px] lg:block"
+                        >
+                            <div className="hm-toast hm-toast-1 bg-card absolute top-0 left-0 flex items-center gap-3 rounded-[18px] px-4 py-3 text-sm leading-snug shadow-[0_12px_30px_-12px_rgb(24_23_35/0.35)]">
+                                <span className="bg-lime flex size-9 items-center justify-center rounded-full">
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="var(--ink)"
+                                        strokeWidth="2.6"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M20 6 9 17l-5-5" />
+                                    </svg>
+                                </span>
+                                <span className="flex flex-col">
+                                    <b className="font-semibold">
+                                        Oro Coffee approved 3 posts
+                                    </b>
+                                    <span className="text-muted-foreground text-xs">
+                                        Client portal · just now
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="hm-toast hm-toast-2 bg-ink text-cream absolute top-14 right-0 flex items-center gap-3 rounded-[18px] px-4 py-3 text-sm leading-snug shadow-[0_12px_30px_-12px_rgb(24_23_35/0.5)]">
+                                <span className="text-lime font-mono text-xl font-medium">
+                                    £2,400
+                                </span>
+                                <span className="flex flex-col">
+                                    <b className="font-semibold">
+                                        Invoice paid
+                                    </b>
+                                    <span
+                                        className="text-xs"
+                                        style={{ color: '#C9C6C1' }}
+                                    >
+                                        Northwind · INV-0142
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="hm-toast hm-toast-3 bg-card absolute top-[118px] left-10 flex items-center gap-3 rounded-[18px] px-4 py-3 text-sm leading-snug shadow-[0_12px_30px_-12px_rgb(24_23_35/0.35)]">
+                                <span className="bg-teal flex size-9 items-center justify-center rounded-full">
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="var(--cream)"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="m22 2-7 20-4-9-9-4Z" />
+                                    </svg>
+                                </span>
+                                <span className="flex flex-col">
+                                    <b className="font-semibold">
+                                        Reel published to 3 networks
+                                    </b>
+                                    <span className="text-muted-foreground text-xs">
+                                        Kite Bakery · 18:00
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="hm-toast hm-toast-4 bg-lilac absolute top-[172px] right-[18px] flex items-center gap-2.5 rounded-[18px] px-3.5 py-2.5 text-sm font-semibold shadow-[0_12px_30px_-12px_rgb(24_23_35/0.35)]">
+                                <Star className="size-4" />
+                                Brand Brain: 5 ideas ready
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <ProductDemo />
+
+                {/* ===== NETWORKS MARQUEE ===== */}
+                <section
+                    aria-label="Networks Alima publishes to"
+                    className="bg-ink text-cream overflow-hidden py-6"
+                >
+                    <div className="hm-marquee flex w-max gap-14 text-[clamp(22px,2.6vw,34px)] font-bold tracking-tight whitespace-nowrap">
+                        {Array.from({ length: 2 }).flatMap((_, rep) =>
+                            [
+                                'Instagram',
+                                'TikTok',
+                                'Facebook',
+                                'LinkedIn',
+                                'YouTube',
+                                'Threads',
+                                'Pinterest',
+                                'X',
+                                'Google Business',
+                            ].flatMap((name, i) => [
+                                <span
+                                    key={`${rep}-n-${i}`}
+                                    aria-hidden={rep > 0}
                                 >
-                                    <div className="flex items-baseline justify-between">
-                                        <span className="eyebrow text-muted-foreground">
-                                            {day.day}
-                                        </span>
-                                        <span className="font-display text-2xl leading-none font-bold">
-                                            {day.date}
-                                        </span>
-                                    </div>
-                                    {day.posts.map((post) => (
-                                        <div
-                                            key={post.client + post.status}
-                                            className="border-border/70 bg-card flex flex-col gap-1.5 rounded-lg border p-2"
-                                        >
-                                            <span className="text-xs font-medium">
-                                                {post.client}
-                                            </span>
-                                            <StatusPill
-                                                kind="post"
-                                                value={post.status}
-                                            />
-                                        </div>
-                                    ))}
+                                    {name}
+                                </span>,
+                                <span
+                                    key={`${rep}-s-${i}`}
+                                    aria-hidden
+                                    className={
+                                        [
+                                            'text-lime',
+                                            'text-signal',
+                                            'text-lilac',
+                                        ][i % 3]
+                                    }
+                                >
+                                    ✦
+                                </span>,
+                            ]),
+                        )}
+                    </div>
+                </section>
+
+                <ChaosCalm />
+                <BrandBrain />
+                <TimeCalculator />
+                <FeatureBento />
+                <Audiences />
+
+                {/* ===== PROOF =====
+                    PLACEHOLDER (replace with real data): the 4th stat tile and the testimonial below
+                    are illustrative examples, not verified figures or a real customer quote. Swap
+                    them for real numbers and a genuine, attributable testimonial before relying on
+                    them in production. The other three stats are factual and can stay. */}
+                <section className="bg-teal text-cream">
+                    <div className="mx-auto flex max-w-[1280px] flex-col gap-12 px-5 py-14 md:px-10 md:py-20 lg:px-20 lg:py-24">
+                        <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+                            {(
+                                [
+                                    ['9', 'networks from one calendar'],
+                                    ['0%', 'fee on creator sales'],
+                                    ['UK·UAE', 'built for both markets'],
+                                    ['6 hrs', 'a week back on approvals'],
+                                ] as const
+                            ).map(([value, label]) => (
+                                <div
+                                    key={label}
+                                    className="flex min-w-0 flex-col gap-1.5 border-t-2 pt-4"
+                                    style={{ borderColor: 'var(--cream)' }}
+                                >
+                                    <span className="text-lime text-[clamp(40px,5vw,72px)] leading-[0.95] font-bold tracking-tight">
+                                        {value}
+                                    </span>
+                                    <span
+                                        className="text-base"
+                                        style={{ color: '#E4E9E1' }}
+                                    >
+                                        {label}
+                                    </span>
                                 </div>
                             ))}
                         </div>
-                    </section>
+                        <figure className="flex max-w-[980px] flex-col gap-5.5">
+                            <blockquote className="text-[clamp(28px,3.6vw,46px)] leading-tight font-light tracking-tight">
+                                “We used to chase sign-off across four group
+                                chats. Now every client approves from one link —
+                                and we got hours back every week.”
+                            </blockquote>
+                            <figcaption className="flex items-center gap-3.5 text-base">
+                                <span className="bg-lilac size-12 rounded-full" />
+                                <span className="flex flex-col leading-snug">
+                                    <b className="font-semibold">Maya Karim</b>
+                                    <span style={{ color: '#CAD3CB' }}>
+                                        Founder, Studio Kite
+                                    </span>
+                                </span>
+                            </figcaption>
+                        </figure>
+                    </div>
+                </section>
 
-                    <section className="grid grid-cols-1 gap-10 sm:grid-cols-3">
-                        {features.map(
-                            ({ icon: Icon, title, description }, i) => (
-                                <div
-                                    key={title}
-                                    className="border-foreground flex flex-col gap-4 border-t-2 pt-6"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-full">
-                                            <Icon className="size-6" />
-                                        </span>
-                                        <span className="text-muted-foreground font-mono text-xs">
-                                            {String(i + 1).padStart(2, '0')}
-                                        </span>
-                                    </div>
-                                    <h2 className="font-display text-2xl leading-[1.15]">
-                                        {title}
-                                    </h2>
-                                    <p className="text-muted-foreground text-[15px] leading-relaxed">
-                                        {description}
-                                    </p>
-                                </div>
-                            ),
-                        )}
-                    </section>
+                <Pricing pricing={pricing} onTalk={scrollTo('talk')} />
+                <Faq onTalk={scrollTo('talk')} />
 
-                    <CampaignsSection />
-                </main>
+                {/* ===== FINAL CTA ===== */}
+                <section
+                    id="talk"
+                    className="scroll-mt-24 px-3 pt-6 pb-10 md:px-12 md:pt-12 md:pb-16"
+                >
+                    <div className="hm-cta-box bg-ink text-cream relative mx-auto flex max-w-[1344px] flex-col gap-6 overflow-hidden rounded-[36px] px-6 pt-10 pb-44 md:px-16 md:pt-16 md:pb-52 lg:px-24 lg:pt-24 lg:pb-56">
+                        <span className="eyebrow text-lime flex items-center gap-3.5 tracking-[0.24em]">
+                            <span aria-hidden className="bg-signal h-0.5 w-7" />
+                            READY WHEN YOU ARE
+                        </span>
+                        <h2 className="font-display max-w-[900px] text-[clamp(52px,8vw,120px)] leading-[0.95] font-bold tracking-tight">
+                            Marketing brighter together
+                            <span className="text-signal">.</span>
+                        </h2>
+                        <div className="relative z-10 flex flex-wrap gap-2.5">
+                            <Button size="xl" variant="spark" asChild>
+                                <Link href={register()}>
+                                    Let&apos;s talk
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                            {!auth.user && (
+                                <Button size="xl" variant="on-ink" asChild>
+                                    <Link href={login()}>Log in</Link>
+                                </Button>
+                            )}
+                        </div>
+                        {/* The peek: the panda bleeding up over the bottom edge, eyes in frame.
+                            The wrapper does the bleed (translate-y); the artwork carries the
+                            hover-rise (hm-peek) so the two transforms don't collide. */}
+                        <div
+                            aria-hidden
+                            className="pointer-events-none absolute right-2 bottom-0 w-[clamp(260px,38vw,520px)] translate-y-[32%] md:right-10"
+                        >
+                            <ArtworkSvg
+                                artwork={markArtwork}
+                                className="hm-peek text-signal block h-auto w-full"
+                            />
+                        </div>
+                    </div>
+                </section>
 
-                <footer className="bg-ink text-cream relative">
-                    <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-12 px-5 pt-16 pb-8 md:px-10 lg:px-20">
-                        <div className="flex flex-wrap items-end justify-between gap-8">
-                            <div className="flex flex-col gap-6">
+                {/* ===== FOOTER ===== */}
+                <footer className="bg-ink text-cream">
+                    <div aria-hidden className="bg-spectrum h-1.5" />
+                    <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 pt-13 pb-8 md:px-10 lg:px-20">
+                        <div className="flex flex-wrap justify-between gap-10">
+                            <div className="flex max-w-[360px] flex-1 basis-[260px] flex-col gap-4">
                                 <BrandMark
                                     size="lg"
                                     wordmark
                                     className="text-cream"
                                 />
-                                <p className="font-display max-w-md text-3xl leading-[1.1]">
-                                    Marketing brighter together
-                                    <span className="text-signal">.</span>
-                                </p>
+                                <span
+                                    className="text-[15px]"
+                                    style={{ color: '#C9C6C1' }}
+                                >
+                                    Clients, campaigns, content, approvals,
+                                    reports and invoices — in one calm planner.
+                                </span>
                             </div>
-                            <Link
-                                href={about()}
-                                className="group text-cream/80 hover:text-cream inline-flex items-center gap-1.5 text-sm font-medium"
-                            >
-                                More about the planner
-                                <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                            </Link>
+                            <div className="flex flex-wrap gap-8 text-[15px] md:gap-16 lg:gap-20">
+                                <div className="flex flex-col gap-2.5">
+                                    <span
+                                        className="font-mono text-[11px] tracking-[0.2em]"
+                                        style={{ color: '#9D9A99' }}
+                                    >
+                                        PRODUCT
+                                    </span>
+                                    <a
+                                        href="#tour"
+                                        className="text-cream/90 hover:text-cream"
+                                    >
+                                        Product tour
+                                    </a>
+                                    <a
+                                        href="#features"
+                                        className="text-cream/90 hover:text-cream"
+                                    >
+                                        Features
+                                    </a>
+                                    <a
+                                        href="#pricing"
+                                        className="text-cream/90 hover:text-cream"
+                                    >
+                                        Pricing
+                                    </a>
+                                </div>
+                                <div className="flex flex-col gap-2.5">
+                                    <span
+                                        className="font-mono text-[11px] tracking-[0.2em]"
+                                        style={{ color: '#9D9A99' }}
+                                    >
+                                        ALIMA
+                                    </span>
+                                    <a
+                                        href="https://prospects.alima.digital"
+                                        className="text-cream/90 hover:text-cream"
+                                    >
+                                        Alima Prospects
+                                    </a>
+                                    <a
+                                        href="#talk"
+                                        className="text-cream/90 hover:text-cream"
+                                    >
+                                        Let&apos;s talk
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                        <div className="eyebrow border-cream/15 text-cream/55 flex flex-wrap justify-between gap-3 border-t pt-4">
-                            <span>© {new Date().getFullYear()} Alima</span>
-                            <span>Strategy · Content · Growth · Impact</span>
+                        <div
+                            className="eyebrow border-cream/15 flex flex-wrap justify-between gap-3 border-t pt-5 tracking-[0.2em]"
+                            style={{ color: '#9D9A99' }}
+                        >
+                            <span>BOLD IDEAS. REAL IMPACT.</span>
+                            <span>© {new Date().getFullYear()} ALIMA</span>
                         </div>
                     </div>
                 </footer>
+
+                {/* ===== MOBILE STICKY CTA ===== */}
+                <div className="bg-background/95 border-border sticky bottom-0 z-[35] flex gap-2 border-t px-4 py-3 backdrop-blur-md lg:hidden">
+                    <Button variant="outline" asChild>
+                        <Link href={login()}>Log in</Link>
+                    </Button>
+                    <Button variant="spark" className="flex-1" asChild>
+                        <Link href={register()}>
+                            Let&apos;s grow
+                            <ArrowRight />
+                        </Link>
+                    </Button>
+                </div>
             </div>
         </>
     );

@@ -71,6 +71,22 @@ class PlanCatalog
     }
 
     /**
+     * The public pricing payload (plans + currencies + annual label) shared by the marketing pages
+     * and the homepage, so the figures shown can never drift from what the app enforces.
+     *
+     * @param  list<string>  $currencies
+     * @return array{plans: list<array<string, mixed>>, currencies: array<string, mixed>, annual_discount_label: string}
+     */
+    public function publicPricing(array $currencies = ['gbp', 'usd']): array
+    {
+        return [
+            'plans' => array_map(fn (Plan $plan) => $plan->toArray($currencies), $this->public()),
+            'currencies' => (array) config('plans.currencies'),
+            'annual_discount_label' => (string) config('plans.annual_discount_label'),
+        ];
+    }
+
+    /**
      * Find the plan (and the currency/interval it was bought at) for a Stripe Price ID — used by the
      * webhook sync to map a subscription back onto `organizations.plan`.
      *
