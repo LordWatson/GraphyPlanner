@@ -60,7 +60,7 @@ class PostWaitingForClientReview extends Notification implements ShouldQueue
     {
         return MessageTemplate::PostWaitingClient->fill([
             'client_name' => $notifiable->name ?? 'there',
-            'post_summary' => $this->post->title ?? 'a new post',
+            'post_summary' => $this->post->summary(),
             'review_url' => $this->reviewUrl ?? route('portal.posts.show', $this->post),
         ]);
     }

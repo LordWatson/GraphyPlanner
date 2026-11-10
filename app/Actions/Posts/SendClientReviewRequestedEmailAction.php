@@ -40,8 +40,14 @@ class SendClientReviewRequestedEmailAction
 
         $recipients = $client?->reviewEmailRecipients() ?? [];
 
-        if ($recipients === []) {
-            Log::warning('Skipped client review email — no review-email contacts on file', [
+        // Step W-2.1: WhatsApp is a channel of its own, not a copy of the email. A client whose
+        // approver has consented to WhatsApp but is not a review-email contact still gets asked.
+        $whatsAppContacts = $client === null
+            ? collect()
+            : $client->contacts()->receivingWhatsApp()->orderBy('id')->get();
+
+        if ($recipients === [] && $whatsAppContacts->isEmpty()) {
+            Log::warning('Skipped client review request — no review-email or WhatsApp contacts on file', [
                 'client_id' => $post->client_id,
                 'post_id' => $post->id,
             ]);
@@ -49,7 +55,7 @@ class SendClientReviewRequestedEmailAction
             return null;
         }
 
-        return DB::transaction(function () use ($post, $client, $createReviewToken, $createPortalLoginToken, $recipients) {
+        return DB::transaction(function () use ($post, $client, $createReviewToken, $createPortalLoginToken, $recipients, $whatsAppContacts) {
             $revoked = ReviewToken::query()
                 ->where('post_id', $post->id)
                 ->whereNull('revoked_at')
@@ -59,49 +65,57 @@ class SendClientReviewRequestedEmailAction
             ['token' => $plainReviewToken, 'model' => $token] = $createReviewToken($client, $post);
             $reviewUrl = URL::to("/review/{$plainReviewToken}");
 
-            // Which recipient emails already have a portal login for this client (case-insensitive).
+            // Which addresses on either channel already have a portal login for this client
+            // (case-insensitive).
+            $addresses = array_values(array_unique(array_merge(
+                array_map(fn (array $recipient) => $recipient['email'], $recipients),
+                $whatsAppContacts->pluck('email')->all(),
+            )));
+
             $portalUsers = User::query()
                 ->where('client_id', $client->id)
                 ->where('role', Role::ClientReviewer)
-                ->whereIn('email', array_map(fn (array $recipient) => $recipient['email'], $recipients))
+                ->whereIn('email', $addresses)
                 ->get()
                 ->keyBy(fn (User $user) => strtolower($user->email));
+
+            // One resolver for both channels: a magic portal link for somebody who has a login,
+            // the token-only review link for everybody else. Memoised, so a contact who is on the
+            // email list *and* on WhatsApp gets one link rather than two.
+            $links = [];
+
+            $urlFor = function (string $email) use (&$links, $portalUsers, $createPortalLoginToken, $post, $reviewUrl): string {
+                $key = strtolower($email);
+
+                if (! array_key_exists($key, $links)) {
+                    $portalUser = $portalUsers->get($key);
+
+                    $links[$key] = $portalUser === null
+                        ? $reviewUrl
+                        : URL::to('/portal-login/'.$createPortalLoginToken($portalUser, $post)['token']);
+                }
+
+                return $links[$key];
+            };
 
             /** @var list<array{email: string, url: string}> $deliveries */
             $deliveries = [];
 
             foreach ($recipients as $recipient) {
-                $portalUser = $portalUsers->get(strtolower($recipient['email']));
-
-                if ($portalUser !== null) {
-                    ['token' => $plainLoginToken] = $createPortalLoginToken($portalUser, $post);
-                    $url = URL::to("/portal-login/{$plainLoginToken}");
-                } else {
-                    $url = $reviewUrl;
-                }
-
-                $deliveries[] = ['email' => $recipient['email'], 'url' => $url];
+                $deliveries[] = ['email' => $recipient['email'], 'url' => $urlFor($recipient['email'])];
             }
 
-            // Step W-2.1 — the headline WhatsApp message. Only contacts who have consented, and
-            // each gets the same link the email would have given them: a magic portal link if they
-            // have a login, the token-only review link otherwise.
-            $whatsAppContacts = $client->contacts()->receivingWhatsApp()->get();
-            $urlByEmail = collect($deliveries)->keyBy(fn (array $delivery) => strtolower($delivery['email']));
-
-            DB::afterCommit(function () use ($deliveries, $post, $client, $token, $whatsAppContacts, $urlByEmail) {
+            DB::afterCommit(function () use ($deliveries, $post, $client, $token, $whatsAppContacts, $urlFor) {
                 foreach ($deliveries as $delivery) {
                     Mail::to($delivery['email'])->send(new ClientReviewRequestedMail($post, $delivery['url']));
                 }
 
+                // Step W-2.1 — the headline message: one tap from WhatsApp to the review screen.
                 foreach ($whatsAppContacts as $contact) {
-                    $contact->notify(new PostWaitingForClientReview(
-                        $post,
-                        $urlByEmail->get(strtolower($contact->email))['url'] ?? null,
-                    ));
+                    $contact->notify(new PostWaitingForClientReview($post, $urlFor($contact->email)));
                 }
 
-                Log::info('Client review requested email queued', [
+                Log::info('Client review requested', [
                     'client_id' => $client->id,
                     'post_id' => $post->id,
                     'review_token_id' => $token->id,

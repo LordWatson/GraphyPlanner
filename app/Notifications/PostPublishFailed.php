@@ -66,7 +66,7 @@ class PostPublishFailed extends Notification implements ShouldQueue
         $data = $this->toArray($notifiable);
 
         return MessageTemplate::PostPublishFailed->fill([
-            'post_summary' => $this->post->title ?? 'a post',
+            'post_summary' => $this->post->summary(),
             'targets' => $this->failedTargetSummary(),
             'url' => (string) $data['url'],
         ]);

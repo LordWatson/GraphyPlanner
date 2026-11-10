@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Notifications;
 
+use App\Actions\Posts\SendClientReviewRequestedEmailAction;
 use App\Contracts\WhatsAppClient;
 use App\Enums\NotificationCategory;
 use App\Enums\WhatsAppMessageStatus;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\Organization;
+use App\Models\Post;
 use App\Models\User;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppSuppression;
@@ -321,6 +323,57 @@ class WhatsAppChannelTest extends TestCase
         $this->assertCount(2, $this->client->sent);
         $this->assertSame(2, WhatsAppMessage::query()->withoutOrgScope()
             ->where('status', WhatsAppMessageStatus::Skipped)->count());
+    }
+
+    /**
+     * Step W-2.1 end to end: moving a post to "waiting on client" is what sends the approval, and
+     * the link a WhatsApp-only contact gets has to be one they can actually open.
+     */
+    public function test_moving_a_post_to_waiting_client_whatsapps_the_consenting_contact(): void
+    {
+        $organization = Organization::factory()->create();
+        $client = Client::factory()->for($organization, 'organization')->create();
+
+        // Consented to WhatsApp and *not* on the review-email list: the case that used to hand
+        // somebody with no login a portal URL, and before that sent them nothing at all.
+        $contact = ClientContact::factory()->create([
+            'org_id' => $organization->id,
+            'client_id' => $client->id,
+            'name' => 'Jess',
+            'phone' => '+447700900124',
+            'receives_review_emails' => false,
+        ]);
+        $contact->setWhatsAppConsent(true, 'staff');
+        $contact->save();
+
+        $post = Post::factory()->create([
+            'org_id' => $organization->id,
+            'client_id' => $client->id,
+            'master_caption' => 'Spring menu teaser',
+        ]);
+
+        app(SendClientReviewRequestedEmailAction::class)($post);
+
+        $this->assertCount(1, $this->client->sent);
+        [$sentOrganization, $to, $message] = $this->client->sent[0];
+
+        $this->assertSame($organization->id, $sentOrganization->id);
+        $this->assertSame('+447700900124', $to);
+        $this->assertSame(MessageTemplate::PostWaitingClient, $message->template);
+        $this->assertSame('Jess', $message->values['client_name']);
+        $this->assertSame('Spring menu teaser', $message->values['post_summary']);
+        // The token link, not `portal.posts.show` — this contact has no login to land on.
+        $this->assertStringContainsString('/review/', $message->values['review_url']);
+    }
+
+    public function test_a_client_with_no_contacts_on_either_channel_is_skipped(): void
+    {
+        $organization = Organization::factory()->create();
+        $client = Client::factory()->for($organization, 'organization')->create(['approval_email' => null]);
+        $post = Post::factory()->create(['org_id' => $organization->id, 'client_id' => $client->id]);
+
+        $this->assertNull(app(SendClientReviewRequestedEmailAction::class)($post));
+        $this->assertSame([], $this->client->sent);
     }
 
     public function test_the_channel_is_registered_under_the_name_notifications_ask_for(): void

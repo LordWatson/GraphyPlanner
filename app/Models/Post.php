@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
@@ -94,6 +95,17 @@ class Post extends Model
             'is_paid_partnership' => 'boolean',
             'recurrence' => PostRecurrence::class,
         ];
+    }
+
+    /**
+     * The post in a few words, for a notification or a WhatsApp message. A post has no title, so
+     * this is the first line of its caption — and a caption is optional, hence the fallback.
+     */
+    public function summary(int $limit = 60): string
+    {
+        $firstLine = trim((string) (preg_split('/\R/', trim((string) $this->master_caption))[0] ?? ''));
+
+        return $firstLine === '' ? 'a post' : Str::limit($firstLine, $limit, '');
     }
 
     /**

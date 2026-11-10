@@ -45,8 +45,8 @@ class ApprovalOverdue extends Notification implements ShouldQueue
         $data = $this->toArray($notifiable);
 
         return MessageTemplate::ApprovalOverdue->fill([
-            'post_summary' => $this->post->title ?? 'a post',
-            'waiting_for' => (string) $data['body'],
+            'post_summary' => $this->post->summary(),
+            'waiting_for' => rtrim((string) $data['body'], '.'),
             'url' => (string) $data['url'],
         ]);
     }

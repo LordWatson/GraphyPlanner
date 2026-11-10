@@ -45,6 +45,46 @@ export type ContactData = {
 export type ContactRole = { value: string; label: string };
 
 /**
+ * Step W-1.2 — the phone field is where a client's WhatsApp messages go, so it says so, and says
+ * what it needs. It stops being optional the moment WhatsApp consent is ticked (the Form Request
+ * enforces that); without a country code the number cannot be dialled and is refused rather than
+ * guessed at.
+ */
+function PhoneField({
+    id,
+    forWhatsApp,
+    defaultValue,
+    error,
+}: {
+    id: string;
+    forWhatsApp: boolean;
+    defaultValue?: string;
+    error?: string;
+}) {
+    return (
+        <div className="grid gap-1">
+            <Label htmlFor={id}>
+                {forWhatsApp ? 'Phone (WhatsApp)' : 'Phone (optional)'}
+            </Label>
+            <Input
+                id={id}
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+44 7700 900123"
+                defaultValue={defaultValue}
+            />
+            <p className="text-muted-foreground text-xs">
+                {forWhatsApp
+                    ? 'WhatsApp messages go to this number. Include the country code.'
+                    : 'Include the country code if you plan to message them on WhatsApp.'}
+            </p>
+            <InputError message={error} />
+        </div>
+    );
+}
+
+/**
  * A boolean form field submitted as "1"/"0" through a hidden input (so Laravel's `boolean` rule
  * accepts it), with a controlled shadcn Checkbox driving it — the project's checkbox convention.
  */
@@ -94,8 +134,9 @@ export function ClientContactsPanel({
 
             {contacts.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
-                    No contacts yet. Add an approver so post review emails reach
-                    the right people.
+                    No contacts yet. Add an approver so review requests reach
+                    the right people — by email, and on WhatsApp if they have
+                    agreed to it.
                 </p>
             ) : (
                 <div className="grid gap-3">
@@ -254,11 +295,11 @@ function AddContactForm({
                         />
                         <InputError message={errors.email} />
                     </div>
-                    <div className="grid gap-1">
-                        <Label htmlFor="contact-phone">Phone (optional)</Label>
-                        <Input id="contact-phone" name="phone" />
-                        <InputError message={errors.phone} />
-                    </div>
+                    <PhoneField
+                        id="contact-phone"
+                        forWhatsApp={whatsapp}
+                        error={errors.phone}
+                    />
                     <div className="grid gap-1">
                         <input type="hidden" name="role" value={role} />
                         <Label htmlFor="contact-role">Role</Label>
@@ -388,15 +429,12 @@ function EditContactFields({
                         />
                         <InputError message={errors.email} />
                     </div>
-                    <div className="grid gap-1">
-                        <Label htmlFor="edit-phone">Phone (optional)</Label>
-                        <Input
-                            id="edit-phone"
-                            name="phone"
-                            defaultValue={contact.phone ?? ''}
-                        />
-                        <InputError message={errors.phone} />
-                    </div>
+                    <PhoneField
+                        id="edit-phone"
+                        forWhatsApp={whatsapp}
+                        defaultValue={contact.phone ?? ''}
+                        error={errors.phone}
+                    />
                     <div className="grid gap-1">
                         <input type="hidden" name="role" value={role} />
                         <Label htmlFor="edit-role">Role</Label>

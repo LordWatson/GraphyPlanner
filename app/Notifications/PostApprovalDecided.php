@@ -56,7 +56,7 @@ class PostApprovalDecided extends Notification implements ShouldQueue
             // No nullsafe chain: `posts.client_id` is not nullable, so a post always has one.
             'client_name' => $this->post->client->name,
             'decision' => $this->decision === ApprovalDecision::Approved ? 'approved' : 'asked for changes on',
-            'post_summary' => $this->post->title ?? 'a post',
+            'post_summary' => $this->post->summary(),
             'url' => (string) $data['url'],
         ]);
     }

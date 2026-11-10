@@ -152,9 +152,13 @@ channel it covers every notification without anyone remembering to `use` it.)
    sender's inbound webhook at the same URL (that is what carries STOP).
 4. On `settings/organization` (Owner): the Account SID, Auth Token and sender, then **Test
    connection**. Tick "Send WhatsApp messages for this workspace".
-5. Each person opts themselves in on `settings/notifications` and verifies their number. Each client
-   contact's consent is recorded by an Owner or Strategist — **only** where they actually said yes.
-6. `settings/whatsapp-log` is where to look when somebody asks whether a message arrived.
+5. Each person opts themselves in on `settings/notifications` and verifies their own number.
+6. A client's number and consent both live on their **contact**: Clients → the client → **Portal
+   access** → Contacts → add or edit → the "Phone (WhatsApp)" field (country code required) and
+   "Has agreed to WhatsApp messages". Owner or Strategist, and **only** where they actually said
+   yes. There is no WhatsApp number on the client itself — messages go to named people, because
+   consent belongs to a person.
+7. `settings/whatsapp-log` is where to look when somebody asks whether a message arrived.
 
 Nothing in steps 1–4 sends a message to anybody: with no opt-in and no consent, every send is a
 `Skipped` row.

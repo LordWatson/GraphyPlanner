@@ -75,20 +75,28 @@ enum MessageTemplate: string
 
     /**
      * The exact text submitted to Twilio for WhatsApp approval, as a `twilio/text` content type.
+     *
+     * Two of Meta's review rules shape this copy, and breaking either gets the template rejected
+     * rather than failing at send time:
+     *
+     * - a body may not **end** with a variable (a "dangling parameter"), so every one of these
+     *   closes with fixed text — which is why the links read "Open {{n}} to …" rather than
+     *   trailing off the end of the sentence;
+     * - two variables may not sit next to each other with only whitespace between them.
      */
     public function sampleBody(): string
     {
         return match ($this) {
             self::VerifyCode => 'Your Alima verification code is {{1}}. It expires in 10 minutes. If you did not ask for it, ignore this message.',
-            self::PostWaitingClient => 'Hi {{1}}, a post is ready for your approval: "{{2}}". Review and approve it here: {{3}}',
-            self::PostScheduledReminder => 'Reminder: "{{1}}" is scheduled to go out {{2}}. Check or change it here: {{3}}',
-            self::PostDecided => '{{1}} {{2}} the post "{{3}}". Open it here: {{4}}',
-            self::PostPublishFailed => 'A post did not publish: "{{1}}" failed on {{2}}. Open it here: {{3}}',
-            self::ApprovalOverdue => 'Still waiting on approval for "{{1}}" — {{2}}. Nudge it here: {{3}}',
-            self::InvoiceIssued => 'Hi {{1}}, your invoice for {{2}} is ready and due {{3}}. View and pay it here: {{4}}',
-            self::CampaignBriefReady => 'Your brief for the {{1}} campaign is ready to read: {{2}}',
-            self::DailyDigest => 'Your Alima update: {{1}}. See everything here: {{2}}',
-            self::Notification => '{{1}} — {{2}} {{3}}',
+            self::PostWaitingClient => 'Hi {{1}}, a post is ready for your approval: "{{2}}". Open {{3}} to review and approve it.',
+            self::PostScheduledReminder => 'Reminder: "{{1}}" is scheduled to go out {{2}}. Open {{3}} to check or change it.',
+            self::PostDecided => '{{1}} has {{2}} the post "{{3}}". Open {{4}} to see it.',
+            self::PostPublishFailed => 'A post did not publish: "{{1}}" failed on {{2}}. Open {{3}} to retry it.',
+            self::ApprovalOverdue => 'Still waiting on approval for "{{1}}": {{2}}. Open {{3}} to nudge it.',
+            self::InvoiceIssued => 'Hi {{1}}, your invoice for {{2}} is ready and due {{3}}. Open {{4}} to view and pay it.',
+            self::CampaignBriefReady => 'Your brief for the {{1}} campaign is ready. Open {{2}} to read it.',
+            self::DailyDigest => 'Your Alima update: {{1}}. Open {{2}} to see everything.',
+            self::Notification => '{{1}}: {{2}}. Open {{3}} for the details.',
         };
     }
 
