@@ -159,8 +159,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     </nav>
                 </aside>
 
-                <div className="min-w-0 flex-1 md:max-w-2xl">
-                    <section className="animate-rise flex max-w-xl flex-col gap-12">
+                {/* No width cap: every settings section gets the whole content column. */}
+                <div className="min-w-0 flex-1">
+                    <section className="animate-rise flex flex-col gap-12">
                         {children}
                     </section>
                 </div>

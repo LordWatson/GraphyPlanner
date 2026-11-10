@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Idempotent: it derives the plan purely from the current subscription state, so running it twice (a
  * replayed webhook, a double checkout return) lands on the same plan. A valid subscription maps its
- * Stripe price back to a plan key; no valid subscription falls back to the org type's default (free).
+ * Stripe price back to a plan key; a subscription that exists but is no longer valid (cancelled,
+ * expired) falls back to the org type's default. An org with no subscription row at all is left
+ * exactly as it is — see the guard below.
  */
 class SyncSubscriptionAction
 {
@@ -53,6 +55,15 @@ class SyncSubscriptionAction
                 }
 
                 $target = $match['plan']->key;
+            }
+
+            if ($target === null && ! $organization->subscriptions()->exists()) {
+                // Nothing from Stripe to reconcile against. Either a first checkout whose webhook
+                // hasn't landed yet, or an org that has simply never subscribed — a grandfathered
+                // plan, or one a super admin set by hand. Falling back to the type default here
+                // would silently undo both. A cancellation always leaves a row behind, so the
+                // revert-to-default path below still runs when it should.
+                return $organization;
             }
 
             $target ??= $this->catalog->defaultKeyFor($organization->type);

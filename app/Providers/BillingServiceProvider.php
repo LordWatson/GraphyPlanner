@@ -4,15 +4,14 @@ namespace App\Providers;
 
 use App\Listeners\SyncSubscriptionOnStripeWebhook;
 use App\Models\Organization;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
-use Laravel\Cashier\Events\WebhookHandled;
 
 /**
  * Phase CG-2 — wires Laravel Cashier to the Organization billable (its subscriptions use an
  * `organization_id` owner key, so the customer model must be Organization) and keeps
- * `organizations.plan` reconciled with Stripe after every webhook.
+ * `organizations.plan` reconciled with Stripe after every webhook — the latter via
+ * {@see SyncSubscriptionOnStripeWebhook}, which auto-discovery registers.
  */
 class BillingServiceProvider extends ServiceProvider
 {
@@ -24,8 +23,7 @@ class BillingServiceProvider extends ServiceProvider
         Cashier::useCustomerModel(Organization::class);
     }
 
-    public function boot(): void
-    {
-        Event::listen(WebhookHandled::class, SyncSubscriptionOnStripeWebhook::class);
-    }
+    // No boot(): `SyncSubscriptionOnStripeWebhook` is picked up by Laravel's listener
+    // auto-discovery (see `bootstrap/cache/events.php`). Registering it here as well ran the plan
+    // sync twice for every billing webhook — the second pass logging "Skipping already-processed".
 }

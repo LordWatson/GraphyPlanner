@@ -20,7 +20,7 @@ type PlanShape = {
     prices: Record<string, { monthly: number | null; annual: number | null }>;
     highlights: string[];
     is_current: boolean;
-    has_price: boolean;
+    has_price: Record<Interval, boolean>;
 };
 
 type UsageMeter = {
@@ -152,7 +152,7 @@ export default function Plan({
                         title="This month"
                         description="Your usage against the plan's limits. Unlimited features don't show a bar."
                     />
-                    <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         {usage.map((meter) => (
                             <Meter key={meter.feature} meter={meter} />
                         ))}
@@ -197,12 +197,12 @@ export default function Plan({
                         </p>
                     )}
 
-                    <div className="grid gap-6 md:grid-cols-3">
+                    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                         {plans.map((plan) => {
                             const amount = plan.prices[currency]?.[interval];
                             const canCheckout =
                                 billingEnabled &&
-                                plan.has_price &&
+                                plan.has_price[interval] &&
                                 !plan.is_current &&
                                 !plan.is_free;
 
@@ -210,7 +210,7 @@ export default function Plan({
                                 <div
                                     key={plan.key}
                                     className={cn(
-                                        'flex flex-col gap-5 rounded-2xl border p-5',
+                                        'flex flex-col gap-5 rounded-2xl border p-6',
                                         plan.is_current
                                             ? 'border-primary bg-primary/5'
                                             : 'border-border bg-card',
@@ -324,7 +324,10 @@ export default function Plan({
                                                 Upgrade
                                             </Button>
                                             <p className="text-muted-foreground text-center text-xs">
-                                                Billing isn&apos;t available yet
+                                                {billingEnabled &&
+                                                !plan.has_price[interval]
+                                                    ? `No ${interval} price yet`
+                                                    : "Billing isn't available yet"}
                                             </p>
                                         </div>
                                     )}

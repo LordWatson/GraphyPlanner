@@ -194,6 +194,10 @@ existing org already has.
   `SocialAccount`'s timezone validation). `default_currency` is required, a 3-letter ISO 4217 code.
 - The settings sidebar (`resources/js/layouts/settings/layout.tsx`) only shows the "Organization" nav
   entry when `auth.user.role === 'owner'`.
+- The settings shell caps the content column at nothing: every section renders at the full width the
+  `Page` shell gives it (~1140px beside the nav). It used to be held at `max-w-xl`, which made the
+  plan page's three pricing cards unreadable. A section that wants a narrower measure — a short form
+  whose inputs shouldn't run the whole width — sets that on its own fields, not on the shell.
 - `default_currency` is shared on every Inertia response as the `currency` prop (see
   `HandleInertiaRequests::share()`) so any page can format an amount via
   `resources/js/lib/currency.ts`'s `formatCurrency()` without a dedicated round-trip. No currency
@@ -226,6 +230,7 @@ existing org already has.
 
 ## Changelog
 
+- 2026-11-10: Dropped the settings shell's `max-w-xl` content cap — every section is now full width.
 - 2026-11-07: Added the Owner-only **Data export** (`data_exports`, `OrganizationDataExport`,
   `BuildOrganizationDataExportJob`, `exports:purge-expired`, `settings/data-export.tsx`) — see the
   section above and `ops.md` for retention.

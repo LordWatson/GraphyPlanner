@@ -71,6 +71,20 @@ class PlanCatalog
     }
 
     /**
+     * Step GTM-5.1 — the public plans an org of this workspace type may actually buy: an agency sees
+     * the agency tiers, a business/creator workspace sees everything else. Both the plan page and
+     * checkout validation read this, so neither can offer a plan the other would reject.
+     *
+     * @return list<Plan>
+     */
+    public function publicFor(OrganizationType $type): array
+    {
+        $agency = $type === OrganizationType::Agency;
+
+        return array_values(array_filter($this->public(), fn (Plan $plan) => $plan->isAgency() === $agency));
+    }
+
+    /**
      * The public pricing payload (plans + currencies + annual label) shared by the marketing pages
      * and the homepage, so the figures shown can never drift from what the app enforces.
      *

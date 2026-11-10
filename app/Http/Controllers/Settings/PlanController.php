@@ -14,6 +14,7 @@ use App\Support\Plans\Plan;
 use App\Support\Plans\PlanCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -70,9 +71,14 @@ class PlanController extends Controller
                 fn (Plan $p) => [
                     ...$p->toArray([$currency]),
                     'is_current' => $p->key === $plan->key,
-                    'has_price' => $p->stripePriceId($currency, 'monthly') !== null,
+                    // Per interval: a plan can have a monthly price in Stripe but no annual one yet,
+                    // and the card must not offer an Upgrade button that checkout would turn away.
+                    'has_price' => [
+                        'monthly' => $p->stripePriceId($currency, 'monthly') !== null,
+                        'annual' => $p->stripePriceId($currency, 'annual') !== null,
+                    ],
                 ],
-                array_values(array_filter($catalog->public(), fn (Plan $p) => $p->segment() !== 'agency')),
+                $catalog->publicFor($organization->type),
             ),
             'annualDiscountLabel' => (string) config('plans.annual_discount_label'),
             'can' => [
@@ -85,6 +91,7 @@ class PlanController extends Controller
         StartCheckoutRequest $request,
         PlanCatalog $catalog,
         BillingGate $billingGate,
+        SyncSubscriptionAction $sync,
     ): HttpResponse {
         $user = $request->user();
         $organization = $user->organization;
@@ -105,6 +112,34 @@ class PlanController extends Controller
             return back()->with('toast', ['type' => 'info', 'message' => __(':plan isn’t available for checkout yet.', ['plan' => $plan->name()])]);
         }
 
+        // An org that already subscribes is changing tier, not buying: swap the price on the
+        // subscription it has. A second `newSubscription()` opens a *second* Stripe subscription
+        // and bills them for both — `swap()` keeps the one subscription (and its trial).
+        $subscription = $organization->subscription();
+
+        if ($subscription !== null && $subscription->valid()) {
+            if ($subscription->getAttribute('stripe_price') === $priceId) {
+                return back()->with('toast', ['type' => 'info', 'message' => __('You’re already on :plan.', ['plan' => $plan->name()])]);
+            }
+
+            $subscription->swap($priceId);
+
+            Log::info('Subscription swapped to a new plan', [
+                'org_id' => $organization->id,
+                'subscription_id' => $subscription->id,
+                'to_plan' => $plan->key,
+                'to_price' => $priceId,
+            ]);
+
+            $sync($organization->refresh());
+
+            return back()->with('toast', ['type' => 'success', 'message' => __('You’re on :plan now.', ['plan' => $plan->name()])]);
+        }
+
+        // shortcut: "already subscribed" is read from the local row, which only the webhook writes,
+        // so two checkouts completed before the first webhook lands still open two Stripe
+        // subscriptions. Upgrade to asking Stripe for the customer's subscriptions here if that
+        // ever happens with webhooks healthy.
         $checkout = $organization
             ->newSubscription('default', $priceId)
             ->trialDays($plan->trialDays())

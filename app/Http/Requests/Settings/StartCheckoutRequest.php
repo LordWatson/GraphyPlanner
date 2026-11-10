@@ -2,13 +2,15 @@
 
 namespace App\Http\Requests\Settings;
 
+use App\Enums\OrganizationType;
 use App\Enums\Role;
+use App\Support\Plans\Plan;
 use App\Support\Plans\PlanCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Step CG-2.4 — validates a Stripe Checkout request: a known public, non-agency plan, a supported
+ * Step CG-2.4 — validates a Stripe Checkout request: a known public plan the org's workspace type is offered, a supported
  * currency and interval. Owner-only (billing).
  */
 class StartCheckoutRequest extends FormRequest
@@ -25,9 +27,13 @@ class StartCheckoutRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Step GTM-5.1: only the paid plans this org's workspace type is offered — an agency can buy
+        // the agency tiers and nothing else, and vice versa.
+        $type = $this->user()?->organization->type ?? OrganizationType::Business;
+
         $checkoutPlans = array_values(array_map(
-            fn ($plan) => $plan->key,
-            array_filter(app(PlanCatalog::class)->public(), fn ($plan) => $plan->segment() !== 'agency' && $plan->isPaid()),
+            fn (Plan $plan) => $plan->key,
+            array_filter(app(PlanCatalog::class)->publicFor($type), fn (Plan $plan) => $plan->isPaid()),
         ));
 
         return [

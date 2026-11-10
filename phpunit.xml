@@ -42,6 +42,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- The suite must never be able to reach a real Stripe account, whatever is in `.env`. -->
+        <env name="STRIPE_KEY" value=""/>
+        <env name="STRIPE_SECRET" value=""/>
         <env name="AI_ENABLED" value="false"/>
         <env name="ANTHROPIC_API_KEY" value=""/>
         <env name="AI_IMAGE_PROVIDER" value="null"/>

@@ -92,7 +92,7 @@ class GetOrganizationDetailAction
                 'posts' => $organization->posts()->count(),
                 'published_posts' => $organization->posts()->where('status', PostStatus::Published)->count(),
                 'scheduled_posts' => $organization->posts()->where('status', PostStatus::Scheduled)->count(),
-                'invoices' => $organization->invoices()->count(),
+                'invoices' => $organization->clientInvoices()->count(),
                 'connected_accounts' => SocialAccount::query()
                     ->where('org_id', $organization->id)
                     ->where('connection_status', ConnectionStatus::Connected)

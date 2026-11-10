@@ -69,8 +69,10 @@ proposed table puts it in Pro; see Known Gaps).
   (`bonus_ai_text_credits` int, `bonus_ai_credits_expires_at` nullable). `plan`/`billing_enabled`/
   the bonus columns are **deliberately not `#[Fillable]`** — set only by the Actions below, never
   mass-assigned. `Organization` uses Cashier's `Billable` trait (its subscriptions use an
-  `organization_id` owner key; the existing `invoices()`/`taxRates()` relations win over Cashier's
-  same-named trait helpers, which we don't use).
+  `organization_id` owner key). Its own relations must not shadow a trait method: what were
+  `taxRates()` and `invoices()` are now `invoiceTaxRates()` and `clientInvoices()` — see the rule
+  under Business Rules. `stripeName()`/`stripeEmail()` are deliberate overrides with Cashier's own
+  signatures.
 - `subscriptions` / `subscription_items` — Cashier's tables, written by hand (keyed on
   `organization_id`, not Cashier's default `user_id`) because the billable is the Organization.
 - `platform_settings` (`key` unique, `value` json) — platform-wide super-admin settings. First key:
@@ -139,7 +141,12 @@ $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLi
 ## Routes / Controllers
 
 - `GET settings/plan` → `Settings\PlanController@edit` (`plan.edit`) — Owner-only; current plan, usage
-  meters, upgrade cards, manage-billing. `POST settings/plan/checkout` (`plan.checkout`,
+  meters, upgrade cards, manage-billing. The cards shown are `PlanCatalog::publicFor($org->type)`:
+  an agency sees the three agency tiers, a business/creator workspace sees everything else.
+  `has_price` is per interval (`monthly`/`annual`), so a plan with only a monthly price in Stripe
+  doesn't offer an Upgrade button the annual toggle can't honour. The cards are laid out for the
+  settings shell's full content column (`layouts/settings/layout.tsx` caps nothing) — three cards
+  in the old 576px column were unreadable. `POST settings/plan/checkout` (`plan.checkout`,
   `StartCheckoutRequest`) → Stripe Checkout via Cashier (`Inertia::location`); guarded so it never
   calls Stripe when billing is off or a price id is missing (friendly flash instead).
   `GET settings/plan/portal` (`plan.portal`) → Customer Portal. `GET settings/plan/success`
@@ -167,8 +174,38 @@ $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLi
   recorded. The sweep never touches an org on a paid tier, or a non-agency org.
 - An agency that hits a cap is offered the next **agency** tier; a solo workspace is never pointed at
   an agency plan, and an agency is never pointed at a solo one (`ConfigEntitlements::suggestUpgrade`).
+  The same rule holds at the till: `PlanCatalog::publicFor()` backs both the plan page's cards and
+  `StartCheckoutRequest`'s `Rule::in`, so the page can never offer a plan checkout would reject, and
+  a hand-rolled POST for another segment's plan is a validation error.
+- **Changing tier swaps, it never re-buys.** `PlanController@checkout` only opens a Stripe Checkout
+  session when the org has no valid subscription; an org that already subscribes gets
+  `$subscription->swap($priceId)` (which keeps its trial) and an immediate `SyncSubscriptionAction`
+  run, so the plan page is right on the redirect back. Calling `newSubscription()` unconditionally
+  opened a *second* Stripe subscription per upgrade — three concurrent trialing subscriptions on one
+  customer, and three bills when the trials ended. A press on the tier the org is already on is a
+  no-op toast that never reaches Stripe.
+- **The local `subscriptions` row is written only by the webhook.** Cashier's hosted Checkout does
+  not write it on return; `customer.subscription.created` does. So a local environment with no
+  `stripe listen` running completes checkout in Stripe and never updates `organizations.plan` —
+  the symptom is a Stripe customer id on the org, no `subscriptions` row, and an empty
+  `stripe_webhook_events` table. Recover with `stripe events resend <event_id>` once the listener is
+  up, rather than writing the row by hand.
+- **Never name a relation `taxRates()` on `Organization`.** Cashier's `Billable` defines
+  `taxRates(): array` (Stripe tax rate IDs for our own subscriptions) and `SubscriptionBuilder`
+  calls it on every checkout, so a `HasMany` of that name made Stripe Checkout throw a TypeError —
+  a 500 that only ever appeared against real Stripe, never in the suite. Our invoice VAT rates live
+  on `invoiceTaxRates()`, and client invoices on `clientInvoices()` (Cashier's `invoices()` takes
+  arguments and is called by `invoicesIncludingPending()`, the same landmine un-trodden). Before
+  adding a relation to `Organization`, check the name isn't one of Cashier's `Billable` methods.
 - The global Stripe switch defaults **off** (billing ships dark). A per-org `billing_enabled` override
   wins either way, letting a super admin let one org through while the platform is still dark.
+  Both are overruled by `BillingGate::configured()` — **no Stripe secret, no billing**, because every
+  Cashier call without one throws `api_key cannot be the empty string` from inside the SDK, i.e. a
+  500 on the Upgrade button. The gate logs a warning when it blocks for that reason, since a switch
+  that's on without a key is a deployment mistake, never a choice.
+- Cashier reads `STRIPE_KEY` (publishable) and `STRIPE_SECRET` (secret) and no other names. A key
+  parked under a plausible-looking alias is simply never read, which is exactly how the 500 above
+  happened; `.env.example` lists only the two names that work.
 - Every plan must define every `Feature` (asserted by `PlanDefinitionsTest`) — no silent nulls.
 - Cashier (subscriptions) and the future creator-store Connect integration share no tables, webhooks
   or keys (Principle 4): Cashier uses `STRIPE_KEY`/`STRIPE_SECRET`/`STRIPE_WEBHOOK_SECRET`.
@@ -190,7 +227,10 @@ $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLi
 - `tests/Feature/Billing/SyncSubscriptionActionTest` + `StripeWebhookTest` — subscribe/upgrade/
   downgrade/cancel map onto `organizations.plan`; replayed events are idempotent.
 - `tests/Feature/Settings/PlanPageTest` — Owner sees it; ClientReviewer/non-owners don't; checkout is
-  gated when billing is off / price missing.
+  gated when billing is off / price missing; an agency owner is shown only the agency tiers and a
+  business owner only the solo ones, and each is refused the other segment's plan at checkout.
+  `phpunit.xml` blanks `STRIPE_KEY`/`STRIPE_SECRET` so no test can reach a real Stripe account
+  whatever is in a developer's `.env`.
 - `tests/Feature/SuperAdmin/PlanControlsTest` — plan override + credit grant + billing override + the
   global switch, each audited and super-admin-only.
 - `tests/Feature/Marketing/PricingPagesTest` — the pricing table renders every public plan from config.
@@ -259,6 +299,20 @@ $current = 0)` — the enforcement seam that throws `App\Exceptions\Plans\PlanLi
 
 ## Changelog
 
+- 2026-11-10: the agency tiers' live Stripe Price IDs wired through
+  `STRIPE_PRICE_AGENCY_{STARTER,STANDARD,SCALE}_{GBP,USD}_{MONTHLY,ANNUAL}` (GBP monthly filled in;
+  USD and annual prices don't exist in Stripe yet). The plan page stopped showing solo pricing to
+  agency orgs (`PlanCatalog::publicFor`), got the full content width, and `Organization::taxRates()`
+  was renamed `invoiceTaxRates()` — it was shadowing Cashier's and 500ing every real checkout
+  (`invoices()` → `clientInvoices()` for the same reason). Checkout then 500'd a second way: the
+  credentials were sitting in `STRIPE_PUBLISHABLE_KEY`/`STRIPE_SECRET_KEY`, which nothing reads, so
+  Cashier had no key — moved onto `STRIPE_KEY`/`STRIPE_SECRET`, the aliases deleted, and
+  `BillingGate::configured()` added so a blank key can only ever mean "billing unavailable".
+  Verified against Stripe: all three agency prices are GBP monthly at £49/£99/£199, test mode.
+- 2026-11-10: upgrades now swap the existing subscription instead of opening a second one, and
+  `SyncSubscriptionAction` no longer resets an org that has never subscribed to the type default
+  (which would have ended a grandfather early, and briefly downgraded anyone returning from a first
+  checkout before the webhook landed).
 - 2026-11-08: Phase W added `Feature::WhatsApp` (agency tiers only, by virtue of their
   `array_fill_keys(gates(), true)`; `$gateDefaults` leaves it off for business and creator).
 - 2026-11-07: Phase GTM-5 added `Feature::AdsReporting` (agency tiers only; read-only paid-ads

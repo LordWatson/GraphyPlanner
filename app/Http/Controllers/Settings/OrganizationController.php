@@ -89,7 +89,7 @@ class OrganizationController extends Controller
             'viewer_has_two_factor' => $request->user()->hasEnabledTwoFactorAuthentication(),
             'currencies' => CurrencyOptions::options(),
             // Step M-4.1: the org's tax rates, active first then archived, for the rates manager.
-            'tax_rates' => $organization->taxRates()
+            'tax_rates' => $organization->invoiceTaxRates()
                 ->orderBy('archived_at')
                 ->orderBy('sort_order')
                 ->orderBy('id')

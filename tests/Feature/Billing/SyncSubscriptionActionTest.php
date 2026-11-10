@@ -6,6 +6,7 @@ use App\Actions\Billing\SyncSubscriptionAction;
 use App\Enums\OrganizationType;
 use App\Models\Organization;
 use App\Support\Plans\PlanCatalog;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -94,6 +95,37 @@ class SyncSubscriptionActionTest extends TestCase
         ($this->sync())($org->refresh());
 
         $this->assertSame('business_pro', $org->refresh()->plan);
+    }
+
+    /**
+     * Regression: a sync against an org that has never subscribed used to reset its plan to the type
+     * default — knocking a grandfathered or super-admin-set plan off, and briefly downgrading anyone
+     * returning from their first checkout before the webhook landed.
+     */
+    public function test_an_org_with_no_subscription_keeps_the_plan_it_was_given(): void
+    {
+        $legacy = Organization::factory()->create(['type' => OrganizationType::Agency, 'plan' => 'agency_legacy']);
+
+        ($this->sync())($legacy);
+
+        $this->assertSame('agency_legacy', $legacy->refresh()->plan);
+        $this->assertDatabaseCount('subscriptions', 0);
+    }
+
+    /**
+     * Regression: a relation named `taxRates()` on the billable shadows Cashier's
+     * `taxRates(): array`, which `SubscriptionBuilder` calls on every checkout — a TypeError that
+     * only ever shows up against real Stripe. Our invoice rates live on `invoiceTaxRates()`.
+     */
+    public function test_the_billable_keeps_cashiers_tax_rates_contract(): void
+    {
+        $org = Organization::factory()->create(['type' => OrganizationType::Agency]);
+
+        $this->assertIsArray($org->taxRates());
+        $this->assertInstanceOf(HasMany::class, $org->invoiceTaxRates());
+
+        // Same trap, one method along: Cashier's invoices() takes arguments and returns a Collection.
+        $this->assertInstanceOf(HasMany::class, $org->clientInvoices());
     }
 
     public function test_an_unmapped_price_leaves_the_plan_unchanged(): void

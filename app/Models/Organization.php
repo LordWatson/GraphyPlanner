@@ -197,9 +197,13 @@ class Organization extends Model
     /**
      * Step M-4.1 — the organization's tax rates (VAT/TRN rates offered on invoices).
      *
+     * Named `invoiceTaxRates`, not `taxRates`: Cashier's Billable already defines `taxRates(): array`
+     * (the Stripe tax rate IDs put on our own subscriptions) and `SubscriptionBuilder` calls it, so a
+     * relation of that name makes every Stripe Checkout throw a TypeError.
+     *
      * @return HasMany<TaxRate, $this>
      */
-    public function taxRates(): HasMany
+    public function invoiceTaxRates(): HasMany
     {
         return $this->hasMany(TaxRate::class, 'org_id');
     }
@@ -256,9 +260,15 @@ class Organization extends Model
     }
 
     /**
+     * The invoices this org has raised against its own clients.
+     *
+     * Named `clientInvoices`, not `invoices`, for the same reason as `invoiceTaxRates()` above:
+     * Cashier's Billable defines `invoices(bool, array): Collection` (our own Stripe invoices) and
+     * calls it from `invoicesIncludingPending()`.
+     *
      * @return HasMany<Invoice, $this>
      */
-    public function invoices(): HasMany
+    public function clientInvoices(): HasMany
     {
         return $this->hasMany(Invoice::class, 'org_id');
     }
