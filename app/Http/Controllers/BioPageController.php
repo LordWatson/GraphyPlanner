@@ -11,6 +11,7 @@ use App\Mail\AudienceConfirmMail;
 use App\Models\BioBlock;
 use App\Models\BioPage;
 use App\Models\BioPageDomain;
+use App\Support\Plans\PlanCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -70,7 +71,7 @@ class BioPageController extends Controller
      * An unverified domain falls through to the marketing page — claiming a hostname serves
      * nothing until DNS actually points here.
      */
-    public function home(Request $request, BuildBioPageAction $build, RecordBioEventAction $record): Response
+    public function home(Request $request, BuildBioPageAction $build, RecordBioEventAction $record, PlanCatalog $plans): Response
     {
         $host = BioPageDomain::normaliseHostname($request->getHost());
 
@@ -81,7 +82,9 @@ class BioPageController extends Controller
         $page = $domain?->page;
 
         if ($page === null || ! $page->isPublished() || $page->client === null) {
-            return Inertia::render('welcome');
+            // The homepage pricing cards read their figures from config/plans.php (via PlanCatalog),
+            // so the marketing prices can never drift from what the app actually enforces.
+            return Inertia::render('welcome', ['pricing' => $plans->publicPricing()]);
         }
 
         $record($request, $page);

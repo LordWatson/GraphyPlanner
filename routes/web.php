@@ -122,7 +122,10 @@ use Illuminate\Support\Facades\Route;
 // Step GTM-3.2: the marketing page on our own host, the creator's bio page on a verified custom
 // domain. Every other route matches on a custom host unchanged, so this is the only split needed.
 Route::get('/', [BioPageController::class, 'home'])->name('home');
-Route::inertia('about', 'about')->name('about');
+// The former standalone About page now lives inside the redesigned homepage (features, pricing,
+// FAQ), so /about redirects home. The `about` route name is kept so existing links (MarketingShell
+// footer, Wayfinder `about()`) keep resolving.
+Route::redirect('about', '/')->name('about');
 
 // Step CG-2.7 / B-12.2: public segment & pricing pages (pricing table generated from config/plans.php).
 Route::get('for-business', [MarketingController::class, 'forBusiness'])->name('for-business');

@@ -1,10 +1,12 @@
-# Marketing Pages (Welcome & About)
+# Marketing Pages (Homepage)
 
 ## Purpose
 
-Public, unauthenticated marketing surfaces used to introduce Alima Planner to prospective users before
-they sign up: the landing page (`/`) and the About page (`/about`), which details the product's
-feature set to help visitors decide whether to register.
+Public, unauthenticated marketing surface used to introduce Alima Planner to prospective users before
+they sign up. As of the Nov 2026 redesign this is a **single long homepage** (`/`) that absorbs the
+former About content: hero → interactive product demo → networks marquee → before/after slider →
+Brand Brain → time calculator → feature bento → audiences → proof → pricing → FAQ → final CTA →
+footer. `/about` now redirects to `/`.
 
 ## Models / Tables
 
@@ -16,32 +18,47 @@ feature set to help visitors decide whether to register.
 
 ## Routes / Controllers
 
-- `GET /` → `Route::inertia('/', 'welcome')` (`home` route name) — hero, headline feature grid, CTA.
-- `GET /about` → `Route::inertia('about', 'about')` (`about` route name) — expanded feature pillars,
-  "how it works" steps, and a closing CTA section. Linked from the welcome page header/footer.
+- `GET /` → `BioPageController@home` (`home` route name); on the app host it renders `welcome` (the
+  full redesigned homepage), on a verified custom bio-page domain it renders that creator's bio page.
+- `GET /about` → `Route::redirect('about', '/')` (`about` route name kept) — the standalone About
+  page was retired into the homepage; the name is preserved so existing links (`MarketingShell`
+  footer, Wayfinder `about()`) keep resolving.
 
 ## Business Rules
 
-- Both pages render outside `AppLayout` (see `resources/js/app.tsx` `layout()` resolver — `welcome`
-  and `about` both map to `null`), since they share the public hero shell rather than the internal
-  sidebar layout.
+- The homepage renders outside `AppLayout` (see `resources/js/app.tsx` `layout()` resolver —
+  `welcome` maps to `null`), carrying its own public header/footer rather than the internal sidebar.
+- The page is composed from section components in `resources/js/components/marketing/home/`:
+  `product-demo.tsx` (the big interactive 7-screen demo with auto-tour, approve/confetti, drawer),
+  `chaos-calm.tsx` (before/after drag slider), `brand-brain.tsx` (pillar/network AI-caption
+  generator), `time-calculator.tsx` (4-slider ROI estimate), `feature-bento.tsx` (bento with a
+  working client-portal approve, currency toggle, command-palette typing), `audiences.tsx` (tabs),
+  `pricing.tsx` (monthly/yearly toggle), `faq.tsx` (accordion). `welcome.tsx` holds the header
+  (sticky + mobile menu + rotating hero word + floating toasts), networks marquee, proof,
+  final CTA (with `<Peek>`), footer and mobile sticky bar, and orchestrates the sections.
+- All interactivity is client-side React `useState`; no new dependencies. Bespoke marketing motion
+  lives in `hm-*` utility classes in `resources/css/app.css` (keyframes guarded by
+  `prefers-reduced-motion`). Colours are the brand tokens (used as `var(--…)` in computed inline
+  styles, or Tailwind token classes). This is the one surface that deliberately exceeds the brand
+  book's conservative motion rules (§11) — confetti, marquee, floating toasts, shimmer, typing.
 - Content mirrors the real product surface area (clients/brands/campaigns, shared calendar, approval
-  workflow, client review portal, AI-assisted captions/ideas/trends/images, pluggable publishing via
-  Upload-Post, multi-currency invoicing, client health) plus a "Recently shipped" strip on `/about` —
-  keep in sync with actual shipped features as they evolve.
-- Follows the Alima "web in practice" layout (brand book §7.6, `.junie/brand-guidelines.md`): 88px
-  header with the 160px horizontal lock-up and one Ink CTA ("Let's talk"), 1280 max width with
-  80/40/20px margins, an oversized Poppins SemiBold headline ending in an orange accent word/full
-  stop, a lime `spark` CTA ("Let's grow") beside an outline "See the work", and **one** brand graphic
-  per page — the lilac panda peek over the welcome hero's bottom rule, a teal/lilac confetti panel
-  beside the About closing CTA. Feature icons sit in solid circles; numbered (`01`–`04`) rows sit on
-  2px ink rules; the welcome footer is an Ink block with the cream lock-up and tagline. The welcome
-  page's "This week" strip is an illustrative vignette built from real `StatusPill`s with fictional
-  client names — not live data.
+  workflow, client review portal, AI-assisted captions/ideas/images, publishing to nine networks,
+  multi-currency invoicing, client health). Illustrative vignettes use fictional client names, not
+  live data.
+- **Pricing is config-driven:** `home/pricing.tsx` receives the `pricing` prop (same `PricingData`
+  shape and `PlanCatalog::publicPricing()` source as the `/pricing` page, passed from
+  `BioPageController@home`) and renders the three agency tiers — `agency_starter`, `agency_standard`,
+  `agency_scale` — with each plan's own name, price and `highlights` straight from config, so nothing
+  drifts from `config/plans.php`. Annual shows the per-month equivalent (annual ÷ 12).
+- **Illustrative placeholders to replace with real data:** the 4th proof stat ("6 hrs a week back
+  on approvals") and the testimonial (Maya Karim / Studio Kite — the demo's own fictional personas)
+  in `welcome.tsx`'s proof section are examples, not verified figures or a genuine customer quote.
+  Swap them for real, attributable data before launch.
 
 ## Tests
 
-- `tests/Feature/ExampleTest.php` — asserts `home` and `about` routes return `200 OK`.
+- `tests/Feature/ExampleTest.php` — `home` returns `200 OK`; `about` returns a redirect to `home`.
+- `tests/Feature/Business/BioPageDomainTest.php` — asserts `/` renders `welcome` on the app host.
 
 ## Known Gaps / Open Questions
 
@@ -86,6 +103,23 @@ tool 2026" result is affiliate-monetised content, and we were absent from it.
 
 ## Changelog
 
+- 2026-11-10: Homepage polish pass — restored the feature-bento hover effects that the first pass
+  dropped (`hm-tile` card lift plus per-tile reveals: campaign bars fill, grid swatches reshuffle,
+  AI-image cards fan out, inbox third reply slides in — defined in `app.css`, hover-only and
+  reduced-motion guarded; also applied the card lift to the audience and pricing cards); moved the
+  "Drag from chaos to calm" subtext to the right at `lg`; swapped the final-CTA peek to the brand
+  mark in Signal (red) with the head framed over the bottom edge (wrapper does the bleed, `hm-peek`
+  the hover-rise); and gave the hero's "Play with the demo" its play-circle icon.
+- 2026-11-10: Homepage redesign — `welcome.tsx` rebuilt as a single long, interactive marketing page
+  from the design canvas (hero with rotating word + floating toasts, interactive product demo,
+  networks marquee, before/after slider, Brand Brain, time calculator, feature bento, audiences,
+  proof, pricing, FAQ, final CTA, footer, mobile sticky bar). New section components under
+  `components/marketing/home/`; bespoke `hm-*` motion keyframes added to `resources/css/app.css`
+  (reduced-motion guarded). `/about` retired to a redirect to `/` (route name kept); `about.tsx` and
+  the now-orphaned `components/marketing/campaigns-section.tsx` removed. `ExampleTest` updated to
+  assert the `/about` redirect. Pricing/proof/testimonial carry marked placeholders pending real
+  values. Note: this page intentionally diverges from the brand book's conservative motion / one-
+  graphic rules — animations and graphics were requested for the front page.
 - 2026-10-18: Campaigns enhancement C-9.2 — a Campaigns section on the welcome page (`components/marketing/campaigns-section.tsx`): eyebrow, "Plan it, sign it off, ship it, prove it.", the three points, and a product vignette built from real components (phase band, status pills, readiness, wrap report). No second Signal Orange accent; the hero keeps the page's one.
 - 2026-10-17: About page content refresh — pillar copy now mentions calendar drag-to-reschedule,
   Brand Brain/campaign-grounded AI (captions with hashtags, Daily Briefs) and per-client-currency

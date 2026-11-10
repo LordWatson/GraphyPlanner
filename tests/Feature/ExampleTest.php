@@ -16,10 +16,12 @@ class ExampleTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_about_page_returns_a_successful_response()
+    public function test_about_redirects_to_the_homepage()
     {
+        // The standalone About page was folded into the redesigned homepage (features, pricing,
+        // FAQ), so /about now redirects home. The `about` route name is kept for existing links.
         $response = $this->get(route('about'));
 
-        $response->assertOk();
+        $response->assertRedirect(route('home'));
     }
 }
