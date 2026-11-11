@@ -46,9 +46,10 @@ class OrganizationRegistrationTest extends TestCase
                 ->has('passwordRules'));
     }
 
-    public function test_the_old_register_url_redirects_to_the_organization_signup(): void
+    public function test_register_now_shows_the_interest_form_while_signup_stays_routed(): void
     {
-        $this->get('/register')->assertRedirect('/register-organization');
+        $this->get('/register')->assertOk()->assertInertia(fn ($page) => $page->component('auth/register-interest'));
+        $this->get('/register-organization')->assertOk();
     }
 
     public function test_signing_up_creates_the_organization_and_its_owner_together_and_signs_them_in(): void

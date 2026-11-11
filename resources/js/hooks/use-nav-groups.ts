@@ -32,6 +32,7 @@ import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
 import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
 import { index as superAdminPartners } from '@/routes/super-admin/partners';
 import { index as superAdminReferrals } from '@/routes/super-admin/referrals';
+import { index as superAdminRegistrations } from '@/routes/super-admin/registrations';
 import { index as superAdminReports } from '@/routes/super-admin/reports';
 import { edit as superAdminSettings } from '@/routes/super-admin/settings';
 import type { Auth, NavItem } from '@/types';
@@ -88,10 +89,19 @@ export function useNavGroups(): NavModel {
                             superAdminDashboard(),
                             currentUrl === '/super-admin',
                         ),
-                        navItem(
-                            platformChapters.organizations,
-                            superAdminOrganizations(),
-                        ),
+                        {
+                            ...navItem(
+                                platformChapters.organizations,
+                                superAdminOrganizations(),
+                            ),
+                            // Registered interest is the step before an organization exists.
+                            subItems: [
+                                {
+                                    title: 'Registrations',
+                                    href: superAdminRegistrations(),
+                                },
+                            ],
+                        },
                         navItem(
                             platformChapters.analytics,
                             superAdminAnalytics(),

@@ -232,6 +232,7 @@ class OrganizationDataExport
         'platform_settings' => self::PLATFORM,
         'referral_partners' => self::PLATFORM,
         'referral_payouts' => self::PLATFORM,
+        'registration_interests' => self::PLATFORM,
         'super_admin_reports' => self::PLATFORM,
         'subscriptions' => self::PLATFORM,
         'subscription_items' => self::PLATFORM,

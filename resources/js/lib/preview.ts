@@ -29,7 +29,7 @@ const PUBLIC_PATHS: RegExp[] = [
     /^\/$/,
     /^\/about$/,
     /^\/login$/,
-    /^\/register-organization$/,
+    /^\/register(-organization)?$/,
 ];
 
 export type PreviewDecision =

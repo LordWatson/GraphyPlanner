@@ -119,6 +119,14 @@ return [
     // contact. Falls back to the from address when unset.
     'support_address' => env('MAIL_SUPPORT_ADDRESS'),
 
+    // The public "register interest" form: the applicant's confirmation comes from `from`, and the
+    // team alert goes to `to` with `cc` copied. `from` must be on the verified sending domain.
+    'registration_interest' => [
+        'from' => env('REGISTRATION_INTEREST_FROM', 'register@alima.digital'),
+        'to' => env('REGISTRATION_INTEREST_TO', 'alexander.watson.dev@gmail.com'),
+        'cc' => array_filter(explode(',', (string) env('REGISTRATION_INTEREST_CC', 'rseklani@gmail.com'))),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | DKIM selector

@@ -102,7 +102,7 @@ export default function Compare({
                         ))}
                     </ul>
                     <Button asChild variant="spark" className="mt-auto w-full">
-                        <Link href={register()}>Start free</Link>
+                        <Link href={register()}>Get early access</Link>
                     </Button>
                 </section>
             </div>

@@ -211,7 +211,7 @@ export const platformChapters: Record<PlatformChapterKey, Chapter> = {
         summary: 'Every workspace — onboard, edit, suspend or remove.',
         icon: Building2,
         swatch: 'bg-teal dark:ring-1 dark:ring-inset dark:ring-cream/50',
-        prefixes: ['/super-admin/organizations'],
+        prefixes: ['/super-admin/organizations', '/super-admin/registrations'],
     },
     analytics: {
         key: 'analytics',

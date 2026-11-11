@@ -121,8 +121,10 @@ cross-org analytics. Covers Phase 15 (Steps 15.1–15.6) of the plan.
 Public (guest):
 
 - `GET|POST /register-organization` → `Organizations\RegistrationController@create/store`
-  (`organizations.register[.store]`, POST throttled 6/min). `/register` (named `register`) redirects
-  here — Fortify's own registration feature is disabled.
+  (`organizations.register[.store]`, POST throttled 6/min). **Unlinked since 2026-11-11** (still
+  routed) while the first clients are onboarded by hand — see "Register interest" below.
+- `GET|POST /register` → `RegistrationInterestController@create/store` (`register[.store]`, POST
+  throttled 6/min). Every site CTA uses `register()`, so they all land on the interest form.
 
 Super admin (`auth`, `verified`, `super_admin`, prefix `super-admin`, names `super-admin.*`):
 
@@ -239,6 +241,37 @@ money already sent — there is no payment integration — and what is _owed_ is
 settles up, so there is only ever one number that can be wrong. Ending a partnership keeps every
 attribution. See `marketing.md`.
 
+## Register interest (manual onboarding, 2026-11-11)
+
+- **Purpose:** signup is closed for now; `/register` (`auth/register-interest`) collects name,
+  email, phone (optional), company and location (optional) and shows "Thank you, we'll be in touch
+  within 24 hours (usually within a few hours)". Super admins then contact, demo and onboard by hand
+  (Organizations → onboard).
+- **Table** `registration_interests` (model `RegistrationInterest`, not org-scoped): contact fields,
+  `status` (`RegistrationInterestStatus`: new → contacted → demo_booked → onboarded / not_a_fit),
+  `demo_at`, `notes`, `contacted_at` (stamped on the first move off `new`), plus visit metadata: IP,
+  `country`/`city` from Cloudflare `CF-IPCountry`/`CF-IPCity` (null when not behind Cloudflare),
+  browser `timezone`, `Accept-Language` locale, user agent, external `referrer` (own-site referrers
+  dropped), `utm_*` (only when present on the `/register` URL itself), `referral_code` cookie.
+- **Actions:** `RecordRegistrationInterestAction` (create + queue both mails in one transaction),
+  `SuperAdmin\UpdateRegistrationInterestAction`, `SuperAdmin\GetRegistrationInterestStatsAction`
+  (totals, 7/30-day + previous-30 trend, awaiting contact, demo/onboarded rates, avg hours to first
+  contact, top sources/countries, 30-day daily series; aggregated in PHP — fine at low volume).
+- **Mail:** `RegistrationInterestThanksMail` to the applicant and `RegistrationInterestReceivedMail`
+  to the team, both from `mail.registration_interest.from` (`register@alima.digital`); the team
+  alert goes to `mail.registration_interest.to` with `cc` (env `REGISTRATION_INTEREST_FROM|TO|CC`).
+  Reply-To on the alert is the applicant. Both are branded HTML (teal band, Ink hero with a Lime
+  accent word, DM Mono spec rows); the alert also has a plain-text part
+  (`registration-interest-received-text`) and shows a "reply by" deadline (created + 24h, UK time).
+- **Spam:** a hidden `website` honeypot — filled means a bot: respond as success, store/send nothing.
+- **Console:** `GET super-admin/registrations` (list + stats, `?status=` / `?q=`),
+  `GET|PUT super-admin/registrations/{registration}` → `SuperAdmin\RegistrationInterestController`.
+  Nav: sub-item "Registrations" under Organizations; status pill kind `registration`.
+- **Tests:** `RegistrationInterestTest`, `SuperAdmin\RegistrationInterestConsoleTest`.
+- **Gaps:** UTM params on the landing page are lost when the visitor clicks through to `/register`
+  (Inertia nav) — only direct `/register?utm_…` links are attributed. Pricing CTAs still read
+  "Start N-day trial" though they now lead to the interest form.
+
 ## Changelog
 
 - 2026-11-07: **An organization purge no longer leaves its white-label logo in storage.**
@@ -308,3 +341,5 @@ attribution. See `marketing.md`.
   holds the **global Stripe switch** (`PlatformSettings` key `billing.enabled`, default off) and a
   plan-distribution table. `GetOrganizationDetailAction` now returns a `billing` block + `planOptions`.
   Full detail in `plans.md`.
+- 2026-11-11: Register interest replaces self-serve signup links (`/register`), plus the super-admin
+  registrations console (pipeline, demo booking, stats). `/register-organization` stays routed but unlinked.

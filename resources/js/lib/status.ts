@@ -40,7 +40,8 @@ export type StatusKind =
     | 'product'
     | 'deal'
     | 'audienceContact'
-    | 'bioDomain';
+    | 'bioDomain'
+    | 'registration';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -232,6 +233,15 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
     bioDomain: {
         verified: { tone: 'success', label: 'Live' },
         pending: { tone: 'warning', label: 'Waiting on DNS' },
+    },
+    // The register-interest pipeline (`RegistrationInterestStatus`). `new` is a warning: we
+    // promised a reply within 24 hours.
+    registration: {
+        new: { tone: 'warning', label: 'New' },
+        contacted: { tone: 'info', label: 'Contacted' },
+        demo_booked: { tone: 'brand', label: 'Demo booked' },
+        onboarded: { tone: 'success', label: 'Onboarded' },
+        not_a_fit: { tone: 'muted', label: 'Not a fit' },
     },
 };
 

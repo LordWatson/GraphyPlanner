@@ -92,7 +92,7 @@ export function MarketingShell({
                                     <Link href={login()}>Log in</Link>
                                 </Button>
                                 <Button asChild>
-                                    <Link href={register()}>Start free</Link>
+                                    <Link href={register()}>Get early access</Link>
                                 </Button>
                             </>
                         )}

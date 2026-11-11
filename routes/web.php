@@ -96,6 +96,7 @@ use App\Http\Controllers\PostRevisionController;
 use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\PublicConnectController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\RegistrationInterestController;
 use App\Http\Controllers\ResendWebhookController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SavedPostViewController;
@@ -114,6 +115,7 @@ use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganiza
 use App\Http\Controllers\SuperAdmin\PartnerController as SuperAdminPartnerController;
 use App\Http\Controllers\SuperAdmin\PlatformSettingController;
 use App\Http\Controllers\SuperAdmin\ReferralController as SuperAdminReferralController;
+use App\Http\Controllers\SuperAdmin\RegistrationInterestController as SuperAdminRegistrationInterestController;
 use App\Http\Controllers\SuperAdmin\ReportController;
 use App\Http\Controllers\UploadPostWebhookController;
 use App\Http\Controllers\WhatsAppWebhookController;
@@ -324,7 +326,14 @@ Route::middleware('guest')->group(function () {
         ->middleware('throttle:6,1')
         ->name('organizations.start.store');
 });
-Route::redirect('register', '/register-organization')->name('register');
+// While the first clients are onboarded by hand, every "sign up" link lands on the register
+// interest form instead. The self-serve signups above stay routed (just unlinked) for later.
+Route::middleware('guest')->group(function () {
+    Route::get('register', [RegistrationInterestController::class, 'create'])->name('register');
+    Route::post('register', [RegistrationInterestController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('register.store');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Reachable by every logged-in role (including Role::ClientReviewer/portal users and super
@@ -1161,6 +1170,11 @@ Route::prefix('super-admin')->name('super-admin.')->middleware(['auth', 'verifie
     Route::post('referrals', [SuperAdminReferralController::class, 'store'])->name('referrals.store');
     Route::post('referrals/{partner}/payouts', [SuperAdminReferralController::class, 'storePayout'])->name('referrals.payouts.store');
     Route::post('referrals/{partner}/end', [SuperAdminReferralController::class, 'end'])->name('referrals.end');
+
+    // The register-interest pipeline: contact, book a demo, onboard by hand.
+    Route::get('registrations', [SuperAdminRegistrationInterestController::class, 'index'])->name('registrations.index');
+    Route::get('registrations/{registration}', [SuperAdminRegistrationInterestController::class, 'show'])->name('registrations.show');
+    Route::put('registrations/{registration}', [SuperAdminRegistrationInterestController::class, 'update'])->name('registrations.update');
 
     Route::resource('reports', ReportController::class);
     Route::get('reports/{report}/export', [ReportController::class, 'export'])->middleware(['throttle:exports', 'password.confirm'])->name('reports.export');
