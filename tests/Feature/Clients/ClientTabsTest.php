@@ -123,13 +123,11 @@ class ClientTabsTest extends TestCase
         Asset::factory()->for($this->client)->count(26)->create(['org_id' => $this->org->id]);
         Campaign::factory()->for($this->client)->count(2)->create(['org_id' => $this->org->id]);
         Invoice::factory()->for($this->client)->count(2)->create(['org_id' => $this->org->id]);
-        ClientInvitation::factory()->for($this->client)->create();
 
         $tabs = [
             ['clients.posts.index', 'clients/tabs/posts', 'posts', 8, 30],
             ['clients.campaigns.index', 'clients/tabs/campaigns', 'campaigns', 2, 2],
             ['clients.billing', 'clients/tabs/billing', 'invoices', 2, 2],
-            ['clients.portal-access', 'clients/tabs/portal-access', 'invitations', 1, 1],
         ];
 
         foreach ($tabs as [$route, $component, $prop, $onPage, $total]) {

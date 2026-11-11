@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Scopes\OrganizationScope;
 use Database\Factories\ClientInvitationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -68,5 +69,16 @@ class ClientInvitation extends Model
     public function isPending(): bool
     {
         return $this->accepted_at === null && $this->revoked_at === null && $this->expires_at->isFuture();
+    }
+
+    /**
+     * The query-side twin of `isPending()`, so callers that need to find or revoke the live
+     * invitations for an email express "pending" exactly once.
+     *
+     * @param  Builder<ClientInvitation>  $query
+     */
+    public function scopePending(Builder $query): void
+    {
+        $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now());
     }
 }

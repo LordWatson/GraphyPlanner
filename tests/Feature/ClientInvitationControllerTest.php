@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Mail\ClientInvitationMail;
 use App\Models\Client;
+use App\Models\ClientContact;
 use App\Models\ClientInvitation;
 use App\Models\Organization;
 use App\Models\User;
@@ -16,6 +17,18 @@ class ClientInvitationControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * An invite only ever goes to one of the client's contacts, so the tests that send one need
+     * the contact to exist first.
+     */
+    private function contact(Client $client, string $email = 'contact@acme.test'): ClientContact
+    {
+        return ClientContact::factory()->for($client)->create([
+            'org_id' => $client->org_id,
+            'email' => $email,
+        ]);
+    }
+
     public function test_owner_can_send_a_client_invitation(): void
     {
         Mail::fake();
@@ -23,6 +36,7 @@ class ClientInvitationControllerTest extends TestCase
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
+        $this->contact($client);
 
         $response = $this->actingAs($owner)->post(route('clients.invitations.store', $client), [
             'email' => 'contact@acme.test',
@@ -44,6 +58,7 @@ class ClientInvitationControllerTest extends TestCase
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
+        $this->contact($client);
         ClientInvitation::factory()->for($client)->for($owner, 'invitedBy')->create([
             'email' => 'contact@acme.test',
         ]);
@@ -63,6 +78,7 @@ class ClientInvitationControllerTest extends TestCase
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
+        $this->contact($client);
         ClientInvitation::factory()->for($client)->for($owner, 'invitedBy')->create([
             'email' => 'contact@acme.test',
             'revoked_at' => now(),
@@ -140,6 +156,7 @@ class ClientInvitationControllerTest extends TestCase
         $org = Organization::factory()->create();
         $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
         $client = Client::factory()->for($org, 'organization')->create();
+        $this->contact($client);
 
         $this->actingAs($owner)->post(route('clients.invitations.store', $client), [
             'email' => 'contact@acme.test',
@@ -152,8 +169,9 @@ class ClientInvitationControllerTest extends TestCase
         $response->assertOk();
         $response->assertDontSee($tokenHash, false);
         $response->assertInertia(fn ($page) => $page
-            ->has('invitations.data', 1)
-            ->where('invitations.data.0.email', 'contact@acme.test')
+            ->has('contacts', 1)
+            ->where('contacts.0.email', 'contact@acme.test')
+            ->where('contacts.0.portal.status', 'pending')
         );
     }
 }

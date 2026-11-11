@@ -134,33 +134,11 @@ final class ClientTabPresenter
     }
 
     /**
-     * Deliberately never includes the token or its hash — only
-     * `App\Actions\ClientInvitations\CreateClientInvitationAction` ever sees the plain token, and
-     * it never gets persisted or rendered.
+     * Step M-6.1 — a client contact row for the Portal access tab, with its portal access state.
      *
      * @return array<string, mixed>
      */
-    public static function invitation(ClientInvitation $invitation, User $user): array
-    {
-        return [
-            'id' => $invitation->id,
-            'email' => $invitation->email,
-            'expires_at' => $invitation->expires_at->toIso8601String(),
-            'accepted_at' => $invitation->accepted_at?->toIso8601String(),
-            'revoked_at' => $invitation->revoked_at?->toIso8601String(),
-            'is_pending' => $invitation->isPending(),
-            'can' => [
-                'delete' => $invitation->isPending() && $user->can('delete', $invitation),
-            ],
-        ];
-    }
-
-    /**
-     * Step M-6.1 — a client contact row for the Portal access tab.
-     *
-     * @return array<string, mixed>
-     */
-    public static function contact(ClientContact $contact, User $user): array
+    public static function contact(ClientContact $contact, User $user, ?ClientInvitation $invitation = null): array
     {
         return [
             'id' => $contact->id,
@@ -175,6 +153,20 @@ final class ClientTabPresenter
             // should be able to see that it is recorded, not just on.
             'receives_whatsapp' => $contact->receives_whatsapp,
             'whatsapp_consent_at' => $contact->whatsapp_consent_at?->toIso8601String(),
+            // Contacts and portal logins are one list: the contact's latest invitation (if any)
+            // says where their portal access got to, and is actioned from the same row.
+            'portal' => [
+                'status' => match (true) {
+                    $invitation === null => 'none',
+                    $invitation->accepted_at !== null => 'accepted',
+                    $invitation->revoked_at !== null => 'revoked',
+                    $invitation->isPending() => 'pending',
+                    default => 'expired',
+                },
+                'invitation_id' => $invitation?->id,
+                'expires_at' => $invitation?->expires_at->toIso8601String(),
+                'can_revoke' => $invitation !== null && $invitation->isPending() && $user->can('delete', $invitation),
+            ],
             'can' => [
                 'update' => $user->can('update', $contact),
                 'delete' => $user->can('delete', $contact),

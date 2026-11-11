@@ -124,9 +124,33 @@ content, complete}`. `brandBrain` is true once any core Brand Brain field (voice
   business workspace), `ClientContactController` + `StoreClientContactRequest` /
   `UpdateClientContactRequest` (`payload()` — not `data()`, which collides with
   `Request::data()`). Routes `clients.contacts.store`, `contacts.update`, `contacts.destroy`
-  (agency-only). Managed inline on the Portal access tab (`ClientContactsPanel`), above invitations.
+  (agency-only). Managed inline on the Portal access tab (`ClientContactsPanel`).
+- **2026-11-11 — contacts and portal access are one list.** The tab's separate "Client portal
+  access" invite form and invitation list are gone; a contact _is_ a portal login:
+    - `CreateClientContactAction` takes the acting `User` and calls `CreateClientInvitationAction`
+      after the (now transactional) contact write, so adding a contact emails them their signup
+      link. The mail send stays outside the transaction — a mail failure must not undo the contact.
+    - `UpdateClientContactAction` moves access with the address: changing a contact's email revokes
+      the old address's pending invite and invites the new one. Shortcut: an already-accepted login
+      at the old address keeps working under its old email; it is re-invited, not renamed.
+    - `DeleteClientContactAction` revokes the pending invite **and** nulls `client_id` on the
+      matching `Role::ClientReviewer` user, so `EnsureClientPortalAccess` turns them away. The user
+      row survives, so whatever they approved or commented on keeps its author.
+    - `StoreClientInvitationRequest` now requires the email to be a live contact of that client
+      (`Rule::exists` on `client_contacts`), which is what makes "only contacts have portal access"
+      true at both ends. The route stays as the per-row "Send invite" after an expiry/revoke.
+    - `ClientInvitation::scopePending()` is the query-side twin of `isPending()` — the one place
+      "pending" is expressed. `ClientTabPresenter::contact()` takes the contact's latest invitation
+      and adds a `portal` block (`status` none/pending/accepted/revoked/expired, `invitation_id`,
+      `expires_at`, `can_revoke`); `ClientTabPresenter::invitation()` and the paginated
+      `invitations` prop are deleted.
+    - What a contact is _notified_ about remains purely the per-channel checkboxes
+      (`receives_review_emails` / `receives_invoices` / `receives_whatsapp`) — portal access is no
+      longer a separate decision.
 - Tests: `tests/Feature/Clients/ClientContactTest.php` (backfill parity + idempotency, CRUD, authz,
-  review emails reach every approver, legacy fallback, contacts preferred over legacy, org scope).
+  review emails reach every approver, legacy fallback, contacts preferred over legacy, org scope,
+  plus: adding a contact invites them, an email change moves the invite, removing a contact closes
+  the portal, and a non-contact cannot be invited).
 
 ## Phase M-3 additions (Step M-3.4 / I-6.1 — client health v2; M-3.3 report schedule)
 
@@ -200,7 +224,9 @@ content, complete}`. `brandBrain` is true once any core Brand Brain field (voice
     - `GET /clients/{client}/billing` → `billing` (`clients.billing`) — `ClientBillingTabRequest`
       (`viewBilling`; `search`/`status`) → `InvoiceLedgerService::query` scoped to the client,
       `INVOICES_PER_PAGE` = 8; also sends `filters`.
-    - `GET /clients/{client}/portal-access` → `portalAccess` (`clients.portal-access`) — invitations.
+    - `GET /clients/{client}/portal-access` → `portalAccess` (`clients.portal-access`) — the single
+      contacts-and-portal-access list: every contact with its latest invitation's state. Not
+      paginated.
     - `GET /clients/{client}/ai` → `ai` (`clients.ai.index`) — Owner/Strategist + `ai.enabled`;
       `trends`/`ideas` are `Inertia::defer` props.
     - `GET /clients/{client}/briefs` → `briefs` (`clients.briefs`) — same gate; the list is fetched

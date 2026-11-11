@@ -7,9 +7,11 @@ use App\Enums\ClientContactRole;
 use App\Enums\OrganizationType;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Mail\ClientInvitationMail;
 use App\Mail\ClientReviewRequestedMail;
 use App\Models\Client;
 use App\Models\ClientContact;
+use App\Models\ClientInvitation;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\User;
@@ -146,6 +148,78 @@ class ClientContactTest extends TestCase
             ->assertRedirect(route('clients.portal-access', $this->client));
 
         $this->assertSoftDeleted($contact);
+    }
+
+    public function test_adding_a_contact_invites_them_to_the_portal(): void
+    {
+        $this->actingAs($this->owner)
+            ->post(route('clients.contacts.store', $this->client), [
+                'email' => 'sarah@acme.test',
+                'role' => ClientContactRole::Approver->value,
+            ])
+            ->assertRedirect(route('clients.portal-access', $this->client));
+
+        $invitation = ClientInvitation::where('client_id', $this->client->id)->sole();
+        $this->assertSame('sarah@acme.test', $invitation->email);
+        $this->assertTrue($invitation->isPending());
+        $this->assertSame($this->owner->id, $invitation->invited_by_user_id);
+        Mail::assertQueued(ClientInvitationMail::class);
+    }
+
+    public function test_changing_a_contacts_email_moves_their_invite_to_the_new_address(): void
+    {
+        $contact = ClientContact::factory()->forClient($this->client)->create(['email' => 'old@acme.test']);
+        $old = ClientInvitation::factory()->for($this->client)->for($this->owner, 'invitedBy')->create([
+            'email' => 'old@acme.test',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->put(route('contacts.update', $contact), [
+                'email' => 'new@acme.test',
+                'role' => $contact->role->value,
+                'receives_review_emails' => '1',
+                'receives_invoices' => '0',
+            ])
+            ->assertRedirect(route('clients.portal-access', $this->client));
+
+        $this->assertNotNull($old->fresh()->revoked_at);
+        $this->assertTrue(
+            ClientInvitation::where('client_id', $this->client->id)->where('email', 'new@acme.test')->sole()->isPending()
+        );
+    }
+
+    public function test_removing_a_contact_closes_their_portal_access(): void
+    {
+        $contact = ClientContact::factory()->forClient($this->client)->create(['email' => 'sarah@acme.test']);
+        $pending = ClientInvitation::factory()->for($this->client)->for($this->owner, 'invitedBy')->create([
+            'email' => 'sarah@acme.test',
+        ]);
+        $reviewer = User::factory()->for($this->org, 'organization')->role(Role::ClientReviewer)->create([
+            'email' => 'sarah@acme.test',
+            'client_id' => $this->client->id,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->delete(route('contacts.destroy', $contact))
+            ->assertRedirect(route('clients.portal-access', $this->client));
+
+        $this->assertSoftDeleted($contact);
+        $this->assertNotNull($pending->fresh()->revoked_at);
+        $this->assertNull($reviewer->fresh()->client_id);
+
+        $this->actingAs($reviewer->fresh())->get(route('portal.dashboard'))->assertForbidden();
+    }
+
+    public function test_the_portal_cannot_be_opened_to_someone_who_is_not_a_contact(): void
+    {
+        $this->actingAs($this->owner)
+            ->from(route('clients.portal-access', $this->client))
+            ->post(route('clients.invitations.store', $this->client), [
+                'email' => 'stranger@acme.test',
+            ])
+            ->assertSessionHasErrors('email');
+
+        $this->assertDatabaseCount('client_invitations', 0);
     }
 
     public function test_designer_and_viewer_cannot_manage_contacts(): void

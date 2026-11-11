@@ -173,20 +173,22 @@ class ClientTabController extends Controller
         $this->authorize('viewAny', [ClientInvitation::class, $client]);
         $user = $request->user();
 
+        // One list: a contact *is* a portal login, so each contact row carries its own latest
+        // invitation. Keyed by email because that is what an invitation is addressed to.
+        $invitations = $client->invitations()
+            ->with('client:id,org_id')
+            ->latest('id')
+            ->get()
+            ->unique('email')
+            ->keyBy('email');
+
         return Inertia::render('clients/tabs/portal-access', [
             ...($this->header)($client, $user, 'portal-access'),
-            'invitations' => $client->invitations()
-                ->with('client:id,org_id')
-                ->latest()
-                ->latest('id')
-                ->paginate(self::PER_PAGE)
-                ->through(fn (ClientInvitation $invitation) => ClientTabPresenter::invitation($invitation, $user)),
-            // Step M-6.1: named contacts, managed inline above the portal invitations.
             'contacts' => $client->contacts()
                 ->orderByRaw("CASE role WHEN 'approver' THEN 0 WHEN 'billing' THEN 1 WHEN 'marketing_lead' THEN 2 ELSE 3 END")
                 ->orderBy('id')
                 ->get()
-                ->map(fn (ClientContact $contact) => ClientTabPresenter::contact($contact, $user))
+                ->map(fn (ClientContact $contact) => ClientTabPresenter::contact($contact, $user, $invitations->get($contact->email)))
                 ->values(),
             'contactRoles' => collect(ClientContactRole::cases())
                 ->map(fn (ClientContactRole $role) => ['value' => $role->value, 'label' => $role->label()])

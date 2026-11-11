@@ -1,5 +1,5 @@
 import { Form, router } from '@inertiajs/react';
-import { Mail, Pencil, Phone, Trash2, UserRound } from 'lucide-react';
+import { Mail, Pencil, Phone, Send, Trash2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { store as storeContact } from '@/routes/clients/contacts';
+import { store as storeInvitation } from '@/routes/clients/invitations';
+import { destroy as destroyInvitation } from '@/routes/invitations';
 import {
     destroy as destroyContact,
     update as updateContact,
@@ -39,6 +41,12 @@ export type ContactData = {
     receives_invoices: boolean;
     receives_whatsapp: boolean;
     whatsapp_consent_at: string | null;
+    portal: {
+        status: 'none' | 'pending' | 'accepted' | 'revoked' | 'expired';
+        invitation_id: number | null;
+        expires_at: string | null;
+        can_revoke: boolean;
+    };
     can: { update: boolean; delete: boolean };
 };
 
@@ -111,9 +119,98 @@ function BooleanField({
     );
 }
 
+const PORTAL_LABELS = {
+    none: 'No portal invite',
+    pending: 'Portal invite pending',
+    accepted: 'Portal access',
+    revoked: 'Portal invite revoked',
+    expired: 'Portal invite expired',
+} as const;
+
 /**
- * Step M-6.1 — manage a client's named contacts (approvers, billing, marketing leads, other). An
- * approver who receives review emails gets every post review link; a billing contact gets invoices.
+ * Where this contact's portal login got to, and the one action that moves it on: send (or re-send)
+ * the signup link, or revoke a link that's still live.
+ */
+function PortalAccess({
+    clientId,
+    contact,
+}: {
+    clientId: number;
+    contact: ContactData;
+}) {
+    const { status } = contact.portal;
+
+    return (
+        <>
+            <Badge
+                variant={
+                    status === 'accepted'
+                        ? 'success'
+                        : status === 'pending'
+                          ? 'warning'
+                          : 'outline'
+                }
+                title={
+                    status === 'pending' && contact.portal.expires_at
+                        ? `Expires ${new Date(contact.portal.expires_at).toLocaleDateString()}`
+                        : undefined
+                }
+            >
+                {PORTAL_LABELS[status]}
+            </Badge>
+            {contact.portal.can_revoke ? (
+                <Form
+                    {...destroyInvitation.form(contact.portal.invitation_id!)}
+                >
+                    {({ processing }) => (
+                        <Button
+                            type="submit"
+                            size="sm"
+                            variant="outline"
+                            disabled={processing}
+                        >
+                            <Trash2 />
+                            Revoke invite
+                        </Button>
+                    )}
+                </Form>
+            ) : (
+                status !== 'accepted' &&
+                status !== 'pending' && (
+                    <Form
+                        {...storeInvitation.form(clientId)}
+                        options={{ preserveScroll: true }}
+                    >
+                        {({ processing }) => (
+                            <>
+                                <input
+                                    type="hidden"
+                                    name="email"
+                                    value={contact.email}
+                                />
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={processing}
+                                >
+                                    <Send />
+                                    Send invite
+                                </Button>
+                            </>
+                        )}
+                    </Form>
+                )
+            )}
+        </>
+    );
+}
+
+/**
+ * Step M-6.1 — manage a client's named contacts (approvers, billing, marketing leads, other). Every
+ * contact is a portal login: adding one emails them their signup link. What they're notified about
+ * is the per-channel boxes — an approver who receives review emails gets every post review link, a
+ * billing contact gets invoices.
  */
 export function ClientContactsPanel({
     clientId,
@@ -136,7 +233,8 @@ export function ClientContactsPanel({
                 <p className="text-muted-foreground text-sm">
                     No contacts yet. Add an approver so review requests reach
                     the right people — by email, and on WhatsApp if they have
-                    agreed to it.
+                    agreed to it. They'll also be emailed a link to set up their
+                    portal login.
                 </p>
             ) : (
                 <div className="grid gap-3">
@@ -187,7 +285,13 @@ export function ClientContactsPanel({
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {canManage && (
+                                    <PortalAccess
+                                        clientId={clientId}
+                                        contact={contact}
+                                    />
+                                )}
                                 {contact.can.update && (
                                     <Button
                                         type="button"
@@ -207,7 +311,7 @@ export function ClientContactsPanel({
                                         onClick={() => {
                                             if (
                                                 window.confirm(
-                                                    `Remove ${contact.name ?? contact.email}? They will stop receiving emails for this client.`,
+                                                    `Remove ${contact.name ?? contact.email}? They will stop receiving emails for this client and lose access to the portal.`,
                                                 )
                                             ) {
                                                 router.delete(
@@ -300,7 +404,7 @@ function AddContactForm({
                         forWhatsApp={whatsapp}
                         error={errors.phone}
                     />
-                    <div className="grid gap-1">
+                    <div className="grid content-start gap-1">
                         <input type="hidden" name="role" value={role} />
                         <Label htmlFor="contact-role">Role</Label>
                         <Select value={role} onValueChange={chooseRole}>
@@ -340,7 +444,7 @@ function AddContactForm({
                     <div className="col-span-full">
                         <Button type="submit" size="sm" disabled={processing}>
                             <UserRound />
-                            Add contact
+                            Add contact &amp; send invite
                         </Button>
                     </div>
                 </>
@@ -435,7 +539,7 @@ function EditContactFields({
                         defaultValue={contact.phone ?? ''}
                         error={errors.phone}
                     />
-                    <div className="grid gap-1">
+                    <div className="grid content-start gap-1">
                         <input type="hidden" name="role" value={role} />
                         <Label htmlFor="edit-role">Role</Label>
                         <Select value={role} onValueChange={setRole}>

@@ -14,19 +14,20 @@ use Illuminate\Http\RedirectResponse;
 /**
  * Step M-6.1 — client contacts. Thin: the Form Request authorizes and validates, an Action does the
  * work, and the response lands back on the Portal access tab where contacts are managed inline.
+ * Creating a contact also sends their portal signup link (see CreateClientContactAction).
  */
 class ClientContactController extends Controller
 {
     public function store(StoreClientContactRequest $request, Client $client, CreateClientContactAction $action): RedirectResponse
     {
-        $action($client, $request->payload());
+        $action($client, $request->payload(), $request->user());
 
         return to_route('clients.portal-access', $client);
     }
 
     public function update(UpdateClientContactRequest $request, ClientContact $contact, UpdateClientContactAction $action): RedirectResponse
     {
-        $action($contact, $request->payload());
+        $action($contact, $request->payload(), $request->user());
 
         return to_route('clients.portal-access', $contact->client_id);
     }

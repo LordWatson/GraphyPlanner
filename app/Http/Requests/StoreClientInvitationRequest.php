@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Client;
 use App\Models\ClientInvitation;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreClientInvitationRequest extends FormRequest
@@ -21,8 +23,18 @@ class StoreClientInvitationRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Client $client */
+        $client = $this->route('client');
+
+        // Portal access is not a second list: an invite only ever goes to one of this client's
+        // contacts, so removing the contact is enough to remove the access.
         return [
-            'email' => ['required', 'email', 'max:255'],
+            'email' => [
+                'required', 'email', 'max:255',
+                Rule::exists('client_contacts', 'email')
+                    ->where('client_id', $client->id)
+                    ->whereNull('deleted_at'),
+            ],
         ];
     }
 
@@ -32,6 +44,7 @@ class StoreClientInvitationRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            /** @var ?Client $client */
             $client = $this->route('client');
 
             if (! $client || blank($this->input('email'))) {
@@ -40,9 +53,7 @@ class StoreClientInvitationRequest extends FormRequest
 
             $hasPending = $client->invitations()
                 ->where('email', $this->input('email'))
-                ->whereNull('accepted_at')
-                ->whereNull('revoked_at')
-                ->where('expires_at', '>', now())
+                ->pending()
                 ->exists();
 
             if ($hasPending) {

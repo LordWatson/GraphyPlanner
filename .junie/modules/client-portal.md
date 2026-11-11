@@ -153,13 +153,14 @@ invitation)` — Owner/Strategist only, scoped to the invitation's client's `org
 ## Routes / Controllers
 
 - `POST /clients/{client}/invitations` → `ClientInvitationController::store` — validated via
-  `StoreClientInvitationRequest` (email required + a custom `withValidator` rule rejecting a
-  duplicate _pending_ invitation to the same email/client), delegates to
-  `CreateClientInvitationAction`, redirects to `clients.show`.
+  `StoreClientInvitationRequest` (email must be a live `client_contacts` row for that client, plus a
+  custom `withValidator` rule rejecting a duplicate _pending_ invitation to the same email/client),
+  delegates to `CreateClientInvitationAction`, redirects to `clients.portal-access`. Since
+  2026-11-11 this is the _re-send_ path only — the first invite is sent by
+  `CreateClientContactAction` when the contact is added.
 - `DELETE /invitations/{invitation}` → `ClientInvitationController::destroy` — sets `revoked_at`,
-  redirects to `clients.show`. No dedicated list endpoint: pending/accepted invitations are loaded
-  by `ClientController::show` (via `transformInvitation`, which never includes the token/hash) and
-  rendered inline, the same way invoices/social accounts are.
+  redirects to `clients.portal-access`. No dedicated list endpoint: each contact's latest invitation
+  rides on its contact row (`ClientTabPresenter::contact()`'s `portal` block).
 - Both routes are mirrored under the `preview.*` prefix (write-blocked by the `preview` middleware,
   same pattern as every other write route).
 - `GET /client-invite/{token}` and `POST /client-invite/{token}` →
@@ -244,7 +245,14 @@ invitation)` — Owner/Strategist only, scoped to the invitation's client's `org
   issue/due dates, the same "Unpaid"-or-status badge), linked from the invoices list; now also
   renders the organization-uploaded invoice PDF inline (`<iframe>`) when one exists (see
   `.junie/modules/billing.md`'s 2026-09-19 changelog entry) — no upload/edit controls here.
-- `resources/js/pages/clients/show.tsx` gained a "Portal access" tab (`UserPlus` icon) alongside
+- **2026-11-11 — one list.** Contacts and portal access are no longer two sections. The
+  `clients.portal-access` tab renders a single `ClientContactsPanel`: adding a contact emails them
+  the portal signup link, each row shows its portal state as a badge (`portal.status`) with a
+  "Send invite" / "Revoke invite" button, and the checkboxes on the row decide only what they are
+  _notified_ about. Removing a contact revokes the pending invite and detaches the
+  `Role::ClientReviewer` login (`client_id` → null), so the portal turns them away. Only contacts
+  can ever hold portal access — see `clients.md` › Phase M-6 additions for the backend detail.
+- _(historic)_ `resources/js/pages/clients/show.tsx` gained a "Portal access" tab (`UserPlus` icon) alongside
   the existing Social accounts/Campaigns/Posts/Assets/Billing tabs, following the exact same
   inline-form-plus-list pattern as the Billing history tab: an email-only form (visible when
   `can.createInvitation`) and a list of invitations showing email, a status badge
