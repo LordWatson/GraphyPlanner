@@ -136,7 +136,7 @@ class NewNetworksPublishTest extends TestCase
         $this->assertSame(['Spring menu is live'], $fields['pinterest_title']);
     }
 
-    public function test_x_publishes_its_own_title_without_the_fold_spacer(): void
+    public function test_x_publishes_its_own_title_with_hashtags_after_a_blank_line(): void
     {
         Http::fake(['*/upload_photos' => Http::response(['request_id' => 'x-1'])]);
 

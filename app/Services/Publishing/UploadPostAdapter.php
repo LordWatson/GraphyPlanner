@@ -711,7 +711,7 @@ class UploadPostAdapter implements PublishAdapter
      * Step I-3.1 / M-2.2: the caption is the *target's* — its override or the master — composed
      * with its hashtags and link exactly as the checklist counted it (`CaptionComposer`). Upload-Post
      * has no working `hashtags` parameter, so tags travel as literal `#tag` text in the caption
-     * (below the dot-dash spacer where the platform folds captions). The generic `title` carries
+     * (after a blank line at the end of it). The generic `title` carries
      * the same text, and so does the platform's own `{prefix}_title`, which some platforms
      * (Instagram) render instead of `title`/`description`.
      *

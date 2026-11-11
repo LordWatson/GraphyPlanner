@@ -114,26 +114,25 @@ class ChannelOverridesTest extends TestCase
         $post->targets()->create(['social_account_id' => $londonLinkedIn->id]);
 
         $post->load('targets.socialAccount', 'assets');
-        $spacer = implode("\n", array_fill(0, 8, '-'));
 
         (new UploadPostAdapter)->publish($post, collect([$dubaiInstagram, $londonLinkedIn]));
 
-        Http::assertSent(function (Request $request) use ($spacer) {
+        Http::assertSent(function (Request $request) {
             $fields = self::fields($request);
 
             return ($fields['platform[]'] ?? null) === ['instagram']
-                && $fields['instagram_title'] === ["Brunch is back in Dubai Marina.\n{$spacer}\n#dubaibrunch #dxb"]
+                && $fields['instagram_title'] === ["Brunch is back in Dubai Marina.\n\n#dubaibrunch #dxb"]
                 && $fields['instagram_first_comment'] === ['Link in bio to book.']
                 && $fields['instagram_alt_text'] === ['["Eggs benedict on a terrace"]']
                 && ! array_key_exists('description', $fields);
         });
 
-        Http::assertSent(function (Request $request) use ($spacer) {
+        Http::assertSent(function (Request $request) {
             $fields = self::fields($request);
 
             return ($fields['platform[]'] ?? null) === ['linkedin']
-                && $fields['linkedin_title'] === ["Brunch is back.\n{$spacer}\n#brunch"]
-                && $fields['description'] === ["Brunch is back.\n{$spacer}\n#brunch"]
+                && $fields['linkedin_title'] === ["Brunch is back.\n\n#brunch"]
+                && $fields['description'] === ["Brunch is back.\n\n#brunch"]
                 && $fields['linkedin_first_comment'] === ['Book at alima.test/brunch'];
         });
     }

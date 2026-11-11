@@ -89,13 +89,11 @@ class UploadPostAdapterTest extends TestCase
 
             // `title` itself now carries the appended hashtag text (per
             // applyHashtagCaptionOverride()), so it's no longer just the bare caption.
-            $spacer = implode("\n", array_fill(0, 8, '-'));
-
             return $request->url() === 'https://api.upload-post.com/api/upload_photos'
                 && $request->hasHeader('Authorization', 'Apikey org-secret-key')
                 && $request->isMultipart()
                 && $fields['user'] === [$account->fresh()->upload_post_profile]
-                && $fields['title'] === ["Hello world\n{$spacer}\n#graphy"]
+                && $fields['title'] === ["Hello world\n\n#graphy"]
                 && $fields['platform[]'] === [Platform::LinkedIn->value]
                 && $fields['photos[]'] === ['https://cdn.test/media.jpg']
                 && $fields['hashtags[]'] === ['graphy']
@@ -227,10 +225,8 @@ class UploadPostAdapterTest extends TestCase
         Http::assertSent(function ($request) {
             $fields = self::multipartFieldsByName($request);
 
-            $spacer = implode("\n", array_fill(0, 8, '-'));
-
-            return $fields['title'] === ["Hello world\n{$spacer}\n#graphy #launch"]
-                && $fields['instagram_title'] === ["Hello world\n{$spacer}\n#graphy #launch"]
+            return $fields['title'] === ["Hello world\n\n#graphy #launch"]
+                && $fields['instagram_title'] === ["Hello world\n\n#graphy #launch"]
                 // Upload-Post's docs explicitly say the generic `description` field is ignored
                 // for Instagram, so it must not be sent for this platform.
                 && ! array_key_exists('description', $fields);
@@ -254,7 +250,6 @@ class UploadPostAdapterTest extends TestCase
         ]);
 
         $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
-        $spacer = implode("\n", array_fill(0, 8, '-'));
 
         foreach ([
             [Platform::TikTok, 'tiktok_title'],
@@ -273,12 +268,12 @@ class UploadPostAdapterTest extends TestCase
 
             $results = (new UploadPostAdapter)->publish($post, new Collection([$account]));
 
-            Http::assertSent(function ($request) use ($titleField, $spacer) {
+            Http::assertSent(function ($request) use ($titleField) {
                 $data = $request->data();
 
-                return ($data['title'] ?? null) === "Hello world\n{$spacer}\n#graphy #launch"
-                    && ($data[$titleField] ?? null) === "Hello world\n{$spacer}\n#graphy #launch"
-                    && ($data['description'] ?? null) === "Hello world\n{$spacer}\n#graphy #launch";
+                return ($data['title'] ?? null) === "Hello world\n\n#graphy #launch"
+                    && ($data[$titleField] ?? null) === "Hello world\n\n#graphy #launch"
+                    && ($data['description'] ?? null) === "Hello world\n\n#graphy #launch";
             });
 
             $this->assertContains($titleField, $results->first()->sentFields);

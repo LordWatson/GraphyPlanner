@@ -32,7 +32,7 @@
 | - `caption_limit`: characters, counted on the caption exactly as it publishes (hashtags and an
 |   appended link included). `title_limit`: for platforms that also need a title (YouTube, Pinterest).
 | - `hashtags`: whether tags are sent at all; `max_hashtags`: the platform's norm (a warning, not a
-|   block); `hashtag_spacer`: push tags below the "more" fold with the dot-dash spacer.
+|   block). Tags sit after a blank line at the end of the caption.
 | - `links_in_caption`: whether a URL in the caption is clickable / welcome there.
 |   `link_field`: the vendor field that carries the post's link instead (Pinterest, Google).
 | - `first_comment`, `alt_text`: supported by the vendor for this platform.
@@ -87,7 +87,6 @@ return [
         'caption_limit' => 2200,
         'hashtags' => true,
         'max_hashtags' => 30,
-        'hashtag_spacer' => true,
         'links_in_caption' => false,
         'link_field' => null,
         'first_comment' => true,
@@ -147,7 +146,6 @@ return [
         'caption_limit' => 2200,
         'hashtags' => true,
         'max_hashtags' => 30,
-        'hashtag_spacer' => true,
         'links_in_caption' => false,
         'link_field' => null,
         'first_comment' => true,
@@ -195,7 +193,6 @@ return [
         'caption_limit' => 63206,
         'hashtags' => true,
         'max_hashtags' => 30,
-        'hashtag_spacer' => true,
         'links_in_caption' => true,
         'link_field' => null,
         'first_comment' => true,
@@ -251,7 +248,6 @@ return [
         'caption_limit' => 3000,
         'hashtags' => true,
         'max_hashtags' => 5,
-        'hashtag_spacer' => true,
         'links_in_caption' => true,
         'link_field' => null,
         'first_comment' => true,
@@ -292,7 +288,6 @@ return [
         'title_limit' => 100,
         'hashtags' => true,
         'max_hashtags' => 15,
-        'hashtag_spacer' => false,
         'links_in_caption' => true,
         'link_field' => null,
         'first_comment' => true,
@@ -335,7 +330,6 @@ return [
         'caption_limit' => 1500,
         'hashtags' => false,
         'max_hashtags' => 0,
-        'hashtag_spacer' => false,
         'links_in_caption' => false,
         'link_field' => 'gbp_cta_url',
         'first_comment' => false,
@@ -374,7 +368,6 @@ return [
         'caption_limit' => 500,
         'hashtags' => true,
         'max_hashtags' => 1,
-        'hashtag_spacer' => false,
         'links_in_caption' => true,
         'link_field' => null,
         'first_comment' => true,
@@ -414,7 +407,6 @@ return [
         'title_limit' => 100,
         'hashtags' => true,
         'max_hashtags' => 20,
-        'hashtag_spacer' => false,
         'links_in_caption' => false,
         'link_field' => 'pinterest_link',
         'first_comment' => false,
@@ -462,7 +454,6 @@ return [
         'caption_limit' => 280,
         'hashtags' => true,
         'max_hashtags' => 2,
-        'hashtag_spacer' => false,
         'links_in_caption' => true,
         'link_field' => null,
         'first_comment' => true,

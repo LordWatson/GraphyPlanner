@@ -213,8 +213,7 @@ export function describeRatio(ratio: number): string {
  * The caption exactly as it publishes — the mirror of `App\Support\Publishing\CaptionComposer`.
  * With a platform's capabilities: a link goes in the caption only where there's no dedicated link
  * field and links work in captions; hashtags are dropped where the platform doesn't use them, and
- * sit below the eight-line "dot-dash" spacer only where it folds captions (`hashtag_spacer`).
- * Without capabilities it behaves as before (spacer, no link).
+ * otherwise sit after a blank line. Without capabilities it behaves as before (no link).
  */
 export function publishedCaption(
     caption: string,
@@ -256,12 +255,7 @@ export function publishedCaption(
         return tagText;
     }
 
-    const spacer =
-        !capability || capability.hashtag_spacer
-            ? `\n${Array.from({ length: 8 }, () => '-').join('\n')}\n`
-            : '\n\n';
-
-    return `${text}${spacer}${tagText}`;
+    return `${text}\n\n${tagText}`;
 }
 
 /** Fallback fold when the registry hasn't reached the page. */

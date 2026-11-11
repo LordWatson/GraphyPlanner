@@ -35,7 +35,6 @@ export type PlatformCapability = {
     title_limit: number | null;
     hashtags: boolean;
     max_hashtags: number;
-    hashtag_spacer: boolean;
     links_in_caption: boolean;
     /** The post's link goes in a dedicated field (Pinterest destination, Google button). */
     link_field: boolean;
@@ -66,7 +65,6 @@ const FALLBACK: PlatformCapability = {
     title_limit: null,
     hashtags: true,
     max_hashtags: 30,
-    hashtag_spacer: false,
     links_in_caption: true,
     link_field: false,
     first_comment: false,

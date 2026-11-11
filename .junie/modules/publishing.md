@@ -269,7 +269,7 @@ certificate subject name matches target host name` deep inside Guzzle. A mismatc
 ### Capability registry (M-2.1 / I-3.3)
 
 - `config/platforms.php` is the single source of truth for every platform rule: caption/title
-  limits, hashtag policy (`hashtags`, `max_hashtags`, `hashtag_spacer`), link policy
+  limits, hashtag policy (`hashtags`, `max_hashtags`), link policy
   (`links_in_caption`, `link_field`), first comment / alt text support, text-only, per-account
   `settings` (keyed by the vendor field they're sent as, e.g. `pinterest_board_id`), the image
   framings (`media_ratios`), the Image Studio default (`ai_image_ratio`), caption fold, vendor field
@@ -300,7 +300,7 @@ certificate subject name matches target host name` deep inside Guzzle. A mismatc
 | Google Business | Upload-Post             | update (1 image/≤30s video)                               | no            | no                         | `gbp_cta_url` + LEARN_MORE | hashtags dropped; `gbp_location_id` setting                                          |
 | Threads         | Upload-Post             | post (text, ≤20 media)                                    | yes           | yes                        | in caption                 | 500 chars, 1 topic tag                                                               |
 | Pinterest       | Upload-Post             | pin, carousel 2–5                                         | no            | yes                        | `pinterest_link`           | **requires** `pinterest_board_id`; not on the hosted connect page's `platforms` list |
-| X               | Upload-Post             | post (text, ≤4 images, video)                             | yes           | yes                        | in caption                 | 280 chars; no fold spacer                                                            |
+| X               | Upload-Post             | post (text, ≤4 images, video)                             | yes           | yes                        | in caption                 | 280 chars                                                                            |
 | Bluesky         | —                       | —                                                         | —             | —                          | —                          | **Deferred** (MVP note: only if cheap; not in this phase)                            |
 
 Cancel/edit: `DELETE` / `PATCH /uploadposts/schedule/{job_id}` (media, profile and platforms can't be
@@ -369,8 +369,8 @@ $15 to $115. Uploads are unlimited on paid plans.
 
 - `UploadPostAdapter::buildFields()` publishes the _target's_ effective caption / hashtags / link
   (override or master) composed by `App\Support\Publishing\CaptionComposer` (link appended only
-  where there's no link field and caption links work; hashtags dropped where unused; dot-dash
-  spacer only where `hashtag_spacer`), sends `{prefix}_title` always, `description` where
+  where there's no link field and caption links work; hashtags dropped where unused, else after a
+  blank line), sends `{prefix}_title` always, `description` where
   `vendor_description`, `{prefix}_first_comment`, `{prefix}_alt_text` (JSON list in slide order),
   the format's media type (`media_type` / `facebook_media_type`, `vendor_media_type_video` for a
   Facebook video post), the video cover/offset, the account's registry settings, and the YouTube /
@@ -1223,3 +1223,16 @@ $platform): Collection<MusicTrack>` and `find(string $id, Platform $platform): ?
   when callers already eager-load it. Regression test:
   `UploadPostAdapterTest::test_publish_loads_the_organization_when_the_account_relation_is_not_eager_loaded`
   (publishes with a freshly-fetched account whose `organization` relation is confirmed unloaded).
+- 2026-11-11: The "dot-dash" hashtag spacer is **removed**. Hashtags now always sit after a single
+  blank line (`caption\n\n#tag1 #tag2`) on every platform, undoing the 2026-09-22 entries above.
+  `CaptionComposer::SPACER_LINES` and the whole `hashtag_spacer` platform flag are gone with it —
+  the flag existed only to switch that block on, so it was deleted from `config/platforms.php` (9
+  entries), `PlatformSpec` (property, `fromConfig`, `toArray`) and the frontend
+  `PlatformCapability` type/fallback in `resources/js/lib/platforms.ts`. The frontend mirror
+  `publishedCaption()` (`resources/js/lib/media-format.ts`) had its own hard-coded run of eight
+  dashes; that went too, so preview, the live checklist's character count and what publishes still
+  agree. Updated the expectations in `UploadPostAdapterTest` (3 cases) and
+  `ChannelOverridesTest::test_london_dubai_acceptance_…`, and renamed
+  `NewNetworksPublishTest::test_x_publishes_its_own_title_without_the_fold_spacer` to
+  `…_with_hashtags_after_a_blank_line` (its assertion was already `\n\n` and is now the rule, not
+  the exception). Note: captions already published keep the dashes — this only changes new sends.

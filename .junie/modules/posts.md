@@ -646,7 +646,7 @@ hashtags,assets,targets,can_decide,comments}` — no `retainer_amount` or any ot
   `media_format[platform]` and `asset_crops[assetId][x|y|zoom]` with the editor form;
   `UpdatePostRequest` only accepts formats the channel offers and framing for attached media.
 - **The preview shows the published caption.** `publishedCaption()` mirrors
-  `UploadPostAdapter::applyHashtagCaptionOverride()` (caption, eight-line dash spacer, `#tags`), and
+  `App\Support\Publishing\CaptionComposer` (caption, blank line, `#tags`), and
   each platform folds it where the app does (`captionFolds`: Instagram 125 chars/2 lines, TikTok
   80/2, Facebook 240/5, LinkedIn 210/3 — approximations) with a working "more" control; the panel
   shows how much of the caption sits before the fold.

@@ -10,14 +10,10 @@ namespace App\Support\Publishing;
  *
  * - A link goes in the caption only where the platform has no dedicated link field and links in
  *   captions are welcome; it's skipped when the caption already contains it.
- * - Hashtags are dropped where the platform doesn't use them. Where `hashtag_spacer` is set they
- *   sit below the eight-line "dot-dash" spacer (pushed under the "more" fold); elsewhere after a
- *   blank line.
+ * - Hashtags are dropped where the platform doesn't use them, and otherwise sit after a blank line.
  */
 final class CaptionComposer
 {
-    public const SPACER_LINES = 8;
-
     /**
      * @param  list<string>  $hashtags  bare tags (no "#")
      */
@@ -39,11 +35,7 @@ final class CaptionComposer
             return $tags;
         }
 
-        $separator = $spec->hashtagSpacer
-            ? "\n".implode("\n", array_fill(0, self::SPACER_LINES, '-'))."\n"
-            : "\n\n";
-
-        return $text.$separator.$tags;
+        return $text."\n\n".$tags;
     }
 
     /**
