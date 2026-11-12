@@ -50,12 +50,14 @@ vendor is wired up yet.
   list, used to populate the `timezone` dropdown on the client page's inline "Add social account"
   form (passed as `ClientController::show`'s `timezones` prop).
 - `App\Actions\SocialAccounts\CheckSocialAccountHealthAction` (Step 1.6): calls the bound
-  `PublishAdapter::health()` for a single `connected` `SocialAccount` and flips it to
-  `token_expired` when unhealthy; `not_connected`/already-`token_expired` accounts are left alone
-  (only the Step 1.3 connect flow clears `token_expired`).
+  `PublishAdapter::health()` (`?bool`) for a `connected` or `token_expired` `SocialAccount`:
+  `false` flips it to `token_expired`, `true` keeps/restores `connected`, `null` (vendor couldn't
+  answer) changes nothing. `not_connected` accounts are never checked. `UploadPostAdapter::health()`
+  only returns `false` when `GET /uploadposts/users` lists the account's `upload_post_profile` with
+  its platform slot empty.
 - `App\Actions\SocialAccounts\CheckAllSocialAccountsHealthAction` (Step 1.6): sweeps every
-  `connected` `SocialAccount` in the DB through `CheckSocialAccountHealthAction`, returning the
-  count flagged as expired.
+  `connected`/`token_expired` `SocialAccount` through `CheckSocialAccountHealthAction`, returning
+  the count newly flagged as expired.
 - `App\Actions\SocialAccounts\ConnectMetaAudioAccessAction` (Step 1.9.3): persists the Meta user
   access token/expiry/Instagram Business user id obtained via the Facebook Login connect flow onto
   a `SocialAccount`, wrapped in `DB::transaction()`; logs only the social account id, never the
@@ -194,6 +196,11 @@ vendor is wired up yet.
   revisit if this proves confusing in practice (e.g. show a manual "Refresh status" affordance).
 
 ## Changelog
+
+- 2026-11-12: Bugfix — the health sweep flagged working accounts `token_expired` whenever the
+  org-wide `GET /uploadposts/users` call failed (rate limit/outage), and the flag was sticky.
+  `health()` now checks the account's own platform slot and returns null when unsure; the sweep
+  re-checks `token_expired` accounts and restores ones the vendor reports as linked.
 
 - 2026-11-07: Bugfix — `upload_post_profile` added; one vendor profile per client instead of one
   per account (which exhausted the Upload-Post plan). Detail in `publishing.md`.

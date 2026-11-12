@@ -316,18 +316,45 @@ class UploadPostAdapter implements PublishAdapter
         return (string) $secret;
     }
 
-    public function health(SocialAccount $account): bool
+    /**
+     * Looks the account's profile up in `GET /uploadposts/users` and reports whether its platform
+     * slot is linked. Only a well-formed answer that lists the profile with an empty slot counts
+     * as "disconnected" — a failed call, a rate limit or a missing profile is null (unknown), so a
+     * vendor hiccup never flips a working account to token_expired.
+     */
+    public function health(SocialAccount $account): ?bool
     {
+        $profile = (string) ($account->upload_post_profile ?? '');
+
+        if ($profile === '') {
+            return null;
+        }
+
         try {
-            return $this->client($account)->get('/uploadposts/users')->successful();
+            $response = $this->client($account)->get('/uploadposts/users');
         } catch (Throwable $e) {
             Log::warning('Upload-Post health check failed', [
                 'social_account_id' => $account->id,
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return null;
         }
+
+        $match = collect($response->json('profiles'))->firstWhere('username', $profile);
+
+        if (! $response->successful() || ! is_array($match) || ! is_array($match['social_accounts'] ?? null)) {
+            Log::warning('Upload-Post health check inconclusive', [
+                'social_account_id' => $account->id,
+                'status' => $response->status(),
+                'profile_found' => is_array($match),
+            ]);
+
+            return null;
+        }
+
+        // Unlinked platforms come back as "" (or are absent); linked ones carry the account details.
+        return filled($match['social_accounts'][$account->platform->spec()->vendor] ?? null);
     }
 
     /**

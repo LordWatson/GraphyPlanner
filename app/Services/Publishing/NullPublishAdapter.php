@@ -62,7 +62,7 @@ class NullPublishAdapter implements PublishAdapter
         return null;
     }
 
-    public function health(SocialAccount $account): bool
+    public function health(SocialAccount $account): ?bool
     {
         return false;
     }

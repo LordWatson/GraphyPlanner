@@ -21,12 +21,15 @@ class CheckAllSocialAccountsHealthAction
     {
         $flagged = 0;
 
+        // `token_expired` accounts are re-checked too, so one the vendor reports as linked recovers.
         $accounts = SocialAccount::query()
-            ->where('connection_status', ConnectionStatus::Connected)
+            ->whereIn('connection_status', [ConnectionStatus::Connected, ConnectionStatus::TokenExpired])
             ->lazyById(200);
 
         foreach ($accounts as $account) {
-            if (! $checkHealth($adapter, $account)) {
+            $wasConnected = $account->connection_status === ConnectionStatus::Connected;
+
+            if (! $checkHealth($adapter, $account) && $wasConnected) {
                 $flagged++;
             }
         }
@@ -34,7 +37,7 @@ class CheckAllSocialAccountsHealthAction
         // Step I-3.9 / M-2.7: accounts that aren't connected to the vendor can still hold a Meta
         // token (music search) that needs refreshing or a warning.
         $withTokens = SocialAccount::query()
-            ->where('connection_status', '!=', ConnectionStatus::Connected)
+            ->where('connection_status', ConnectionStatus::NotConnected)
             ->whereNotNull('meta_access_token_expires_at')
             ->lazyById(200);
 

@@ -495,6 +495,38 @@ class UploadPostAdapterTest extends TestCase
         $this->assertNotNull($account->connected_at);
     }
 
+    public function test_health_reads_the_accounts_platform_slot_on_its_profile(): void
+    {
+        Config::set('publishing.http.retries', 0);
+        Http::fake(['*/uploadposts/users' => Http::response(['success' => true, 'profiles' => [
+            ['username' => 'other', 'social_accounts' => ['instagram' => '']],
+            ['username' => 'alima-client-1', 'social_accounts' => ['instagram' => ['username' => 'brand'], 'tiktok' => '']],
+        ]])]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $linked = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::Instagram, 'upload_post_profile' => 'alima-client-1']);
+        $unlinked = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::TikTok, 'upload_post_profile' => 'alima-client-1']);
+        $unknownProfile = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::Instagram, 'upload_post_profile' => 'missing']);
+        $noProfile = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::Instagram, 'upload_post_profile' => null]);
+
+        $adapter = new UploadPostAdapter;
+        $this->assertTrue($adapter->health($linked));
+        $this->assertFalse($adapter->health($unlinked));
+        $this->assertNull($adapter->health($unknownProfile));
+        $this->assertNull($adapter->health($noProfile));
+    }
+
+    public function test_health_is_unknown_not_unhealthy_when_the_vendor_call_fails(): void
+    {
+        Config::set('publishing.http.retries', 0);
+        Http::fake(['*/uploadposts/users' => Http::response(['message' => 'Too many requests'], 429)]);
+
+        $organization = Organization::factory()->create(['upload_post_key' => 'org-secret-key']);
+        $account = SocialAccount::factory()->for($organization, 'organization')->create(['platform' => Platform::Instagram, 'upload_post_profile' => 'alima-client-1']);
+
+        $this->assertNull((new UploadPostAdapter)->health($account));
+    }
+
     public function test_handle_callback_clears_a_stale_health_error_left_by_an_earlier_sweep(): void
     {
         // An earlier health sweep (Step 1.6) flagged the account; reconnecting must wipe that red

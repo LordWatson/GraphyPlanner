@@ -21,20 +21,25 @@ class CheckSocialAccountHealthAction
         // whatever the vendor connection's state.
         app(CheckTokenExpiryAction::class)($account);
 
-        if ($account->connection_status !== ConnectionStatus::Connected) {
-            // Nothing to check — `not_connected` has never linked a token, and `token_expired`
-            // is only ever cleared by re-running the connect flow (Step 1.3), not by health().
+        if ($account->connection_status === ConnectionStatus::NotConnected) {
+            // Nothing to check — `not_connected` has never linked a token.
             return false;
         }
 
         $healthy = $adapter->health($account);
 
+        if ($healthy === null) {
+            // The vendor couldn't give a definite answer — keep whatever state the account had.
+            return $account->connection_status === ConnectionStatus::Connected;
+        }
+
         // Step I-3.9 / M-2.7: the last check and its outcome are kept on the account (shown on
-        // the client's Accounts tab).
+        // the client's Accounts tab). A `token_expired` account the vendor reports as linked again
+        // is restored — this action is the only writer of `token_expired`, so that's always safe.
         $account->update([
             'last_health_check_at' => now(),
             'last_health_error' => $healthy ? null : 'The publishing service no longer accepts this connection. Reconnect the account.',
-            ...($healthy ? [] : ['connection_status' => ConnectionStatus::TokenExpired]),
+            'connection_status' => $healthy ? ConnectionStatus::Connected : ConnectionStatus::TokenExpired,
         ]);
 
         if (! $healthy) {

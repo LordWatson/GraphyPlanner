@@ -63,9 +63,11 @@ interface PublishAdapter
 
     /**
      * Check the current connection health of a SocialAccount against the
-     * vendor (e.g. to detect an expired token).
+     * vendor (e.g. to detect an expired token). True = linked, false = the vendor
+     * definitively says it isn't, null = couldn't tell (outage, rate limit, odd
+     * response) — callers must never treat null as "disconnected".
      */
-    public function health(SocialAccount $account): bool;
+    public function health(SocialAccount $account): ?bool;
 
     /**
      * Step I-1.6: whether the vendor accepts this organization's stored credentials ("Test
