@@ -26,6 +26,9 @@ void createInertiaApp({
             // C-5.4: the public campaign preview stands alone, like the review page.
             case name.startsWith('share/'):
                 return null;
+            // The public connect-invite page is visited logged out; it brings its own `PublicShell`.
+            case name.startsWith('connect/'):
+                return null;
             case name.startsWith('client-invite/'):
                 return null;
             case name.startsWith('staff-invite/'):
