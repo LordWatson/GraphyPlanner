@@ -37,7 +37,7 @@ export function FeatureBento() {
                 </div>
                 <span className="eyebrow text-muted-foreground">
                     <span className="hidden md:inline">HOVER THE TILES ↓</span>
-                    <span className="md:hidden">SWIPE →</span>
+                    <span className="md:hidden">TAP TO TRY ↓</span>
                 </span>
             </div>
 

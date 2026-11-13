@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { PointerEvent } from 'react';
 
 import { Eyebrow } from '@/components/page';
 
@@ -8,6 +9,18 @@ import { Eyebrow } from '@/components/page';
  */
 export function ChaosCalm() {
     const [slide, setSlide] = useState(50);
+
+    const drag = (e: PointerEvent<HTMLDivElement>) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setSlide(
+            Math.round(
+                Math.min(
+                    100,
+                    Math.max(0, ((e.clientX - r.left) / r.width) * 100),
+                ),
+            ),
+        );
+    };
 
     return (
         <section className="mx-auto flex max-w-[1280px] flex-col gap-9 px-5 py-16 md:px-10 md:py-24 lg:px-20 lg:py-28">
@@ -27,25 +40,36 @@ export function ChaosCalm() {
                 </p>
             </div>
 
-            <div className="hm-reveal relative h-[460px] overflow-hidden rounded-[32px] select-none sm:h-[520px]">
+            {/* pointer drag anywhere on the card (touch-action pan-y keeps vertical page scroll);
+                the range input below stays for keyboard users */}
+            <div
+                onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    drag(e);
+                }}
+                onPointerMove={(e) => {
+                    if (e.currentTarget.hasPointerCapture(e.pointerId)) drag(e);
+                }}
+                className="hm-reveal has-[input:focus-visible]:ring-lime relative h-[460px] cursor-ew-resize touch-pan-y overflow-hidden rounded-[32px] select-none has-[input:focus-visible]:ring-4 sm:h-[520px]"
+            >
                 {/* BEFORE */}
                 <div aria-hidden className="bg-secondary absolute inset-0">
                     <span className="eyebrow bg-ink text-cream absolute top-[22px] left-6 rounded-full px-3 py-1.5 tracking-[0.2em]">
                         BEFORE
                     </span>
-                    <div className="absolute top-[18%] left-[6%] w-[270px] -rotate-4 rounded-tl-[18px] rounded-tr-[18px] rounded-br-[18px] rounded-bl-[4px] bg-white p-3 text-sm leading-snug shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
+                    <div className="absolute top-[18%] left-[6%] w-[200px] -rotate-4 text-xs sm:w-[270px] sm:text-sm rounded-tl-[18px] rounded-tr-[18px] rounded-br-[18px] rounded-bl-[4px] bg-white p-3 leading-snug shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
                         <b className="text-destructive block text-xs font-semibold">
                             Client · 23:47
                         </b>
                         any update on the reel?? also can we change the font
                     </div>
-                    <div className="absolute top-[8%] left-[30%] w-[230px] rotate-3 rounded-tl-[18px] rounded-tr-[18px] rounded-br-[4px] rounded-bl-[18px] bg-white p-3 text-sm leading-snug shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
+                    <div className="absolute top-[8%] left-[30%] w-[170px] rotate-3 text-xs sm:w-[230px] sm:text-sm rounded-tl-[18px] rounded-tr-[18px] rounded-br-[4px] rounded-bl-[18px] bg-white p-3 leading-snug shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
                         <b className="text-info block text-xs font-semibold">
                             Account manager
                         </b>
                         which version is final? v3 or v3_FINAL?
                     </div>
-                    <div className="absolute top-[52%] left-[4%] w-[300px] rotate-2 rounded-xl bg-white p-2.5 shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
+                    <div className="absolute top-[52%] left-[4%] w-[220px] rotate-2 sm:w-[300px] rounded-xl bg-white p-2.5 shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
                         <div className="grid grid-cols-3 gap-0.5 font-mono text-[10px]">
                             <span className="bg-secondary p-1">POST</span>
                             <span className="bg-secondary p-1">STATUS</span>
@@ -61,10 +85,10 @@ export function ChaosCalm() {
                             <span className="p-1">—</span>
                         </div>
                     </div>
-                    <div className="bg-lime absolute top-[46%] left-[34%] h-[150px] w-[190px] -rotate-6 p-4 text-[15px] leading-tight font-semibold shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
+                    <div className="bg-lime absolute top-[42%] left-[38%] h-[120px] w-[150px] -rotate-6 p-3 text-[13px] sm:top-[46%] sm:left-[34%] sm:h-[150px] sm:w-[190px] sm:p-4 sm:text-[15px] leading-tight font-semibold shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
                         CHASE OUTSTANDING INVOICE!!! (Fable — 3rd time)
                     </div>
-                    <div className="absolute bottom-[6%] left-[22%] -rotate-2 rounded-xl bg-white px-3.5 py-2.5 text-[13px] shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
+                    <div className="absolute bottom-[6%] left-[8%] -rotate-2 rounded-xl bg-white px-3.5 py-2.5 text-xs sm:left-[22%] sm:text-[13px] shadow-[0_8px_20px_-10px_rgb(24_23_35/0.35)]">
                         <b className="font-semibold">
                             RE: RE: FW: final_v3_FINAL.png
                         </b>
@@ -73,7 +97,7 @@ export function ChaosCalm() {
                             “See attached… again”
                         </span>
                     </div>
-                    <span className="bg-destructive text-cream absolute top-[12%] left-[44%] flex size-[52px] rotate-[8deg] items-center justify-center rounded-full text-lg font-bold">
+                    <span className="bg-destructive text-cream absolute top-[12%] left-[62%] flex size-11 sm:left-[44%] sm:size-[52px] rotate-[8deg] items-center justify-center rounded-full text-lg font-bold">
                         47
                     </span>
                 </div>
@@ -86,7 +110,7 @@ export function ChaosCalm() {
                     <span className="eyebrow bg-lime text-ink absolute top-[22px] right-6 rounded-full px-3 py-1.5 tracking-[0.2em]">
                         AFTER
                     </span>
-                    <div className="bg-card absolute top-[14%] right-[6%] flex w-[min(440px,80%)] flex-col gap-3 rounded-[22px] p-5 shadow-[0_20px_40px_-20px_rgb(24_23_35/0.6)]">
+                    <div className="bg-card absolute top-[14%] right-[5%] flex w-[min(440px,90%)] flex-col gap-2 rounded-[22px] p-4 text-[13px] sm:right-[6%] sm:w-[min(440px,80%)] sm:gap-3 sm:p-5 sm:text-sm shadow-[0_20px_40px_-20px_rgb(24_23_35/0.6)]">
                         <span className="flex items-center justify-between">
                             <b className="text-base font-semibold">
                                 This week · Northwind
@@ -95,32 +119,32 @@ export function ChaosCalm() {
                                 All approved
                             </span>
                         </span>
-                        <span className="border-secondary flex justify-between border-t py-2 text-sm">
+                        <span className="border-secondary flex justify-between gap-3 border-t py-2">
                             <span>Teaser 2 · Reel</span>
                             <span className="text-success font-semibold">
                                 Published
                             </span>
                         </span>
-                        <span className="border-secondary flex justify-between border-t py-2 text-sm">
+                        <span className="border-secondary flex justify-between gap-3 border-t py-2">
                             <span>Launch day · Carousel</span>
                             <span className="text-primary font-semibold">
                                 Scheduled 12:00
                             </span>
                         </span>
-                        <span className="border-secondary flex justify-between border-t py-2 text-sm">
+                        <span className="border-secondary flex justify-between gap-3 border-t py-2">
                             <span>Customer roundup · Story</span>
                             <span className="text-primary font-semibold">
                                 Scheduled 17:00
                             </span>
                         </span>
-                        <span className="border-secondary flex justify-between border-t py-2 text-sm">
+                        <span className="border-secondary flex justify-between gap-3 border-t py-2">
                             <span>INV-0144 · Fable &amp; Co</span>
                             <span className="text-success font-semibold">
                                 Paid
                             </span>
                         </span>
                     </div>
-                    <div className="bg-ink text-cream absolute right-[6%] bottom-[10%] flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-semibold">
+                    <div className="bg-ink text-cream absolute right-[6%] bottom-[5%] sm:bottom-[10%] flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-semibold">
                         <span className="text-lime text-[22px] font-bold">
                             0
                         </span>
@@ -140,7 +164,7 @@ export function ChaosCalm() {
                         ⇆
                     </span>
                 </div>
-                <label className="absolute inset-0 cursor-ew-resize">
+                <label className="pointer-events-none absolute inset-0">
                     <span className="sr-only">
                         Compare before and after Alima
                     </span>
@@ -150,7 +174,7 @@ export function ChaosCalm() {
                         max={100}
                         value={slide}
                         onChange={(e) => setSlide(Number(e.target.value))}
-                        className="absolute inset-0 m-0 size-full cursor-ew-resize opacity-0"
+                        className="pointer-events-none absolute inset-0 m-0 size-full opacity-0"
                     />
                 </label>
             </div>

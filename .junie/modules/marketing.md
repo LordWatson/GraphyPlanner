@@ -103,6 +103,18 @@ tool 2026" result is affiliate-monetised content, and we were absent from it.
 
 ## Changelog
 
+- 2026-11-13: Homepage mobile pass (Instagram traffic). Product demo: tighter screen padding and a
+  compact Home hero card below `md`, the screen body is `min(560px,70svh)` tall on phones, the
+  active tab auto-centres in the mobile tab strip (scrolls the strip only), the duplicate tour-chip
+  cloud is desktop-only, the post drawer goes full-width on phones, and Calendar/Campaigns/Clients/
+  Invoices got mobile layouts (agenda pills under the title, a two-column client row, a 1+2 invoice
+  stat grid). Before/after slider: smaller "before" notes on phones, and a pointer drag anywhere on
+  the card (`touch-action: pan-y` keeps page scroll) because iOS only drags a range input's
+  invisible thumb; the range input stays for keyboard users. Shell: 56px mobile header; the mobile
+  sticky CTA is now `fixed`, slides in only once the hero CTAs leave the viewport, honours the
+  safe-area inset, and shows "Open planner" when signed in (as does the mobile menu); the bento's
+  mobile hint now reads "TAP TO TRY ↓" (the tiles stack, they don't swipe).
+
 - 2026-11-10: Homepage polish pass — restored the feature-bento hover effects that the first pass
   dropped (`hm-tile` card lift plus per-tile reveals: campaign bars fill, grid swatches reshuffle,
   AI-image cards fan out, inbox third reply slides in — defined in `app.css`, hover-only and

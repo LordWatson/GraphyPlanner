@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight, CirclePlay, Menu, Star, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ArtworkSvg, BrandMark } from '@/components/brand-mark';
 import { markArtwork } from '@/components/brand/artwork';
@@ -44,6 +44,19 @@ export default function Welcome({ pricing }: { pricing: PricingData }) {
         return () => clearInterval(t);
     }, []);
 
+    const heroCtaRef = useRef<HTMLDivElement>(null);
+    const [heroCtaVisible, setHeroCtaVisible] = useState(true);
+
+    useEffect(() => {
+        const el = heroCtaRef.current;
+        if (!el) return;
+        const io = new IntersectionObserver(([entry]) =>
+            setHeroCtaVisible(entry.isIntersecting),
+        );
+        io.observe(el);
+        return () => io.disconnect();
+    }, []);
+
     const scrollTo = (id: string) => () =>
         document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
@@ -56,7 +69,7 @@ export default function Welcome({ pricing }: { pricing: PricingData }) {
             >
                 {/* ===== HEADER ===== */}
                 <header className="bg-background/90 sticky top-0 z-40 border-b backdrop-blur-xl">
-                    <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-6 px-5 md:h-20 md:px-10 lg:px-20">
+                    <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-6 px-5 md:h-20 md:px-10 lg:px-20">
                         <Link
                             href="/"
                             aria-label="Alima Planner home"
@@ -144,18 +157,29 @@ export default function Welcome({ pricing }: { pricing: PricingData }) {
                                 </a>
                             ))}
                             <div className="mt-5 flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    asChild
-                                    className="flex-1"
-                                >
-                                    <Link href={login()}>Log in</Link>
-                                </Button>
-                                <Button asChild className="flex-1">
-                                    <Link href={register()}>
-                                        Let&apos;s talk
-                                    </Link>
-                                </Button>
+                                {auth.user ? (
+                                    <Button asChild className="flex-1">
+                                        <Link href={dashboard()}>
+                                            Open planner
+                                            <ArrowRight />
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            asChild
+                                            className="flex-1"
+                                        >
+                                            <Link href={login()}>Log in</Link>
+                                        </Button>
+                                        <Button asChild className="flex-1">
+                                            <Link href={register()}>
+                                                Let&apos;s talk
+                                            </Link>
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         </nav>
                     )}
@@ -205,7 +229,10 @@ export default function Welcome({ pricing }: { pricing: PricingData }) {
                                 from one workspace, with AI that knows every
                                 brand you manage.
                             </p>
-                            <div className="flex flex-wrap gap-2.5">
+                            <div
+                                ref={heroCtaRef}
+                                className="flex flex-wrap gap-2.5"
+                            >
                                 <Button size="xl" variant="spark" asChild>
                                     <Link href={register()}>
                                         Let&apos;s grow
@@ -449,7 +476,7 @@ export default function Welcome({ pricing }: { pricing: PricingData }) {
                 {/* ===== FOOTER ===== */}
                 <footer className="bg-ink text-cream">
                     <div aria-hidden className="bg-spectrum h-1.5" />
-                    <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 pt-13 pb-8 md:px-10 lg:px-20">
+                    <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 pt-13 pb-28 md:px-10 lg:px-20 lg:pb-8">
                         <div className="flex flex-wrap justify-between gap-10">
                             <div className="flex max-w-[360px] flex-1 basis-[260px] flex-col gap-4">
                                 <BrandMark
@@ -524,17 +551,33 @@ export default function Welcome({ pricing }: { pricing: PricingData }) {
                     </div>
                 </footer>
 
-                {/* ===== MOBILE STICKY CTA ===== */}
-                <div className="bg-background/95 border-border sticky bottom-0 z-[35] flex gap-2 border-t px-4 py-3 backdrop-blur-md lg:hidden">
-                    <Button variant="outline" asChild>
-                        <Link href={login()}>Log in</Link>
-                    </Button>
-                    <Button variant="spark" className="flex-1" asChild>
-                        <Link href={register()}>
-                            Let&apos;s grow
-                            <ArrowRight />
-                        </Link>
-                    </Button>
+                {/* ===== MOBILE STICKY CTA =====
+                    Slides in once the hero CTAs have scrolled away, so the two never double up. */}
+                <div
+                    aria-hidden={heroCtaVisible}
+                    inert={heroCtaVisible}
+                    className={`bg-background/95 border-border fixed inset-x-0 bottom-0 z-[35] flex gap-2 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md transition-transform duration-300 lg:hidden ${heroCtaVisible ? 'translate-y-full' : 'translate-y-0'}`}
+                >
+                    {auth.user ? (
+                        <Button variant="spark" className="flex-1" asChild>
+                            <Link href={dashboard()}>
+                                Open planner
+                                <ArrowRight />
+                            </Link>
+                        </Button>
+                    ) : (
+                        <>
+                            <Button variant="outline" asChild>
+                                <Link href={login()}>Log in</Link>
+                            </Button>
+                            <Button variant="spark" className="flex-1" asChild>
+                                <Link href={register()}>
+                                    Let&apos;s grow
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
         </>

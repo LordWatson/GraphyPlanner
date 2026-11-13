@@ -481,6 +481,20 @@ export function ProductDemo() {
         return () => clearInterval(t);
     }, []);
 
+    // keep the active tab centred in the mobile tab strip (the auto-tour moves it off-screen);
+    // scrolls the strip only, never the page
+    const mobileNavRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const nav = mobileNavRef.current;
+        const tab = nav?.querySelector<HTMLElement>('[aria-current="true"]');
+        if (nav && tab) {
+            nav.scrollTo({
+                left: tab.offsetLeft - (nav.clientWidth - tab.offsetWidth) / 2,
+                behavior: 'smooth',
+            });
+        }
+    }, [screen]);
+
     useEffect(
         () => () => {
             if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -880,7 +894,8 @@ export function ProductDemo() {
 
                             {/* mobile nav */}
                             <div
-                                className="flex gap-1.5 overflow-x-auto border-b px-3.5 py-2.5 md:hidden"
+                                ref={mobileNavRef}
+                                className="relative flex gap-1.5 overflow-x-auto border-b px-3.5 py-2.5 md:hidden"
                                 style={{
                                     borderColor: C.secondary,
                                     background: C.teal,
@@ -892,6 +907,7 @@ export function ProductDemo() {
                                         key={k}
                                         type="button"
                                         onClick={go(k)}
+                                        aria-current={screen === k}
                                         className="h-9 shrink-0 cursor-pointer rounded-full px-3.5 text-[13px] font-semibold"
                                         style={{
                                             background:
@@ -908,7 +924,7 @@ export function ProductDemo() {
                             </div>
 
                             {/* screen body */}
-                            <div className="relative h-[600px] overflow-y-auto md:h-[690px]">
+                            <div className="relative h-[min(560px,70svh)] overflow-y-auto md:h-[690px]">
                                 {screen === 'home' && (
                                     <HomeScreen
                                         greeting={greeting}
@@ -1029,7 +1045,7 @@ export function ProductDemo() {
                                 {/* post drawer */}
                                 {selE && (
                                     <div
-                                        className="hm-drawer absolute inset-y-3 right-3 z-[5] flex w-[340px] flex-col gap-3.5 overflow-y-auto rounded-[22px] p-5"
+                                        className="hm-drawer absolute inset-y-3 right-3 left-3 z-[5] flex sm:left-auto sm:w-[340px] flex-col gap-3.5 overflow-y-auto rounded-[22px] p-5"
                                         style={{
                                             background: C.card,
                                             boxShadow:
@@ -1169,7 +1185,7 @@ export function ProductDemo() {
                 </div>
 
                 {/* tour chips */}
-                <div className="relative mt-[18px] flex flex-wrap justify-center gap-2">
+                <div className="relative mt-[18px] hidden flex-wrap justify-center gap-2 md:flex">
                     {SCREEN_ORDER.map((k, i) => {
                         const on = screen === k;
                         return (
@@ -1244,9 +1260,9 @@ function HomeScreen({
     goCalendar: () => void;
 }) {
     return (
-        <div className="hm-screen flex flex-col gap-[18px] p-[22px]">
+        <div className="hm-screen flex flex-col gap-[18px] p-3.5 md:p-[22px]">
             <div
-                className="relative flex min-h-[290px] flex-col justify-between gap-6 overflow-hidden rounded-3xl p-[30px] sm:flex-row"
+                className="relative flex flex-col justify-between gap-5 overflow-hidden rounded-3xl p-5 sm:flex-row md:min-h-[290px] md:gap-6 md:p-[30px]"
                 style={{ background: C.ink, color: C.cream }}
             >
                 <div className="relative z-10 flex max-w-[560px] flex-col gap-4">
@@ -1321,7 +1337,7 @@ function HomeScreen({
                         NEEDS ATTENTION
                     </span>
                     <span
-                        className="text-[108px] leading-[0.95] font-bold tracking-tight"
+                        className="text-[72px] leading-[0.95] md:text-[108px] font-bold tracking-tight"
                         style={{ color: C.lime }}
                     >
                         {String(needs).padStart(2, '0')}
@@ -1353,7 +1369,7 @@ function HomeScreen({
                         >
                             {s.label}
                         </span>
-                        <span className="text-[44px] leading-none font-bold tracking-tight">
+                        <span className="text-[32px] leading-none font-bold tracking-tight md:text-[44px]">
                             {s.value}
                         </span>
                         <span
@@ -1486,16 +1502,16 @@ function CalendarScreen({
     onOpen: (id: number) => void;
 }) {
     return (
-        <div className="hm-screen p-[22px]">
+        <div className="hm-screen p-3.5 md:p-[22px]">
             <div
-                className="rounded-3xl p-5"
+                className="rounded-3xl p-4 md:p-5"
                 style={{
                     background: C.card,
                     boxShadow: '0 1px 2px rgb(24 23 35 / 0.06)',
                 }}
             >
                 <div className="flex items-center justify-between gap-3 pb-3.5">
-                    <span className="text-[28px] font-bold tracking-tight">
+                    <span className="text-[22px] font-bold tracking-tight md:text-[28px]">
                         November{' '}
                         <span
                             className="font-semibold"
@@ -1506,7 +1522,7 @@ function CalendarScreen({
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span
-                            className="flex h-8 items-center rounded-full border px-3.5 text-[13px] font-semibold"
+                            className="hidden h-8 items-center rounded-full border px-3.5 text-[13px] font-semibold sm:flex"
                             style={{ borderWidth: 1.5, borderColor: C.ink }}
                         >
                             Today
@@ -1655,8 +1671,10 @@ function CalendarScreen({
                                 >
                                     {e.text}
                                 </span>
+                                <span className="mt-1.5 self-start">
+                                    <Pill status={e.status} />
+                                </span>
                             </span>
-                            <Pill status={e.status} />
                         </button>
                     ))}
                 </div>
@@ -1690,7 +1708,7 @@ function PostsScreen({
 }) {
     const clear = needs === 0;
     return (
-        <div className="hm-screen relative flex flex-col gap-3.5 p-[22px]">
+        <div className="hm-screen relative flex flex-col gap-3.5 p-3.5 md:p-[22px]">
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <span className="flex flex-col">
                     <span
@@ -1852,7 +1870,7 @@ function CampaignsScreen({
 }) {
     const phases = ['Teaser', 'Launch', 'Sustain', 'Wrap'];
     return (
-        <div className="hm-screen grid grid-cols-1 items-start gap-3.5 p-[22px] md:grid-cols-[290px_minmax(0,1fr)]">
+        <div className="hm-screen grid grid-cols-1 items-start gap-3.5 p-3.5 md:p-[22px] md:grid-cols-[290px_minmax(0,1fr)]">
             <div className="flex flex-col gap-2">
                 <span
                     className="font-mono text-[10px] tracking-[0.16em]"
@@ -1906,13 +1924,13 @@ function CampaignsScreen({
                 })}
             </div>
             <div
-                className="hm-screen flex flex-col gap-[18px] rounded-3xl p-6"
+                className="hm-screen flex flex-col gap-4 rounded-3xl p-4 md:gap-[18px] md:p-6"
                 style={{
                     background: C.card,
                     boxShadow: '0 1px 2px rgb(24 23 35 / 0.06)',
                 }}
             >
-                <div className="flex flex-wrap justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                     <span className="flex flex-col">
                         <span
                             className="font-mono text-[10px] tracking-[0.16em]"
@@ -1930,7 +1948,7 @@ function CampaignsScreen({
                     {phases.map((n, i) => (
                         <span
                             key={n}
-                            className="flex flex-col gap-0.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold"
+                            className="flex min-w-0 flex-col gap-0.5 rounded-xl px-2 py-2.5 text-xs font-semibold md:px-3 md:text-[13px]"
                             style={{
                                 background:
                                     i === cc.pIdx
@@ -1953,11 +1971,11 @@ function CampaignsScreen({
                         </span>
                     ))}
                 </div>
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-3 gap-1.5 md:gap-2.5">
                     {cc.kpis.map(([label, value, note]) => (
                         <div
                             key={label}
-                            className="flex flex-col gap-1 rounded-2xl p-3.5"
+                            className="flex min-w-0 flex-col gap-1 rounded-2xl p-2.5 md:p-3.5"
                             style={{ background: C.canvas }}
                         >
                             <span
@@ -1966,7 +1984,7 @@ function CampaignsScreen({
                             >
                                 {label}
                             </span>
-                            <span className="text-[26px] leading-tight font-bold tracking-tight">
+                            <span className="text-xl leading-tight font-bold tracking-tight md:text-[26px]">
                                 {value}
                             </span>
                             <span
@@ -2029,7 +2047,7 @@ function CampaignsScreen({
 
 function ClientsScreen() {
     return (
-        <div className="hm-screen flex flex-col gap-3.5 p-[22px]">
+        <div className="hm-screen flex flex-col gap-3.5 p-3.5 md:p-[22px]">
             <span className="flex flex-col">
                 <span
                     className="font-mono text-[10px] tracking-[0.16em]"
@@ -2063,7 +2081,7 @@ function ClientsScreen() {
                     return (
                         <div
                             key={c.name}
-                            className="grid grid-cols-[2fr_1fr_1fr_1.4fr_1fr] items-center gap-3 border-b py-3.5 text-[13px]"
+                            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b py-3.5 text-[13px] md:grid-cols-[2fr_1fr_1fr_1.4fr_1fr]"
                             style={{ borderColor: '#F0ECE1' }}
                         >
                             <span className="flex min-w-0 items-center gap-2.5">
@@ -2080,26 +2098,30 @@ function ClientsScreen() {
                                         style={{ color: C.muted }}
                                     >
                                         {c.brands}
+                                        <span className="md:hidden">
+                                            {' '}
+                                            · {c.posts}
+                                        </span>
                                     </span>
                                 </span>
                             </span>
-                            <span className="font-mono text-xs">
+                            <span className="hidden font-mono text-xs md:block">
                                 {c.retainer}
                             </span>
                             <span
-                                className="text-xs"
+                                className="hidden text-xs md:block"
                                 style={{ color: '#4A4857' }}
                             >
                                 {c.posts}
                             </span>
                             <span
-                                className="text-xs"
+                                className="hidden text-xs md:block"
                                 style={{ color: '#4A4857' }}
                             >
                                 {c.next}
                             </span>
                             <span
-                                className="justify-self-start rounded-full px-2.5 py-[3px] text-[11px] font-semibold"
+                                className="justify-self-end rounded-full whitespace-nowrap md:justify-self-start px-2.5 py-[3px] text-[11px] font-semibold"
                                 style={{ color: fg, background: bg }}
                             >
                                 {c.health}
@@ -2122,7 +2144,7 @@ function InvoicesScreen({
     onAct: (no: string, next: string, client: string, label: string) => void;
 }) {
     return (
-        <div className="hm-screen flex flex-col gap-3.5 p-[22px]">
+        <div className="hm-screen flex flex-col gap-3.5 p-3.5 md:p-[22px]">
             <span className="flex flex-col">
                 <span
                     className="font-mono text-[10px] tracking-[0.16em]"
@@ -2134,9 +2156,9 @@ function InvoicesScreen({
                     Invoices
                 </span>
             </span>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
                 <div
-                    className="rounded-[18px] p-4"
+                    className="col-span-2 rounded-[18px] p-4 md:col-span-1"
                     style={{ background: C.ink, color: C.cream }}
                 >
                     <span
@@ -2182,7 +2204,9 @@ function InvoicesScreen({
                     >
                         INVOICED (AED)
                     </span>
-                    <span className="text-[30px] font-bold">AED 9.5K</span>
+                    <span className="text-[26px] font-bold whitespace-nowrap md:text-[30px]">
+                        AED 9.5K
+                    </span>
                 </div>
             </div>
             <div
@@ -2258,7 +2282,7 @@ function AnalyticsScreen({
     const showInv = !seriesOff.inv;
     const showPaid = !seriesOff.paid;
     return (
-        <div className="hm-screen grid grid-cols-1 gap-3.5 p-[22px] md:grid-cols-[1.4fr_1fr]">
+        <div className="hm-screen grid grid-cols-1 gap-3.5 p-3.5 md:p-[22px] md:grid-cols-[1.4fr_1fr]">
             <div
                 className="flex flex-col gap-2.5 rounded-3xl p-5"
                 style={{
