@@ -22,6 +22,7 @@ export type Auth = {
     /** Shared chapter gates (`HandleInertiaRequests::share()`), so nav never re-derives roles. */
     can?: {
         viewAnalytics?: boolean;
+        viewStoryQueue?: boolean;
     };
 };
 

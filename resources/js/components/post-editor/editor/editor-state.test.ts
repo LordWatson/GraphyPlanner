@@ -100,6 +100,8 @@ describe('editor state', () => {
                     firstComment: null,
                     link: null,
                     format: null,
+                    storyExtras: null,
+                    handoffRecipient: null,
                 },
             },
             altTexts: { 5: 'A latte' },

@@ -2,8 +2,10 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Stories\ResolveStoryPosterAction;
 use App\Enums\AssetType;
 use App\Enums\MediaRatio;
+use App\Enums\StoryHandoffRecipient;
 use App\Models\Asset;
 use App\Models\Post;
 use App\Models\PostTarget;
@@ -34,7 +36,7 @@ class EvaluatePostChecklistAction
      */
     public function __invoke(Post $post): array
     {
-        $post->loadMissing('targets.socialAccount', 'assets', 'campaign');
+        $post->loadMissing('targets.socialAccount', 'assets', 'campaign', 'client');
 
         $targets = $post->targets->filter(fn (PostTarget $target) => $target->socialAccount !== null)->values();
         $targets->each(fn (PostTarget $target) => $target->setRelation('post', $post));
@@ -75,6 +77,13 @@ class EvaluatePostChecklistAction
             $this->item('media_framing', 'Media is framed for each channel', $checks['media_framing'], soft: true, fixes: $checks['framing_fixes']),
         ];
 
+        // Step S-1.3: only for a post with a Story that is posted by hand — a blocker for extras
+        // that aren't finished, and a warning when there is nobody obvious to post it.
+        if ($checks['has_assisted_story'] !== []) {
+            $items[] = $this->item('story_extras', 'Story extras are complete', $checks['story_extras']);
+            $items[] = $this->item('story_handoff', 'Someone can post this by hand', $checks['story_handoff'], soft: true);
+        }
+
         // Step 18.10 / 18.11: a post made from a grid tile is checked against the approved look
         // and its place in the sequence — warnings, never blockers.
         array_push($items, ...$this->gridItems($post));
@@ -108,7 +117,7 @@ class EvaluatePostChecklistAction
         $checks = array_fill_keys([
             'caption_length', 'format', 'format_fixes', 'media_fit', 'account_settings',
             'hashtags', 'links', 'first_comment', 'media_framing', 'framing_fixes',
-            'partnership_disclosure',
+            'partnership_disclosure', 'has_assisted_story', 'story_extras', 'story_handoff',
         ], []);
 
         $media = $post->publishableMedia();
@@ -153,11 +162,19 @@ class EvaluatePostChecklistAction
             }
 
             $link = $target->effectiveLink();
+            // Step S-1.3: a Story posted by hand with a link sticker does carry a link — the
+            // person adds it in Instagram — so "the link won't be posted" would be wrong there.
+            $assisted = $target->needsHandoff();
+            $hasLinkSticker = $assisted && $target->storyExtras()->hasLink();
 
             if (! $spec->linksInCaption && preg_match(self::URL_PATTERN, $target->effectiveCaption()) === 1) {
                 $checks['links'][] = "{$name}: links in captions aren’t clickable — use the link in bio instead.";
-            } elseif ($link !== null && $spec->linkField === null && ! $spec->linksInCaption) {
+            } elseif ($link !== null && $spec->linkField === null && ! $spec->linksInCaption && ! $hasLinkSticker) {
                 $checks['links'][] = "{$name}: the link won’t be posted — {$spec->label} doesn’t show links on posts.";
+            }
+
+            if ($assisted) {
+                $this->checkStoryHandoff($checks, $post, $target);
             }
 
             if ($target->effectiveFirstComment() !== null && ! $spec->firstComment) {
@@ -275,6 +292,33 @@ class EvaluatePostChecklistAction
                 'value' => $format->fillScreen,
                 'label' => "Crop {$spec->label} images to {$format->fillScreen}",
             ];
+        }
+    }
+
+    /**
+     * Step S-1.3: a Story that is posted by hand. `story_extras` blocks scheduling until every
+     * extra that was added is filled in; `story_handoff` warns when the handoff has nobody
+     * obvious on the other end (it still goes ahead — everyone is asked instead).
+     *
+     * @param  array<string, list<mixed>>  $checks
+     */
+    private function checkStoryHandoff(array &$checks, Post $post, PostTarget $target): void
+    {
+        $name = $this->channel($target);
+        $checks['has_assisted_story'][] = $target->id;
+
+        foreach ($target->storyExtras()->problems() as $problem) {
+            $checks['story_extras'][] = "{$name}: {$problem}";
+        }
+
+        $resolvePoster = new ResolveStoryPosterAction;
+
+        if ($target->handoffRecipient() === StoryHandoffRecipient::Client) {
+            if ($post->client !== null && ! $resolvePoster->clientCanBeNotified($post->client)) {
+                $checks['story_handoff'][] = "{$name}: {$post->client->name} has no contact to send the story to, so your team will be asked instead.";
+            }
+        } elseif ($resolvePoster->teamPoster($post) === null) {
+            $checks['story_handoff'][] = "{$name}: no one is assigned, so everyone on the team will be asked.";
         }
     }
 

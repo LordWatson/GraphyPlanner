@@ -47,7 +47,14 @@ class AlertOnFailedPublishingJob
         }
 
         $command = $job->payload()['data']['command'] ?? null;
-        $instance = is_string($command) ? unserialize($command) : null;
+
+        // An encrypted job (`ShouldBeEncrypted`, e.g. a notification carrying a one-time link)
+        // is not a serialized object here, and reading it must never replace the real failure.
+        if (! is_string($command) || ! str_starts_with($command, 'O:')) {
+            return null;
+        }
+
+        $instance = unserialize($command);
 
         return is_object($instance) && isset($instance->queue) && is_string($instance->queue) ? $instance->queue : null;
     }

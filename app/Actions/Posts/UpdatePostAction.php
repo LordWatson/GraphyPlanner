@@ -2,6 +2,10 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Publishing\ResolvePostPublishOutcomeAction;
+use App\Actions\Stories\SyncTargetStoryExtrasAction;
+use App\Enums\PostStatus;
+use App\Enums\StoryHandoffRecipient;
 use App\Models\CampaignDeliverable;
 use App\Models\Post;
 use App\Models\PostTarget;
@@ -18,7 +22,7 @@ class UpdatePostAction
     /**
      * Per-target fields a save may set; any not sent for a target are left as they are.
      */
-    private const TARGET_FIELDS = ['caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format'];
+    private const TARGET_FIELDS = ['caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format', 'handoff_recipient'];
 
     /**
      * Update a post's content, per-target schedule and channel overrides, and attached media,
@@ -35,6 +39,11 @@ class UpdatePostAction
      * `link_url` override the post's master values (`null` = use the master; an empty string /
      * list = none on this channel). Step I-3.2 / M-2.3: `format` picks the target's format (`null`
      * = Auto).
+     *
+     * Step S-1.2: a target's `story_extras` (a link, a poll, … on a Story) go through
+     * `SyncTargetStoryExtrasAction`, the one writer of `handoff_required`. It runs for every
+     * listed channel, because a save that only changes the format can move a channel on or off the
+     * assisted lane. `handoff_recipient` is who posts it (`null` = the client's default).
      *
      * `$data['asset_ids']` (when present) fully replaces the attached media, in that order (the
      * carousel order). `$data['asset_crops']` (`{assetId: {x, y, zoom}}`) sets each image's framing
@@ -58,11 +67,26 @@ class UpdatePostAction
         // Step I-3.6 / M-2.5: editing a post the vendor is holding for later recalls those
         // channels first (the edit is refused if the vendor says it's too late), and re-submits
         // them with the new content once saved — the old version never goes out.
+        // Step S-2.5: a Story that is waiting to be posted by hand keeps its handoff through an
+        // edit — the handoff page reads the post live, so the poster simply sees the new version.
         $vendor = app(VendorScheduleService::class);
-        $recalled = $post->canBeRecalled() || $post->isHeldByVendor() ? $vendor->recall($post, 'targets') : [];
+        $recalled = $post->canBeRecalled() || $post->isHeldByVendor() ? $vendor->recall($post, 'targets', keepHandoffs: true) : [];
 
-        return DB::transaction(function () use ($post, $data, $actor, $evaluateChecklist, $transition, $revisions, $vendor, $recalled) {
-            DB::afterCommit(fn () => $vendor->resubmit($post, $recalled));
+        // Channels to send again once saved, besides the recalled ones: a channel whose lane
+        // changed in this save (extras added or removed on a post that is already going out), and
+        // a Story waiting to be posted by hand whose time moved. Filled by `syncTargets()`.
+        $resend = [];
+
+        return DB::transaction(function () use ($post, $data, $actor, $evaluateChecklist, $transition, $revisions, $vendor, $recalled, &$resend) {
+            DB::afterCommit(function () use ($post, $vendor, $recalled, &$resend): void {
+                $vendor->resubmit($post, array_values(array_unique([...$recalled, ...$resend])));
+
+                // Removing the last channel a `publishing` post was waiting on leaves nothing to
+                // report back, so nothing else would ever finish the post.
+                if ($post->refresh()->status === PostStatus::Publishing) {
+                    app(ResolvePostPublishOutcomeAction::class)($post);
+                }
+            });
 
             if (array_key_exists('media_format', $data)) {
                 $data['media_format'] = self::normalizeMediaFormat($data['media_format']);
@@ -80,7 +104,7 @@ class UpdatePostAction
             }
 
             if (array_key_exists('targets', $data)) {
-                $this->syncTargets($post, (array) ($data['targets'] ?? []));
+                $resend = $this->syncTargets($post, (array) ($data['targets'] ?? []));
             }
 
             $this->syncAssets($post, $data);
@@ -110,11 +134,14 @@ class UpdatePostAction
 
     /**
      * @param  array<int, array<string, mixed>>  $targets
+     * @return list<int> the channels that must be sent again once the save has committed
      */
-    private function syncTargets(Post $post, array $targets): void
+    private function syncTargets(Post $post, array $targets): array
     {
         $existing = $post->targets()->get()->keyBy('social_account_id');
+        $syncExtras = app(SyncTargetStoryExtrasAction::class);
         $keep = [];
+        $resend = [];
 
         foreach ($targets as $input) {
             $account = SocialAccount::query()->whereKey((int) $input['social_account_id'])->firstOrFail();
@@ -141,21 +168,41 @@ class UpdatePostAction
             $target = $existing->get($account->id);
 
             if ($target === null) {
-                $post->targets()->create(['social_account_id' => $account->id, ...$attributes]);
+                $target = $post->targets()->create(['social_account_id' => $account->id, ...$attributes]);
+            } else {
+                $target->fill($attributes);
 
-                continue;
+                if ($target->isDirty('scheduled_at_utc') || $target->isDirty('scheduled_local_date')) {
+                    $target->reminder_sent_at = null;
+                }
+
+                // Step S-2.5: a Story already handed to a person runs on its handoff's clock. If
+                // its time moves, the handoff has to be re-opened for the new time, or the poster
+                // is told (and the Story fails as missed) at the old one.
+                if ($target->isDirty('scheduled_at_utc') && $target->isAwaitingHandoff()) {
+                    $resend[] = $target->id;
+                }
+
+                $target->save();
             }
 
-            $target->fill($attributes);
+            $target->setRelation('socialAccount', $account);
+            $wasAssisted = $target->handoff_required;
 
-            if ($target->isDirty('scheduled_at_utc') || $target->isDirty('scheduled_local_date')) {
-                $target->reminder_sent_at = null;
+            if (array_key_exists('story_extras', $input)) {
+                $syncExtras($target, is_array($input['story_extras']) ? $input['story_extras'] : null);
+            } else {
+                $syncExtras->refresh($target);
             }
 
-            $target->save();
+            if ($target->handoff_required !== $wasAssisted) {
+                $resend[] = $target->id;
+            }
         }
 
         $post->targets()->whereNotIn('social_account_id', $keep)->delete();
+
+        return $resend;
     }
 
     /**
@@ -215,6 +262,10 @@ class UpdatePostAction
 
         if ($field === 'format') {
             return filled($value) ? (string) $value : null;
+        }
+
+        if ($field === 'handoff_recipient') {
+            return StoryHandoffRecipient::tryFrom((string) ($value ?? ''));
         }
 
         // Overrides: null = use the master, '' = none on this channel.

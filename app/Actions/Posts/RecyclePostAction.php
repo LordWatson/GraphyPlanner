@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Stories\SyncTargetStoryExtrasAction;
 use App\Enums\PostRecurrence;
 use App\Enums\PostStatus;
 use App\Models\Post;
@@ -41,7 +42,9 @@ class RecyclePostAction
 
         $source->loadMissing(['targets.socialAccount', 'assets']);
 
-        return DB::transaction(function () use ($source, $user, $recurrence) {
+        $syncExtras = app(SyncTargetStoryExtrasAction::class);
+
+        return DB::transaction(function () use ($source, $user, $recurrence, $syncExtras) {
             $copy = Post::create([
                 'org_id' => $source->org_id,
                 'client_id' => $source->client_id,
@@ -89,6 +92,9 @@ class RecyclePostAction
                     'first_comment' => $target->first_comment,
                     'link_url' => $target->link_url,
                     'format' => $target->format,
+                    // Step S-1.2: a Story's extras come along; its lane is re-derived below.
+                    'story_extras' => $target->story_extras,
+                    'handoff_recipient' => $target->handoff_recipient,
                 ];
 
                 // Recurrence advances each dated target by one interval; a manual recycle drops the
@@ -102,7 +108,7 @@ class RecyclePostAction
                         : null;
                 }
 
-                $copy->targets()->create($data);
+                $syncExtras->refresh($copy->targets()->create($data));
             }
 
             Log::info('Post recycled', [

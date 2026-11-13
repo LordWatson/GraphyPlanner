@@ -71,6 +71,16 @@ it is enforced and the automated test that proves it.
   signed URL or storage `disk`/`path`, and only for assets uploaded through that session. The
   "no signed URL / storage path leaves the server" rule is unchanged; `McpUploadSessionTest` asserts an
   image preview is present while the path and the `/files/` signed‑URL prefix are not.
+- **Story extras (Phase S, 2026-11-13).** `create_draft_post` and `update_post` targets accept
+  `format`, `story_extras` and `handoff_recipient`, validated with the editor's own rules
+  (`App\Support\Api\StoryChannels` → `ValidatesStoryExtras`). A Story with extras is posted by a
+  person, so three things hold: `story_extras.if_missed` ("publish it plain if nobody posts it") is
+  never accepted from an assistant (`StoryChannels::keepIfMissed()` drops it and keeps a person's
+  stored choice); no tool opens or completes a handoff; and no tool output carries a handoff token
+  or a `/story/` link, which would open the handoff page without signing in. Evidence:
+  `McpStoryExtrasTest` (`test_an_assistant_cannot_choose_publish_it_plain`,
+  `test_get_post_says_ready_to_post_without_the_handoff_link`,
+  `test_no_tool_can_say_a_story_was_posted`).
 - **Evidence:** `McpSecretsGuardTest` enumerates **every** registered tool/resource/prompt, fails if
   a new primitive is added without conscious coverage, asserts no schema/definition names a
   secret‑shaped field, and invokes each read primitive against seeded data containing a **sentinel

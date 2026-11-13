@@ -21,6 +21,10 @@ use Illuminate\Support\Str;
  * not is unaffected. The class name carries `Publish` on purpose: that is what puts it in the
  * `publishing` preference category.
  *
+ * Step S-3.4: `$storiesByHand` is how many of those are assisted Stories due today. The template's
+ * variables are fixed, so the count is folded into `post_summary` ("3 posts, 1 story to post by
+ * hand today").
+ *
  * Idempotency is the sweep's, not this notification's — `post_targets.reminder_sent_at` is stamped
  * in the same transaction, so a second run of the command sends nothing.
  */
@@ -32,6 +36,7 @@ class UpcomingPublishReminder extends Notification implements ShouldQueue
         private readonly int $count,
         private readonly ?string $firstCaption,
         private readonly ?CarbonInterface $soonest,
+        private readonly int $storiesByHand = 0,
     ) {}
 
     /**
@@ -53,12 +58,30 @@ class UpcomingPublishReminder extends Notification implements ShouldQueue
     public function toWhatsApp(object $notifiable): WhatsAppTemplateMessage
     {
         return MessageTemplate::PostScheduledReminder->fill([
-            'post_summary' => $this->count === 1
-                ? Str::limit((string) ($this->firstCaption ?? 'a post'), 60, '')
-                : $this->count.' posts',
+            'post_summary' => $this->summary(),
             'going_out_at' => $this->soonest?->diffForHumans() ?? 'soon',
             'url' => route('calendar'),
         ]);
+    }
+
+    /**
+     * "Our autumn menu is here" for one post, "3 posts" for several; and when some are Stories to
+     * post by hand today, "2 posts, 1 story to post by hand today". Always within 60 characters.
+     */
+    private function summary(): string
+    {
+        if ($this->storiesByHand === 0) {
+            return $this->count === 1
+                ? Str::limit((string) ($this->firstCaption ?? 'a post'), 60, '')
+                : $this->count.' posts';
+        }
+
+        $stories = $this->storiesByHand.' '.Str::plural('story', $this->storiesByHand).' to post by hand today';
+        $others = $this->count - $this->storiesByHand;
+
+        return $others > 0
+            ? Str::limit($others.' '.Str::plural('post', $others).', '.$stories, 60, '')
+            : $stories;
     }
 
     /**

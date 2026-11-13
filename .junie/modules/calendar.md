@@ -37,6 +37,15 @@ filters by client/campaign/status/platform. Builds directly on the Post/PostTarg
   `calendar.new-post-options`) returns one client's target accounts + open campaigns, fetched
   lazily by the empty-slot "New post" dialog. Authorized exactly like creating a post for that
   client (`PostPolicy::create`), org-scoped.
+- Phase S — Stories with extras (assisted lane, `.junie/plans/story-extras.md`): each occurrence
+  carries `handoff: {state, label} | null`, the channel's assisted-lane state from
+  `App\Support\Stories\StoryPostPresenter::channel()`. `BuildCalendarOccurrencesAction::__invoke()`
+  takes a third argument, `bool $forClient = false`, after `$posts` and `$orgTimezone`; the portal
+  calendar passes `forClient: true` and never gets `ready_to_post`. Callers
+  (`GetCalendarPostsAction`, `GetPortalCalendarPostsAction`) eager-load `targets.openStoryHandoff`
+  and `targets.postedStoryHandoff` and select the targets' `status` and `handoff_required`, which
+  `PostTarget::handoffState()` reads. The query count does not grow with the number of assisted
+  posts.
 
 ## Routes / Controllers
 
@@ -68,6 +77,11 @@ filters by client/campaign/status/platform. Builds directly on the Post/PostTarg
   introduced on the dashboard, clients index, client show, and post editor pages, per the
   agency-premium brand guidelines. The dense calendar grid itself stays flat per the
   data-dense-screen rule; only the header banner carries the gradient/glow.
+- Phase S: `resources/js/components/content-calendar.tsx` shows the assisted-lane state. Compact
+  grid chips get a small hand marker coloured by the state's tone
+  (`resolveStatus('storyHandoff', state)`), with the label as its `title` and as screen-reader
+  text, so the state is never colour alone. Detailed chips and list rows show the full
+  `StoryHandoffPill` (`components/stories/story-handoff-pill.tsx`).
 
 ## Business Rules
 
@@ -126,8 +140,15 @@ filters by client/campaign/status/platform. Builds directly on the Post/PostTarg
       excludes the other client's post.
     - `test_client_reviewer_only_sees_their_own_clients_posts_on_the_calendar` — a `Role::ClientReviewer`
       only ever sees their own client's occurrences, even with no filters applied.
+- `tests/Feature/Stories/StorySurfacesTest.php` (Phase S):
+    - `test_calendar_occurrences_carry_the_channel_state` — `handoff` per occurrence.
+    - `test_the_calendar_query_count_does_not_grow_with_assisted_posts` — the N+1 guard.
+    - `test_the_portal_calendar_never_says_ready_to_post` — the client's reading.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): the calendar has no filter for "posted by hand" channels, and a missed
+  Story shows as an ordinary failed post: `handoffState()` has no "missed" state.
 
 - The month/week/day/list rendering (grid building, date-key grouping) is done client-side with
   plain `Date`/`Intl` (no date library is installed in this repo) rather than a calendar component
@@ -145,6 +166,10 @@ filters by client/campaign/status/platform. Builds directly on the Post/PostTarg
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). Occurrences carry `handoff`
+  (`{state, label}` or null); `BuildCalendarOccurrencesAction` gained `$forClient`; grid chips show
+  a hand marker and list rows the `StoryHandoffPill`. Eager loads added so the query count stays
+  flat.
 - 2026-10-23: Step M-5.7 / I-5.1 — calendar interaction upgrade. Native HTML5 drag-and-drop replaced
   with `@dnd-kit` (pointer + touch); week/day became real time grids (hour rows + an "All day"
   rail); single-channel moves via `RescheduleTargetAction` + `posts.targets.reschedule`; a

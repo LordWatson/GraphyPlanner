@@ -104,6 +104,8 @@ return [
             'invoice_issued' => env('TWILIO_TEMPLATE_INVOICE_ISSUED'),
             'campaign_brief_ready' => env('TWILIO_TEMPLATE_CAMPAIGN_BRIEF_READY'),
             'daily_digest' => env('TWILIO_TEMPLATE_DAILY_DIGEST'),
+            // Step S-3.3: until this is approved, "story ready to post" uses the generic template.
+            'story_ready_to_post' => env('TWILIO_TEMPLATE_STORY_READY_TO_POST'),
             'alima_notification' => env('TWILIO_TEMPLATE_NOTIFICATION'),
         ],
     ],

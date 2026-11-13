@@ -27,6 +27,7 @@ import {
     primaryTransitionFor,
     statusGuidance,
 } from '@/lib/post-workflow';
+import { StoryByHandRow } from '@/components/post-editor/workflow/story-by-hand-row';
 import { destroy as destroyPost } from '@/routes/posts';
 
 /**
@@ -44,6 +45,7 @@ export function PostWorkflow({
     canRetryFailedTargets = false,
     canDelete = false,
     canOverrideApproval = false,
+    canPostStoryByHand = false,
 }: {
     post: {
         id: number;
@@ -63,6 +65,8 @@ export function PostWorkflow({
     canDelete?: boolean;
     /** Step M-2.9: Owner may approve a client-required post without the client. */
     canOverrideApproval?: boolean;
+    /** Step S-4.5 / S-5.2: may open a Story's handoff or mark it as posted. */
+    canPostStoryByHand?: boolean;
 }) {
     const [pending, setPending] = useState<TransitionAction | null>(null);
     const [overriding, setOverriding] = useState(false);
@@ -130,6 +134,15 @@ export function PostWorkflow({
     const failedTargets = canRetryFailedTargets
         ? (post.targets ?? []).filter((target) => target.status === 'failed')
         : [];
+
+    // Step S-5.1: Stories on this post that are waiting to be posted by hand.
+    const storiesByHand = (post.targets ?? []).filter(
+        (target) =>
+            target.status === 'pending' &&
+            ['scheduled', 'publishing'].includes(post.status) &&
+            (target.handoff_state === 'ready_to_post' ||
+                target.handoff_state === 'needs_hand_posting'),
+    );
 
     const hasMoves =
         backMoves.length > 0 ||
@@ -219,11 +232,22 @@ export function PostWorkflow({
                 )}
             </div>
 
+            {storiesByHand.length > 0 && (
+                <div className="px-5 pb-4">
+                    <StoryByHandRow
+                        postId={post.id}
+                        targets={storiesByHand}
+                        canAct={canPostStoryByHand}
+                    />
+                </div>
+            )}
+
             {failedTargets.length > 0 && (
                 <div className="px-5 pb-4">
                     <RetryFailedTargetsRow
                         postId={post.id}
                         failedTargets={failedTargets}
+                        canMarkStoryPosted={canPostStoryByHand}
                     />
                 </div>
             )}

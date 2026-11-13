@@ -9,6 +9,7 @@ use App\Enums\PostStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Support\Api\ApiResponse;
+use App\Support\Api\StoryChannels;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -76,11 +77,16 @@ class PostScheduleController extends Controller
             );
         }
 
+        $post->load(PostController::CHANNELS);
+
         return ApiResponse::item([
-            'id' => $post->id,
-            'status' => $post->status->value,
+            ...PostController::present($post),
             // The earliest channel's instant: "when does this start going out".
             'scheduled_at' => $post->targets()->whereNotNull('scheduled_at_utc')->min('scheduled_at_utc'),
+        ], [
+            // Step S-5.4: "scheduled" does not mean "will publish itself" for a story that is
+            // posted by hand, so say so where an integration cannot miss it.
+            'notes' => array_filter([StoryChannels::note($post)]),
         ]);
     }
 }

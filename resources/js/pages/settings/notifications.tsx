@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { PushRemindersCard } from '@/components/pwa/push-reminders-card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -268,6 +269,8 @@ export default function NotificationsSettings({
                     )}
                 </div>
             </div>
+
+            <PushRemindersCard workspace="agency" />
         </>
     );
 }

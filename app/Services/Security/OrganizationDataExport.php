@@ -82,6 +82,10 @@ class OrganizationDataExport
         'post_assets' => ['scope' => 'parent', 'column' => 'post_id', 'parent' => 'posts'],
         'post_revisions' => ['scope' => 'org'],
         'approval_steps' => ['scope' => 'org'],
+        // Step S-6.4: who was asked to post each assisted Story by hand, when, and how it ended.
+        // The link's token hash is redacted: this reads raw rows, so the model's `#[Hidden]` does
+        // not apply here.
+        'story_handoffs' => ['scope' => 'org'],
 
         // The media library, as a manifest. The bytes are not in the archive — see the README the
         // export writes, which says so and gives each file's in-app location.
@@ -260,6 +264,7 @@ class OrganizationDataExport
         'organizations' => ['upload_post_key', 'upload_post_webhook_secret', 'chat_webhook_url', 'xai_key', 'whatsapp_auth_token'],
         'users' => ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'],
         'social_accounts' => ['meta_access_token'],
+        'story_handoffs' => ['token_hash'],
         'media_kits' => ['share_token'],
         'bio_page_domains' => ['verification_token'],
     ];

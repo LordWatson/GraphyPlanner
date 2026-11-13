@@ -533,6 +533,120 @@ campaign` — only `accounts` required; handles `;`-separated and resolved again
 - Shortcuts: ⌘/Ctrl+S save, ⌘/Ctrl+Enter opens "Send for internal review" (or "Send to client")
   — still confirmed in the dialog — ⌘/Ctrl+K palette, `?` lists them.
 
+## Phase S — Stories with extras (assisted lane)
+
+Plan: `.junie/plans/story-extras.md`. The pipeline, the handoff model, the token routes and the
+decisions live in `publishing.md` › "Stories with extras". This section covers what the post and
+its editor gained. Everything here is inert while `publishing.story_handoff.enabled` is off.
+
+### Model
+
+- `PostTarget`: new columns `story_extras` (cast `array`), `handoff_required` (cast `boolean`),
+  `handoff_recipient` (cast `App\Enums\StoryHandoffRecipient`, null = the client's default). All
+  three are fillable.
+    - `storyExtras()` → the `App\Support\Publishing\StoryExtras` DTO, empty for a channel with
+      none.
+    - `needsHandoff()` → the rule behind `handoff_required`: the account's platform supports
+      Story extras (`PlatformCapabilities::supportsStoryExtras()`: kill switch on, platform on the
+      lane's list, it has a `story` format), `format === 'story'`, and at least one extra.
+    - `handoffRecipient()` → the channel's own choice, else `clients.story_handoff_recipient`.
+      Always `team` for a business workspace's primary brand. It tolerates a client loaded with a
+      column list (`client:id,name`) by fetching the real row.
+    - `handoffState()` → `needs_hand_posting` / `ready_to_post` / `posted_by_hand`, or null. Null
+      unless the post is `scheduled` or `publishing` (a draft with extras stays quiet), or the
+      channel is `published` and has a `posted` handoff. Derived, never stored.
+    - `isAwaitingHandoff()` → `handoff_required`, `pending`, no `external_post_id`, has a
+      `publish_attempt_id`.
+    - Relations `storyHandoffs` (has many), `openStoryHandoff` and `postedStoryHandoff` (has one,
+      newest). `PostTarget::HANDOFF_STATE_RELATIONS` names the two `handoffState()` reads; lazy
+      loading is off, so every list eager-loads them.
+- `Post::canBeRecalled()` now counts a channel that `isAwaitingHandoff()` the same as a
+  vendor-held one, so a publishing post whose Story is waiting on a person can still be taken off
+  the schedule.
+- `PostPolicy::postStoryByHand(User, Post)` (same organization, Owner / Strategist / Designer) and
+  `PostPolicy::viewStoryQueue(User)` (the same roles; shared to the frontend as
+  `auth.can.viewStoryQueue` by `HandleInertiaRequests`, read by the command palette). `postStoryByHand` is deliberately not
+  `update()`: a post that is going out is locked for edits, and that is when its Story needs
+  posting.
+
+### Saving and validating extras
+
+- `App\Http\Requests\Concerns\ValidatesStoryExtras` (used by `UpdatePostRequest`, and by
+  `App\Support\Api\StoryChannels` for the API and MCP): `storyExtrasRules()` /
+  `storyExtrasMessages()` are the shape rules (https link, length limits, at most 5 mention
+  handles of legal characters, at most 4 poll options, `if_missed`, `handoff_recipient`). The
+  lower bounds (a poll needs two options) are `StoryExtras::problems()`, so they sit in the
+  checklist.
+  `validateStoryExtrasPlatforms()` refuses extras on a platform the lane is not offered on.
+  Completeness is the checklist's job, not the request's: a half-typed extra saves.
+- The editor posts each channel's extras as one JSON string. `decodeStoryExtras()` turns it back
+  into an array in `prepareForValidation()`. `UpdatePostRequest::validated()` calls
+  `restoreStoryExtras()` because Laravel's `validated()` drops an empty `story_extras: {}`, and
+  "none" must not be mistaken for "not sent".
+- `UpdatePostAction` hands every listed channel to
+  `App\Actions\Stories\SyncTargetStoryExtrasAction`, the one writer of `handoff_required`:
+  `__invoke()` when `story_extras` was sent, `refresh()` when it was not (a format change alone
+  can move a channel on or off the lane). `handoff_recipient` is an ordinary target field.
+- `EvaluatePostChecklistAction`: two items that are only present when the post has an assisted
+  Story. `story_extras` ("Story extras are complete") blocks, listing
+  `StoryExtras::problems()` per channel. `story_handoff` ("Someone can post this by hand") is
+  soft: it warns when the team posts it and nobody is assigned, or the client posts it and has no
+  contact. The soft `links` item no longer says "the link won't be posted" for a Story that has a
+  link sticker.
+- `PostRevisionService::snapshot()` records `story_extras` per channel (the key is only present
+  when there are some, so older snapshots still compare equal) and diffs it;
+  `RestorePostRevisionAction` restores it. `DuplicatePostAction` and `RecyclePostAction` copy the
+  extras and the recipient and re-derive the flag through `SyncTargetStoryExtrasAction::refresh()`.
+
+### Editor
+
+- `PostController::edit` sends `storyHandoff` (`default_recipient`, `can_choose_recipient`,
+  `client_can_be_notified`, `posters`, `creator_id`, `window_minutes`), `can.post_story_by_hand`,
+  and per target `story_extras`, `handoff_required`, `handoff_recipient`
+  (`PostMediaPresenter::channel()`) and `handoff_state`.
+- `resources/js/lib/story-extras.ts` (types, parsing, `hasStoryExtras`, `storyExtrasProblems`) and
+  `takesStoryExtras(capability, format)` in `lib/platforms.ts`, which reads the
+  `platforms.*.story_extras` flag the registry prop carries.
+- `components/post-editor/story-extras-panel.tsx` plus `components/post-editor/story-extras/*`
+  (`link-field`, `sticker-fields`, `poll-field`, `who-posts`, `parts`). Rendered by
+  `composer/channel-composer.tsx` only when `takesStoryExtras()` is true.
+- State: `ChannelState.storyExtras` / `handoffRecipient` (`types.ts`, `editor/editor-state.ts`).
+  Hidden `story_extras` and `handoff_recipient` inputs in `target-fields.tsx`. The live checklist
+  mirrors both new items in `lib/live-checklist.ts`.
+- Preview: `StoryExtrasChips` in `preview/preview-parts.tsx` lists the extras under the phone
+  preview. The channel row in `channel-schedule.tsx` shows a `StatusPill kind="storyHandoff"`.
+- Workflow: `workflow/story-by-hand-row.tsx` ("Open the story", "Mark as posted") while a Story
+  is waiting. `RetryFailedTargetsRow` in `workflow/workflow-rows.tsx` reads "Send a new reminder"
+  and offers "Mark as posted" for a missed Story. A same-status activity row reads "added a note"
+  in `discussion/discussion-items.tsx`.
+
+### Lists and the queue
+
+- `App\Support\Stories\StoryPostPresenter`: `channel(Post, PostTarget, bool $forClient)` for one
+  channel, `summary(Post, bool $forClient)` for the post's most urgent state (ready, then needs
+  hand posting, then posted by hand). `App\Support\Stories\StoryChannelPresenter` owns the labels.
+- `ContentHubPresenter::core()` and `ClientTabPresenter::post()` add a post-level `handoff`.
+  `ListPostsAction`, `ListClientPostsAction`, `GetContentBoardAction`, `GetMyWorkAction` and
+  `GetUpcomingPostOccurrencesAction` eager-load `targets.openStoryHandoff` and
+  `targets.postedStoryHandoff`.
+- Queue page `resources/js/pages/stories/to-post.tsx` (route `stories.queue`), fed by
+  `GetStoryQueueAction`. Shared `components/stories/story-row.tsx` and `story-handoff-pill.tsx`. A
+  command palette entry and a "Stories to post" shortcut in `public/manifest.webmanifest`.
+
+### Handoff pages
+
+- `resources/js/pages/story-handoff/show.tsx`: standalone `PublicShell`, registered in `app.tsx`
+  so even a signed-in member gets no app chrome. `story-handoff/not-ready.tsx` for the signed-in
+  open route when there is nothing to open.
+- `components/story-handoff/*`: `handoff-view`, `handoff-parts`, `use-handoff-media`, `types`.
+  `HandoffView` takes `pending: 'posted' | 'problem' | null`; "I've posted it" asks once
+  (house `ConfirmDialog`) when nothing was shared or saved from the page first; a share that
+  fails switches the page to the save-first layout.
+- `lib/story-share.ts`: clipboard first, share second, in the same tap handler. Nothing is awaited
+  before `navigator.share`, or the browser drops the user activation.
+- `lib/http.ts` gained `fetchBlob` (the media is fetched before the tap) and a `keepalive` option
+  (the fire-and-forget `shared` stamp).
+
 ## Routes / Controllers
 
 - `POST /clients/{client}/posts` → `clients.posts.store` (`PostController::store`) — validates via
@@ -883,6 +997,34 @@ false`, incl. the scheduled/published lock) get read-only panels and a lock noti
   within the `--days` window (and stamps `reminder_sent_at`); asserts a target already stamped with
   `reminder_sent_at` is never re-emailed; asserts non-`Scheduled` posts and targets outside the window
   are ignored entirely.
+- Phase S (Stories with extras). The pipeline and handoff tests are listed in `publishing.md`.
+    - `tests/Feature/Stories/StoryExtrasPersistenceTest.php` (S-1.1 / S-1.2): extras sent as one
+      JSON string or a real array are stored and flag the channel; the kill switch off stores
+      nothing new and writes the flag false; a format change away from Story keeps the extras and
+      clears the flag, and switching back restores it; an empty object clears, an omitted key
+      leaves alone, a placement note alone does not flag; `handoff_recipient` stored, cleared and
+      validated; duplicate, recycle and the next recurring occurrence carry extras and recipient
+      and derive their own flag; revisions record and restore extras; the stored flag always
+      equals `needsHandoff()`.
+    - `tests/Feature/Stories/StoryExtrasValidationTest.php` (S-1.3): each shape rule, https only,
+      mention characters, limits, platforms off the lane, the kill switch, half-finished extras
+      accepted on a draft, who may submit extras (not a client reviewer, a Viewer or another
+      organization), the `story_extras` and `story_handoff` checklist items in each state, the
+      `links` item with and without a link sticker, and a post with broken extras refusing to
+      schedule.
+    - `tests/Feature/Stories/StoryExtrasClientSurfacesTest.php` (S-1.5):
+      `test_the_editor_is_told_who_can_post_a_story_by_hand` covers the editor's `storyHandoff`
+      prop; the rest is in `client-portal.md` and `clients.md`.
+    - `tests/Feature/Stories/StorySurfacesTest.php` (S-5.1): content rows, board cards, the client
+      posts tab and My work carry the post's most urgent handoff state.
+    - `tests/Unit/Support/Publishing/StoryExtrasTest.php`: the DTO.
+    - Vitest: `lib/story-extras.test.ts`, `lib/live-checklist.story.test.ts`,
+      `lib/story-share.test.ts`, `components/post-editor/story-extras-panel.test.tsx`,
+      `components/post-editor/story-extras/who-posts.test.tsx`,
+      `components/post-editor/composer/channel-composer.story.test.tsx`,
+      `components/posts/story-extras-note.test.tsx`, `components/stories/story-row.test.tsx`,
+      `components/story-handoff/handoff-view.test.tsx`. `editor/editor-state.test.ts` was
+      extended.
 
 ## Seeders
 
@@ -894,6 +1036,9 @@ false`, incl. the scheduled/published lock) get read-only panels and a lock noti
 
 ## Known Gaps / Open Questions
 
+- Phase S (2026-11-13): Story extras are Instagram only (`story_handoff.platforms`); Facebook
+  Stories (S-6.3) need the sticker list checked first. The preview lists extras as chips and does
+  not draw stickers on the media. There is no Playwright journey for the handoff page.
 - 2026-10-20: the editor page is still one large file plus new feature components — M-1.6 (editor
   decomposition, I-4.6) hasn't been done yet and should precede more editor work.
 - Alt text is per image (shared by every channel), not per channel.
@@ -930,6 +1075,12 @@ false`, incl. the scheduled/published lock) get read-only panels and a lock noti
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). `post_targets` gained `story_extras`,
+  `handoff_required` and `handoff_recipient`; `PostTarget` gained the handoff helpers and
+  relations; `ValidatesStoryExtras`, two checklist items, revisions, duplicate and recycle carry
+  extras; the editor gained the Story extras panel, the workflow rows and the handoff pill; new
+  queue page `stories/to-post` and the standalone handoff page. See the Phase S section above and
+  `publishing.md`.
 - 2026-11-07: **Bugfix — the calendar showed seconds on MySQL.**
   `post_targets.scheduled_local_time` is a `TIME` column, so MySQL handed it back as `09:00:00`
   while SQLite returned `09:00`. The value went straight to the frontend

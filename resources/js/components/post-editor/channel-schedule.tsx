@@ -6,6 +6,7 @@ import type {
     ScheduleRows,
     TargetAccountData,
 } from '@/components/post-editor/types';
+import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { todayIn } from '@/lib/timezones';
@@ -50,6 +51,7 @@ export function ChannelSchedule({
     onApplyToAll,
     onSameInstant,
     usage,
+    byHand = [],
     error,
 }: {
     accounts: TargetAccountData[];
@@ -65,6 +67,8 @@ export function ChannelSchedule({
     onSameInstant: (accountId: number) => void;
     /** Step M-2.2: the caption length (as it publishes there) and hashtag count per channel. */
     usage: Record<number, { chars: number; tags: number }>;
+    /** Step S-5.1: channels that are a Story with extras, so posted by hand at their time. */
+    byHand?: number[];
     error?: string;
 }) {
     const selectedIds = Object.keys(rows).map(Number);
@@ -100,11 +104,11 @@ export function ChannelSchedule({
                         <li
                             key={account.id}
                             className={cn(
-                                'flex flex-col gap-3 px-4 py-3 transition-colors sm:flex-row sm:items-center',
+                                'grid gap-3 px-4 py-3.5 transition-colors',
                                 selected ? 'bg-card' : 'bg-muted/30',
                             )}
                         >
-                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                            <label className="flex min-w-0 cursor-pointer items-center gap-3">
                                 <Checkbox
                                     checked={selected}
                                     onCheckedChange={() => onToggle(account.id)}
@@ -131,6 +135,15 @@ export function ChannelSchedule({
                                         {account.platform_label} ·{' '}
                                         {account.timezone}
                                     </span>
+                                    {selected &&
+                                        byHand.includes(account.id) && (
+                                            <StatusPill
+                                                kind="storyHandoff"
+                                                value="needs_hand_posting"
+                                                className="mt-1"
+                                                title="A story with a link or stickers is posted by hand from the Instagram app. We’ll remind whoever is posting when it’s due."
+                                            />
+                                        )}
                                     {(account.missing_settings?.length ?? 0) >
                                         0 && (
                                         <span className="text-warning text-xs">
@@ -141,33 +154,53 @@ export function ChannelSchedule({
                                 </span>
                             </label>
 
+                            {/* Everything about "when" sits under the handle on one left edge
+                                (indented past the checkbox + icon from `sm`). */}
                             {selected && (
-                                <div className="flex flex-col gap-1.5 sm:items-end">
-                                    <DateTimePicker
-                                        size="sm"
-                                        label={account.handle}
-                                        timeZone={account.timezone}
-                                        min={todayIn(account.timezone)}
-                                        value={row}
-                                        onChange={(next) => {
-                                            if (next.date !== row.date) {
-                                                onChange(
-                                                    account.id,
-                                                    'date',
-                                                    next.date,
-                                                );
-                                            }
+                                <div className="grid gap-2 sm:ps-[4.625rem]">
+                                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                                        <DateTimePicker
+                                            label={account.handle}
+                                            timeZone={account.timezone}
+                                            min={todayIn(account.timezone)}
+                                            value={row}
+                                            onChange={(next) => {
+                                                if (next.date !== row.date) {
+                                                    onChange(
+                                                        account.id,
+                                                        'date',
+                                                        next.date,
+                                                    );
+                                                }
 
-                                            if (next.time !== row.time) {
-                                                onChange(
-                                                    account.id,
-                                                    'time',
-                                                    next.time,
-                                                );
-                                            }
-                                        }}
-                                        className="sm:items-end"
-                                    />
+                                                if (next.time !== row.time) {
+                                                    onChange(
+                                                        account.id,
+                                                        'time',
+                                                        next.time,
+                                                    );
+                                                }
+                                            }}
+                                            className="w-full sm:w-auto"
+                                        />
+                                        <span className="flex items-center gap-3 text-[11px] sm:h-10">
+                                            <Usage
+                                                used={
+                                                    usage[account.id]?.chars ??
+                                                    0
+                                                }
+                                                limit={account.caption_limit}
+                                                unit="chars"
+                                            />
+                                            <Usage
+                                                used={
+                                                    usage[account.id]?.tags ?? 0
+                                                }
+                                                limit={account.max_hashtags}
+                                                unit="tags"
+                                            />
+                                        </span>
+                                    </div>
                                     <BestTimes
                                         account={account}
                                         onPick={(slot) => {
@@ -183,46 +216,38 @@ export function ChannelSchedule({
                                             );
                                         }}
                                     />
-                                    <div className="flex items-center gap-3 text-[11px]">
-                                        {canApplyToAll && (
+                                    {canApplyToAll && (
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                                             <Button
                                                 type="button"
                                                 variant="link"
-                                                className="h-auto text-[11px]"
+                                                className="h-auto py-1 text-xs has-[>svg]:px-0"
                                                 title="Copy this date and local time to every channel — each keeps its own clock."
                                                 onClick={() =>
                                                     onApplyToAll(account.id)
                                                 }
                                             >
-                                                <CopyCheck className="size-3" />
+                                                <CopyCheck className="size-3.5" />
                                                 Same local time
                                             </Button>
-                                        )}
-                                        {canApplyToAll && mixedZones && (
-                                            <Button
-                                                type="button"
-                                                variant="link"
-                                                className="h-auto text-[11px]"
-                                                title="Go out at this exact moment everywhere: other channels get the matching time on their own clock."
-                                                onClick={() =>
-                                                    onSameInstant(account.id)
-                                                }
-                                            >
-                                                <Clock4 className="size-3" />
-                                                Same moment
-                                            </Button>
-                                        )}
-                                        <Usage
-                                            used={usage[account.id]?.chars ?? 0}
-                                            limit={account.caption_limit}
-                                            unit="chars"
-                                        />
-                                        <Usage
-                                            used={usage[account.id]?.tags ?? 0}
-                                            limit={account.max_hashtags}
-                                            unit="tags"
-                                        />
-                                    </div>
+                                            {mixedZones && (
+                                                <Button
+                                                    type="button"
+                                                    variant="link"
+                                                    className="h-auto py-1 text-xs has-[>svg]:px-0"
+                                                    title="Go out at this exact moment everywhere: other channels get the matching time on their own clock."
+                                                    onClick={() =>
+                                                        onSameInstant(
+                                                            account.id,
+                                                        )
+                                                    }
+                                                >
+                                                    <Clock4 className="size-3.5" />
+                                                    Same moment
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </li>

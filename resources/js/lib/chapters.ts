@@ -82,7 +82,8 @@ export type Chapter = {
 export const chapters: Record<ChapterKey, Chapter> = {
     // MOVE 1 (ux-overhaul): the single front door. The old Overview, Needs attention and My work
     // fold into one adaptive Home — `/dashboard` (the studio view), `/home` (the attention queue)
-    // and `/my-work` (mine) all resolve here and are switched by `HomeViewTabs` in-page.
+    // and `/my-work` (mine) all resolve here and are switched by `HomeViewTabs` in-page. The
+    // poster's queue (`/stories/to-post`, Step S-4.4) is a sub-page of the same chapter.
     home: {
         key: 'home',
         number: '01',
@@ -91,7 +92,7 @@ export const chapters: Record<ChapterKey, Chapter> = {
             'What needs you, what is going out, and how every client is tracking.',
         icon: LayoutGrid,
         swatch: 'bg-lime',
-        prefixes: ['/dashboard', '/home', '/my-work'],
+        prefixes: ['/dashboard', '/home', '/my-work', '/stories'],
     },
     calendar: {
         key: 'calendar',

@@ -36,7 +36,7 @@ export function ChannelFormatField({
                     onChange(value === AUTO ? null : value)
                 }
             >
-                <SelectTrigger id={id}>
+                <SelectTrigger id={id} className="w-full">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Actions\Posts\UpdatePostAction;
 use App\Enums\McpScope;
 use App\Models\Post;
+use App\Support\Api\StoryChannels;
 use App\Support\Mcp\McpTenant;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -26,7 +27,7 @@ use Laravel\Mcp\Server\Attributes\Title;
  */
 #[Name('update_post')]
 #[Title('Update post')]
-#[Description('Edits a post\'s caption, hashtags, link, first comment, campaign or targets, reusing the web editor\'s validation. Only the fields you supply change; returns the before→after diff. Requires the write:drafts scope.')]
+#[Description('Edits a post\'s caption, hashtags, link, first comment, campaign or targets (including a target\'s format and, for an Instagram story, story_extras), reusing the web editor\'s validation. A story with a link or stickers is posted by hand by a person, never by Alima. Only the fields you supply change; returns the before→after diff. Requires the write:drafts scope.')]
 class UpdatePostTool extends McpTool
 {
     public function __construct(private readonly UpdatePostAction $updatePost) {}
@@ -69,7 +70,8 @@ class UpdatePostTool extends McpTool
 
         $clientId = $post->client_id;
 
-        $validated = $request->validate([
+        // Step S-5.4: a target's format, Story extras and poster follow the editor's own rules.
+        $validated = StoryChannels::validate(StoryChannels::keepIfMissed($request->all(), 'targets', $post), 'targets', [
             'post_id' => ['required', 'integer'],
             'master_caption' => ['nullable', 'string', 'max:65000'],
             'hashtags' => ['nullable', 'array'],
@@ -115,6 +117,7 @@ class UpdatePostTool extends McpTool
             'status' => $post->status->value,
             'changed' => $diff,
             'edit_url' => route('posts.edit', $post),
+            'note' => StoryChannels::note($post),
         ]);
     }
 
@@ -130,7 +133,7 @@ class UpdatePostTool extends McpTool
             'link_url' => $schema->string()->description('Set the link URL (http/https).'),
             'first_comment' => $schema->string()->description('Set the first comment.'),
             'campaign_id' => $schema->integer()->description('Move the post to this campaign (must belong to the same client).'),
-            'targets' => $schema->array()->description('Replace the targets: objects with social_account_id and optional scheduled_local_date/scheduled_local_time. Unlisted channels are removed.'),
+            'targets' => $schema->array()->description('Replace the targets: objects with social_account_id and optional scheduled_local_date/scheduled_local_time, format (e.g. "story"), and for an Instagram story: story_extras {link: {url (https), text}, mentions: [handles], hashtag, location, poll: {question, options: [2-4]}, placement_note} and handoff_recipient ("team" or "client"). A story with any extra is NOT published by Alima: a person posts it by hand from the Instagram app at its time. Unlisted channels are removed; omit story_extras to keep a target\'s extras, send null to remove them.'),
         ];
     }
 }

@@ -2,15 +2,19 @@
 
 namespace App\Actions\Home;
 
+use App\Actions\Stories\GetStoryQueueAction;
 use App\Enums\CampaignStatus;
 use App\Enums\ConnectionStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
+use App\Enums\PublishFailureReason;
 use App\Enums\Role;
 use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\GridPlan;
 use App\Models\Post;
+use App\Models\PostTarget;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\Campaigns\Health\LaunchingWithUnapprovedWorkRule;
@@ -52,10 +56,19 @@ class GetNeedsAttentionItemsAction
      * `EvaluatePostChecklistAction` media rule: no assets, and either no targets or at least one
      * target on a platform outside `Platform::textOnlyCapableValues()`.
      *
+     * Step S-5.2: `storiesToPost` is the assisted lane's "post this now" group — open, due Story
+     * handoffs the viewer is the poster for, or every one in the organization for an Owner or
+     * Strategist (`GetStoryQueueAction`, one bounded query; the queue is capped at
+     * `GetStoryQueueAction::LIMIT`, so `total` is counted from its rows). Each row's `url` is the
+     * signed-in `posts.story-handoff.open` route, never a token link. A Story nobody confirmed lands
+     * in `failedPublishes` like any failed channel; its row reads the `PublishFailureReason`
+     * message and carries `fix` and `story_failure`.
+     *
      * Scoped like `CalendarController`/`GetUpcomingPostOccurrencesAction`: a `Role::ClientReviewer`
      * only ever sees their own client's rows.
      *
      * @return array{
+     *     storiesToPost: array{items: list<array<string, mixed>>, total: int},
      *     failedPublishes: array{items: list<array<string, mixed>>, total: int},
      *     internalReviews: array{items: list<array<string, mixed>>, total: int},
      *     waitingApprovals: array{items: list<array<string, mixed>>, total: int, overdue: int},
@@ -101,7 +114,14 @@ class GetNeedsAttentionItemsAction
                     ->where('meta_access_token_expires_at', '<=', now()->addDays(SocialAccount::TOKEN_WARNING_DAYS))))
             ->when($user->role === Role::ClientReviewer, fn (Builder $query) => $query->where('client_id', $user->client_id));
 
+        // Step S-5.2: empty for anybody who cannot post a Story by hand (viewers, client reviewers).
+        $stories = app(GetStoryQueueAction::class)($user, oversee: true, includeUpcoming: false);
+
         return [
+            'storiesToPost' => [
+                'items' => array_slice($stories, 0, $limit),
+                'total' => count($stories),
+            ],
             'failedPublishes' => [
                 'items' => $this->rows(
                     $this->posts($user)->whereIn('status', [PostStatus::Failed, PostStatus::PartiallyPublished]),
@@ -379,7 +399,7 @@ class GetNeedsAttentionItemsAction
     private function rows(Builder $query, int $limit, callable $reason): array
     {
         return array_values($query
-            ->with(['client:id,name', 'targets:id,post_id,social_account_id', 'targets.socialAccount:id,platform,handle'])
+            ->with(['client:id,name', 'targets:id,post_id,social_account_id,status,error', 'targets.socialAccount:id,platform,handle'])
             ->orderBy('id')
             ->limit($limit)
             ->get(['id', 'org_id', 'client_id', 'status', 'master_caption'])
@@ -393,6 +413,26 @@ class GetNeedsAttentionItemsAction
     private function transformPost(Post $post, string $reason): array
     {
         $target = $post->targets->first();
+        $fix = null;
+        $storyFailure = null;
+
+        // Step S-5.2: a Story nobody posted (or whose poster hit a problem) says so, in the
+        // assisted lane's own words, on the channel it happened to.
+        if (in_array($post->status, [PostStatus::Failed, PostStatus::PartiallyPublished], true)) {
+            foreach ($post->targets as $candidate) {
+                $cause = $this->storyFailure($candidate);
+
+                if ($cause !== null) {
+                    $target = $candidate;
+                    $reason = $cause->message($candidate->socialAccount?->platform);
+                    $fix = $cause->fix($candidate->socialAccount?->platform);
+                    $storyFailure = $cause->value;
+
+                    break;
+                }
+            }
+        }
+
         $account = $target?->socialAccount;
 
         return [
@@ -402,9 +442,25 @@ class GetNeedsAttentionItemsAction
             'status' => $post->status->value,
             'status_label' => $post->status->label(),
             'reason' => $reason,
+            'fix' => $fix,
+            'story_failure' => $storyFailure,
             'master_caption' => $post->master_caption,
             'platform' => $account?->platform?->value,
             'handle' => $account?->handle,
         ];
+    }
+
+    /**
+     * The assisted lane's failure on this channel, if that is why it failed.
+     */
+    private function storyFailure(PostTarget $target): ?PublishFailureReason
+    {
+        if ($target->status !== PostTargetStatus::Failed) {
+            return null;
+        }
+
+        $cause = PublishFailureReason::classify($target->error);
+
+        return in_array($cause, [PublishFailureReason::StoryNotPosted, PublishFailureReason::StoryProblemReported], true) ? $cause : null;
     }
 }

@@ -123,7 +123,7 @@ export function StepSpine({
             <ol
                 ref={listRef}
                 role="tablist"
-                className="flex items-stretch gap-1 overflow-x-auto"
+                className="flex [scrollbar-width:none] items-stretch gap-1 overflow-x-auto"
             >
                 {editorSteps.map((step, index) => {
                     const active = nav.activeTab === step.id;

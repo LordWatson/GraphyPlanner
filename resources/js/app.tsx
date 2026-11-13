@@ -23,6 +23,10 @@ void createInertiaApp({
                 return null;
             case name.startsWith('review/'):
                 return null;
+            // Step S-4.3: the Story handoff page is opened from a notification on a phone, with
+            // no sign-in — its own `PublicShell`, never the app chrome, even for a member.
+            case name === 'story-handoff/show':
+                return null;
             // C-5.4: the public campaign preview stands alone, like the review page.
             case name.startsWith('share/'):
                 return null;

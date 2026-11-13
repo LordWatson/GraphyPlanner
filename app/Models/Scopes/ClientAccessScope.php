@@ -32,6 +32,7 @@ use App\Models\Product;
 use App\Models\ReviewToken;
 use App\Models\SavedReply;
 use App\Models\SocialAccount;
+use App\Models\StoryHandoff;
 use App\Models\TrackedProfile;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -102,6 +103,7 @@ class ClientAccessScope implements Scope
         ReviewToken::class,
         SavedReply::class,
         SocialAccount::class,
+        StoryHandoff::class,
         TrackedProfile::class,
     ];
 
@@ -137,7 +139,8 @@ class ClientAccessScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $allowed = self::accessibleClientIds();
+        // A route authorised by a link rather than a login runs unscoped (`TenantScopes`).
+        $allowed = TenantScopes::areSuspended() ? null : self::accessibleClientIds();
 
         if ($allowed === null) {
             return;

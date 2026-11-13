@@ -27,7 +27,11 @@ class SecurityHeaders
 
         $headers->set('X-Content-Type-Options', 'nosniff');
         $headers->set('X-Frame-Options', 'SAMEORIGIN');
-        $headers->set('Referrer-Policy', (string) config('security.referrer_policy'));
+        // A response may ask for something stricter than the default (the Story handoff page and
+        // its media send `no-referrer`, because their URL carries a token).
+        if (! $headers->has('Referrer-Policy')) {
+            $headers->set('Referrer-Policy', (string) config('security.referrer_policy'));
+        }
         $headers->set('Permissions-Policy', (string) config('security.permissions_policy'));
 
         if ($request->isSecure()) {
@@ -36,13 +40,18 @@ class SecurityHeaders
 
         if (config('security.csp.enabled') && ! $request->is(...(array) config('security.csp.except'))) {
             $name = config('security.csp.report_only') ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
-            $headers->set($name, $this->contentSecurityPolicy($nonce, $request->isSecure()));
+            // A CSP report carries the page's full URL to the collector, so a page whose URL is
+            // its token (a review link, a Story handoff) is never given a `report-uri`.
+            $headers->set($name, $this->contentSecurityPolicy($nonce, $request->isSecure(), ! $request->is(...self::TOKEN_PATHS)));
         }
 
         return $response;
     }
 
-    public function contentSecurityPolicy(string $nonce, bool $secure): string
+    /** Paths whose URL is itself a credential. */
+    private const TOKEN_PATHS = ['story/*', 'review/*', 'kit/*', 'share/*', 'portal-login/*'];
+
+    public function contentSecurityPolicy(string $nonce, bool $secure, bool $report = true): string
     {
         // The Vite dev server (`npm run dev`) serves scripts, styles and HMR from its own origin.
         $dev = Vite::isRunningHot() ? $this->devServerOrigins() : [];
@@ -75,7 +84,7 @@ class SecurityHeaders
             $policy[] = 'upgrade-insecure-requests';
         }
 
-        if ($uri = config('security.csp.report_uri')) {
+        if ($report && ($uri = config('security.csp.report_uri'))) {
             $policy[] = 'report-uri '.$uri;
         }
 

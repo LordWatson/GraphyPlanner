@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Actions\Posts\PostStatusTransitionMap;
+use App\Actions\Stories\ResolveStoryPosterAction;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Enums\Role;
@@ -193,6 +194,26 @@ class PostPolicy
         return in_array($post->status, [PostStatus::Failed, PostStatus::PartiallyPublished], true)
             && $user->org_id === $post->org_id
             && in_array($user->role, [Role::Owner, Role::Strategist, Role::Designer], true);
+    }
+
+    /**
+     * Step S-4.5: open a Story's handoff from inside Alima, or mark it as posted. Deliberately not
+     * `update()`: a post that is going out is locked for edits, and that is exactly when its Story
+     * needs posting. The roles are the ones that work on posts — a Viewer or a client reviewer is
+     * refused.
+     */
+    public function postStoryByHand(User $user, Post $post): bool
+    {
+        return $user->org_id === $post->org_id
+            && in_array($user->role, ResolveStoryPosterAction::POSTER_ROLES, true);
+    }
+
+    /**
+     * Step S-4.4: the "Stories to post" queue — the same roles, across the organization.
+     */
+    public function viewStoryQueue(User $user): bool
+    {
+        return in_array($user->role, ResolveStoryPosterAction::POSTER_ROLES, true);
     }
 
     /**

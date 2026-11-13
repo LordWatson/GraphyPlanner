@@ -23,6 +23,8 @@ class NotifyingOpsAlerter implements OpsAlerter
 {
     public function alert(string $key, string $message, array $context = []): void
     {
+        // Step S-6.4: a link token in a URL (`/story/{token}`) must not reach a log or an inbox.
+        $message = SecretScrubber::scrubUrl($message);
         $context = SecretScrubber::scrub($context + array_filter([
             TraceContext::CORRELATION_ID => TraceContext::correlationId(),
         ]));

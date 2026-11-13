@@ -8,6 +8,7 @@ use App\Enums\McpScope;
 use App\Enums\PostStatus;
 use App\Models\Client;
 use App\Models\Post;
+use App\Support\Api\StoryChannels;
 use App\Support\Mcp\McpTenant;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -31,7 +32,7 @@ use Laravel\Mcp\Server\Attributes\Title;
  */
 #[Name('create_draft_post')]
 #[Title('Create draft post')]
-#[Description('Creates a DRAFT post for a client (never published). Accepts caption, hashtags, optional campaign, and per-account targets with their own local date/time. Requires the write:drafts scope. Returns the new post id and an edit link.')]
+#[Description('Creates a DRAFT post for a client (never published). Accepts caption, hashtags, optional campaign, and per-account targets with their own local date/time, format and (Instagram stories only) story_extras. A story with a link or stickers is posted by hand by a person, never by Alima. Requires the write:drafts scope. Returns the new post id and an edit link.')]
 class CreateDraftPostTool extends McpTool
 {
     public function __construct(
@@ -78,7 +79,8 @@ class CreateDraftPostTool extends McpTool
         }
 
         // Validated like StorePostRequest: targets must reference the client's own live accounts.
-        $validated = $request->validate([
+        // Step S-5.4: a target's format, Story extras and poster follow the editor's own rules.
+        $validated = StoryChannels::validate(StoryChannels::keepIfMissed($request->all(), 'targets'), 'targets', [
             'client_id' => ['required', 'integer'],
             'master_caption' => ['nullable', 'string', 'max:65000'],
             'hashtags' => ['nullable', 'array'],
@@ -92,19 +94,25 @@ class CreateDraftPostTool extends McpTool
             'targets.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
         ]);
 
+        $targets = $validated['targets'] ?? [];
+
         $post = ($this->createPost)($client, [
             'status' => PostStatus::Draft->value,
             'master_caption' => $validated['master_caption'] ?? null,
             'hashtags' => $validated['hashtags'] ?? null,
             'campaign_id' => $validated['campaign_id'] ?? null,
-            'targets' => $validated['targets'] ?? [],
+            'targets' => $targets,
         ]);
 
-        // Attach media through UpdatePostAction so the carousel order + §6 checklist stay in one path.
-        if (! empty($validated['asset_ids'])) {
-            $post = ($this->updatePost)($post, [
-                'asset_ids' => array_values(array_map('intval', $validated['asset_ids'])),
-            ], $user);
+        // Media, formats and Story extras go through UpdatePostAction so the carousel order, the §6
+        // checklist and the one writer of "posted by hand" stay in one path.
+        $changes = array_filter([
+            'asset_ids' => empty($validated['asset_ids']) ? null : array_values(array_map('intval', $validated['asset_ids'])),
+            'targets' => StoryChannels::carryOptions($targets) ? $targets : null,
+        ], fn ($value) => $value !== null);
+
+        if ($changes !== []) {
+            $post = ($this->updatePost)($post, $changes, $user);
         }
 
         return Response::structured([
@@ -114,6 +122,7 @@ class CreateDraftPostTool extends McpTool
             'media_count' => $post->assets()->count(),
             'edit_url' => route('posts.edit', $post),
             'message' => 'Draft created. Review and refine it in Graphy before scheduling.',
+            'note' => StoryChannels::note($post),
         ]);
     }
 
@@ -128,7 +137,7 @@ class CreateDraftPostTool extends McpTool
             'hashtags' => $schema->array()->description('A list of hashtag strings (without the leading #).'),
             'campaign_id' => $schema->integer()->description('Attach the draft to this campaign (must belong to the client).'),
             'asset_ids' => $schema->array()->description('Media asset ids to attach, in carousel order (use upload_media to add a new image first). Each must belong to the client.'),
-            'targets' => $schema->array()->description('Per-account targets: objects with social_account_id and optional scheduled_local_date (YYYY-MM-DD) and scheduled_local_time (HH:MM).'),
+            'targets' => $schema->array()->description('Per-account targets: objects with social_account_id and optional scheduled_local_date (YYYY-MM-DD), scheduled_local_time (HH:MM), format (e.g. "story"), and for an Instagram story: story_extras {link: {url (https), text}, mentions: [handles], hashtag, location, poll: {question, options: [2-4]}, placement_note} and handoff_recipient ("team" or "client"). A story with any extra is NOT published by Alima: a person posts it by hand from the Instagram app at its time.'),
         ];
     }
 }

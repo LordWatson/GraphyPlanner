@@ -71,7 +71,7 @@ export function SettingsSection({
                             editor.update({ approvalMode })
                         }
                     >
-                        <SelectTrigger id="approval_mode">
+                        <SelectTrigger id="approval_mode" className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

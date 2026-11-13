@@ -198,6 +198,22 @@ content, complete}`. `brandBrain` is true once any core Brand Brain field (voice
   name / owner / health via the existing `ClientIndexRequest` sorts; column visibility remembered
   per browser). The Posts tab uses it too (each row opens the editor).
 
+## Phase S — Stories with extras (assisted lane)
+
+- `clients.story_handoff_recipient` (string, default `team`; cast `App\Enums\StoryHandoffRecipient`,
+  `team` / `client`): who posts this client's Stories with links and stickers by hand. A channel
+  can override it (`post_targets.handoff_recipient`); see `posts.md` and `publishing.md`.
+- Set on the client edit form (`pages/clients/edit.tsx`, "Stories with links and stickers are
+  posted by"). Owner and Strategist only, because editing a client is (`ClientPolicy::update`).
+  `UpdateClientRequest` rule: `sometimes`, `required`, `Enum(StoryHandoffRecipient)`, so an
+  omitted value is left alone and an unknown one is rejected.
+- `ClientController::edit` sends a `storyHandoff` prop with the options, or null while
+  `publishing.story_handoff.enabled` is off, so the form does not offer a setting that does
+  nothing. `ClientPresenter::detail()` exposes `story_handoff_recipient`.
+- `App\Models\StoryHandoff` is in `ClientAccessScope::MODELS`: a member restricted to some clients
+  only sees those clients' handoffs.
+- The Posts tab rows carry a post-level `handoff` (`ClientTabPresenter::post()`).
+
 ## Routes / Controllers
 
 - `Route::resource('clients', ClientController::class)` (under `auth`+`verified` middleware):
@@ -307,8 +323,16 @@ content, complete}`. `brandBrain` is true once any core Brand Brain field (voice
     - `tests/Unit/Actions/AI/CreateDailyBriefActionTest.php`: idempotency per client/date.
     - `tests/Feature/DailyBriefControllerTest.php`: authorization and scoping for briefs routes.
     - `tests/Feature/GenerateDailyBriefsCommandTest.php`: one job per active client when command runs.
+- Phase S: `tests/Feature/Stories/StoryExtrasClientSurfacesTest.php` — an Owner or Strategist sets
+  who posts a client's Stories; a Designer or Viewer cannot; an unknown recipient is rejected and
+  an omitted one left alone; the form only offers the setting while the lane is on.
+  `tests/Feature/Stories/StorySurfacesTest.php` — the client posts tab carries the post's most
+  urgent handoff state.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): the Story poster default is per client only. There is no per-client
+  handoff window; `story_handoff.window_minutes` is one value for the whole platform.
 
 - An archived client always restores to `active` (its previous status isn't remembered).
 - Soft-deleted assets keep their files until the client/org is purged — no time-based prune yet.
@@ -321,6 +345,9 @@ content, complete}`. `brandBrain` is true once any core Brand Brain field (voice
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). New `clients.story_handoff_recipient`
+  (`team` / `client`, default `team`) on the client edit form, Owner/Strategist only; `StoryHandoff`
+  added to `ClientAccessScope::MODELS`.
 - 2026-11-07: **Client onboarding templates** (audit item 19). New `client_templates` + `ClientTemplate`,
   `SaveClientAsTemplateAction` (re-saving a name updates rather than duplicating),
   `CreateClientFromTemplateAction` (**what the person typed always wins over the template**), and

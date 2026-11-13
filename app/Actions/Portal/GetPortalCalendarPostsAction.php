@@ -49,9 +49,12 @@ class GetPortalCalendarPostsAction
                 'campaign:id,name,code,colour',
                 'targets' => fn ($target) => $target
                     ->whereBetween(CalendarWindow::TARGET_DATE_COLUMN, $window->targetDateRange())
-                    ->select(['id', 'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc'])
+                    ->select(['id', 'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc', 'status', 'handoff_required'])
                     ->orderBy('id'),
                 'targets.socialAccount:id,platform,handle,timezone',
+                // Step S-5.1: what the assisted-lane state reads.
+                'targets.openStoryHandoff',
+                'targets.postedStoryHandoff',
             ])
             ->orderBy('id')
             ->get(['id', 'org_id', 'client_id', 'campaign_id', 'status', 'master_caption']);

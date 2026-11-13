@@ -19,6 +19,8 @@ enum WebhookEvent: string
     case PostChangesRequested = 'post.changes_requested';
     case PostPublished = 'post.published';
     case PostFailed = 'post.failed';
+    /** Step S-5.5: an assisted Story is due and somebody has just been asked to post it by hand. */
+    case StoryReadyToPost = 'story.ready_to_post';
     case OrderPaid = 'order.paid';
 
     public function label(): string
@@ -28,6 +30,7 @@ enum WebhookEvent: string
             self::PostChangesRequested => 'A client requested changes',
             self::PostPublished => 'A post went live',
             self::PostFailed => 'A post failed to publish',
+            self::StoryReadyToPost => 'A story is ready to post by hand',
             self::OrderPaid => 'A store order was paid',
         };
     }

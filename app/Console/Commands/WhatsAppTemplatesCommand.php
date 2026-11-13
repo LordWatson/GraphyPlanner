@@ -76,6 +76,7 @@ class WhatsAppTemplatesCommand extends Command
             MessageTemplate::InvoiceIssued => 'TWILIO_TEMPLATE_INVOICE_ISSUED',
             MessageTemplate::CampaignBriefReady => 'TWILIO_TEMPLATE_CAMPAIGN_BRIEF_READY',
             MessageTemplate::DailyDigest => 'TWILIO_TEMPLATE_DAILY_DIGEST',
+            MessageTemplate::StoryReadyToPost => 'TWILIO_TEMPLATE_STORY_READY_TO_POST',
             MessageTemplate::Notification => 'TWILIO_TEMPLATE_NOTIFICATION',
         };
     }

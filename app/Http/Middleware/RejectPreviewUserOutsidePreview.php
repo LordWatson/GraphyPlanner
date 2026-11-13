@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Observability\SecretScrubber;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +25,8 @@ class RejectPreviewUserOutsidePreview
         }
 
         Log::warning('Preview user authenticated outside preview mode', [
-            'path' => $request->path(),
+            // The path can be a public token link (`story/…`, `review/…`): never log the token.
+            'path' => SecretScrubber::scrubUrl('/'.$request->path()),
             'method' => $request->method(),
             'ip' => $request->ip(),
         ]);

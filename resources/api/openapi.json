@@ -165,7 +165,7 @@
                 "operationId": "createDraftPost",
                 "tags": ["Posts"],
                 "summary": "Create a draft post",
-                "description": "Needs the `write:drafts` scope. Always creates a **draft** — there is no parameter that creates something already approved or scheduled.\n\n`campaign_id`, `asset_ids` and every `channels[].social_account_id` must belong to the same client, so a token cannot borrow another client's campaign or media.\n\nEach channel carries its own local date and time; they are never shared implicitly. Attach media in the order you want it to publish — `asset_ids` is the carousel order.",
+                "description": "Needs the `write:drafts` scope. Always creates a **draft** — there is no parameter that creates something already approved or scheduled.\n\n`campaign_id`, `asset_ids` and every `channels[].social_account_id` must belong to the same client, so a token cannot borrow another client's campaign or media.\n\nEach channel carries its own local date and time; they are never shared implicitly. Attach media in the order you want it to publish — `asset_ids` is the carousel order.\n\n**Stories with a link or stickers.** Instagram only lets a person add a link, mention, hashtag, location or poll sticker from its own app. Set a channel's `format` to `story` and send `story_extras`, and that channel is **posted by hand**: Alima does not publish it. When it is due, someone on the team (or the client, see `handoff_recipient`) is reminded, posts it from Instagram and confirms it. The response says so with `posted_by_hand: true`. Extras on a channel that is not an Instagram story are a `422` on another network, and on an Instagram channel with another format are stored but change nothing.",
                 "parameters": [
                     {
                         "name": "Idempotency-Key",
@@ -215,23 +215,7 @@
                                     "channels": {
                                         "type": "array",
                                         "items": {
-                                            "type": "object",
-                                            "required": ["social_account_id"],
-                                            "properties": {
-                                                "social_account_id": {
-                                                    "type": "integer"
-                                                },
-                                                "scheduled_local_date": {
-                                                    "type": "string",
-                                                    "format": "date",
-                                                    "nullable": true
-                                                },
-                                                "scheduled_local_time": {
-                                                    "type": "string",
-                                                    "nullable": true,
-                                                    "description": "HH:MM on that channel’s own clock."
-                                                }
-                                            }
+                                            "$ref": "#/components/schemas/ChannelInput"
                                         }
                                     }
                                 }
@@ -241,7 +225,19 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "The created draft, with its channels."
+                        "description": "The created draft, with its channels.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Post"
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "No such client for this token."
@@ -267,7 +263,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "The post."
+                        "$ref": "#/components/responses/Post"
                     },
                     "403": {
                         "description": "Not this organization's post."
@@ -278,7 +274,7 @@
                 "operationId": "updateDraftPost",
                 "tags": ["Posts"],
                 "summary": "Edit a draft post",
-                "description": "Needs the `write:drafts` scope. Only ideas and drafts are editable; anything further along answers `409`, because a scheduled or published post being rewritten by an integration is a surprise nobody asked for.\n\nOnly the fields you send are changed. Sending `asset_ids` replaces the whole attachment list, in the order given.",
+                "description": "Needs the `write:drafts` scope. Only ideas and drafts are editable; anything further along answers `409`, because a scheduled or published post being rewritten by an integration is a surprise nobody asked for.\n\nOnly the fields you send are changed. Sending `asset_ids` replaces the whole attachment list, in the order given.\n\nSending `channels` replaces the whole channel list: a channel you leave out is removed. A channel you list keeps its `format`, `story_extras` and `handoff_recipient` unless you send them, but its date and time are set from what you send, so send those every time. `story_extras: null` removes a story's extras, and it goes back to publishing itself.",
                 "parameters": [
                     {
                         "$ref": "#/components/parameters/PostId"
@@ -321,6 +317,12 @@
                                         "items": {
                                             "type": "integer"
                                         }
+                                    },
+                                    "channels": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChannelInput"
+                                        }
                                     }
                                 }
                             }
@@ -329,7 +331,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "The updated post."
+                        "$ref": "#/components/responses/Post"
                     },
                     "403": {
                         "description": "Not this organization's post."
@@ -425,6 +427,7 @@
                                                 "post.changes_requested",
                                                 "post.published",
                                                 "post.failed",
+                                                "story.ready_to_post",
                                                 "order.paid"
                                             ]
                                         }
@@ -497,7 +500,7 @@
                 "operationId": "schedulePost",
                 "tags": ["Posts"],
                 "summary": "Schedule an approved post",
-                "description": "Needs the `write:schedule` scope — its own scope because this is the only write that reaches real audiences, and it cannot be undone by another call.\n\nThe post must already be **approved**. The full pre-publish checklist is re-run here, not trusted from earlier: if it does not pass you get a `409` whose `outstanding` array names every item still to fix.",
+                "description": "Needs the `write:schedule` scope — its own scope because this is the only write that reaches real audiences, and it cannot be undone by another call.\n\nThe post must already be **approved**. The full pre-publish checklist is re-run here, not trusted from earlier: if it does not pass you get a `409` whose `outstanding` array names every item still to fix.\n\n**Scheduled does not always mean it publishes itself.** A channel with `posted_by_hand: true` is an Instagram story with a link or stickers, which Instagram only allows from its own app. Alima does not publish that channel: a person is reminded when it is due, posts it from Instagram and confirms it. When a post has one, `meta.notes` carries a plain sentence saying so. Show it to whoever asked for the post to be scheduled. `meta.notes` is an empty array when every channel publishes automatically.",
                 "parameters": [
                     {
                         "$ref": "#/components/parameters/PostId"
@@ -515,7 +518,50 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scheduled. `scheduled_at` is the earliest channel’s instant."
+                        "description": "Scheduled. The post with its channels, plus `scheduled_at`, the earliest channel’s instant.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/Post"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "scheduled_at": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ],
+                                                            "description": "The earliest channel’s instant, UTC."
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "notes": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "description": "Plain sentences to pass on to a person. Empty when every channel publishes automatically.",
+                                                    "example": [
+                                                        "1 channel is a story on Instagram with a link or stickers. Instagram only allows those from its own app, so Alima will not publish it: someone posts it by hand from the Instagram app at 10:00 on 2027-05-04 (Europe/London), and is reminded at that time. Every other channel publishes automatically."
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     },
                     "403": {
                         "description": "This token’s member may not schedule this post."
@@ -610,7 +656,300 @@
             }
         }
     },
+    "webhooks": {
+        "story.ready_to_post": {
+            "post": {
+                "operationId": "onStoryReadyToPost",
+                "tags": ["Webhooks"],
+                "summary": "A story is due and somebody has been asked to post it by hand",
+                "description": "Sent once, when the first reminder goes out for an Instagram story with a link or stickers. Use it to route the reminder into your own tools. `url` opens the story inside Alima and needs a signed-in member; the reminder's own no-sign-in link is never sent to a webhook. Signed like every other delivery.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "event": {
+                                        "type": "string",
+                                        "enum": ["story.ready_to_post"]
+                                    },
+                                    "occurred_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "organization_id": {
+                                        "type": "integer"
+                                    },
+                                    "data": {
+                                        "type": "object",
+                                        "properties": {
+                                            "post_id": {
+                                                "type": "integer"
+                                            },
+                                            "client_id": {
+                                                "type": "integer"
+                                            },
+                                            "post_target_id": {
+                                                "type": "integer",
+                                                "description": "The channel that is due."
+                                            },
+                                            "platform": {
+                                                "type": ["string", "null"],
+                                                "example": "instagram"
+                                            },
+                                            "handle": {
+                                                "type": ["string", "null"]
+                                            },
+                                            "due_at": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            },
+                                            "posted_by": {
+                                                "type": "string",
+                                                "enum": ["team", "client"],
+                                                "description": "Who was asked to post it."
+                                            },
+                                            "url": {
+                                                "type": "string",
+                                                "format": "uri",
+                                                "description": "Opens the story in Alima for a signed-in member."
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Any 2xx tells us it arrived."
+                    }
+                }
+            }
+        }
+    },
     "components": {
+        "schemas": {
+            "StoryExtras": {
+                "type": "object",
+                "description": "What a person adds to an Instagram story by hand. Every key is optional; leave a key out, or send it as null, for an extra the story does not have. A placement note alone does not make a story posted by hand.",
+                "properties": {
+                    "version": {
+                        "type": "integer",
+                        "enum": [1],
+                        "description": "Returned on reads. Ignored on writes."
+                    },
+                    "link": {
+                        "type": ["object", "null"],
+                        "description": "A link sticker.",
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "format": "uri",
+                                "maxLength": 2048,
+                                "description": "Must start with https://."
+                            },
+                            "text": {
+                                "type": ["string", "null"],
+                                "maxLength": 30,
+                                "description": "The sticker's own text."
+                            }
+                        }
+                    },
+                    "mentions": {
+                        "type": ["array", "null"],
+                        "maxItems": 5,
+                        "items": {
+                            "type": "string",
+                            "pattern": "^@?[A-Za-z0-9._]{1,30}$"
+                        },
+                        "description": "Instagram handles. Returned without the @."
+                    },
+                    "hashtag": {
+                        "type": ["string", "null"],
+                        "maxLength": 100,
+                        "description": "One tag, one word. Returned without the #."
+                    },
+                    "location": {
+                        "type": ["string", "null"],
+                        "maxLength": 80,
+                        "description": "Free text. The poster picks the real place in Instagram."
+                    },
+                    "poll": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "question": {
+                                "type": "string",
+                                "maxLength": 80
+                            },
+                            "options": {
+                                "type": "array",
+                                "minItems": 2,
+                                "maxItems": 4,
+                                "items": {
+                                    "type": "string",
+                                    "maxLength": 25
+                                }
+                            }
+                        }
+                    },
+                    "placement_note": {
+                        "type": ["string", "null"],
+                        "maxLength": 280,
+                        "description": "Where the stickers go, for the person posting."
+                    },
+                    "if_missed": {
+                        "type": ["string", "null"],
+                        "enum": ["fail", "publish_plain", null],
+                        "description": "What happens if nobody confirms it in time. `fail` (the default) marks the channel failed and tells the team. `publish_plain` publishes the story without its link and stickers instead."
+                    }
+                }
+            },
+            "ChannelInput": {
+                "type": "object",
+                "required": ["social_account_id"],
+                "properties": {
+                    "social_account_id": {
+                        "type": "integer"
+                    },
+                    "scheduled_local_date": {
+                        "type": ["string", "null"],
+                        "format": "date"
+                    },
+                    "scheduled_local_time": {
+                        "type": ["string", "null"],
+                        "description": "HH:MM on that channel’s own clock."
+                    },
+                    "format": {
+                        "type": ["string", "null"],
+                        "maxLength": 32,
+                        "description": "The format this channel publishes as, e.g. `story`. Null lets Alima pick from the media. Must be one the channel's network offers."
+                    },
+                    "story_extras": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/StoryExtras"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Instagram only. With `format: story`, any extra makes this channel posted by hand."
+                    },
+                    "handoff_recipient": {
+                        "type": ["string", "null"],
+                        "enum": ["team", "client", null],
+                        "description": "Who posts a story by hand. Null uses the client's default."
+                    }
+                }
+            },
+            "Channel": {
+                "type": "object",
+                "properties": {
+                    "social_account_id": {
+                        "type": "integer"
+                    },
+                    "platform": {
+                        "type": ["string", "null"]
+                    },
+                    "handle": {
+                        "type": ["string", "null"]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "format": {
+                        "type": ["string", "null"]
+                    },
+                    "scheduled_local_date": {
+                        "type": ["string", "null"],
+                        "format": "date"
+                    },
+                    "scheduled_local_time": {
+                        "type": ["string", "null"]
+                    },
+                    "scheduled_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "published_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "url": {
+                        "type": ["string", "null"],
+                        "description": "The live post. Always null for a story posted by hand: Alima cannot see it."
+                    },
+                    "error": {
+                        "type": ["string", "null"]
+                    },
+                    "story_extras": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/StoryExtras"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "handoff_recipient": {
+                        "type": ["string", "null"],
+                        "enum": ["team", "client", null],
+                        "description": "The channel's own choice of poster. Null means the client's default."
+                    },
+                    "posted_by_hand": {
+                        "type": "boolean",
+                        "description": "True for an Instagram story with a link or stickers. Alima does not publish this channel: a person posts it from Instagram when it is due."
+                    },
+                    "handoff_state": {
+                        "type": ["string", "null"],
+                        "enum": [
+                            "needs_hand_posting",
+                            "ready_to_post",
+                            "posted_by_hand",
+                            null
+                        ],
+                        "description": "`needs_hand_posting`: it will be posted by hand at its time. `ready_to_post`: it is due and somebody has been asked to post it. `posted_by_hand`: a person confirmed it went out. Null for a channel that publishes itself."
+                    }
+                }
+            },
+            "Post": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "client_id": {
+                        "type": "integer"
+                    },
+                    "campaign_id": {
+                        "type": ["integer", "null"]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": ["string", "null"]
+                    },
+                    "channels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Channel"
+                        }
+                    },
+                    "created_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    }
+                }
+            }
+        },
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
@@ -670,6 +1009,21 @@
             }
         },
         "responses": {
+            "Post": {
+                "description": "The post, with its channels.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/components/schemas/Post"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "Unauthenticated": {
                 "description": "Missing, unknown or revoked token."
             },

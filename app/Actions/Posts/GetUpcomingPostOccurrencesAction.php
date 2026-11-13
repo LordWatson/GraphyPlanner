@@ -5,6 +5,7 @@ namespace App\Actions\Posts;
 use App\Enums\Role;
 use App\Models\Post;
 use App\Models\User;
+use App\Support\Stories\StoryPostPresenter;
 use Illuminate\Support\Carbon;
 
 class GetUpcomingPostOccurrencesAction
@@ -24,7 +25,7 @@ class GetUpcomingPostOccurrencesAction
         $query = Post::query()
             ->forActiveClients()
             ->where('org_id', $user->org_id)
-            ->with(['client:id,name', 'targets' => fn ($q) => $q->orderBy('scheduled_at_utc'), 'targets.socialAccount']);
+            ->with(['client:id,name', 'targets' => fn ($q) => $q->orderBy('scheduled_at_utc'), 'targets.socialAccount', 'targets.openStoryHandoff', 'targets.postedStoryHandoff']);
 
         if ($user->role === Role::ClientReviewer) {
             $query->where('client_id', $user->client_id);
@@ -50,6 +51,8 @@ class GetUpcomingPostOccurrencesAction
                     'client_name' => $post->client?->name,
                     'platform' => $account?->platform?->value,
                     'handle' => $account?->handle,
+                    // Step S-5.1: the channel's assisted-lane state, read the way the viewer may see it.
+                    'handoff' => StoryPostPresenter::channel($post, $target, $user->role === Role::ClientReviewer),
                     'date' => $utc->clone()->setTimezone($orgTimezone)->toDateString(),
                     'time' => $utc->clone()->setTimezone($orgTimezone)->format('H:i'),
                     'scheduled_at_utc' => $utc->toIso8601String(),

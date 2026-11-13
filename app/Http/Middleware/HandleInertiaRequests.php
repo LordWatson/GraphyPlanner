@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Contracts\PushNotifier;
 use App\Enums\Role;
+use App\Models\Post;
 use App\Models\User;
 use App\Services\Branding\BrandingResolver;
 use App\Services\Publishing\PlatformCapabilities;
@@ -58,6 +59,8 @@ class HandleInertiaRequests extends Middleware
                 // many pages pass their own top-level `can` prop, which would replace a shared one).
                 'can' => [
                     'viewAnalytics' => self::canViewAnalytics($user()),
+                    // Step S-4.4: "Stories to post" in the ⌘K palette (`PostPolicy::viewStoryQueue`).
+                    'viewStoryQueue' => $user()?->can('viewStoryQueue', Post::class) ?? false,
                 ],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
@@ -66,9 +69,9 @@ class HandleInertiaRequests extends Middleware
             // is the business workspace's primary brand (null for an agency); `roleLabels` maps each
             // stored role to the label this workspace shows ("Manager"/"Creator" for business).
             'workspace' => fn (): ?array => self::sharedWorkspace($user()),
-            // Step B-7: the PWA + push config, shared only for business workspaces so agency pages
-            // are untouched. `pushPublicKey` is the VAPID application-server key the browser needs
-            // to subscribe; null when push isn't configured.
+            // Step B-7 / S-3.2: the push config for the per-browser opt-in, shared with every member
+            // who can subscribe (not an agency's client reviewers). `pushPublicKey` is the VAPID
+            // application-server key the browser needs to subscribe; null when push isn't configured.
             'pwa' => fn (): ?array => self::sharedPwa($user()),
             'client' => function () use ($user): ?array {
                 $current = $user();
@@ -163,9 +166,11 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Step B-7 — the business-only PWA shell flags. Returned only for a business org so agency
-     * responses carry nothing new. `pushEnabled` gates the opt-in UI; `pushPublicKey` is the VAPID
-     * key the browser subscribes with.
+     * Step B-7 / S-3.2 — the push opt-in flags, for anyone who may subscribe a browser: every
+     * business role, and every agency member except a client reviewer (who lives in the portal and
+     * is turned away from `push.subscribe`). `pushEnabled` gates the opt-in UI; `pushPublicKey` is
+     * the VAPID key the browser subscribes with. The installable PWA shell itself stays
+     * business-only (the layout decides that from `workspace.type`, not from this prop).
      *
      * @return array{pushEnabled: bool, pushPublicKey: string|null}|null
      */
@@ -173,7 +178,11 @@ class HandleInertiaRequests extends Middleware
     {
         $organization = $user?->organization;
 
-        if ($organization === null || ! $organization->isBusiness()) {
+        if ($organization === null) {
+            return null;
+        }
+
+        if (! $organization->isBusiness() && $user->role === Role::ClientReviewer) {
             return null;
         }
 

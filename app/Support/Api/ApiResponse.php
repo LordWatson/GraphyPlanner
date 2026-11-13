@@ -28,11 +28,15 @@ final class ApiResponse
     public const DEFAULT_PER_PAGE = 50;
 
     /**
+     * `$meta` is for things about the answer rather than the record: `meta.notes`, the plain
+     * sentences a caller should pass on to a person.
+     *
      * @param  array<string, mixed>|list<mixed>  $data
+     * @param  array<string, mixed>  $meta
      */
-    public static function item(array $data): JsonResponse
+    public static function item(array $data, array $meta = []): JsonResponse
     {
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => $data] + ($meta === [] ? [] : ['meta' => $meta]));
     }
 
     /**

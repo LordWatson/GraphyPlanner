@@ -45,6 +45,9 @@ enum MessageTemplate: string
     /** Step W-2.6 — the daily digest, one message instead of many. */
     case DailyDigest = 'daily_digest';
 
+    /** Step S-3.3 — a Story with a link or stickers is due and needs posting by hand. */
+    case StoryReadyToPost = 'story_ready_to_post';
+
     /**
      * The generic fallback: any notification wired to WhatsApp that has not been given copy of its
      * own. Deliberately bland, because it has to be true of anything.
@@ -69,6 +72,7 @@ enum MessageTemplate: string
             self::InvoiceIssued => ['client_name', 'amount', 'due_date', 'url'],
             self::CampaignBriefReady => ['campaign_name', 'url'],
             self::DailyDigest => ['summary', 'url'],
+            self::StoryReadyToPost => ['account', 'due_at', 'url'],
             self::Notification => ['title', 'body', 'url'],
         };
     }
@@ -96,6 +100,7 @@ enum MessageTemplate: string
             self::InvoiceIssued => 'Hi {{1}}, your invoice for {{2}} is ready and due {{3}}. Open {{4}} to view and pay it.',
             self::CampaignBriefReady => 'Your brief for the {{1}} campaign is ready. Open {{2}} to read it.',
             self::DailyDigest => 'Your Alima update: {{1}}. Open {{2}} to see everything.',
+            self::StoryReadyToPost => 'Time to post: the story for {{1}} is ready, due {{2}}. Open {{3}} to post it to Instagram.',
             self::Notification => '{{1}}: {{2}}. Open {{3}} for the details.',
         };
     }

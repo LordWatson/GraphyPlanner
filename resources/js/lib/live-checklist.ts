@@ -7,7 +7,8 @@ import type {
 import { EMPTY_CHANNEL } from '@/components/post-editor/types';
 import { publishedCaption } from '@/lib/media-format';
 import type { PlatformRegistry } from '@/lib/platforms';
-import { capabilityOf, resolveFormat } from '@/lib/platforms';
+import { capabilityOf, resolveFormat, takesStoryExtras } from '@/lib/platforms';
+import { hasStoryExtras, storyExtrasProblems } from '@/lib/story-extras';
 
 const URL = /https?:\/\/\S+/i;
 
@@ -24,6 +25,15 @@ export type LiveState = {
     link?: string;
     firstComment?: string;
     registry?: PlatformRegistry;
+    /** Step S-1.4: who would post a Story by hand (for the live `story_handoff` warning). */
+    storyHandoff?: {
+        defaultRecipient: 'team' | 'client';
+        canChooseRecipient: boolean;
+        clientCanBeNotified: boolean;
+        clientName: string;
+        /** The post has an assignee (or creator) who can be the poster. */
+        hasPoster: boolean;
+    };
 };
 
 type Live = { passed: boolean; problems: string[]; fixes?: ChecklistFix[] };
@@ -76,6 +86,14 @@ export function liveChecklist(
             firstComment: own.firstComment ?? state.firstComment ?? '',
         };
     };
+
+    // Step S-1.4: a Story with extras is posted by hand (mirror of `PostTarget::needsHandoff()`).
+    const isAssisted = (account: TargetAccountData) =>
+        takesStoryExtras(
+            capabilityOf(registry, account.platform),
+            channel(account).format,
+        ) && hasStoryExtras(channel(account).storyExtras);
+    const assisted = accounts.filter(isAssisted);
 
     const formatFixes: ChecklistFix[] = [];
 
@@ -196,9 +214,11 @@ export function liveChecklist(
                 return `${name(account)}: links in captions aren’t clickable — use the link in bio instead.`;
             }
 
+            // Step S-1.3: a Story with a link sticker does carry a link — a person adds it.
             return content.link.trim() !== '' &&
                 !capability.link_field &&
-                !capability.links_in_caption
+                !capability.links_in_caption &&
+                !(isAssisted(account) && channel(account).storyExtras?.link)
                 ? `${name(account)}: the link won’t be posted — ${capability.label} doesn’t show links on posts.`
                 : null;
         }),
@@ -219,21 +239,87 @@ export function liveChecklist(
     };
     live.format.fixes = formatFixes;
 
-    return serverItems.map((item) => {
-        const result = live[item.key];
+    const handoff = state.storyHandoff;
+    const storyProblems = assisted.flatMap((account) =>
+        storyExtrasProblems(channel(account).storyExtras).map(
+            (problem) => `${name(account)}: ${problem}`,
+        ),
+    );
+    const handoffProblems = handoff
+        ? assisted
+              .map((account) => {
+                  const recipient = handoff.canChooseRecipient
+                      ? (channel(account).handoffRecipient ??
+                        handoff.defaultRecipient)
+                      : 'team';
 
-        if (!result) {
-            return item;
-        }
+                  if (recipient === 'client') {
+                      return handoff.clientCanBeNotified
+                          ? null
+                          : `${name(account)}: ${handoff.clientName} has no contact to send the story to, so your team will be asked instead.`;
+                  }
 
-        return {
-            ...item,
-            passed: result.passed,
-            detail:
-                result.problems.length > 0
-                    ? result.problems.join('\n')
-                    : undefined,
-            fixes: result.passed ? undefined : (result.fixes ?? item.fixes),
-        };
-    });
+                  return handoff.hasPoster
+                      ? null
+                      : `${name(account)}: no one is assigned, so everyone on the team will be asked.`;
+              })
+              .filter((problem): problem is string => problem !== null)
+        : [];
+
+    live.story_extras = {
+        passed: storyProblems.length === 0,
+        problems: storyProblems,
+    };
+    live.story_handoff = {
+        passed: handoffProblems.length === 0,
+        problems: handoffProblems,
+    };
+
+    const merged = serverItems
+        // The two Story items only exist while the post has a Story that is posted by hand.
+        .filter(
+            (item) => assisted.length > 0 || !STORY_ITEMS.includes(item.key),
+        )
+        .map((item) => {
+            const result = live[item.key];
+
+            if (!result) {
+                return item;
+            }
+
+            return {
+                ...item,
+                passed: result.passed,
+                detail:
+                    result.problems.length > 0
+                        ? result.problems.join('\n')
+                        : undefined,
+                fixes: result.passed ? undefined : (result.fixes ?? item.fixes),
+            };
+        });
+
+    if (assisted.length === 0) {
+        return merged;
+    }
+
+    // Added before the first save has told the server there is one.
+    const missing: ChecklistItem[] = [
+        {
+            key: 'story_extras',
+            label: 'Story extras are complete',
+            passed: live.story_extras.passed,
+            detail: storyProblems.join('\n') || undefined,
+        },
+        {
+            key: 'story_handoff',
+            label: 'Someone can post this by hand',
+            passed: live.story_handoff.passed,
+            soft: true,
+            detail: handoffProblems.join('\n') || undefined,
+        },
+    ].filter((item) => !merged.some((existing) => existing.key === item.key));
+
+    return [...merged, ...missing];
 }
+
+const STORY_ITEMS = ['story_extras', 'story_handoff'];

@@ -13,6 +13,8 @@ import { platformIcon } from '@/components/platform-icon';
 import { Pagination } from '@/components/pagination';
 import type { Paginated } from '@/components/pagination';
 import { StatusPill } from '@/components/status-pill';
+import type { StoryHandoff } from '@/components/stories/story-handoff-pill';
+import { StoryHandoffPill } from '@/components/stories/story-handoff-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,6 +43,8 @@ type Target = {
 type PostRow = {
     id: number;
     status: string;
+    /** Step S-5.1: the most urgent assisted-lane state across the post's channels. */
+    handoff?: StoryHandoff | null;
     master_caption: string | null;
     targets: Target[];
 };
@@ -230,8 +234,14 @@ export default function BusinessPostsIndex({
                                         value={post.status}
                                         className="shrink-0"
                                     />
-                                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                        {post.master_caption ?? 'Untitled post'}
+                                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                                        <span className="w-full truncate text-sm font-medium">
+                                            {post.master_caption ??
+                                                'Untitled post'}
+                                        </span>
+                                        <StoryHandoffPill
+                                            handoff={post.handoff}
+                                        />
                                     </span>
                                     <PlatformDots targets={post.targets} />
                                     <span className="eyebrow text-muted-foreground hidden shrink-0 text-right normal-case sm:block">

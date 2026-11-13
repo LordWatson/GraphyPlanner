@@ -8,6 +8,7 @@ use App\Models\Campaign;
 use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Support\Api\StoryChannels;
 
 /**
  * Phase MCP-2 — the single place that maps Graphy models to the safe, read-only shapes MCP tools and
@@ -136,7 +137,7 @@ class McpPresenters
             'assignee' => $post->relationLoaded('assignee') && $post->assignee !== null
                 ? ['id' => $post->assignee->id, 'name' => $post->assignee->name]
                 : null,
-            'targets' => $post->targets->map(fn (PostTarget $target): array => self::target($target, $orgTimezone))->all(),
+            'targets' => $post->targets->map(fn (PostTarget $target): array => self::target($target->setRelation('post', $post), $orgTimezone))->all(),
             'assets' => $post->assets->map(fn (Asset $asset): array => self::asset($asset))->all(),
             'checklist' => [
                 'passed' => $checklist['passed'],
@@ -180,6 +181,8 @@ class McpPresenters
                 'timezone' => $orgTimezone,
             ],
             'scheduled_at_utc' => $utc?->toIso8601String(),
+            // Step S-5.4: a story with extras is posted by a person. Never a handoff token or link.
+            ...StoryChannels::present($target),
         ];
     }
 

@@ -206,7 +206,7 @@
                     <tbody>
                         @foreach ($engagement['by_platform'] as $row)
                             <tr>
-                                <td>{{ $row['label'] }}@if (! ($row['available'] ?? true))<span class="muted"> &mdash; engagement not available</span>@endif</td>
+                                <td>{{ $row['label'] }}@if (! ($row['available'] ?? true))<span class="muted"> &mdash; engagement not available</span>@elseif (($row['posted_by_hand'] ?? 0) > 0)<span class="muted"> &mdash; {{ $count($row['posted_by_hand']) }} posted by hand, engagement not available</span>@endif</td>
                                 <td class="num">{{ $count($row['published'] ?? 0) }}</td>
                                 <td class="num">{{ $count($row['engagement'] ?? null) }}</td>
                                 <td class="num">{{ $percent($row['engagement_rate'] ?? null) }}</td>

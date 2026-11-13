@@ -42,7 +42,15 @@ export function DateTimePicker({
 
     return (
         <div className={cn('flex flex-col gap-1', className)}>
-            <div className="flex items-center gap-2">
+            {/* The default size stacks on a phone: side by side, the time selects clip. */}
+            <div
+                className={cn(
+                    'flex gap-2',
+                    size === 'sm'
+                        ? 'items-center'
+                        : 'flex-col sm:flex-row sm:items-center',
+                )}
+            >
                 <DatePicker
                     aria-label={`Date for ${label}`}
                     value={value.date || null}
@@ -51,8 +59,11 @@ export function DateTimePicker({
                         onChange({ ...value, date: date ?? '' })
                     }
                     className={cn(
-                        'font-mono text-xs',
-                        size === 'sm' ? 'h-8 w-[9.5rem]' : 'w-40',
+                        'font-mono',
+                        // Full width on a phone, then a fixed width.
+                        size === 'sm'
+                            ? 'h-8 w-[9.5rem] text-xs'
+                            : 'text-[13px] sm:w-44',
                     )}
                 />
                 <TimeField
@@ -60,7 +71,7 @@ export function DateTimePicker({
                     value={value.time}
                     onChange={(time) => onChange({ ...value, time })}
                     size={size}
-                    className={size === 'sm' ? 'w-[8.5rem]' : 'w-40'}
+                    className={size === 'sm' ? 'w-[8.5rem]' : 'sm:w-40'}
                 />
             </div>
             {timeZone && (

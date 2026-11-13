@@ -5,10 +5,12 @@ namespace App\Actions\SuperAdmin;
 use App\Enums\ClientStatus;
 use App\Enums\PostStatus;
 use App\Enums\Role;
+use App\Enums\StoryHandoffOutcome;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Post;
 use App\Models\PostActivityLog;
+use App\Models\StoryHandoff;
 use App\Models\User;
 use App\Services\Analytics\AiUsageMetrics;
 use App\Services\Analytics\PostActivityMetrics;
@@ -178,7 +180,11 @@ class GetPlatformAnalyticsSummaryAction
      * "Published"/"failed" in a window are counted from the post activity log (the moment each
      * transition happened, as the dashboard's publish reliability chart does), not `updated_at`.
      *
-     * @return array{total: int, published_all_time: int, published: int, published_last_30_days: int, failed: int, success_rate: float|null, scheduled: int}
+     * Step S-5.3: the assisted lane's own figures ride along — Stories posted by hand, Stories
+     * nobody posted in time, and the median minutes from opening the handoff to confirming it,
+     * which is the number that says whether the lane works.
+     *
+     * @return array{total: int, published_all_time: int, published: int, published_last_30_days: int, failed: int, success_rate: float|null, scheduled: int, stories_posted_by_hand: int, stories_missed: int, stories_median_minutes_to_post: float|null}
      */
     private function posts(AnalyticsScope $scope, AnalyticsFilters $filters): array
     {
@@ -194,6 +200,38 @@ class GetPlatformAnalyticsSummaryAction
             'failed' => $outcomes['failed'],
             'success_rate' => $outcomes['success_rate'],
             'scheduled' => $scope->posts()->where('status', PostStatus::Scheduled)->count(),
+            ...$this->storyHandoffs($scope, $filters),
+        ];
+    }
+
+    /**
+     * Handoffs closed in the range. The median is worked out in PHP from the plucked pairs, so the
+     * SQL stays the same on MySQL and SQLite.
+     *
+     * @return array{stories_posted_by_hand: int, stories_missed: int, stories_median_minutes_to_post: float|null}
+     */
+    private function storyHandoffs(AnalyticsScope $scope, AnalyticsFilters $filters): array
+    {
+        $closed = fn (StoryHandoffOutcome $outcome) => StoryHandoff::query()
+            ->withoutGlobalScopes()
+            ->whereIn('org_id', $scope->orgIds)
+            ->where('outcome', $outcome)
+            ->whereBetween('completed_at', $filters->period->utcBounds());
+
+        $minutes = $closed(StoryHandoffOutcome::Posted)
+            ->whereNotNull('opened_at')
+            ->get(['id', 'opened_at', 'completed_at'])
+            ->map(fn (StoryHandoff $handoff) => $handoff->opened_at !== null && $handoff->completed_at !== null
+                ? max(0, $handoff->opened_at->diffInSeconds($handoff->completed_at, false)) / 60
+                : null)
+            ->filter(fn (int|float|null $value) => $value !== null);
+
+        $median = $minutes->median();
+
+        return [
+            'stories_posted_by_hand' => $closed(StoryHandoffOutcome::Posted)->count(),
+            'stories_missed' => $closed(StoryHandoffOutcome::Missed)->count(),
+            'stories_median_minutes_to_post' => $median === null ? null : round((float) $median, 1),
         ];
     }
 

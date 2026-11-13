@@ -247,6 +247,8 @@ export type EngagementTopPost = {
 export type EngagementSection = {
     published_channels: number;
     measured_channels: number;
+    /** Step S-5.3: assisted Stories posted by hand. Engagement is not available for them. */
+    posted_by_hand_channels: number;
     totals: EngagementTotals;
     engagement_rate: number | null;
     by_platform: {
@@ -256,6 +258,9 @@ export type EngagementSection = {
         note: string | null;
         published: number;
         measured: number;
+        /** Step S-5.3: optional so a snapshot taken before it still renders. */
+        posted_by_hand?: number;
+        posted_by_hand_note?: string | null;
         engagement: number | null;
         impressions: number | null;
         reach: number | null;

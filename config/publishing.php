@@ -82,4 +82,37 @@ return [
     */
     'webhook_allow_unsigned' => (bool) env('PUBLISH_WEBHOOK_ALLOW_UNSIGNED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Stories with extras: the assisted lane (Phase S)
+    |--------------------------------------------------------------------------
+    |
+    | Instagram's publishing API cannot add a link, a poll, a mention or any other sticker to a
+    | Story, so a Story channel that carries extras is held back from the vendor and handed to a
+    | person to post from the Instagram app (`.junie/plans/story-extras.md`).
+    |
+    | `enabled` is the kill switch (Step S-1.1). Off: the editor hides Story extras, a save ignores
+    | any that are submitted and `post_targets.handoff_required` is always written false. Rows that
+    | are already flagged are left alone, so a Story that is mid-handoff still finishes.
+    |
+    | `platforms` is the list the lane is offered on. The data model is keyed on the `story` format,
+    | so Facebook (Step S-6.3) is a config change, not a migration.
+    |
+    */
+    'story_handoff' => [
+        'enabled' => (bool) env('STORY_HANDOFF_ENABLED', false),
+        'platforms' => ['instagram'],
+        // Due time → the Story counts as missed.
+        'window_minutes' => (int) env('STORY_HANDOFF_WINDOW_MINUTES', 120),
+        // After the first notification, one nudge if nobody has shared it yet.
+        'nudge_after_minutes' => (int) env('STORY_HANDOFF_NUDGE_MINUTES', 15),
+        // How long the handoff link opens after the due time. A Story lives 24h; a little slack.
+        'token_ttl_hours' => (int) env('STORY_HANDOFF_TOKEN_TTL_HOURS', 30),
+        // A sweep running later than this still notifies, with "This was due at 10:00".
+        'late_grace_minutes' => 10,
+        // Above this size the handoff page skips the in-memory share and leads with Save media:
+        // a phone browser holding a 100 MB blob for the share sheet is the likeliest thing to fail.
+        'max_share_mb' => (int) env('STORY_HANDOFF_MAX_SHARE_MB', 50),
+    ],
+
 ];

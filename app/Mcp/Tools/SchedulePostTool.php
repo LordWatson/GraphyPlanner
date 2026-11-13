@@ -8,6 +8,7 @@ use App\Actions\Posts\TransitionPostStatusAction;
 use App\Enums\McpScope;
 use App\Enums\PostStatus;
 use App\Models\Post;
+use App\Support\Api\StoryChannels;
 use App\Support\Mcp\McpTenant;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -34,7 +35,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
  */
 #[Name('schedule_post')]
 #[Title('Schedule post')]
-#[Description('Schedules an APPROVED post for publishing. Re-runs the full pre-publish checklist first; refuses if it does not pass. This is irreversible and outward-facing — requires the write:schedule scope. Returns the earliest scheduled UTC instant.')]
+#[Description('Schedules an APPROVED post for publishing. Re-runs the full pre-publish checklist first; refuses if it does not pass. This is irreversible and outward-facing — requires the write:schedule scope. Returns the earliest scheduled UTC instant and, when a target is an Instagram story with a link or stickers, a note saying a person posts that one by hand: relay it, and never say such a story will publish itself.')]
 #[IsDestructive]
 class SchedulePostTool extends McpTool
 {
@@ -110,12 +111,19 @@ class SchedulePostTool extends McpTool
 
         $earliest = $post->targets()->whereNotNull('scheduled_at_utc')->min('scheduled_at_utc');
 
+        // Step S-5.4: an assistant must never tell its user that a story posted by hand "will
+        // publish itself", so the message says who does what.
+        $note = StoryChannels::note($post);
+
         return Response::structured([
             'post_id' => $post->id,
             'status' => $post->status->value,
             'scheduled_at_utc' => $earliest,
             'edit_url' => route('posts.edit', $post),
-            'message' => 'Post scheduled. It will publish automatically at the scheduled time.',
+            'message' => $note === null
+                ? 'Post scheduled. It will publish automatically at the scheduled time.'
+                : 'Post scheduled. '.$note,
+            'note' => $note,
         ]);
     }
 

@@ -240,6 +240,82 @@ This is the one step with real infrastructure surface, and **the app does not ow
   **never throw**: a failed lookup is "not verified yet", which is also what it means to a creator
   who hasn't finished their DNS.
 
+## Stories with extras — the assisted lane (Phase S)
+
+Plan: `.junie/plans/story-extras.md`. How the lane works is in `publishing.md` › "Stories with
+extras". This is what an operator needs.
+
+- **Kill switch.** `STORY_HANDOFF_ENABLED` (`publishing.story_handoff.enabled`), **default
+  `false`**. Off: the editor hides Story extras, a save ignores submitted extras and writes
+  `handoff_required` false, the client form does not offer the poster setting, and the morning
+  heads-up says nothing. Rows that are already flagged are left alone, so a Story that is
+  mid-handoff still finishes; the sweep keeps running either way. Leave it off until the share
+  sheet has been proven on real phones (plan Step S-0.1).
+- **Knobs** (`config/publishing.php` → `story_handoff`):
+
+    | Env                             | Default | Meaning                                                   |
+    | ------------------------------- | ------- | --------------------------------------------------------- |
+    | `STORY_HANDOFF_WINDOW_MINUTES`  | 120     | Due time → the Story counts as missed.                    |
+    | `STORY_HANDOFF_NUDGE_MINUTES`   | 15      | After the first notification, one nudge if nobody shared. |
+    | `STORY_HANDOFF_TOKEN_TTL_HOURS` | 30      | How long the link opens after the due time (or a retry).  |
+    | `STORY_HANDOFF_MAX_SHARE_MB`    | 50      | Above this the page leads with Save media, not the share. |
+
+    `late_grace_minutes` is 10 and has no env var: a sweep later than that still notifies, with
+    "was due at". `platforms` is `['instagram']`. WhatsApp:
+    `TWILIO_TEMPLATE_STORY_READY_TO_POST` is optional (the generic template is used without it).
+
+- **The sweep.** `stories:process-handoffs` (`ProcessStoryHandoffsCommand` →
+  `ProcessStoryHandoffsAction`), every minute, in `SchedulerHeartbeat::COMMANDS`
+  (`interval_minutes` 1) and wrapped with `$safely(...)` in `routes/console.php`. It notifies,
+  nudges once, expires, and cancels stale handoffs. It is idempotent (`notified_at` / `nudged_at`
+  are stamped under a row lock before anything is sent) and safe to run by hand. One handoff
+  that throws is logged ("Story handoff sweep: a handoff could not be processed", with its ids), reported and
+  counted as `failed` in the command's summary line; the others still run.
+- **Links.** A handoff's link is derived from its id, its publish attempt and `APP_KEY`; it is
+  never stored or logged and is the same every time it is sent. Rotating `APP_KEY` therefore
+  breaks every open link: posters open the Story from the bell or Needs attention instead (the
+  signed-in route re-derives the link and heals the stored hash).
+- **How to read a stuck handoff.** Look at the `story_handoffs` rows for the channel
+  (`post_target_id`): `due_at`, `notified_at`, `nudged_at`, `opened_at`, `shared_at`, `outcome`,
+  `completed_at`, `expires_at`.
+    - Open (`outcome` and `completed_at` null), past `due_at`, `notified_at` null → the scheduler
+      is not running. Check the scheduler heartbeat on the super-admin dashboard.
+    - Open, but its `publish_attempt_id` differs from the channel's, or the post is no longer
+      `publishing` → stale. The next sweep closes it as `cancelled`; its link already 404s.
+    - Open and current, but the client is archived or the organization suspended → paused on
+      purpose: nobody is notified or nudged. It resumes if the hold lifts inside the window, and
+      is closed as `missed` (the channel fails) when the window ends first.
+    - Channel `pending` on a `publishing` post with **no** open handoff → it is an ordinary
+      channel again, and `publishing:poll-pending-statuses` fails it at the generic
+      `publishing.delivery_timeout_hours` (24).
+    - Notified but nobody opened it → look for the "Story poster notified" log line (it has the
+      recipient counts, never the link) and the WhatsApp log.
+- **Outcomes.** `posted` (a person confirmed it; `completed_via` says `link` or `staff`), `missed`
+  (nobody confirmed inside the window; the channel failed with "Nobody confirmed this story was
+  posted…" and can be retried or confirmed late), `cancelled` (a retry, recall, unschedule or lane
+  change replaced it; the channel was not touched), `published_plain` (nobody posted it and the
+  post asked to go out without its extras, so it went to the vendor), `problem` (the poster
+  reported one; the channel failed with their note).
+- **Health read.** The super-admin platform analytics Publishing panel: Stories posted by hand,
+  Stories not posted in time, and the median minutes from opening the handoff to confirming it.
+- **Tokens never leave.** The handoff page and its media are served `no-store`, `noindex` and
+  `Referrer-Policy: no-referrer`; `SecurityHeaders` now keeps a stricter `Referrer-Policy` that a
+  response set itself. The queued notification is encrypted. No log line carries a link.
+  `SecretScrubber::scrubUrl()` replaces any whole path segment of 32 or more letters and digits
+  (`/story/{token}`, `/review/{token}`, `/kit/{token}`) with `[Filtered]`: in every string value
+  `scrub()` sees, in the Sentry request data, transaction name and breadcrumbs, and in
+  `NotifyingOpsAlerter` messages. **Not covered:** an exception's own message, and a token passed
+  as a query-string value rather than a path segment.
+- **Data lifecycle.** The organization data export includes `story_handoffs` with `token_hash`
+  redacted (the export reads raw rows, so the model's `#[Hidden]` does not apply). An organization
+  purge removes them by foreign-key cascade.
+- **Dates are immutable.** `Date::use(CarbonImmutable::class)` in `AppServiceProvider` applies
+  app-wide, so type a date as `CarbonInterface`, not `Carbon`, and never rely on `->addMinutes()`
+  changing the receiver.
+- **After pulling route changes, clear the route cache.** A cached
+  `bootstrap/cache/routes-v7.php` hides new routes (here `story-handoff.*`, `stories.queue` and
+  the renamed `push.*`). Run `php artisan route:clear`, or re-cache.
+
 ## Data retention
 
 The only retention window the application enforces by itself is the one on **data exports**:
@@ -279,6 +355,14 @@ hard-deletes the rows). That is the policy; if these numbers change, the policy 
 ## Tests
 
 - `tests/Feature/Database/IndexCoverageTest.php`, `tests/Feature/QueueInfrastructureTest.php`.
+- Phase S: `tests/Feature/Stories/ProcessStoryHandoffsTest.php`
+  (`test_the_sweep_is_registered_with_the_scheduler_heartbeat_every_minute`, and the sweep's
+  notify / nudge / expire / cancel rules); `tests/Feature/Stories/StoryHandoffDataLifecycleTest.php`
+  (export without `token_hash`, another organization's rows left out, every other column
+  exported, purge deletes them); `tests/Unit/SecretScrubberTest.php` (a link token in a path is
+  filtered, ordinary URLs survive, the Sentry hook keeps a handoff token out of the event and
+  leaves a route-pattern transaction alone);
+  `tests/Feature/Stories/StoryHandoffNotificationTest.php` (`test_no_log_line_contains_the_token`).
 
 ## Benchmarks (local MySQL 8.0.40, Windows, 2026-10-18)
 
@@ -299,6 +383,10 @@ committed):
 
 ## Known Gaps / Open Questions
 
+- Phase S (2026-11-13): `STORY_HANDOFF_ENABLED` is still `false` by default; flipping it waits on
+  the real-phone share test (S-0.1). Nothing alerts on a rising missed-Story count; the
+  super-admin figures are read by a person. `SecretScrubber` does not cover exception messages or
+  query-string tokens. The morning heads-up guard is a cache key, not a column.
 - Sentry, the alert mailbox and Pulse's Redis ingest need production values (`SENTRY_LARAVEL_DSN`,
   `OPS_ALERT_MAIL_TO`, `PULSE_INGEST_DRIVER=redis` + `pulse:work`) before the M-8 release.
 - 41 PHPStan errors pre-date Phase M-1 (44 on `edbfebb`; three fixed here in the webhook
@@ -312,6 +400,11 @@ committed):
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). New kill switch
+  `STORY_HANDOFF_ENABLED` (off by default) and `story_handoff` config; the per-minute
+  `stories:process-handoffs` sweep in the scheduler heartbeat; `story_handoffs` in the data export
+  (hash redacted) and the purge; `SecretScrubber::scrubUrl()` for path tokens in Sentry events and
+  ops alerts; `SecurityHeaders` keeps a stricter `Referrer-Policy`. See the section above.
 - 2026-11-08: **Exports no longer queue behind the engagement sweep, and a long queue wait pages
   somebody** (audit finding 12, steps 4 and 5). New `exports` queue and supervisor, with
   `BuildOrganizationDataExportJob` moved onto it; `horizon.waits` thresholds for `exports` and

@@ -8,6 +8,7 @@ import type { ComposerErrors } from '@/components/post-editor/composer/master-co
 import { MasterComposer } from '@/components/post-editor/composer/master-composer';
 import type {
     ChannelState,
+    StoryPanelContext,
     TargetAccountData,
 } from '@/components/post-editor/types';
 
@@ -34,6 +35,7 @@ export function Composer({
     errors,
     aiPanel,
     captionRef,
+    story,
 }: {
     scope: ComposerScope;
     accounts: TargetAccountData[];
@@ -47,6 +49,8 @@ export function Composer({
     /** AI suggestions, shown under the main caption only. */
     aiPanel?: ReactNode;
     captionRef?: Ref<HTMLTextAreaElement>;
+    /** Step S-1.4: what a Story channel's extras panel needs. */
+    story?: StoryPanelContext;
 }) {
     const account =
         scope === 'all' ? null : accounts.find((a) => a.id === scope);
@@ -61,6 +65,7 @@ export function Composer({
             mediaKinds={mediaKinds}
             hashtagSuggestions={hashtagSuggestions}
             captionRef={captionRef}
+            story={story}
         />
     ) : (
         <MasterComposer

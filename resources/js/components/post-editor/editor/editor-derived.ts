@@ -8,16 +8,43 @@ import type {
     AssetData,
     ChecklistItem,
     PostData,
+    StoryHandoffOptions,
     TargetAccountData,
 } from '@/components/post-editor/types';
 import { EMPTY_CHANNEL } from '@/components/post-editor/types';
-import type { PreviewTarget } from '@/components/social-post-preview';
+import type { Target as PreviewPanelTarget } from '@/components/post-editor/preview/preview-parts';
 import { liveChecklist } from '@/lib/live-checklist';
 import { publishedCaption } from '@/lib/media-format';
 import type { PlatformRegistry } from '@/lib/platforms';
-import { capabilityOf } from '@/lib/platforms';
+import { capabilityOf, takesStoryExtras } from '@/lib/platforms';
+import { hasStoryExtras, parseStoryExtras } from '@/lib/story-extras';
 
 export type ChannelUsage = Record<number, { chars: number; tags: number }>;
+
+const NO_STORY_HANDOFF: StoryHandoffOptions = {
+    default_recipient: 'team',
+    can_choose_recipient: false,
+    client_can_be_notified: false,
+    posters: [],
+    creator_id: null,
+    window_minutes: 120,
+};
+
+/** The team member a Story's reminder goes to: the assignee, else the creator, else nobody. */
+function storyPosterId(
+    options: StoryHandoffOptions,
+    assigneeId: string,
+): number | null {
+    const isPoster = (id: number | null) =>
+        id !== null && options.posters.some((poster) => poster.id === id);
+    const assignee = assigneeId ? Number(assigneeId) : null;
+
+    return isPoster(assignee)
+        ? assignee
+        : isPoster(options.creator_id)
+          ? options.creator_id
+          : null;
+}
 
 /**
  * Step I-4.6 / M-1.6 — everything the editor shows that follows from its state: the selected
@@ -32,6 +59,8 @@ export function deriveEditorView({
     campaignOptions,
     registry,
     canUpdate,
+    storyHandoff = NO_STORY_HANDOFF,
+    clientName = 'The client',
 }: {
     state: EditorState;
     post: PostData;
@@ -40,6 +69,9 @@ export function deriveEditorView({
     campaignOptions: CampaignOption[];
     registry: PlatformRegistry;
     canUpdate: boolean;
+    /** Step S-1.4: who can post a Story by hand (the live `story_handoff` check reads it). */
+    storyHandoff?: StoryHandoffOptions;
+    clientName?: string;
 }) {
     const saved = normalizeEditorState(state);
     const selectedAccounts = Object.keys(state.schedule)
@@ -75,11 +107,19 @@ export function deriveEditorView({
               link: state.link,
               firstComment: state.firstComment,
               registry,
+              storyHandoff: {
+                  defaultRecipient: storyHandoff.default_recipient,
+                  canChooseRecipient: storyHandoff.can_choose_recipient,
+                  clientCanBeNotified: storyHandoff.client_can_be_notified,
+                  clientName,
+                  hasPoster:
+                      storyPosterId(storyHandoff, state.assigneeId) !== null,
+              },
           })
         : post.checklist.items;
 
     // Each channel's preview carries its own caption, hashtags, link, first comment and format.
-    const previewTargets: (PreviewTarget & { id: number })[] = canUpdate
+    const previewTargets: PreviewPanelTarget[] = canUpdate
         ? selectedAccounts.map((a) => {
               const channel = saved.channels[a.id] ?? EMPTY_CHANNEL;
 
@@ -94,6 +134,7 @@ export function deriveEditorView({
                   firstComment:
                       channel.firstComment ?? (state.firstComment || null),
                   format: channel.format,
+                  storyExtras: channel.storyExtras,
               };
           })
         : post.targets.map((t) => ({
@@ -105,6 +146,7 @@ export function deriveEditorView({
               link: t.link_url ?? post.link_url,
               firstComment: t.first_comment ?? post.first_comment,
               publishedCaption: t.published_caption,
+              storyExtras: parseStoryExtras(t.story_extras),
           }));
 
     // Per-channel usage for the schedule rows: the caption as it publishes there.
@@ -137,8 +179,23 @@ export function deriveEditorView({
         ),
     ];
 
+    // Step S-5.1: the channels that are a Story with extras, so posted by hand.
+    const assistedAccountIds = selectedAccounts
+        .filter((account) => {
+            const channel = saved.channels[account.id] ?? EMPTY_CHANNEL;
+
+            return (
+                takesStoryExtras(
+                    capabilityOf(registry, account.platform),
+                    channel.format,
+                ) && hasStoryExtras(channel.storyExtras)
+            );
+        })
+        .map((account) => account.id);
+
     return {
         saved,
+        assistedAccountIds,
         selectedAccounts,
         selectedAssets,
         mediaKinds,

@@ -118,7 +118,9 @@ export function MusicField({
                     </Button>
                 </div>
             ) : (
-                <>
+                // Search first, so the field lines up with its neighbours; the platform choice
+                // (visually under it, via `flex-col-reverse`) only appears with two platforms.
+                <div className="flex flex-col-reverse gap-2">
                     {platforms.length > 1 && (
                         <div className="flex gap-1.5">
                             {platforms.map((p) => (
@@ -127,7 +129,7 @@ export function MusicField({
                                     type="button"
                                     onClick={() => setPlatform(p)}
                                     className={cn(
-                                        'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+                                        'rounded-full border px-3 py-1 text-xs transition-colors',
                                         activePlatform === p
                                             ? 'bg-ink text-ink-foreground border-transparent'
                                             : 'border-border text-muted-foreground hover:text-foreground',
@@ -158,7 +160,7 @@ export function MusicField({
                             className="pl-9"
                         />
                     </div>
-                </>
+                </div>
             )}
 
             {error && (

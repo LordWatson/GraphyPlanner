@@ -81,6 +81,8 @@ class BuildClientReportSnapshotAction
             ],
             'engagement' => [
                 'measured_channels' => $engagement['measured_channels'],
+                // Step S-5.3: Stories posted by hand have no numbers to report ("not available").
+                'posted_by_hand_channels' => $engagement['posted_by_hand_channels'],
                 'totals' => $engagement['totals'],
                 'engagement_rate' => $engagement['engagement_rate'],
                 'by_platform' => array_map(fn (array $row) => array_diff_key($row, ['impressions' => true]), $engagement['by_platform']),

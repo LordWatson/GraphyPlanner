@@ -112,6 +112,15 @@ export function EngagementPanels({
                                 'Channels measured',
                                 `${integer.format(engagement.measured_channels)} of ${integer.format(engagement.published_channels)}`,
                             ],
+                            // Step S-5.3: a Story posted by hand has no numbers to read.
+                            ...(engagement.posted_by_hand_channels > 0
+                                ? [
+                                      [
+                                          'Stories posted by hand',
+                                          `${integer.format(engagement.posted_by_hand_channels)} · engagement not available`,
+                                      ] as [string, string],
+                                  ]
+                                : []),
                         ]}
                     />
                 </Panel>
@@ -140,8 +149,24 @@ export function EngagementPanels({
                                                 className="text-muted-foreground size-4 shrink-0"
                                                 aria-hidden
                                             />
-                                            <span className="truncate">
-                                                {row.label}
+                                            <span className="flex min-w-0 flex-col">
+                                                <span className="truncate">
+                                                    {row.label}
+                                                </span>
+                                                {(row.posted_by_hand ?? 0) >
+                                                    0 && (
+                                                    <span
+                                                        className="text-muted-foreground text-xs"
+                                                        title={
+                                                            row.posted_by_hand_note ??
+                                                            undefined
+                                                        }
+                                                    >
+                                                        {row.posted_by_hand}{' '}
+                                                        posted by hand ·
+                                                        engagement not available
+                                                    </span>
+                                                )}
                                             </span>
                                         </span>
                                         {row.available ? (

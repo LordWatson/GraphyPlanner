@@ -33,6 +33,7 @@ class SharedPropsTest extends TestCase
                 ])
                 ->where('auth.user.id', $user->id)
                 ->where('auth.user.role', 'owner')
+                ->where('auth.can.viewStoryQueue', true)
                 ->missing('auth.user.password')
                 ->missing('auth.user.created_at')
             );

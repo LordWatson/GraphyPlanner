@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Log;
  * channel the vendor holds for a later time is skipped until it's due, and its timeout counts
  * from then.
  * Step I-1.8: rows are walked with `lazyById()` instead of loaded all at once.
+ * Step S-2.3: a Story channel with an open handoff is skipped — it is waiting on a person, not on
+ * the vendor, and its own sweep expires it.
  */
 class PollPendingPublishStatusesAction
 {
@@ -37,9 +39,18 @@ class PollPendingPublishStatusesAction
             ->where('updated_at', '<=', now()->subMinutes($olderThanMinutes))
             ->whereHas('post', fn ($query) => $query->where('status', PostStatus::Publishing))
             ->with('socialAccount')
+            ->withExists(['storyHandoffs as has_open_story_handoff' => fn ($query) => $query->open()])
             ->lazyById(200);
 
         foreach ($targets as $target) {
+            // Step S-2.3: a Story waiting to be posted by hand runs on its handoff's own clock
+            // (`ProcessStoryHandoffsAction`), which fails it with the right reason. The generic
+            // timeout below would beat a long window and blame the vendor. Once it has no open
+            // handoff (or has gone to the vendor after all) it is an ordinary channel again.
+            if ($target->handoff_required && blank($target->external_post_id) && (bool) $target->getAttribute('has_open_story_handoff')) {
+                continue;
+            }
+
             // Held by the vendor until a later time: nothing to confirm yet, and the timeout only
             // starts once it's due.
             if ($target->scheduled_at_utc !== null && $target->scheduled_at_utc->isFuture()) {

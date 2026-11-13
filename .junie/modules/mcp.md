@@ -147,6 +147,31 @@ DEFAULT_TTL_MINUTES = 60`. Not single-use — a `config('mcp.upload.max_files')`
   `mcp`), and the MCP-1.4 `rate_limit` block (`rate_limit.per_minute` / `MCP_RATE_LIMIT_PER_MINUTE`,
   default `60`, `0` disables).
 
+## Phase S — Stories with extras (assisted lane)
+
+Plan: `.junie/plans/story-extras.md`, Step S-5.4. The lane is in `publishing.md` › "Stories with
+extras"; the shared helper `App\Support\Api\StoryChannels` is described in `api.md`.
+
+- `create_draft_post` and `update_post`: each target accepts `format` (e.g. `story`),
+  `story_extras` (`link`, `mentions`, `hashtag`, `location`, `poll`, `placement_note`) and
+  `handoff_recipient` (`team` / `client`), validated with the
+  editor's own rules through `StoryChannels::validate()`. On `update_post`, omitting
+  `story_extras` keeps a target's extras and `null` removes them. Both return a `note` when a
+  target is posted by hand.
+- `get_post`: each target carries `story_extras`, `handoff_recipient`, `posted_by_hand` and
+  `handoff_state` (`McpPresenters::target()` → `StoryChannels::present()`). The tool now loads the
+  whole `client`, because the checklist reads the client's poster default.
+- `schedule_post`: returns `note`, a plain-language sentence saying a person posts that Story by
+  hand, and folds it into `message` in place of "It will publish automatically".
+- **`if_missed` is never accepted from an MCP caller.** `StoryChannels::keepIfMissed()` drops
+  whatever the assistant sends, and carries through a choice a person already stored on that
+  channel. "If nobody posts it, publish it plain" is a human's standing instruction on one post.
+- No tool opens or completes a handoff. No tool returns a handoff token or a `/story/` URL.
+- The server instructions (`GraphyServer`) gained: a Story with a link or stickers is never
+  published by Alima, so when a target has `posted_by_hand` true, never tell the user it will
+  publish itself.
+- `docs/connecting-your-ai-assistant.md` has a "Stories with a link or stickers" section.
+
 ## Routes / Controllers
 
 - `routes/ai.php` registers **two transports**:
@@ -352,6 +377,14 @@ the reverse direction, and only for session uploads.
   revisited when a primitive changes; no declared schema / advertised definition names a secret-shaped
   field; and the real output of each read primitive — invoked against seeded data with a connected
   account's sentinel access token — leaks neither the token nor any secret-shaped field.
+- `tests/Feature/Mcp/McpStoryExtrasTest.php` (Phase S, Step S-5.4): `get_post` returns each
+  target's extras and lane, and says `ready_to_post` without the handoff link; `create_draft_post`
+  stores extras and marks the Story posted by hand; `update_post` adds extras, `null` removes
+  them and an empty object clears them; an assistant cannot choose `publish_plain` and an update
+  keeps a person's choice; the kill switch off ignores extras; the editor's validation rules
+  apply; a null key means "not added"; another organization's connection cannot read or write;
+  `schedule_post` says a person posts the Story by hand and has no note otherwise; no registered
+  tool's name suggests it can complete a handoff.
 
 ## Package facts & API deltas (verify each phase)
 
@@ -427,6 +460,9 @@ is enforced and the test that proves it.
 
 ## Known Gaps / Open Questions
 
+- **Phase S (2026-11-13): an assistant can set a Story up but cannot post or confirm it.** That is
+  the design, not a gap to close: there is no handoff tool, and `if_missed` is human-only. The
+  `plan_week` and `fill_calendar_gaps` prompts do not mention Story extras.
 - **Resources are not scope-gated yet.** Only tools (via `McpTool`) check scopes, are rate-limited and
   are audited; `BrandBrainResource` does none of these. It is read-only and every issued token holds
   `Read` by default, so this is safe for now — revisit with a resource base class if a resource ever
@@ -475,6 +511,11 @@ they have an MCP server at all — that question is settled.
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). `create_draft_post` / `update_post`
+  targets accept `format`, `story_extras` and `handoff_recipient`; `get_post` returns them with
+  `posted_by_hand` and `handoff_state`; `schedule_post` returns a `note` when a person posts a
+  channel by hand; `if_missed` is never accepted from an assistant; server instructions and the
+  connection guide updated. Tests `McpStoryExtrasTest`.
 - 2026-10-26: Media over MCP — **`get_post` returns the post's images as vision previews** (default on,
   `include_media` flag; reuses `McpImagePreview`). Robustness fix after a real run where Claude Desktop
   called `get_media_upload` with no `session_id` ("field is required") — a client-side omission (server/

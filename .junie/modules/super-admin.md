@@ -150,6 +150,20 @@ The studio shell is reused: `AppSidebar` and the ⌘K palette switch to the cons
 05 Settings) for `super_admin`; `useChapter()` resolves `/settings` to the console book for them.
 New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.ts`.
 
+## Phase S — Stories with extras (assisted lane)
+
+- `GetPlatformAnalyticsSummaryAction::posts()` adds three figures for handoffs closed in the
+  range (`story_handoffs.completed_at`), across the organizations in scope:
+  `stories_posted_by_hand`, `stories_missed` and `stories_median_minutes_to_post`. The median is
+  `opened_at → completed_at` for `posted` handoffs that were opened, worked out in PHP so the SQL
+  is the same on MySQL and SQLite; null before anyone has posted one.
+- Shown in the Publishing panel of `components/super-admin/platform-analytics-view.tsx`
+  ("Stories posted by hand", "Stories not posted in time", "Median time to post"), only when
+  either count is above zero. They are plain keys of the `posts` section, so a saved report's CSV
+  (`PlatformAnalyticsCsv` → `AnalyticsCsv::sectionRows()`) lists them with the rest of it.
+- These three are the health read for the lane (`ops.md` › "Stories with extras"). The plan and
+  the pipeline are in `.junie/plans/story-extras.md` and `publishing.md`.
+
 ## Business Rules
 
 - **Login:** Fortify flow unchanged; `LoginResponse`/`TwoFactorLoginResponse` send super admins to
@@ -196,8 +210,14 @@ New status kind `organization` (`active`/`suspended`/`preview`) in `lib/status.t
   update, delete, run ≡ direct action call (+ `last_run_at`), run view, index org names, builder
   prefill, CSV export.
 - `tests/Unit/Support/AnalyticsFiltersTest.php`: range resolution, fallbacks, sanitising, storage.
+- `tests/Feature/Stories/StoryReportingHonestyTest.php` (Phase S):
+  `test_the_platform_summary_reports_how_the_lane_is_doing` and
+  `test_the_platform_summary_has_no_median_before_anyone_posts`.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): the Story figures have no time series and no per-organization breakdown,
+  and no test asserts them in the CSV export (they reach it through the generic flattening).
 
 - Engagement metrics wait on Phase 12 (`PostTargetMetrics`); `engagement` is always `null`.
 - No impersonation ("sign in as this org") — deliberately left out pending an audit-trail design.
@@ -343,3 +363,6 @@ attribution. See `marketing.md`.
   Full detail in `plans.md`.
 - 2026-11-11: Register interest replaces self-serve signup links (`/register`), plus the super-admin
   registrations console (pipeline, demo booking, stats). `/register-organization` stays routed but unlinked.
+- 2026-11-13: Phase S — Stories with extras (assisted lane). Platform analytics `posts` gained
+  `stories_posted_by_hand`, `stories_missed` and `stories_median_minutes_to_post`, shown in the
+  Publishing panel and carried into the report CSV.

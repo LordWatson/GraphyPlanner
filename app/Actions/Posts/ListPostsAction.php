@@ -27,7 +27,7 @@ class ListPostsAction
     public function __invoke(array $filters = []): LengthAwarePaginator
     {
         return $this->query($filters)
-            ->with(['client:id,name', 'campaign', 'creator:id,name', 'assignee:id,name', 'targets.socialAccount', 'assets:id'])
+            ->with(['client:id,name', 'campaign', 'creator:id,name', 'assignee:id,name', 'targets.socialAccount', 'targets.openStoryHandoff', 'targets.postedStoryHandoff', 'assets:id'])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->paginate(self::PER_PAGE)

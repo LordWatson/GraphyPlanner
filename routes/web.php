@@ -109,6 +109,7 @@ use App\Http\Controllers\Store\BookingController as StoreBookingController;
 use App\Http\Controllers\Store\CheckoutController as StoreCheckoutController;
 use App\Http\Controllers\Store\ConnectWebhookController;
 use App\Http\Controllers\Store\DownloadController as StoreDownloadController;
+use App\Http\Controllers\StoryHandoffController;
 use App\Http\Controllers\SuperAdmin\AnalyticsController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\OrganizationController as SuperAdminOrganizationController;
@@ -154,6 +155,15 @@ Route::middleware('throttle:public-token')->group(function () {
     Route::post('review/{token}/preview-feedback', [ReviewController::class, 'previewFeedback'])->name('review.preview-feedback');
     // Step 18.8: a grid review link's decision (approve / request changes, with flagged tiles).
     Route::post('review/{token}/grid', [ReviewController::class, 'decideGrid'])->name('review.grid.decide');
+
+    // Phase S-4: the Story handoff page. A Story with a link or stickers is posted by hand from
+    // the Instagram app; this is the page the poster does it from. Unauthenticated like the review
+    // link — the token is the authorisation, and it opens that one channel and nothing else.
+    Route::get('story/{token}', [StoryHandoffController::class, 'show'])->name('story-handoff.show');
+    Route::get('story/{token}/media', [StoryHandoffController::class, 'media'])->name('story-handoff.media');
+    Route::post('story/{token}/shared', [StoryHandoffController::class, 'shared'])->name('story-handoff.shared');
+    Route::post('story/{token}/posted', [StoryHandoffController::class, 'posted'])->name('story-handoff.posted');
+    Route::post('story/{token}/problem', [StoryHandoffController::class, 'problem'])->name('story-handoff.problem');
 
     // Campaigns enhancement C-5.4: a read-only campaign preview for stakeholders without portal access.
     Route::get('share/campaigns/{token}', [CampaignShareLinkController::class, 'show'])->name('campaign-share.show');
@@ -500,10 +510,6 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
         Route::post('posts/quick/share', [BusinessQuickPostController::class, 'share'])
             ->middleware('throttle:30,1')
             ->name('posts.quick.share');
-
-        // Step B-7.4: per-user, per-browser push opt-in / opt-out (reminders). Business-only.
-        Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
-        Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
     });
 
 // The organization workspace. `org.member` (Step 15.1) sends org-less super admins to
@@ -513,6 +519,13 @@ Route::middleware(['auth', 'verified', 'org.member', 'workspace:business'])
 // to their `/portal/*` equivalent (or the portal dashboard). Their experience lives entirely in
 // `/portal/*`; the notification bell, profile and logout they do use sit in the shared group above.
 Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(function () {
+    // Step B-7.4 / S-3.2: per-user, per-browser push opt-in / opt-out. Open to every member of an
+    // agency or business workspace; `portal.redirect` keeps client reviewers out. Same URL as
+    // before, when it lived in the business group. Which pushes a subscription receives is decided
+    // by each sender (the reminder pushes stay business-only).
+    Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
+    Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
+
     // Deep-link redirects for the pages with a direct portal counterpart (dashboard/calendar/home);
     // the group-level `portal.redirect` above already blocks everything else.
     Route::middleware('portal.redirect')->group(function () {
@@ -927,6 +940,18 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
     // Step I-1.3: resend only the failed targets of a failed/partially published post.
     Route::post('posts/{post}/retry-failed-targets', [PostController::class, 'retryFailedTargets'])
         ->name('posts.retry-failed-targets');
+    // Step S-4.5: a member opens a Story's handoff from inside Alima (the bell stores this URL,
+    // never a token), and Step S-5.2: marks a Story as posted from the editor.
+    Route::scopeBindings()->group(function () {
+        Route::get('posts/{post}/targets/{target}/story-handoff', [StoryHandoffController::class, 'open'])
+            ->name('posts.story-handoff.open');
+        Route::post('posts/{post}/targets/{target}/story-handoff/posted', [StoryHandoffController::class, 'markPosted'])
+            ->name('posts.story-handoff.mark-posted');
+    });
+    // Step S-4.4: the poster's queue — every story the signed-in member is due to post by hand.
+    Route::get('stories/to-post', [StoryHandoffController::class, 'queue'])
+        ->middleware('portal.redirect')
+        ->name('stories.queue');
     Route::post('posts/{post}/comments', [PostController::class, 'comment'])
         ->name('posts.comments.store');
     Route::post('posts/{post}/activity-logs/{activityLog}/resend-review-email', [PostController::class, 'resendReviewEmail'])

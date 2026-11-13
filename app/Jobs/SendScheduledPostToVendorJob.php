@@ -121,6 +121,9 @@ class SendScheduledPostToVendorJob implements ShouldBeUnique, ShouldQueue
             ->where('status', PostTargetStatus::Pending)
             ->whereNull('external_post_id')
             ->whereNull('publish_requested_at')
+            // Step S-2.1: a Story with extras is posted by hand and never goes to the vendor. It
+            // gets its handoff when the post starts publishing (`PublishPostJob::dispatchTargets`).
+            ->where('handoff_required', false)
             ->where('scheduled_at_utc', '>', now()->addMinutes(self::LEAD_MINUTES))
             ->get();
 

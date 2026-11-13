@@ -40,6 +40,8 @@ import { ChapterHero, EmptyState, HeroStat, Page } from '@/components/page';
 import type { Paginated } from '@/components/pagination';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
+import type { StoryHandoff } from '@/components/stories/story-handoff-pill';
+import { StoryHandoffPill } from '@/components/stories/story-handoff-pill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -94,6 +96,8 @@ type CoreCard = {
     id: number;
     status: string;
     status_label: string;
+    /** Step S-5.1: the most urgent assisted-lane state across the post's channels. */
+    handoff?: StoryHandoff | null;
     master_caption: string | null;
     campaign: ChipData | null;
     thumbnail_url: string | null;
@@ -461,11 +465,14 @@ const columns: ColumnDef<Row, unknown>[] = [
         id: 'status',
         header: 'Status',
         cell: ({ row }) => (
-            <StatusPill
-                kind="post"
-                value={row.original.status}
-                label={row.original.status_label}
-            />
+            <span className="flex flex-col items-start gap-1">
+                <StatusPill
+                    kind="post"
+                    value={row.original.status}
+                    label={row.original.status_label}
+                />
+                <StoryHandoffPill handoff={row.original.handoff} />
+            </span>
         ),
     },
     {
@@ -1438,6 +1445,10 @@ function Board({
                         <span className="text-muted-foreground truncate text-xs">
                             {post.client.name}
                         </span>
+                        <StoryHandoffPill
+                            handoff={post.handoff}
+                            className="self-start"
+                        />
                         <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
                             {post.targets.map((target, i) => {
                                 const Icon = platformIcon(target.platform);

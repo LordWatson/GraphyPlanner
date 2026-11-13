@@ -2,6 +2,7 @@
 
 namespace App\Services\Publishing;
 
+use App\Actions\Stories\CancelStoryHandoffsAction;
 use App\Contracts\PublishAdapter;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
@@ -10,6 +11,7 @@ use App\Models\Post;
 use App\Models\PostTarget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -37,18 +39,31 @@ class VendorScheduleService
      * unsent `pending` (no vendor id, no attempt) and its id is returned. Throws (and leaves the
      * ones it couldn't cancel held) when the vendor refuses any of them.
      *
+     * Step S-2.5: on a `publishing` post, a Story waiting to be posted by hand is recalled too —
+     * its handoff is closed as `cancelled` (the link stops working) and the channel reset the same
+     * way. `$keepHandoffs` leaves those alone: an edit doesn't need to take a handoff back, since
+     * the handoff page reads the post live.
+     *
      * @return list<int> the recalled target ids
      *
      * @throws ValidationException
      */
-    public function recall(Post $post, string $field = 'status'): array
+    public function recall(Post $post, string $field = 'status', bool $keepHandoffs = false): array
     {
         $post->loadMissing('targets.socialAccount.organization');
 
         /** @var Collection<int, PostTarget> $held */
         $held = $post->targets->filter(fn (PostTarget $target) => $target->isVendorHeld())->values();
 
-        if ($held->isEmpty()) {
+        // Step S-2.5: Stories waiting to be posted by hand. There is no vendor to ask, so these
+        // can always be taken back — but only once every vendor channel has agreed (below), which
+        // keeps the "refused = nothing changes" guarantee.
+        /** @var Collection<int, PostTarget> $awaiting */
+        $awaiting = $keepHandoffs || $post->status !== PostStatus::Publishing
+            ? new Collection
+            : $post->targets->filter(fn (PostTarget $target) => $target->isAwaitingHandoff())->values();
+
+        if ($held->isEmpty() && $awaiting->isEmpty()) {
             return [];
         }
 
@@ -89,7 +104,52 @@ class VendorScheduleService
             ]);
         }
 
+        if ($awaiting->isNotEmpty()) {
+            array_push($recalled, ...$this->recallAwaitingHandoffs($post, $awaiting));
+        }
+
         return $recalled;
+    }
+
+    /**
+     * Take back the Stories that are waiting to be posted by hand: one transaction, locked in the
+     * order every Story action uses (post, channel, handoff), and re-checked on the locked rows —
+     * a "Posted" that landed a moment ago wins, and that channel is left exactly as it is.
+     *
+     * @param  Collection<int, PostTarget>  $awaiting
+     * @return list<int> the channels that were actually recalled
+     */
+    private function recallAwaitingHandoffs(Post $post, Collection $awaiting): array
+    {
+        return DB::transaction(function () use ($post, $awaiting): array {
+            Post::query()->whereKey($post->id)->lockForUpdate()->first();
+
+            $recalled = [];
+
+            $locked = PostTarget::query()
+                ->whereIn('id', $awaiting->map(fn (PostTarget $target) => $target->id)->all())
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($locked as $target) {
+                if (! $target->isAwaitingHandoff()) {
+                    continue;
+                }
+
+                $target->update([
+                    'status' => PostTargetStatus::Pending,
+                    'external_post_id' => null,
+                    'error' => null,
+                    'publish_attempt_id' => null,
+                    'publish_requested_at' => null,
+                ]);
+                $recalled[] = $target->id;
+            }
+
+            app(CancelStoryHandoffsAction::class)($recalled, 'post recalled');
+
+            return $recalled;
+        });
     }
 
     /**

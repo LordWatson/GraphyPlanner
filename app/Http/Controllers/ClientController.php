@@ -15,6 +15,7 @@ use App\Enums\ApprovalPolicy;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
 use App\Enums\Role;
+use App\Enums\StoryHandoffRecipient;
 use App\Http\Requests\ClientIndexRequest;
 use App\Http\Requests\PurgeClientRequest;
 use App\Http\Requests\StoreClientRequest;
@@ -174,6 +175,11 @@ class ClientController extends Controller
             'approvalModes' => array_map(fn (ApprovalMode $mode) => ['value' => $mode->value, 'label' => $mode->label()], ApprovalMode::cases()),
             // Step M-6.3: how approvals combine across the client's approver contacts.
             'approvalPolicies' => array_map(fn (ApprovalPolicy $policy) => ['value' => $policy->value, 'label' => $policy->label(), 'description' => $policy->description()], ApprovalPolicy::cases()),
+            // Step S-1.5: who posts Stories with links and stickers by hand. Null while the
+            // assisted lane is switched off, so the form doesn't offer a setting for nothing.
+            'storyHandoff' => config('publishing.story_handoff.enabled')
+                ? ['options' => array_map(fn (StoryHandoffRecipient $recipient) => ['value' => $recipient->value, 'label' => $recipient->label()], StoryHandoffRecipient::cases())]
+                : null,
             'languages' => LanguageOptions::options(),
             'owners' => $this->ownerOptions($request),
             'currencies' => CurrencyOptions::options(),

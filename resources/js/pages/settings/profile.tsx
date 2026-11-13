@@ -124,7 +124,7 @@ export default function Profile({
                 </Form>
             </div>
 
-            <PushRemindersCard />
+            <PushRemindersCard workspace="business" />
 
             <DeleteUser />
         </>

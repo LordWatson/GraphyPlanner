@@ -8,6 +8,7 @@ use App\Models\Post;
 use App\Models\PostTarget;
 use App\Models\User;
 use App\Support\Campaigns\CampaignPresenter;
+use App\Support\Stories\StoryPostPresenter;
 
 /**
  * Step M-5.1 — shapes a post for the content hub (`/content`). The table row and the board card
@@ -94,6 +95,8 @@ class ContentHubPresenter
             'id' => $post->id,
             'status' => $post->status->value,
             'status_label' => $post->status->label(),
+            // Step S-5.1: the most urgent assisted-lane state across the post's channels.
+            'handoff' => StoryPostPresenter::summary($post),
             'master_caption' => $post->master_caption,
             'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'thumbnail_url' => $post->assets->first()?->thumbnailUrl(),

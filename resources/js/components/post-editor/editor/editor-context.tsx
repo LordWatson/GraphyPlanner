@@ -4,6 +4,7 @@ import type { EditorNavigation } from '@/components/post-editor/editor/use-edito
 import type { PostEditor } from '@/components/post-editor/editor/use-post-editor';
 import type {
     PostData,
+    StoryHandoffOptions,
     TargetAccountData,
 } from '@/components/post-editor/types';
 import type { MediaFormatOptions } from '@/lib/media-format';
@@ -19,6 +20,8 @@ export type PostEditorPageData = {
     staff: { id: number; name: string }[];
     /** Step CG-5.2: the brand's open deals, for linking a paid-partnership post to one. */
     dealOptions: { id: number; partner_name: string }[];
+    /** Step S-1.4: who can post a Story by hand, and the client's default. */
+    storyHandoff: StoryHandoffOptions;
     can: { update: boolean; create_asset: boolean; duplicate: boolean };
 };
 

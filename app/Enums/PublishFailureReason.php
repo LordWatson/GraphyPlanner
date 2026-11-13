@@ -19,7 +19,19 @@ enum PublishFailureReason: string
     case RateLimited = 'rate_limited';
     case PermissionDenied = 'permission_denied';
     case NotEnabledYet = 'not_enabled_yet';
+    /** Step S-2.3: an assisted Story nobody confirmed posting inside its window. */
+    case StoryNotPosted = 'story_not_posted';
+    /** Step S-2.4: the person posting an assisted Story said something went wrong. */
+    case StoryProblemReported = 'story_problem_reported';
     case Unknown = 'unknown';
+
+    /**
+     * The fragments the two Story errors are recognised by. The full sentences live with the
+     * actions that write them (`ExpireStoryHandoffAction`, `ReportStoryHandoffProblemAction`).
+     */
+    public const STORY_NOT_POSTED_MARKER = 'confirmed this story was posted';
+
+    public const STORY_PROBLEM_MARKER = 'the poster reported a problem';
 
     /**
      * Map a raw vendor error string to a cause. Order matters: more specific signals are matched
@@ -34,6 +46,10 @@ enum PublishFailureReason: string
         }
 
         return match (true) {
+            // The assisted lane's own errors first: the poster's note is free text and could
+            // contain any of the words below.
+            self::matches($text, [self::STORY_NOT_POSTED_MARKER]) => self::StoryNotPosted,
+            self::matches($text, [self::STORY_PROBLEM_MARKER]) => self::StoryProblemReported,
             self::matches($text, ['not yet enabled', 'rollout']) => self::NotEnabledYet,
             self::matches($text, ['rate limit', 'rate-limit', 'too many request', 'throttle', '429']) => self::RateLimited,
             self::matches($text, ['expired', 'reconnect', 're-auth', 'reauth', 'token', 'unauthorized', 'not authorized', '401', 'invalid credential', 'access revoked']) => self::TokenExpired,
@@ -78,6 +94,8 @@ enum PublishFailureReason: string
             self::RateLimited => "{$name} is rate-limiting your account right now.",
             self::PermissionDenied => "{$name} wouldn't allow this post — your account may be missing a permission.",
             self::NotEnabledYet => "Publishing to {$name} isn't switched on yet.",
+            self::StoryNotPosted => 'Nobody confirmed this story was posted, so we can\'t say it went out.',
+            self::StoryProblemReported => 'The person posting this story hit a problem.',
             self::Unknown => "{$name} rejected this post.",
         };
     }
@@ -97,6 +115,8 @@ enum PublishFailureReason: string
             self::RateLimited => 'Wait a little while, then retry.',
             self::PermissionDenied => 'Reconnect the account to refresh its permissions, then retry.',
             self::NotEnabledYet => 'Nothing to do — we\'ll switch it on soon.',
+            self::StoryNotPosted => 'Open the post and choose Retry to send a new reminder, or mark it as posted if it went out.',
+            self::StoryProblemReported => 'Read their note on the post, fix it, then choose Retry to send a new reminder.',
             self::Unknown => 'Try again, or reconnect the account if it keeps failing.',
         };
     }

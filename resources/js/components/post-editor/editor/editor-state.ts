@@ -8,6 +8,7 @@ import type {
 import { EMPTY_CHANNEL } from '@/components/post-editor/types';
 import type { Crop, MediaFormat } from '@/lib/media-format';
 import { DEFAULT_CROP, normalizeCrop } from '@/lib/media-format';
+import { parseStoryExtras } from '@/lib/story-extras';
 
 /** Everything the editor form can change before it's saved. */
 export type EditorState = {
@@ -71,6 +72,10 @@ export const checkSection: Record<string, EditorSection> = {
     media_framing: 'preview',
     campaign_hashtags: 'settings',
     partnership_disclosure: 'settings',
+    // Step S-1.4: a Story's extras live with its channel's own content; who posts it follows
+    // the assignee, which is in Settings.
+    story_extras: 'compose',
+    story_handoff: 'settings',
 };
 
 export const approvalLabels: Record<string, string> = {
@@ -123,6 +128,8 @@ export function initialEditorState(
                     firstComment: target.first_comment,
                     link: target.link_url,
                     format: target.format,
+                    storyExtras: parseStoryExtras(target.story_extras),
+                    handoffRecipient: target.handoff_recipient ?? null,
                 } satisfies ChannelState,
             ]),
         ),

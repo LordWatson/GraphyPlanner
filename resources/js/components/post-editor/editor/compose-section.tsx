@@ -58,61 +58,6 @@ export function ComposeSection({
                 title="Write"
                 className={nav.flash('compose')}
                 bodyClassName="grid gap-5"
-                actions={
-                    showAi &&
-                    nav.activeScope === 'all' && (
-                        <div className="flex flex-wrap justify-end gap-2">
-                            <WritingToolsMenu
-                                postId={page.post.id}
-                                caption={editor.state.caption}
-                                onRewrite={(next) =>
-                                    editor.update({ caption: next })
-                                }
-                            />
-                            {platforms.size >= 2 && (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => void runRepurpose()}
-                                    disabled={repurpose.loading}
-                                >
-                                    <Shuffle />
-                                    <span className="hidden sm:inline">
-                                        {repurpose.loading
-                                            ? 'Repurposing…'
-                                            : 'Repurpose per platform'}
-                                    </span>
-                                    <span className="sm:hidden">
-                                        {repurpose.loading
-                                            ? 'Repurposing…'
-                                            : 'Repurpose'}
-                                    </span>
-                                </Button>
-                            )}
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void ai.fetchSuggestions()}
-                                disabled={ai.loading}
-                            >
-                                <Sparkles />
-                                {ai.loading ? 'Thinking…' : 'Suggest with AI'}
-                            </Button>
-                            {ai.loading && (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => ai.cancel()}
-                                >
-                                    Cancel
-                                </Button>
-                            )}
-                        </div>
-                    )
-                }
             >
                 <ChannelScopeBar
                     scope={nav.activeScope}
@@ -133,23 +78,86 @@ export function ComposeSection({
                     hashtagSuggestions={page.hashtagSuggestions}
                     errors={errors}
                     captionRef={nav.captionRef}
+                    story={{
+                        options: page.storyHandoff,
+                        assigneeId: editor.state.assigneeId,
+                        clientName: page.client.name,
+                    }}
+                    // The AI tools sit right under the caption they act on (the main caption
+                    // only), not in the panel header, where they crowded the title on a phone.
                     aiPanel={
-                        <>
-                            {ai.error && (
-                                <p className="text-destructive text-xs">
-                                    {ai.error}
-                                </p>
-                            )}
-                            <AiCaptionSuggestions
-                                suggestions={ai.suggestions}
-                                policyWarnings={ai.policyWarnings}
-                                brandFit={ai.brandFit}
-                                appliedIndex={ai.appliedIndex}
-                                expanded={ai.expanded}
-                                onToggleExpanded={ai.toggleExpanded}
-                                onApply={ai.apply}
-                            />
-                        </>
+                        showAi && (
+                            <>
+                                <div className="flex flex-wrap gap-2">
+                                    <WritingToolsMenu
+                                        postId={page.post.id}
+                                        caption={editor.state.caption}
+                                        onRewrite={(next) =>
+                                            editor.update({ caption: next })
+                                        }
+                                    />
+                                    {platforms.size >= 2 && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => void runRepurpose()}
+                                            disabled={repurpose.loading}
+                                        >
+                                            <Shuffle />
+                                            <span className="hidden sm:inline">
+                                                {repurpose.loading
+                                                    ? 'Repurposing…'
+                                                    : 'Repurpose per platform'}
+                                            </span>
+                                            <span className="sm:hidden">
+                                                {repurpose.loading
+                                                    ? 'Repurposing…'
+                                                    : 'Repurpose'}
+                                            </span>
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            void ai.fetchSuggestions()
+                                        }
+                                        disabled={ai.loading}
+                                    >
+                                        <Sparkles />
+                                        {ai.loading
+                                            ? 'Thinking…'
+                                            : 'Suggest with AI'}
+                                    </Button>
+                                    {ai.loading && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => ai.cancel()}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    )}
+                                </div>
+                                {ai.error && (
+                                    <p className="text-destructive text-xs">
+                                        {ai.error}
+                                    </p>
+                                )}
+                                <AiCaptionSuggestions
+                                    suggestions={ai.suggestions}
+                                    policyWarnings={ai.policyWarnings}
+                                    brandFit={ai.brandFit}
+                                    appliedIndex={ai.appliedIndex}
+                                    expanded={ai.expanded}
+                                    onToggleExpanded={ai.toggleExpanded}
+                                    onApply={ai.apply}
+                                />
+                            </>
+                        )
                     }
                 />
             </Panel>

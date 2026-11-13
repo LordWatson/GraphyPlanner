@@ -528,6 +528,209 @@ networks; a profile per _organization_ broke as soon as a second brand wanted th
   (agencies keep database-only) and carries the classified per-channel reasons in both `toArray` and
   `toMail`, so no business failure is silent.
 
+## Stories with extras — the assisted lane (Phase S, `.junie/plans/story-extras.md`)
+
+Instagram's publishing API cannot add a link, a poll, a mention or any other sticker to a Story,
+and a Story cannot be edited once it is live. So a Story channel that carries **extras** is never
+sent to the vendor: Alima plans it, gets it approved, holds it, tells the right person the moment
+it is due, hands the media and the link to their phone, and records the result. A plain Story still
+auto-publishes exactly as before. Alima never touches Instagram's app (no automation, no unofficial
+API, no stored Instagram password), and "Posted" is the poster's word: an assisted Story has no
+`post_url` or `platform_post_id`.
+
+**Kill switch.** `publishing.story_handoff.enabled` (`STORY_HANDOFF_ENABLED`, **default `false`**
+until the share sheet has been proven on real phones — see the plan's section 0). Off: the editor
+hides Story extras (`platforms.*.story_extras` in the shared registry prop), a save ignores
+submitted extras, and `handoff_required` is always written `false`. Rows that are already flagged
+are left alone, so a Story that is mid-handoff still finishes.
+
+### Models / tables
+
+- `post_targets.story_extras` (json), `handoff_required` (bool, indexed), `handoff_recipient`
+  (`team` / `client` / null = the client's default). `clients.story_handoff_recipient` (default
+  `team`). Migration `2027_05_01_100100_add_story_extras_to_post_targets`.
+- `App\Support\Publishing\StoryExtras` — the readonly DTO for `story_extras` (v1): `link {url,
+text}`, `mentions[]`, `hashtag`, `location`, `poll {question, options[]}`, `placement_note`,
+  `if_missed`. An extra is **added when its key is present**, even if blank (the editor autosaves
+  half-typed work); `isEmpty()` answers "has anything been added?", `problems()` lists what is
+  unfinished, `checklist()` is the row list the handoff page, the review link, the portal and the
+  email all render, `summary()` is "a link and a poll". A placement note or `if_missed` alone is
+  not an extra.
+- `story_handoffs` / `App\Models\StoryHandoff` (migration `2027_05_01_100200`): one row per attempt
+  at posting a Story by hand — org, client, post, channel, `publish_attempt_id` (unique with the
+  channel), `token_hash`, `recipient_type`, `user_id`, `due_at`, `notified_at`, `nudged_at`,
+  `opened_at`, `shared_at`, `completed_at`, `completed_by_user_id`, `completed_via`
+  (`link` / `staff`), `outcome` (`App\Enums\StoryHandoffOutcome`: `posted`, `missed`,
+  `cancelled`, `published_plain`, `problem`), `problem_note`, `expires_at`. Open =
+  `completed_at IS NULL AND outcome IS NULL`. `scopeOpen()`, `isOpen()`, `isCurrent()`,
+  `linkExpiresAt()`, `lockForChange()`. Registered in `ClientAccessScope::MODELS`; `token_hash` is
+  `#[Hidden]`.
+- `story_handoffs` indexes: unique `token_hash`, unique `(post_target_id, publish_attempt_id)`,
+  `due_at`, `expires_at`, `(completed_at, due_at)` (the sweep and the "Stories to post" lists read
+  open rows only), `(org_id, outcome, completed_at)`, `(client_id, due_at)`, `(post_id, outcome)`,
+  `(user_id, completed_at)` and `completed_by_user_id`. Every foreign key leads an index
+  (`IndexCoverageTest`). All four parent keys cascade on delete; the two user keys null on delete.
+- `App\Enums\StoryHandoffRecipient` (`team` / `client`) casts `post_targets.handoff_recipient`,
+  `clients.story_handoff_recipient` and `story_handoffs.recipient_type`. Factories:
+  `StoryHandoffFactory` (`posted()`, `missed()`), `PostTargetFactory::story()` /
+  `withStoryExtras()`.
+- Config: `config/publishing.php` → `story_handoff` (`enabled`, `platforms`, `window_minutes`,
+  `nudge_after_minutes`, `token_ttl_hours`, `late_grace_minutes`, `max_share_mb`). See `ops.md`.
+
+### The decisions, as built
+
+- **D1 — not a `PublishAdapter`.** The lanes split at the one fan-out,
+  `PublishPostJob::dispatchTargets()`: channels with `handoff_required` go to
+  `OpenStoryHandoffAction`; the rest are batched as before (and any handoff a channel was holding
+  is cancelled first). `SendScheduledPostToVendorJob` filters `handoff_required = false`, and
+  `PublishPostTargetJob::claim()` refuses an assisted channel as a belt-and-braces net.
+- **D2 — `pending` with an open handoff.** No new `PostTargetStatus`. The post waits in
+  `publishing` exactly as it does for a vendor; confirm → `published`, missed → `failed`, both
+  through `SyncPublishStatusAction`, so `partially_published` and "Retry failed channels" work
+  unchanged. The readable state is derived, never stored: `PostTarget::handoffState()` →
+  `needs_hand_posting` / `ready_to_post` / `posted_by_hand`, presented by
+  `App\Support\Stories\StoryChannelPresenter` (`state()`, `clientState()`, `clientStory()`).
+- **D3 — `handoff_required` is stored and has one writer.** `SyncTargetStoryExtrasAction`
+  (`__invoke` stores extras + re-derives; `refresh` re-derives only). The rule is
+  `PostTarget::needsHandoff()`: kill switch on, platform on `story_handoff.platforms`
+  (Instagram), `format === 'story'` (only ever an explicit choice), at least one extra. Called from
+  `UpdatePostAction` (every listed channel, every save), `DuplicatePostAction`, `RecyclePostAction`
+  and the factory state. Changing the format away from Story keeps the extras and clears the flag.
+- **D4 — opened at publish time, notified by a sweep.** The handoff row is created when the _post_
+  starts publishing (its earliest channel's time) with `due_at` = the Story's own
+  `scheduled_at_utc`. `stories:process-handoffs` (every minute, `ProcessStoryHandoffsAction`) does
+  the rest per open handoff, in this order: stale → `cancelled`; expired →
+  `ExpireStoryHandoffAction` (**even while paused** — a Story for an archived client or a suspended
+  organization still fails loudly when its window closes, rather than waiting forever); paused
+  (archived client, suspended/deleted org) → skipped, so nobody is notified or nudged; due → notify
+  (flagged `late` past `late_grace_minutes`); notified, not shared, `nudge_after_minutes` ago →
+  nudge once. Stamp, then send, under a row lock. Each handoff is processed in its own try/catch:
+  one that throws is logged, reported and counted (`failed` in the command's summary) and the rest
+  still run.
+- **D5 — a handoff belongs to one publish attempt.** A retry or a recall mints a new attempt id;
+  the old handoff is stale (its link 404s) and is closed as `cancelled`.
+- **D6 — tokens.** 64 hex characters, `sha256` at rest, throttled by `throttle:public-token`,
+  scoped to one channel. The token is **derived, not stored and not rotated**:
+  `StoryHandoff::plainToken()` is an HMAC of the handoff id and its publish attempt under the app
+  key, and `OpenStoryHandoffAction` stores its hash when the row is created.
+  `IssueStoryHandoffLinkAction` returns the same link every time for one handoff (and heals a hash
+  that is out of step), so the first email, the nudge and a teammate opening the Story from the
+  bell all hold one working link. A new attempt (retry, recall + resubmit, a moved time) is a new
+  handoff with a new token. The link opens for `token_ttl_hours` (30) after the later of `due_at`
+  and the row's creation, so a Story retried days after its time still gets a usable link.
+  Rotating `APP_KEY` invalidates every open link (the next notification or the bell re-issues).
+- **Tenant scopes on the token routes.** The token is the credential, so
+  `StoryHandoffController` runs show / media / shared / posted / problem inside
+  `App\Models\Scopes\TenantScopes::suspended()`, which makes `OrganizationScope` and
+  `ClientAccessScope` no-ops for the callback. Without it, a person signed in to a _different_
+  organization (or restricted to other clients) who opened the link would have had the post
+  scoped away mid-action. A signed-in visitor is recorded as `completed_by_user_id` only when they
+  belong to the handoff's organization (`memberOf()`).
+- **D7 — the poster.** `ResolveStoryPosterAction`: `team` → the post's assignee, else its creator
+  (Owner / Strategist / Designer only — a Viewer cannot act on a post), else everyone on the team;
+  `client` → the client's review-email contacts and portal reviewers by email, and any contact who
+  consented to WhatsApp. A `client` handoff with nobody to reach falls back to the team (never
+  silent). A business workspace is always `team`.
+- **D8 — no feature gate.** Every plan gets the lane.
+
+### Actions (`App\Actions\Stories\*`)
+
+`SyncTargetStoryExtrasAction`, `OpenStoryHandoffAction` (idempotent per attempt; lock order post →
+channel → handoff, used by every Story action), `IssueStoryHandoffLinkAction`,
+`CancelStoryHandoffsAction`, `ProcessStoryHandoffsAction`, `ExpireStoryHandoffAction` (fails the
+channel with `MISSED_ERROR`; or, when the Story's extras say `if_missed = publish_plain`, closes
+the handoff as `published_plain`, notes it on the activity log and dispatches
+`PublishPostTargetJob(..., plain: true)` — the stored flag is untouched),
+`CompleteStoryHandoffAction` (publishes the channel, writes a same-status activity note naming who
+confirmed and that it was by hand; **late confirmation** of a `missed` handoff is accepted while
+the channel is still failed for that reason on the same attempt — the post moves
+`failed`/`partially_published` → `publishing` and resolves again), `ReportStoryHandoffProblemAction`,
+`NotifyStoryPosterAction`, `ResolveStoryPosterAction`, `ShowStoryHandoffAction` (the single token
+gate + the page payload), `GetStoryHandoffMediaAction`, `FindStoryHandoffForChannelAction`,
+`GetStoryQueueAction`. Push: `App\Actions\Push\SendStoryHandoffPushAction`.
+
+`PublishFailureReason` gained `StoryNotPosted` and `StoryProblemReported` (matched first, so a
+poster's free-text note cannot be read as a vendor error). `PollPendingPublishStatusesAction` skips
+a channel with an open handoff; without one it is an ordinary channel again and the generic
+timeout applies. `Post::canBeRecalled()` counts `PostTarget::isAwaitingHandoff()`, and
+`VendorScheduleService::recall()` closes those handoffs and resets the channels once every vendor
+channel has agreed — in one transaction, under locks, re-checking each locked channel, so a Story
+confirmed a moment earlier stays `published` (`keepHandoffs: true` for an edit, which leaves the
+handoff open — the page reads the post live). `UpdatePostAction` re-sends a channel whose lane
+changes while its post is going out, and one whose time changes while its handoff is open (the old
+handoff is cancelled and a new one opened for the new time); if the save leaves nothing in flight
+the post is resolved rather than left in `publishing`. With the kill switch off,
+`SyncTargetStoryExtrasAction::refresh()` leaves a channel that is already awaiting its handoff
+alone, so switching the lane off never strands or auto-publishes a Story mid-handoff.
+
+The media route serves only an allow-list of types (`GetStoryHandoffMediaAction::SERVABLE_TYPES` —
+JPEG, PNG, WebP, GIF, MP4, QuickTime, WebM as built; anything else, e.g. SVG or HTML, is a 404 and
+the page shows no media), skips the 9:16 crop above `MAX_CROP_PIXELS` rather than decoding a huge
+image, and answers a `Range` request with a 206 only when the stream is seekable (a remote disk's
+non-seekable stream gets the whole file with `Accept-Ranges: none`).
+`StoryPublishHandoffReady::shouldSend()` drops a queued notification whose handoff closed in the
+meantime.
+
+### Routes
+
+| Method | URI                                                  | Name                              | Notes                                                                                                                                                                                        |
+| ------ | ---------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `story/{token}`                                      | `story-handoff.show`              | The page. Stamps `opened_at`. `no-store`, `noindex`, `no-referrer`.                                                                                                                          |
+| GET    | `story/{token}/media`                                | `story-handoff.media`             | The one item the Story sends; images cropped to 9:16 by `PublishImageCropper` (the same crop the auto lane publishes), video streamed with single-range support. Never a signed storage URL. |
+| POST   | `story/{token}/shared`                               | `story-handoff.shared`            | Stamps `shared_at` (stops the nudge). 204.                                                                                                                                                   |
+| POST   | `story/{token}/posted`                               | `story-handoff.posted`            | `CompleteStoryHandoffAction`.                                                                                                                                                                |
+| POST   | `story/{token}/problem`                              | `story-handoff.problem`           | `ReportStoryHandoffProblemAction`.                                                                                                                                                           |
+| GET    | `posts/{post}/targets/{target}/story-handoff`        | `posts.story-handoff.open`        | Signed in, `PostPolicy::postStoryByHand`. Redirects to the handoff's link; renders `story-handoff/not-ready` when there is nothing to open. This is the URL the bell stores.                 |
+| POST   | `posts/{post}/targets/{target}/story-handoff/posted` | `posts.story-handoff.mark-posted` | "Mark as posted" from the editor (`completed_via = staff`), including late.                                                                                                                  |
+| GET    | `stories/to-post`                                    | `stories.queue`                   | The poster's queue (`PostPolicy::viewStoryQueue`).                                                                                                                                           |
+
+All token routes are unauthenticated by design and answer a plain 404 for a token that is unknown,
+past its lifetime, cancelled, superseded, or for an archived client. A finished handoff still
+opens, read-only. The page payload is deliberately short: account, client name, due time, extras,
+media. No caption, no other channel or post, nothing about money, no internal comment.
+
+### Business rules
+
+- Never silent: an assisted Story is confirmed, or it fails loudly with a plain reason, lands in
+  Needs attention and can be retried (which opens a fresh handoff and sends a new reminder).
+- The notification link carries a token, so it travels only in the email, WhatsApp and push. The
+  bell stores the signed-in route. The queued notification is `ShouldBeEncrypted`. Nothing logs a
+  token, and `SecretScrubber` strips long path tokens from error reports.
+- AI never publishes, and no MCP tool can open or complete a handoff or set `if_missed`.
+- `PostPolicy::postStoryByHand` is deliberately not `update()`: a post that is going out is locked
+  for edits, and that is exactly when its Story needs posting.
+
+- The sweep checks expiry before it checks whether to notify. A handoff that is already past
+  `expires_at` and was never notified goes straight to `missed`; nobody is told "time to post"
+  for a Story that can no longer be posted in its window.
+- Retrying after a miss leaves the old handoff `missed` and opens exactly one new one. Its
+  `due_at` stays the Story's original time and `expires_at` is a full window from now, so the next
+  sweep sends its first notification, flagged late.
+- `if_missed = publish_plain` leaves the stored `handoff_required` true. The handoff closes as
+  `published_plain` and `PublishPostTargetJob($targetId, $attemptId, plain: true)` is dispatched
+  after commit; `plain` is what lets that one job past the guard in `claim()`.
+- A `team` handoff with no poster notifies every Owner, Strategist and Designer
+  (`ResolveStoryPosterAction::teamRecipients()`), never a Viewer or a client reviewer.
+- Every notification issues one link, shared by all its recipients. The webhook
+  `story.ready_to_post` fires on the first notification only and carries the signed-in
+  `posts.story-handoff.open` URL, never a token.
+
+### Known gaps
+
+- **S-0.1 (share sheet on real phones) has not been run.** The page branches on
+  `navigator.canShare`, so it degrades to "Save media", but the "three taps" promise is unproven
+  until the table in the plan is filled in. The kill switch stays off until then.
+- After a retry, the earlier (`missed` / `problem`) handoff's link still opens, read-only; it
+  cannot confirm anything. Only a cancelled or superseded-and-open handoff 404s.
+- `MAX_CROP_PIXELS` has no test (it needs a 50-megapixel fixture).
+- A handoff's link is the same for everyone it was sent to and lasts until the handoff closes or
+  its lifetime ends; it cannot be revoked for one recipient without closing the handoff (retry or
+  recall). Anyone holding it can mark that one Story as posted — "Posted" is the poster's word.
+- Cropped images are rendered per request (not cached), and a video on a remote disk is not
+  range-served.
+- S-6.1 (auto-confirm through Meta Graph) and S-6.3 (Facebook Stories) are not built.
+- Client recipients get email and WhatsApp, not push or a bell item.
+
 ## Routes / Controllers
 
 - No dedicated `/posts/:id/schedule` route — Step 1.4 reuses the existing `POST
@@ -733,8 +936,75 @@ Apikey {org upload_post_key}`, body fields) for LinkedIn (common fields only), I
   1.8.5 acceptance pattern using the real `MetaGraphMusicProvider` (only the outbound Graph HTTP
   call faked) — a selected Instagram track's id round-trips through `Post::music` into
   `UploadPostAdapter::publish()`'s `audio_id` field, unchanged from the Step 1.2 mapping.
+- Phase S (Stories with extras, assisted lane), all in `tests/Feature/Stories/` unless noted.
+  `tests/Concerns/BuildsStoryHandoffs.php` holds the shared fixtures (kill switch on, a Story post,
+  `startPublishing()`, `openHandoff()`, `issueToken()`, accepting / refusing adapter mocks).
+    - `AssistedLanePipelineTest` (S-2.1 / S-2.2 / S-2.4): a mixed post sends only its feed channel
+      to the vendor; a Story-only assisted post makes no vendor request; a plain Story still goes
+      to the vendor; `PublishPostTargetJob` refuses an assisted channel; publishing opens one
+      handoff due at the Story's own time and leaves the channel `pending`; opening twice for one
+      attempt yields one row and a new attempt cancels the old one; the poster falls back from
+      assignee to creator to everyone; confirming publishes a Story-only post and a mixed post
+      waits for its vendor channel; a second confirm and a stale attempt are refused; a problem
+      report fails the channel with the note; the status poll never asks the vendor about an
+      assisted Story.
+    - `ProcessStoryHandoffsTest` (S-2.3, S-6.2): nobody is notified before the due time; exactly
+      one notification across two runs; the late flag on either side of the grace period; one
+      nudge, and none once the media was shared; expiry fails a Story-only post and leaves a mixed
+      post `partially_published`; an archived client's or suspended organization's handoff is
+      skipped and resumes; a replaced attempt or a post that left `publishing` is cancelled without
+      failing the channel; `publish_plain` queues the vendor job with `plain` and keeps
+      `handoff_required` true, and the Story reaches the vendor; the command is in the scheduler
+      heartbeat at one minute.
+    - `AssistedLaneLifecycleTest` (S-2.5): retry after a miss opens a fresh handoff and the next
+      sweep notifies; unscheduling or moving a scheduled mixed post only recalls the vendor-held
+      channel; unscheduling a publishing Story cancels its handoff and resets the channel; moving
+      it reopens the handoff with the new due time; a refused vendor cancel changes nothing; late
+      confirmation of a missed Story (Story-only, partially published, with a failed feed channel
+      left failed) and its refusal after a retry; editing extras keeps the handoff open; removing
+      every extra sends the Story to the vendor and cancels the handoff; no notification for an
+      archived client; a scheduled assisted post deletes without a vendor call.
+    - `StoryHandoffNotificationTest` (S-3.1 / S-3.2 / S-3.3 / S-5.5): who is notified per recipient
+      type, the fallback to the team, channels per notifiable, the muted bell still getting mail,
+      the encrypted queued notification, the bell payload with no token, late and nudge wording,
+      the mail view, the generic and the dedicated WhatsApp template, the nudge carrying the same
+      link as the first notification, the push (poster only, tag reuse, `Gone` pruned, no-op when unconfigured), no token in
+      any log line, and the webhook on the first notification only.
+    - `StoryHandoffPageTest` (S-4.1): the payload and its scope (no caption, billing, comments or
+      other channels; one client only), `opened_at` stamped once, every 404 case (wrong, expired,
+      cancelled, superseded, archived client), the read-only finished page, late confirmation from
+      the link, the private headers, the throttle on every token route, the signed-in extras
+      (jump to the post, next story), and `shared` / `posted` / `problem`.
+    - `StoryHandoffMediaTest` (S-4.2): images cropped to 9:16 (and one already 9:16 served as is),
+      video streamed with range and 416 handling, only the first item served and a video ahead of
+      images, 404 for a wrong token or missing media, remote disks, and `parseRange` units.
+    - `StoryHandoffOpenTest` (S-4.4 / S-4.5 / S-5.2): the signed-in open route per role, opening
+      twice giving the same link, the not-ready states (not due, posted, missed), "Mark as
+      posted" (open, late, forbidden, no handoff, twice), and the queue (own stories only, roles,
+      overseeing, `readyCount`, stale handoffs left out, `nextFor`).
+    - `StoryHandoffLinkTest`: the derived token (stable per handoff, new per attempt, healed
+      when the stored hash is out of step), the link lifetime after a late retry, a moved time
+      re-opening the handoff, the recall race, the kill switch going off mid-handoff,
+      `shouldSend()`, and who "everyone on the team" is under client restrictions.
+    - `StoryHandoffTenantScopeTest` + `tests/Unit/Models/TenantScopesTest.php`: the link used
+      by someone signed in to another organization, or restricted to other clients, still
+      confirms / reports and resolves the post; scopes are restored afterwards.
+    - `StoryExtrasPersistenceTest`, `StoryExtrasValidationTest`, `StoryExtrasClientSurfacesTest`
+      (S-1.x): see `posts.md` and `client-portal.md`.
+    - `StorySurfacesTest` (S-5.1 / S-5.2), `StoryReportingHonestyTest` (S-5.3),
+      `StoryMorningHeadsUpTest` (S-3.4), `AgencyPushOptInTest` (S-3.2): see `calendar.md`,
+      `home.md`, `analytics.md` and `notifications.md`.
+    - `StoryHandoffDataLifecycleTest` (S-6.4): the data export carries the handoffs without
+      `token_hash` and only this organization's; an organization purge deletes them.
+    - `tests/Unit/Support/Publishing/StoryExtrasTest.php`: normalising (junk in, unknown keys
+      dropped, trimming, handles and hashtag stripped), what counts as an extra, `problems()`,
+      `checklist()` order, `summary()`, `hasValidLink()` and `publishesPlainIfMissed()`.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): see "Stories with extras" › Known gaps above. In short: the share sheet has
+  not been proven on real phones, so `STORY_HANDOFF_ENABLED` stays `false`; one link per handoff,
+  shared by its recipients; auto-confirm (S-6.1) and Facebook Stories (S-6.3) are not built.
 
 - Phase M-2 (2026-10-20): field names for the five new networks come from Upload-Post's docs and are
   covered by faked-vendor tests only — confirm each against a live sandbox before relying on it, and
@@ -1236,3 +1506,10 @@ $platform): Collection<MusicTrack>` and `find(string $id, Platform $platform): ?
   `NewNetworksPublishTest::test_x_publishes_its_own_title_without_the_fold_spacer` to
   `…_with_hashtags_after_a_blank_line` (its assertion was already `\n\n` and is now the rule, not
   the exception). Note: captions already published keep the dashes — this only changes new sends.
+- 2026-11-13: Phase S — Stories with extras, the assisted lane (`.junie/plans/story-extras.md`). An
+  Instagram Story that carries a link or stickers is held back from the vendor, handed to a person
+  at its time and confirmed by them. New `story_handoffs` table and `StoryHandoff`, the
+  `App\Actions\Stories\*` actions, the `stories:process-handoffs` sweep, the `/story/{token}` page
+  and its signed-in routes, `StoryNotPosted` / `StoryProblemReported` failure reasons, and the
+  lane split in `PublishPostJob::dispatchTargets()`. Kill switch `STORY_HANDOFF_ENABLED`, off by
+  default. See the "Stories with extras" section above.

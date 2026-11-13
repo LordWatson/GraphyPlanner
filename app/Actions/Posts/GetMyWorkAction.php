@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Stories\GetStoryQueueAction;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\User;
@@ -13,6 +14,9 @@ use Illuminate\Support\Carbon;
  * Step M-5.4 — one person's work across every client: what's assigned to them, waiting on their
  * review, due soon or overdue, and where they've been mentioned. The org scope keeps it to the
  * viewer's own organization; every bucket is their own records only.
+ *
+ * Step S-5.2: `stories` is the viewer's own assisted Stories that are ready to post now or due
+ * inside the next day (`GetStoryQueueAction` rows, `state` `ready` / `upcoming`).
  */
 class GetMyWorkAction
 {
@@ -23,6 +27,8 @@ class GetMyWorkAction
         PostStatus::Idea, PostStatus::Draft, PostStatus::InternalReview, PostStatus::WaitingClient,
         PostStatus::ChangesRequested, PostStatus::Approved, PostStatus::Scheduled, PostStatus::Failed,
     ];
+
+    public function __construct(private readonly GetStoryQueueAction $storyQueue) {}
 
     /**
      * @return array<string, array<int, array<string, mixed>>>
@@ -59,6 +65,7 @@ class GetMyWorkAction
             ->get();
 
         return [
+            'stories' => ($this->storyQueue)($user),
             'due' => $due->map(fn (Post $post) => ContentHubPresenter::row($post, $user))->all(),
             'review' => $review->map(fn (Post $post) => ContentHubPresenter::row($post, $user))->all(),
             'assigned' => $assigned->map(fn (Post $post) => ContentHubPresenter::row($post, $user))->all(),
@@ -73,6 +80,6 @@ class GetMyWorkAction
     {
         return Post::query()
             ->whereIn('status', array_map(fn (PostStatus $status) => $status->value, self::ACTIVE))
-            ->with(['client:id,name', 'campaign', 'creator:id,name', 'assignee:id,name', 'targets.socialAccount', 'assets:id']);
+            ->with(['client:id,name', 'campaign', 'creator:id,name', 'assignee:id,name', 'targets.socialAccount', 'targets.openStoryHandoff', 'targets.postedStoryHandoff', 'assets:id']);
     }
 }

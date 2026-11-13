@@ -362,8 +362,19 @@ export function ClientReportDocument({
                                                 className="text-muted-foreground size-4 shrink-0"
                                                 aria-hidden
                                             />
-                                            <span className="truncate">
-                                                {row.label}
+                                            <span className="flex min-w-0 flex-col">
+                                                <span className="truncate">
+                                                    {row.label}
+                                                </span>
+                                                {/* Step S-5.3: no numbers for a Story posted by hand. */}
+                                                {(row.posted_by_hand ?? 0) >
+                                                    0 && (
+                                                    <span className="text-muted-foreground text-xs">
+                                                        {row.posted_by_hand}{' '}
+                                                        posted by hand ·
+                                                        engagement not available
+                                                    </span>
+                                                )}
                                             </span>
                                         </span>
                                         {row.available ? (

@@ -36,7 +36,7 @@ class PortalCalendarController extends Controller
 
         return Inertia::render('portal/calendar', [
             'client' => ['name' => $user->client->name],
-            'occurrences' => fn () => $buildOccurrences($getPosts($user, $window, $status, $campaignId, $platform), $orgTimezone),
+            'occurrences' => fn () => $buildOccurrences($getPosts($user, $window, $status, $campaignId, $platform), $orgTimezone, forClient: true),
             'window' => $window->toArray(),
             'orgTimezone' => $orgTimezone,
             'filters' => [

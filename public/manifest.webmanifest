@@ -48,6 +48,12 @@
             "short_name": "Today",
             "description": "What's going out and what needs you.",
             "url": "/today?source=pwa"
+        },
+        {
+            "name": "Stories to post",
+            "short_name": "Stories",
+            "description": "Stories ready to post by hand.",
+            "url": "/stories/to-post?source=pwa"
         }
     ],
     "share_target": {

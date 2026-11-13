@@ -6,6 +6,7 @@ use App\Enums\ApprovalMode;
 use App\Enums\ApprovalPolicy;
 use App\Enums\BillingCycle;
 use App\Enums\ClientStatus;
+use App\Enums\StoryHandoffRecipient;
 use App\Support\Options\CurrencyOptions;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -37,6 +38,9 @@ class UpdateClientRequest extends FormRequest
             // Step I-3.8 / M-2.9: how this client's new posts get approved.
             'default_approval_mode' => ['nullable', new Enum(ApprovalMode::class)],
             'approval_policy' => ['nullable', new Enum(ApprovalPolicy::class)],
+            // Step S-1.5: who posts this client's Stories with links and stickers by hand. Editing
+            // a client is Owner/Strategist only (`ClientPolicy::update`), so this is too.
+            'story_handoff_recipient' => ['sometimes', 'required', new Enum(StoryHandoffRecipient::class)],
             'owner_user_id' => ['nullable', Rule::exists('users', 'id')->where('org_id', $this->user()->org_id)],
             'start_date' => ['nullable', 'date'],
             'retainer_amount' => ['nullable', 'numeric', 'min:0'],

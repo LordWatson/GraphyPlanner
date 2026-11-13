@@ -21,6 +21,7 @@ use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Posts\UpdatePostAction;
 use App\Actions\Publishing\RetryFailedPostTargetsAction;
 use App\Actions\Publishing\SearchMusicAction;
+use App\Actions\Stories\ResolveStoryPosterAction;
 use App\Enums\CampaignStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
@@ -129,6 +130,7 @@ class PostController extends Controller
         BestTimeService $bestTime,
         PostWorkflowResolver $workflows,
         AiAccess $aiAccess,
+        ResolveStoryPosterAction $storyPosters,
     ): Response {
         $this->authorize('view', $post);
 
@@ -139,6 +141,9 @@ class PostController extends Controller
             // Step I-2.6: the editor reads the client and its brand brain (hashtag policy).
             'client.brandBrain',
             'targets.socialAccount',
+            // Step S-5.1: the assisted lane's state per channel (`PostTarget::handoffState()`).
+            'targets.openStoryHandoff',
+            'targets.postedStoryHandoff',
             'assets',
             'coverAsset',
             'campaign',
@@ -212,7 +217,11 @@ class PostController extends Controller
                 // Step B-3.2 / B-3.4: the one-tap schedule and the share-preview link.
                 'quick_schedule' => $user->can('transition', [$post, PostStatus::Scheduled]),
                 'share_preview' => $user->can('sharePreview', $post),
+                // Step S-4.5 / S-5.2: open a Story's handoff, or mark it as posted, from here.
+                'post_story_by_hand' => $user->can('postStoryByHand', $post),
             ],
+            // Step S-1.4: what the Story extras panel needs to say who will post it by hand.
+            'storyHandoff' => $storyPosters->editorOptions($post),
             // Step B-3.2: the business editor's one-tap primary action reads this to pick its label
             // ("Schedule"/"Post now" when review is off, "Send for review" when it's on).
             'workflow' => [
@@ -630,6 +639,8 @@ class PostController extends Controller
                 'caption_limit' => $target->socialAccount?->platform?->captionLimit(),
                 'is_text_only_capable' => $target->socialAccount?->platform?->isTextOnlyCapable() ?? false,
                 ...PostMediaPresenter::channel($target->setRelation('post', $post)),
+                // Step S-5.1: `needs_hand_posting` / `ready_to_post` / `posted_by_hand`, or null.
+                'handoff_state' => $target->handoffState(),
                 'scheduled_local_date' => $target->scheduled_local_date?->toDateString(),
                 'scheduled_local_time' => $target->scheduled_local_time,
                 'scheduled_at_utc' => $target->scheduled_at_utc?->toIso8601String(),

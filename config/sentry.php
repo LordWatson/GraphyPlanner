@@ -58,6 +58,9 @@ return [
     // Step I-16.1 / M-1.1: strip API keys, tokens, passwords, signatures and cookies from every
     // event before it leaves the app (an array callable, so `config:cache` still works).
     'before_send' => [SecretScrubber::class, 'beforeSend'],
+    // Performance traces carry the request URL too (`/story/{token}`, `/review/{token}`), and
+    // only this hook sees them.
+    'before_send_transaction' => [SecretScrubber::class, 'beforeSend'],
 
     // Configures which data is collected automatically, `null` keeps collecting data based on `send_default_pii`
     'data_collection' => null,

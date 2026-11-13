@@ -77,7 +77,8 @@ export function DatePicker({
                             : ariaLabel
                     }
                     className={cn(
-                        'h-10 w-full justify-start gap-2 px-3 font-normal',
+                        // A form field, so it wears the input shape (§6 Inputs), not the pill.
+                        'border-input bg-card hover:border-foreground/60 hover:bg-card dark:border-input h-10 w-full justify-start gap-2 rounded-lg border-2 px-3 font-normal has-[>svg]:px-3',
                         !value && 'text-muted-foreground',
                         className,
                     )}

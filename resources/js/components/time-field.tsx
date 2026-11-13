@@ -5,7 +5,7 @@ const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
 
 const selectClasses =
-    'border-input bg-card focus-visible:border-ring focus-visible:ring-ring/25 aria-invalid:border-destructive hover:border-foreground/60 min-w-0 flex-1 rounded-lg border-2 px-2 text-center font-mono text-xs transition-[color,box-shadow,border-color] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50';
+    'border-input bg-card focus-visible:border-ring focus-visible:ring-ring/25 aria-invalid:border-destructive hover:border-foreground/60 min-w-0 flex-1 rounded-lg border-2 px-2 text-center font-mono transition-[color,box-shadow,border-color] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * The shared local-time field (`HH:MM`, 24-hour), split into two dropdowns — hour and quarter-hour —
@@ -63,7 +63,9 @@ export function TimeField({
         onChange?.(next);
     };
 
-    const heightClass = size === 'sm' ? 'h-8' : 'h-10';
+    // 16px on phones at the default size, so iOS doesn't zoom the page on focus.
+    const heightClass =
+        size === 'sm' ? 'h-8 text-xs' : 'h-10 text-base md:text-[13px]';
 
     return (
         <div className={cn('flex items-center gap-1', className)}>

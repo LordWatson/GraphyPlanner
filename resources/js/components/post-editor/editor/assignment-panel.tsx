@@ -25,7 +25,6 @@ export function AssignmentPanel({
 
     return (
         <Panel
-            eyebrow="05"
             title="Assignment"
             description="Who owns this post, who reviews it, and when it's due."
             className="mt-5"
@@ -97,7 +96,7 @@ function StaffSelect({
             value={value || UNASSIGNED}
             onValueChange={(next) => onChange(next === UNASSIGNED ? '' : next)}
         >
-            <SelectTrigger id={id}>
+            <SelectTrigger id={id} className="w-full">
                 <SelectValue placeholder="Unassigned" />
             </SelectTrigger>
             <SelectContent>

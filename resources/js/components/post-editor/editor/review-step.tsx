@@ -15,6 +15,7 @@ export type ReviewStepCan = {
     comment: boolean;
     resend_review_email: boolean;
     retry_failed_targets: boolean;
+    post_story_by_hand?: boolean;
     delete: boolean;
     override_approval: boolean;
     quick_schedule: boolean;
@@ -103,6 +104,7 @@ export function ReviewStep({
                 mentionableUsers={mentionableUsers}
                 canResendReviewEmail={can.resend_review_email}
                 canRetryFailedTargets={can.retry_failed_targets}
+                canPostStoryByHand={can.post_story_by_hand}
                 canDelete={can.delete}
                 canOverrideApproval={can.override_approval}
             />

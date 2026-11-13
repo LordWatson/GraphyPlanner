@@ -106,7 +106,7 @@ export function HashtagInput({
 
     return (
         <div className="relative">
-            <div className="border-input focus-within:border-ring focus-within:ring-ring/50 dark:bg-input/30 flex flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5 focus-within:ring-[3px]">
+            <div className="border-input bg-card hover:border-foreground/60 focus-within:border-ring hover:focus-within:border-ring focus-within:ring-ring/25 flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border-2 px-2 py-1 transition-[box-shadow,border-color] focus-within:ring-[3px]">
                 {value.map((tag) => (
                     <Badge
                         key={tag}
@@ -141,7 +141,7 @@ export function HashtagInput({
                         setTimeout(() => setIsFocused(false), 150);
                     }}
                     placeholder={value.length === 0 ? placeholder : ''}
-                    className="h-7 min-w-[8rem] flex-1 border-none bg-transparent p-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+                    className="h-7 min-w-24 flex-1 border-none bg-transparent px-1 py-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
                 />
             </div>
 

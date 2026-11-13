@@ -4,15 +4,18 @@ namespace Tests\Feature\Security;
 
 use App\Contracts\VirusScanner;
 use App\Enums\Role;
+use App\Http\Middleware\SecurityHeaders;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
 use App\Rules\SafeUpload;
 use App\Services\Security\ClamAvVirusScanner;
+use App\Support\Observability\SecretScrubber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -110,6 +113,61 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Content-Security-Policy-Report-Only');
 
         $this->get('/horizon')->assertHeaderMissing('Content-Security-Policy-Report-Only');
+    }
+
+    /**
+     * A CSP violation report carries the page's full URL to the collector. On a page whose URL is
+     * its token, that would hand the token to a third party.
+     */
+    public function test_a_page_whose_url_is_a_token_is_never_given_a_csp_report_uri(): void
+    {
+        config(['security.csp.report_uri' => 'https://csp.example.test/report']);
+
+        $login = (string) $this->get(route('login'))->assertOk()->headers->get('Content-Security-Policy');
+        $this->assertStringContainsString('report-uri https://csp.example.test/report', $login);
+
+        $token = Str::random(64);
+        $paths = [
+            route('story-handoff.show', ['token' => $token]),
+            route('story-handoff.media', ['token' => $token]),
+            route('review.show', ['token' => $token]),
+            '/kit/'.$token,
+            '/share/campaigns/'.$token,
+            '/portal-login/'.$token,
+        ];
+
+        foreach ($paths as $path) {
+            $csp = (string) $this->get($path)->headers->get('Content-Security-Policy');
+
+            // Still protected by the policy itself; only the reporting is left off.
+            $this->assertStringContainsString("default-src 'self'", $csp, $path);
+            $this->assertStringNotContainsString('report-uri', $csp, $path);
+            $this->assertStringNotContainsString('csp.example.test', $csp, $path);
+        }
+    }
+
+    public function test_the_csp_report_uri_is_left_off_only_when_asked(): void
+    {
+        config(['security.csp.report_uri' => 'https://csp.example.test/report']);
+        $headers = new SecurityHeaders;
+
+        $this->assertStringContainsString('report-uri https://csp.example.test/report', $headers->contentSecurityPolicy('abc', false));
+        $this->assertStringNotContainsString('report-uri', $headers->contentSecurityPolicy('abc', false, false));
+        $this->assertSame(
+            $headers->contentSecurityPolicy('abc', false, false).'; report-uri https://csp.example.test/report',
+            $headers->contentSecurityPolicy('abc', false),
+        );
+    }
+
+    /**
+     * Performance traces carry the request URL (`/story/{token}`), and only the transaction hook
+     * sees them: it must be the same scrubber the error hook uses.
+     */
+    public function test_sentry_scrubs_transactions_as_well_as_errors(): void
+    {
+        $this->assertSame([SecretScrubber::class, 'beforeSend'], config('sentry.before_send'));
+        $this->assertSame([SecretScrubber::class, 'beforeSend'], config('sentry.before_send_transaction'));
+        $this->assertIsCallable(config('sentry.before_send_transaction'));
     }
 
     // --- Password confirmation -------------------------------------------------------------

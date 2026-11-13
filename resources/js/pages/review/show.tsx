@@ -8,6 +8,8 @@ import type { FeedbackThread } from '@/components/feedback/types';
 import InputError from '@/components/input-error';
 import { platformIcon } from '@/components/platform-icon';
 import { ReviewChanges } from '@/components/posts/review-changes';
+import type { ClientStory } from '@/components/posts/story-extras-note';
+import { StoryExtrasNote } from '@/components/posts/story-extras-note';
 import { PublicShell, PublicTitle } from '@/components/public-shell';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
@@ -29,6 +31,8 @@ type TargetData = {
     published_caption?: string;
     first_comment?: string | null;
     format?: string | null;
+    /** Step S-1.5: a Story's link and stickers, when it is posted by hand. */
+    story?: ClientStory | null;
 };
 
 type CommentData = {
@@ -267,6 +271,13 @@ export default function ReviewShow({
                                 </ul>
                             </section>
                         )}
+
+                        <StoryExtrasNote
+                            stories={post.targets.map((target) => ({
+                                handle: target.handle,
+                                story: target.story,
+                            }))}
+                        />
 
                         {post.can_decide ? (
                             <Form
