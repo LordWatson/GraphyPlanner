@@ -63,7 +63,7 @@ class BrandFitScorer
 
         // A phrase the brand never uses — the strongest negative (and already guardrail-dropped).
         foreach ([...$neverUse, ...$doNots] as $banned) {
-            if (str_contains($haystack, mb_strtolower($banned))) {
+            if (str_contains($haystack, mb_strtolower(ltrim($banned, '#')))) {
                 $score -= 45;
                 $reasons = ['Uses a phrase the brand avoids: '.$banned];
                 break;

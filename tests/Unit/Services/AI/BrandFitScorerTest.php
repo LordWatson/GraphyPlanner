@@ -48,6 +48,16 @@ class BrandFitScorerTest extends TestCase
         $this->assertStringContainsString('cheap', $result['reason']);
     }
 
+    public function test_a_never_use_hashtag_stored_with_a_hash_scores_low_when_returned_bare(): void
+    {
+        $brain = $this->brain();
+        $brain->hashtag_policy = ['always_use' => [], 'never_use' => ['#cheap'], 'rotation_notes' => null];
+
+        $result = (new BrandFitScorer)->score($brain, new AiCaptionSuggestion('A lovely fresh loaf for the weekend.', ['cheap'], null, null));
+
+        $this->assertLessThan(50, $result['score']);
+    }
+
     public function test_a_do_not_phrase_also_scores_low(): void
     {
         $result = (new BrandFitScorer)->score(

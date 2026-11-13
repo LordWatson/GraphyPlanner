@@ -262,7 +262,8 @@ class AiGuardrailService
     {
         $fromBrandBrain = $brandBrain === null ? [] : array_merge(
             $brandBrain->voice['do_nots'] ?? [],
-            $brandBrain->hashtag_policy['never_use'] ?? [],
+            // Banned with or without its "#": models return bare tags as often as hashed ones.
+            array_map(fn ($tag) => is_string($tag) ? ltrim(trim($tag), '#') : $tag, $brandBrain->hashtag_policy['never_use'] ?? []),
         );
 
         $fromConfig = (array) config('ai.guardrails.prohibited_topics', []);

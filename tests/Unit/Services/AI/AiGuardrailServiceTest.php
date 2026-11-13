@@ -81,6 +81,21 @@ class AiGuardrailServiceTest extends TestCase
         $this->assertSame(['#brand'], $result->suggestions[0]->hashtags);
     }
 
+    public function test_a_never_use_hashtag_is_rejected_when_the_model_returns_it_without_the_hash(): void
+    {
+        $brandBrain = BrandBrain::factory()->make(); // hashtag_policy.never_use: ['#competitor']
+
+        $suggestions = new AiCaptionSuggestions([
+            new AiCaptionSuggestion(caption: 'Great post', hashtags: ['competitor']),
+            new AiCaptionSuggestion(caption: 'Another post', hashtags: ['brand']),
+        ]);
+
+        $result = (new AiGuardrailService)->filterCaptionSuggestions($brandBrain, $suggestions);
+
+        $this->assertCount(1, $result->suggestions);
+        $this->assertSame(['brand'], $result->suggestions[0]->hashtags);
+    }
+
     public function test_globally_prohibited_topics_are_rejected_across_all_surfaces(): void
     {
         Config::set('ai.guardrails.prohibited_topics', ['politics']);

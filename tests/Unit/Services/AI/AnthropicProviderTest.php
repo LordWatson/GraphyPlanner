@@ -6,12 +6,17 @@ use App\Contracts\AiProvider;
 use App\Enums\CampaignStatus;
 use App\Models\BrandBrain;
 use App\Models\Campaign;
+use App\Enums\WritingTool;
 use App\Models\Client;
+use App\Models\GridPlan;
+use App\Models\InboxConversation;
 use App\Models\Post;
 use App\Services\AI\AnthropicProvider;
 use App\Support\AI\AiCaptionSuggestions;
 use App\Support\AI\AiPostIdeas;
 use App\Support\AI\AiTrends;
+use App\Support\AI\IdeaContext;
+use App\Support\AI\Images\ImageBriefInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -393,6 +398,53 @@ class AnthropicProviderTest extends TestCase
                 && str_contains($system, '#AcmeMoves')
                 && str_contains($system, 'Quick workouts');
         });
+    }
+
+    /**
+     * Every client-facing method must send the Brand Brain, not just the three above. A new method
+     * that builds its own system prompt and forgets the context fails here.
+     */
+    public function test_every_client_grounded_method_sends_the_brand_brain(): void
+    {
+        // An empty object fails each method's schema check; the prompt is still sent, which is all this asserts.
+        Http::fake(['*/v1/messages' => Http::response($this->chatResponse([]), 200)]);
+
+        $client = $this->clientWithBrandBrain();
+        $post = Post::factory()->create(['client_id' => $client->id, 'master_caption' => 'Move more today']);
+        $campaign = Campaign::factory()->for($client)->create();
+        $plan = GridPlan::factory()->create(['client_id' => $client->id]);
+        $conversation = InboxConversation::factory()->create(['client_id' => $client->id, 'org_id' => $client->org_id]);
+        $provider = new AnthropicProvider;
+
+        $calls = [
+            'recommendLocalPosts' => fn () => $provider->recommendLocalPosts($client, new IdeaContext('Europe/London')),
+            'repurpose' => fn () => $provider->repurpose($post, ['instagram']),
+            'rewrite' => fn () => $provider->rewrite($client, 'Move more today', WritingTool::Shorten),
+            'draftReply' => fn () => $provider->draftReply($client, $conversation),
+            'draftImageBrief' => fn () => $provider->draftImageBrief($client, new ImageBriefInput('Morning stretch')),
+            'draftCampaignBrief' => fn () => $provider->draftCampaignBrief($campaign),
+            'planCampaign' => fn () => $provider->planCampaign($campaign, ['platforms' => ['instagram'], 'phases' => [], 'pillars' => [], 'start' => '2026-01-01', 'end' => '2026-01-31', 'max' => 3]),
+            'draftCampaignWrap' => fn () => $provider->draftCampaignWrap($campaign, ['kpis' => [], 'top_posts' => [], 'published' => 0, 'success_measures' => null]),
+            'suggestTileCaptions' => fn () => $provider->suggestTileCaptions($plan, [['tile_id' => 1, 'position' => 1, 'kind' => 'post', 'description' => 'Gym floor']]),
+            'checkGridBalance' => fn () => $provider->checkGridBalance($plan, [['position' => 1, 'row' => 1, 'kind' => 'post', 'colours' => ['#111111'], 'description' => 'Gym floor']]),
+        ];
+
+        foreach ($calls as $method => $call) {
+            $call();
+        }
+
+        $sent = Http::recorded()->map(fn (array $pair) => $pair[0]);
+        $this->assertGreaterThanOrEqual(count($calls), $sent->count());
+
+        foreach ($sent as $request) {
+            $system = $request['system'];
+
+            $this->assertStringContainsString('Ground everything you propose in the company context below', $system);
+            $this->assertStringContainsString('Playful and bold', $system);
+            $this->assertStringContainsString('Never shame bodies', $system);
+            $this->assertStringContainsString('#AcmeMoves', $system);
+            $this->assertStringContainsString('Quick workouts', $system);
+        }
     }
 
     public function test_suggest_captions_grounds_the_prompt_in_the_brand_brain_and_post_campaign(): void
