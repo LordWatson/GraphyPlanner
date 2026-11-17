@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 import { http } from '@/lib/http';
@@ -16,6 +17,9 @@ import {
  * doesn't, so nothing here waits on `serviceWorker.ready` before a registration exists (it would
  * never settle): state is read from `getRegistration()`, and the worker is registered when the
  * user opts in.
+ *
+ * Inside the native shell (Capacitor) there is no service worker to subscribe: the same toggle
+ * registers the phone's FCM device token instead (`@/lib/native-push`, loaded on demand).
  */
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
@@ -50,15 +54,20 @@ export type PushState = {
 };
 
 export function usePush(): PushState {
-    const { pwa } = usePage().props;
+    const { pwa, auth } = usePage().props;
+    const native = Capacitor.isNativePlatform();
+    const userId = auth?.user?.id ?? null;
     const publicKey = pwa?.pushPublicKey ?? null;
-    const configured = Boolean(pwa?.pushEnabled && publicKey);
+    const configured = native
+        ? Boolean(pwa?.nativePushEnabled && userId !== null)
+        : Boolean(pwa?.pushEnabled && publicKey);
 
     const supported =
-        typeof window !== 'undefined' &&
-        'serviceWorker' in navigator &&
-        'PushManager' in window &&
-        'Notification' in window;
+        native ||
+        (typeof window !== 'undefined' &&
+            'serviceWorker' in navigator &&
+            'PushManager' in window &&
+            'Notification' in window);
 
     const [subscribed, setSubscribed] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -69,9 +78,24 @@ export function usePush(): PushState {
             return;
         }
 
-        setBlocked(Notification.permission === 'denied');
-
         let cancelled = false;
+
+        if (native) {
+            void import('@/lib/native-push').then(async (push) => {
+                const isBlocked = await push.isBlocked();
+
+                if (!cancelled) {
+                    setBlocked(isBlocked);
+                    setSubscribed(userId !== null && push.isOptedIn(userId));
+                }
+            });
+
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        setBlocked(Notification.permission === 'denied');
 
         navigator.serviceWorker
             .getRegistration()
@@ -86,16 +110,30 @@ export function usePush(): PushState {
         return () => {
             cancelled = true;
         };
-    }, [supported]);
+    }, [supported, native, userId]);
 
     const subscribe = useCallback(async () => {
-        if (!supported || !configured || !publicKey || busy) {
+        if (!supported || !configured || busy) {
             return;
         }
 
         setBusy(true);
 
         try {
+            if (native) {
+                const push = await import('@/lib/native-push');
+                const outcome = await push.enable(userId as number);
+
+                setSubscribed(outcome === 'subscribed');
+                setBlocked(outcome === 'blocked');
+
+                return;
+            }
+
+            if (!publicKey) {
+                return;
+            }
+
             const permission = await Notification.requestPermission();
 
             if (permission !== 'granted') {
@@ -128,7 +166,7 @@ export function usePush(): PushState {
         } finally {
             setBusy(false);
         }
-    }, [supported, configured, publicKey, busy]);
+    }, [supported, configured, publicKey, busy, native, userId]);
 
     const unsubscribe = useCallback(async () => {
         if (!supported || busy) {
@@ -138,6 +176,13 @@ export function usePush(): PushState {
         setBusy(true);
 
         try {
+            if (native) {
+                await (await import('@/lib/native-push')).disable();
+                setSubscribed(false);
+
+                return;
+            }
+
             const registration =
                 await navigator.serviceWorker.getRegistration();
             const subscription =
@@ -154,7 +199,7 @@ export function usePush(): PushState {
         } finally {
             setBusy(false);
         }
-    }, [supported, busy]);
+    }, [supported, busy, native]);
 
     return {
         supported,

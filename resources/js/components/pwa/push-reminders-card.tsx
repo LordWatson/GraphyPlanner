@@ -61,8 +61,9 @@ export function PushRemindersCard({
 
             {blocked ? (
                 <p className="text-muted-foreground text-sm">
-                    Notifications are blocked for Alima in this browser. Turn
-                    them back on in your browser settings to use reminders.
+                    Notifications are blocked for Alima on this device. Turn
+                    them back on in your browser or phone settings to use
+                    reminders.
                 </p>
             ) : (
                 <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">

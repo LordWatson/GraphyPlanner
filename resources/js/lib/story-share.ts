@@ -14,6 +14,8 @@
  *    lead with "Save media" instead of offering a button that does nothing.
  */
 
+import { Capacitor } from '@capacitor/core';
+
 export type ShareOutcome =
     /** The share sheet took it (the poster may still have picked something other than Instagram). */
     | 'shared'
@@ -36,6 +38,11 @@ function shareNavigator(): ShareNavigator | null {
 
 /** Whether this browser will hand this file to another app. */
 export function canShareFile(file: File | null): boolean {
+    // The native shell shares through the OS sheet (an Android WebView has no `navigator.share`).
+    if (file && Capacitor.isNativePlatform()) {
+        return true;
+    }
+
     const nav = shareNavigator();
 
     if (!nav || !file || typeof nav.share !== 'function') {
@@ -85,6 +92,15 @@ export async function shareStory({
     const copying = link ? copyText(link) : Promise.resolve(false);
 
     onStart?.();
+
+    if (Capacitor.isNativePlatform()) {
+        const { shareFileNatively } = await import('@/lib/native-share');
+
+        return {
+            outcome: await shareFileNatively(file),
+            copied: await copying,
+        };
+    }
 
     if (!nav || !canShareFile(file)) {
         return { outcome: 'unsupported', copied: await copying };

@@ -18,7 +18,12 @@ declare module '@inertiajs/core' {
             /** Step B-1.3: the workspace shell (null for org-less super admins). */
             workspace: Workspace | null;
             /** Step B-7 / S-3.2: the push opt-in config (null for an org-less user or a client reviewer). */
-            pwa: { pushEnabled: boolean; pushPublicKey: string | null } | null;
+            pwa: {
+                pushEnabled: boolean;
+                pushPublicKey: string | null;
+                /** Native shell: a device token can be registered (FCM). */
+                nativePushEnabled: boolean;
+            } | null;
             unreadNotificationsCount: number;
             currency: string;
             /** Step M-2.1: the platform capability registry (`usePlatforms()`). */

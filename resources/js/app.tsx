@@ -7,8 +7,12 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import ClientPortalLayout from '@/layouts/client-portal/client-portal-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { initNativeShell } from '@/lib/native-shell';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Alima';
+
+// Inside the iOS / Android wrapper only: native push, camera and deep links. A no-op on the web.
+initNativeShell();
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
