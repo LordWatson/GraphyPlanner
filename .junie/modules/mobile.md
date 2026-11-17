@@ -99,9 +99,11 @@ Regenerate icons/splash with `npx @capacitor/assets generate --assetPath native/
 
 ## Known Gaps / Open Questions
 
-- **Nothing native has been run.** The dev machine has no JDK, Android SDK or Mac, so neither
-  project has been compiled and no flow (login, push, camera, share, back button, safe areas, the
-  offline page) has been seen on a device or emulator.
+- **Android: built and smoke-tested only.** `gradlew assembleDebug` succeeds and, on an API 36
+  emulator against a local server, the shell opens the sign-in page, the bridge loads, login works
+  and the system bars stay clear of the page. Not exercised: push (needs Firebase), the camera /
+  gallery sheet, Story share, the back button, app links, the offline page.
+- **iOS: never built** (no Mac).
 - **iOS push needs the Firebase SDK.** `@capacitor/push-notifications` returns an APNs token on iOS
   unless Firebase Messaging is added to the Xcode project (SPM) and `AppDelegate` forwards the FCM
   token. Until that is done on a Mac, an iOS token would be rejected by FCM — do not ship iOS push.
@@ -117,7 +119,8 @@ Regenerate icons/splash with `npx @capacitor/assets generate --assetPath native/
 
 ## Owner handoff checklist
 
-1. Install Android Studio (JDK + SDK); `npm run native:sync`; build and run on a device.
+1. Android toolchain: JDK 21 + SDK 36 (set `JAVA_HOME` / `ANDROID_HOME`); `npm run native:sync`;
+   `gradlew assembleDebug` in `native/android`; test push, capture and share on a real device.
 2. Firebase project → add Android app `com.alima.app` → `google-services.json` into
    `native/android/app/`. Add the iOS app → `GoogleService-Info.plist`, Firebase Messaging via SPM,
    forward the FCM token in `AppDelegate`; upload the APNs auth key to Firebase.
@@ -132,4 +135,4 @@ Regenerate icons/splash with `npx @capacitor/assets generate --assetPath native/
 - 2026-11-17: Created. Capacitor 8 shell in remote-URL mode (`native/`), native push over FCM
   behind the existing `PushNotifier` contract, camera / gallery picker for media inputs, native
   Story share, app links, icons and splash. Verified: PHP + Vitest suites, `tsc`, lint, guards,
-  `cap sync`. Not verified: any native build or device run.
+  `cap sync`, Android debug build, login on an emulator. Not verified: iOS, push, capture, share.

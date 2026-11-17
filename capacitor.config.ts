@@ -20,7 +20,8 @@ const config: CapacitorConfig = {
     android: { path: 'native/android' },
     ios: { path: 'native/ios' },
     server: {
-        url: serverUrl,
+        // Open on sign-in, not the marketing home page; a signed-in user is redirected on.
+        url: `${serverUrl.replace(/\/$/, '')}/login`,
         cleartext: serverUrl.startsWith('http://'),
         // Shown when the remote app can't be reached (index.html is the offline page).
         errorPath: 'index.html',
