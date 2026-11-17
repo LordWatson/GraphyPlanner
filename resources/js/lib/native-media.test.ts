@@ -52,6 +52,8 @@ describe('mediaKinds', () => {
         });
         expect(mediaKinds('.csv,text/csv,text/plain')).toBeNull();
         expect(mediaKinds('application/pdf')).toBeNull();
+        // Mixed media + documents (the post editor) stays with the system chooser.
+        expect(mediaKinds('image/*,video/*,.pdf,.zip')).toBeNull();
         expect(mediaKinds('')).toBeNull();
     });
 });

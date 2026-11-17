@@ -57,7 +57,7 @@ Regenerate icons/splash with `npx @capacitor/assets generate --assetPath native/
       (`alima.native-push`), so a second person on the same phone is never subscribed silently.
       `hooks/use-push.ts` branches to it, so `PushRemindersCard` is the one opt-in UI.
     - `lib/native-media.ts` — a capture-phase click listener takes over every
-      `<input type="file">` whose `accept` includes `image/` or `video/`: native action sheet
+      `<input type="file">` whose `accept` lists **only** `image/` / `video/` types: native action sheet
       (take photo / record video / choose from library) → `File`s → set on the input → `change`.
       Pages and upload endpoints are untouched; CSV / PDF inputs keep the system chooser.
     - `lib/native-share.ts` — Story handoff: writes the file to the app cache and opens the OS
@@ -99,10 +99,13 @@ Regenerate icons/splash with `npx @capacitor/assets generate --assetPath native/
 
 ## Known Gaps / Open Questions
 
-- **Android: built and smoke-tested only.** `gradlew assembleDebug` succeeds and, on an API 36
-  emulator against a local server, the shell opens the sign-in page, the bridge loads, login works
-  and the system bars stay clear of the page. Not exercised: push (needs Firebase), the camera /
-  gallery sheet, Story share, the back button, app links, the offline page.
+- **Android: built and checked on an API 36 emulator** against a local server: the shell opens the
+  sign-in page, login works, the system bars stay clear, the back button walks history
+  (`/content` → `/dashboard`), a media-only input opens the native sheet, and "Take photo" hands the
+  page a JPEG `File`. Not exercised: push (needs Firebase), gallery pick and video (no media on
+  the emulator), Story share, app links, the offline page, any real device.
+- The post editor and MCP upload inputs also accept documents, so they keep the **system chooser**
+  (which offers camera, gallery and files) rather than the native sheet — see `mediaKinds()`.
 - **iOS: never built** (no Mac).
 - **iOS push needs the Firebase SDK.** `@capacitor/push-notifications` returns an APNs token on iOS
   unless Firebase Messaging is added to the Xcode project (SPM) and `AppDelegate` forwards the FCM

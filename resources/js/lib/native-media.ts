@@ -16,14 +16,23 @@ import { fetchBlob } from '@/lib/http';
 
 export type MediaKinds = { image: boolean; video: boolean };
 
-/** What a file input's `accept` allows, or null when it isn't a media input. */
+/**
+ * What a file input's `accept` allows, or null when it isn't a media-only input. An input that
+ * also takes documents (the post editor: PDFs, decks, zips) is left to the system chooser, which
+ * offers the camera and the gallery as well — taking it over would make documents unreachable.
+ */
 export function mediaKinds(accept: string): MediaKinds | null {
+    const types = accept
+        .split(',')
+        .map((type) => type.trim())
+        .filter(Boolean);
     const kinds = {
-        image: /image\//.test(accept),
-        video: /video\//.test(accept),
+        image: types.some((type) => type.startsWith('image/')),
+        video: types.some((type) => type.startsWith('video/')),
     };
+    const mediaOnly = types.every((type) => /^(image|video)\//.test(type));
 
-    return kinds.image || kinds.video ? kinds : null;
+    return mediaOnly && (kinds.image || kinds.video) ? kinds : null;
 }
 
 async function toFile(result: MediaResult): Promise<File> {
