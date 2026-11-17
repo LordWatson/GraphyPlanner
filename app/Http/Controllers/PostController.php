@@ -238,6 +238,8 @@ class PostController extends Controller
             // Campaigns enhancement C-1.3 / C-4.2: the client's open campaigns (plus the post's
             // own, whatever its status) with what joining each offers the post.
             'campaignOptions' => $this->campaignOptions($post, $defaults),
+            // The places the Location picker offers ({id, name}); the id is Instagram's location_id.
+            'locationOptions' => config('instagram_locations'),
             'mentionableUsers' => $mentionableUsers->map(fn ($mentionable) => [
                 'id' => $mentionable->id,
                 'name' => $mentionable->name,

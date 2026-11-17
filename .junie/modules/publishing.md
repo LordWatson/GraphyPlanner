@@ -56,7 +56,8 @@ adds a per-platform rollout gate (Instagram feed → Reels → TikTok → Facebo
           publish: an unreadable image, an animated GIF, or an image already in shape goes out as the
           original. Skipped for videos, remote (URL-only) images (logged), and AI-generated images sent to
           LinkedIn (re-encoding would strip the C2PA credentials LinkedIn reads).
-    - Instagram: `location_id` (`Post::location['id']`), `media_type` (`REELS` for a first attached video
+    - Instagram: `location_id` (`Post::location['id']` — a numeric Facebook Page/Place ID picked in the
+      editor from `config/instagram_locations.php`; Upload-Post ignores non-numeric values), `media_type` (`REELS` for a first attached video
       asset, `IMAGE` for image — `STORIES` isn't derivable from any existing field, always skipped), and
       `audio_id`/`audio_name` (`Post::music['id']`, falling back to `Post::music['name']` only when no
       real id is set, per spec §7.1).

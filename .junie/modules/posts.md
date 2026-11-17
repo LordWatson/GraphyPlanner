@@ -73,6 +73,16 @@ Resend) a `ReviewToken`-scoped link whenever a post lands in `waiting_client`.
   call to keep `Post::checklist_snapshot` fresh, and re-run (not just read from the snapshot) inside
   `TransitionPostRequest` before any move to `scheduled` so a stale snapshot can never let an
   incomplete post through.
+- **Location picker** — `config/instagram_locations.php` lists the places the editor's Location
+  field offers as `{id, name}` rows (~1,130 UK and UAE cities, areas, landmarks and venues; `id` is
+  what Upload-Post sends to Instagram as `location_id`). Two sections: Facebook place IDs (Wikidata
+  P1997 + Facebook's public Places pages — the kind Upload-Post documents) and Instagram location
+  IDs (from `instagram.com/explore/locations/{id}` URLs found by web search — not yet confirmed to
+  be accepted as `location_id`). `PostController::edit` passes it as `locationOptions`; the editor
+  renders the shared `Combobox` and submits `location[id]` + `location[name]`.
+  `StorePostRequest`/`UpdatePostRequest` reject a `location.id` that isn't in the config. A name
+  typed before the picker existed (no id) shows as the placeholder and is kept until replaced. Known
+  gap: a hand-kept list with patchy coverage — swap for a live Meta Pages Search lookup once API access exists.
 - `App\Actions\Posts\UpdatePostAction` (Step 0.10): updates a post's content fields
   (`master_caption`/`review_message`/`hashtags`/`music`/`location`/`campaign_id`/`approval_mode`); when `targets`/
   `asset_ids` keys are present in the input they **fully replace** the post's `PostTarget`s /

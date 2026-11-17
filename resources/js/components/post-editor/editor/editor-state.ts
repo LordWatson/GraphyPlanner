@@ -19,6 +19,7 @@ export type EditorState = {
     schedule: ScheduleRows;
     musicId: string;
     musicName: string;
+    locationId: string;
     locationName: string;
     mediaFormat: MediaFormat;
     /** Framing of the attached media only, keyed by asset id. */
@@ -112,6 +113,7 @@ export function initialEditorState(
         ),
         musicId: (post.music?.id as string) ?? '',
         musicName: (post.music?.name as string) ?? '',
+        locationId: (post.location?.id as string) ?? '',
         locationName: (post.location?.name as string) ?? '',
         mediaFormat: { ...post.media_format },
         crops: Object.fromEntries(

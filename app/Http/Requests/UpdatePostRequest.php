@@ -61,6 +61,9 @@ class UpdatePostRequest extends FormRequest
             'thumb_offset_ms' => ['nullable', 'integer', 'min:0', 'max:86400000'],
             'music' => ['nullable', 'array'],
             'location' => ['nullable', 'array'],
+            // Instagram only accepts a known Facebook place ID — see config/instagram_locations.php.
+            'location.id' => ['nullable', Rule::in(array_column(config('instagram_locations'), 'id'))],
+            'location.name' => ['nullable', 'string', 'max:255'],
 
             // Step CG-5.1 (B-11.1) / CG-5.2: the paid-partnership declaration, who it's with, and
             // the deal it delivers (this brand's own only — a bare `exists:` would take another's).

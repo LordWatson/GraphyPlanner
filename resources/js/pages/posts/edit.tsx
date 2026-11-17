@@ -70,6 +70,7 @@ export default function PostEdit({
     can,
     hashtagSuggestions,
     campaignOptions,
+    locationOptions,
     mentionableUsers,
     ai,
     imageStudio,
@@ -106,6 +107,7 @@ export default function PostEdit({
     };
     hashtagSuggestions: string[];
     campaignOptions: CampaignOption[];
+    locationOptions: { id: string; name: string }[];
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
     imageStudio?: ImageStudioData | null;
@@ -161,6 +163,7 @@ export default function PostEdit({
         client,
         targetAccounts,
         campaignOptions,
+        locationOptions,
         hashtagSuggestions,
         mediaFormatOptions,
         staff,

@@ -189,6 +189,52 @@ class PostEditorControllerTest extends TestCase
     }
 
     /**
+     * The Location picker saves a place from config/instagram_locations.php as {id, name} — the id
+     * is what Upload-Post sends to Instagram — and the editor is handed the list to search.
+     */
+    public function test_update_saves_a_known_instagram_location_and_rejects_an_unknown_id(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->for($org, 'organization')->role(Role::Owner)->create();
+        $client = Client::factory()->for($org, 'organization')->create();
+        $post = Post::factory()->for($client)->create(['org_id' => $org->id]);
+        $place = config('instagram_locations.0');
+
+        $this->actingAs($owner)->get(route('posts.edit', $post))
+            ->assertInertia(fn ($page) => $page->where('locationOptions.0', $place));
+
+        $this->actingAs($owner)->put(route('posts.update', $post), ['location' => $place])
+            ->assertSessionHasNoErrors();
+        $this->assertSame($place, $post->refresh()->location);
+
+        $this->actingAs($owner)->put(route('posts.update', $post), [
+            'location' => ['id' => 'Shoreditch', 'name' => 'Shoreditch'],
+        ])->assertSessionHasErrors('location.id');
+        $this->assertSame($place, $post->refresh()->location);
+
+        // Clearing the picker submits empty strings.
+        $this->actingAs($owner)->put(route('posts.update', $post), [
+            'location' => ['id' => '', 'name' => ''],
+        ])->assertSessionHasNoErrors();
+        $this->assertNull($post->refresh()->location['id'] ?? null);
+    }
+
+    /**
+     * Every configured place carries a numeric id — Upload-Post silently drops anything else.
+     */
+    public function test_configured_instagram_locations_have_unique_numeric_ids(): void
+    {
+        $ids = array_column(config('instagram_locations'), 'id');
+
+        $this->assertNotEmpty($ids);
+        $this->assertSame($ids, array_unique($ids));
+        foreach (config('instagram_locations') as $place) {
+            $this->assertMatchesRegularExpression('/^\d+$/', $place['id']);
+            $this->assertNotSame('', trim($place['name']));
+        }
+    }
+
+    /**
      * Step 1.8.4 — the editor's music search field calls PostController::musicSearch, which
      * delegates to SearchMusicAction/MusicProvider and returns the matched tracks as JSON.
      */

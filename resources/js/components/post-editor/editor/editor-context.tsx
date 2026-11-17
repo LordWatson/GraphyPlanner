@@ -14,6 +14,8 @@ export type PostEditorPageData = {
     client: { id: number; name: string };
     targetAccounts: TargetAccountData[];
     campaignOptions: CampaignOption[];
+    /** The places the Location picker offers; `id` is Instagram's location_id. */
+    locationOptions: { id: string; name: string }[];
     hashtagSuggestions: string[];
     mediaFormatOptions: MediaFormatOptions;
     /** Step M-5.4: internal staff for the assignee/reviewer pickers. */
