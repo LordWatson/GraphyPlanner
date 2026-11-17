@@ -104,6 +104,7 @@ use App\Services\Publishing\MetaGraphMusicProvider;
 use App\Services\Publishing\OrganizationOrPlatformCredentials;
 use App\Services\Publishing\UploadPostAdapter;
 use App\Services\Publishing\UploadPostMusicProvider;
+use App\Services\Push\FcmPushNotifier;
 use App\Services\Push\MinishlinkWebPushNotifier;
 use App\Services\Push\WebPushNotifier;
 use App\Services\Security\ClamAvVirusScanner;
@@ -171,9 +172,11 @@ class AppServiceProvider extends ServiceProvider
         // dev and tests dependency-free. No caller changes either way.
         $this->app->bind(
             PushNotifier::class,
-            fn ($app) => config('push.transport') === 'webpush'
+            // Native shell: device tokens go over FCM; everything else falls through to the
+            // browser transport chosen above.
+            fn ($app) => new FcmPushNotifier(config('push.transport') === 'webpush'
                 ? $app->make(MinishlinkWebPushNotifier::class)
-                : $app->make(WebPushNotifier::class),
+                : $app->make(WebPushNotifier::class)),
         );
 
         // Step M-6.7 (I-12.1): team chat behind a contract. Slack by default and safe

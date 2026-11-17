@@ -32,6 +32,15 @@ return [
         'private_key' => env('PUSH_VAPID_PRIVATE_KEY'),
     ],
 
+    // Native shell (Capacitor): device tokens are delivered over FCM (which also fronts APNs for
+    // iOS), beside the browser transport above. `log` (the default) accepts registrations and logs
+    // instead of sending, so dev and tests need no Firebase project. `fcm` sends through the HTTP v1
+    // API with the service-account JSON at `credentials` (an absolute path; never commit the file).
+    'fcm' => [
+        'transport' => env('PUSH_FCM_TRANSPORT', 'log'),
+        'credentials' => env('PUSH_FCM_CREDENTIALS'),
+    ],
+
     // How far ahead of a scheduled target to fire the "goes out soon" reminder, and the sweep
     // window the command scans each run (it runs every 5 minutes, so the window must cover one tick
     // plus a little slack). Minutes.

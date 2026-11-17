@@ -14,10 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $user_id
+ * @property string|null $platform null for a browser; `android` / `ios` for a native device token
  * @property string $endpoint
  * @property string $endpoint_hash
- * @property string $public_key
- * @property string $auth_token
+ * @property string|null $public_key
+ * @property string|null $auth_token
  * @property string|null $content_encoding
  */
 class PushSubscription extends Model
@@ -27,6 +28,7 @@ class PushSubscription extends Model
 
     protected $fillable = [
         'user_id',
+        'platform',
         'endpoint',
         'endpoint_hash',
         'public_key',
@@ -37,6 +39,12 @@ class PushSubscription extends Model
     public static function hashEndpoint(string $endpoint): string
     {
         return hash('sha256', $endpoint);
+    }
+
+    /** A native-shell device token (delivered over FCM) rather than a browser subscription. */
+    public function isNative(): bool
+    {
+        return $this->platform !== null;
     }
 
     /**

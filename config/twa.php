@@ -28,4 +28,9 @@ return [
         explode(',', (string) env('ANDROID_FINGERPRINTS', '')),
     ))),
 
+    // Native shell (Capacitor, `.junie/modules/mobile.md`): the iOS app's `<TeamID>.<bundle id>`,
+    // served at `/.well-known/apple-app-site-association` so universal links open the app. The
+    // Android shell reuses `package` / `fingerprints` above for its App Links.
+    'ios_app_id' => env('IOS_APP_ID'),
+
 ];

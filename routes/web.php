@@ -95,6 +95,7 @@ use App\Http\Controllers\PostFeedbackController;
 use App\Http\Controllers\PostRevisionController;
 use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\PublicConnectController;
+use App\Http\Controllers\PushDeviceController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\RegistrationInterestController;
 use App\Http\Controllers\ResendWebhookController;
@@ -263,6 +264,19 @@ Route::get('.well-known/assetlinks.json', function () {
         ],
     ]]);
 })->name('well-known.assetlinks');
+
+// Native shell (Capacitor): the iOS counterpart — universal links open `https://<this domain>/...`
+// in the app. 404s until `IOS_APP_ID` (`<TeamID>.<bundle id>`) is set. Apple fetches it with no
+// cookies and wants JSON at this exact, extension-less path.
+Route::get('.well-known/apple-app-site-association', function () {
+    $appId = (string) config('twa.ios_app_id');
+
+    abort_if($appId === '', 404);
+
+    return response()->json([
+        'applinks' => ['details' => [['appIDs' => [$appId], 'components' => [['/' => '/*']]]]],
+    ]);
+})->name('well-known.apple-app-site-association');
 
 // Step CG-4.3 / CG-4.5: the buyer's own links from their receipt email. `signed` is the whole
 // authorisation — there is no session — so the expiry, the use limit and the refund check inside
@@ -525,6 +539,9 @@ Route::middleware(['auth', 'verified', 'org.member', 'portal.redirect'])->group(
     // by each sender (the reminder pushes stay business-only).
     Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
+    // Native shell (Capacitor): the same opt-in for a phone's FCM device token.
+    Route::post('push/devices', [PushDeviceController::class, 'store'])->name('push.devices.store');
+    Route::delete('push/devices', [PushDeviceController::class, 'destroy'])->name('push.devices.destroy');
 
     // Deep-link redirects for the pages with a direct portal counterpart (dashboard/calendar/home);
     // the group-level `portal.redirect` above already blocks everything else.

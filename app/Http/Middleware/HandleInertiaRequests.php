@@ -8,6 +8,7 @@ use App\Models\Post;
 use App\Models\User;
 use App\Services\Branding\BrandingResolver;
 use App\Services\Publishing\PlatformCapabilities;
+use App\Services\Push\FcmPushNotifier;
 use App\Services\SharedPropsCache;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -172,7 +173,7 @@ class HandleInertiaRequests extends Middleware
      * the VAPID key the browser subscribes with. The installable PWA shell itself stays
      * business-only (the layout decides that from `workspace.type`, not from this prop).
      *
-     * @return array{pushEnabled: bool, pushPublicKey: string|null}|null
+     * @return array{pushEnabled: bool, pushPublicKey: string|null, nativePushEnabled: bool}|null
      */
     private static function sharedPwa(?User $user): ?array
     {
@@ -191,6 +192,8 @@ class HandleInertiaRequests extends Middleware
         return [
             'pushEnabled' => $notifier->isConfigured(),
             'pushPublicKey' => $notifier->publicKey(),
+            // Native shell: whether a device token can be registered (FCM, not VAPID).
+            'nativePushEnabled' => FcmPushNotifier::nativeConfigured(),
         ];
     }
 
