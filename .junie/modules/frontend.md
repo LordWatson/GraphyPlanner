@@ -141,6 +141,11 @@ serve`, which would drop env vars also in `.env`); `support/env.mjs` holds the i
 
 ## Changelog
 
+- 2026-11-17: Capacitor native shell (`mobile.md`). `lib/native-shell.ts` (`initNativeShell()` in
+  `app.tsx`, a no-op in a browser), `native-push.ts`, `native-media.ts`, `native-share.ts`;
+  `use-push.ts` and `story-share.ts` branch on `Capacitor.isNativePlatform()`. `native/**` is
+  excluded from `vp` lint/format. Verified: `tsc`, lint, guards, 258 vitest tests. Not verified: on
+  a device. `vp check` still reports 10 pre-existing unformatted files this change did not touch.
 - 2026-11-13: Post editor field pass. Every field in the editor now wears the one input shape
   (brand §6: 8px radius, 2px `border-input`, `bg-card`, 40px): `DatePicker`'s trigger (shared —
   it was a pill button), `HashtagInput`'s box and the caption textarea. `SelectTrigger` is `w-fit`

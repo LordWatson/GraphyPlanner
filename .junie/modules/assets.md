@@ -194,6 +194,9 @@ campaign_name, created_at, can: {delete}}], meta: {current_page, last_page, per_
 
 ## Changelog
 
+- 2026-11-17: Native shell (`mobile.md`): inside the Capacitor app, media file inputs open the
+  native camera / gallery (`resources/js/lib/native-media.ts`) and hand ordinary `File`s to the
+  existing upload flow. No change to the upload endpoints, validation or storage.
 - 2026-11-07: **S3 made usable, and a way to move what is already stored.**
   `league/flysystem-aws-s3-v3` installed (`ASSETS_DISK=s3` previously failed at runtime, not boot).
   New `php artisan storage:migrate-disk --from=local --to=s3` (`MigrateStoredFilesDiskCommand`):

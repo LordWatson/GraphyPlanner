@@ -400,6 +400,9 @@ committed):
 
 ## Changelog
 
+- 2026-11-17: `GET /.well-known/apple-app-site-association` (`config/twa.php` `ios_app_id`,
+  `IOS_APP_ID`) for the Capacitor shell's universal links; the Android shell reuses
+  `assetlinks.json`. Test: `AppLinksTest`. See `mobile.md`.
 - 2026-11-13: Phase S — Stories with extras (assisted lane). New kill switch
   `STORY_HANDOFF_ENABLED` (off by default) and `story_handoff` config; the per-minute
   `stories:process-handoffs` sweep in the scheduler heartbeat; `story_handoffs` in the data export

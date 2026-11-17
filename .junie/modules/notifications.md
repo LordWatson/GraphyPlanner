@@ -434,6 +434,11 @@ exclude: $actor)` only — never the actor, outsiders, or client-portal users �
 
 ## Changelog
 
+- 2026-11-17: Native push for the Capacitor shell (`mobile.md`). `push_subscriptions.platform`
+  (migration `2027_05_02_100000`; `public_key` / `auth_token` now nullable), `FcmPushNotifier`
+  bound as the `PushNotifier`, `POST|DELETE /push/devices`, `ForgetPushDeviceOnLogout`, the
+  `pwa.nativePushEnabled` shared prop. See "Native push" below. New config: `push.fcm.*`.
+  Tests: `PushDeviceTest`, `FcmPushNotifierTest`.
 - 2026-11-13: Phase S — Stories with extras (assisted lane). New `StoryPublishHandoffReady`
   (bell + mail + WhatsApp, encrypted, no token in the bell), `NotifyStoryPosterAction`,
   `SendStoryHandoffPushAction`, the `story_ready_to_post` WhatsApp template, the morning heads-up
@@ -536,6 +541,28 @@ agency's client reviewers. `PushRemindersCard workspace="agency"` on Settings �
 member opts in, because only the business shell registers it on every page. The three older pushes
 above still filter on business organizations (`AgencyPushOptInTest`). `public/sw.js`: a
 notification click reuses a same-origin window when one is open and opens a new one otherwise.
+
+## Native push (Capacitor shell)
+
+A phone running the native shell has no service worker, so it registers an **FCM device token**
+instead (`POST /push/devices` → `PushDeviceController` → `RegisterPushDeviceAction`). The token is a
+`push_subscriptions` row with `platform` = `android` / `ios`, so the senders above are unchanged:
+they loop the same rows and call the same contract.
+
+- `AppServicesPushFcmPushNotifier` is now what `PushNotifier` resolves to. It wraps the web
+  transport chosen by `push.transport`: a native row goes to FCM HTTP v1 (which fronts APNs), a
+  browser row falls through. `isConfigured()` is true when **either** side is.
+- `push.fcm.transport`: `log` (default — registrations work, sends are logged and return `Failed`,
+  no Firebase needed) or `fcm` (needs the service-account JSON at `push.fcm.credentials`).
+  `FcmPushNotifier::nativeConfigured()` gates the route (404) and the `pwa.nativePushEnabled` prop.
+- Auth is a service-account JWT exchanged for an access token, cached ~55 min (dropped on a 401).
+  404 / `UNREGISTERED` → `Gone` (pruned by the sender). Never throws; never logs a token or payload.
+- The message carries `data.url` (where a tap lands — the shell opens it, same origin only) and the
+  web `tag` as the Android notification tag / APNs collapse id.
+- Lifecycle: registered when the user turns the toggle on, re-registered on every app start
+  (rotation + "last seen" = `updated_at`), deleted on opt-out, on logout from that phone
+  (`ForgetPushDeviceOnLogout`, keyed by a session value) and when FCM says it is gone.
+- Opt-in rules are the web ones: same route group, so client reviewers are turned away.
 
 ## Phase M-9 — overdue inbox reply reminder
 
