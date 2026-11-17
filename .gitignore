@@ -49,3 +49,12 @@ yarn-error.log
 !/android/README.md
 !/android/twa-manifest.json
 !/android/play-listing.md
+
+# Capacitor native shell (`native/`): the offline page is built by `npm run native:sync`, and the
+# Firebase / signing files are secrets that never belong in the repo (see `.junie/modules/mobile.md`).
+/native/www
+/native/android/app/google-services.json
+/native/ios/App/App/GoogleService-Info.plist
+/native/**/*.keystore
+/native/**/*.jks
+/storage/app/firebase-*.json

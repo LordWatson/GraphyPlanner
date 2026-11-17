@@ -56,6 +56,7 @@ export default defineConfig({
             'vendor/**',
             'node_modules/**',
             'public/**',
+            'native/**',
             'bootstrap/ssr/**',
             // Finding 30: installed agent tooling, not project source — `.claude/skills/**`
             // alone contributed 21 `denyWarnings` lint warnings. Same reasoning as `fmt` below.
@@ -94,6 +95,8 @@ export default defineConfig({
             '.agents/**',
             '.claude/**',
             '.cursor/**',
+            // The Capacitor iOS / Android projects are generated and owned by Xcode / Gradle.
+            'native/**',
         ],
         sortTailwindcss: {
             functions: ['clsx', 'cn', 'cva'],
