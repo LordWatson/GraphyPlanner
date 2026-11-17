@@ -4,6 +4,7 @@ import type { EditorNavigation } from '@/components/post-editor/editor/use-edito
 import type { PostEditor } from '@/components/post-editor/editor/use-post-editor';
 import type {
     PostData,
+    StoryHandoffOptions,
     TargetAccountData,
 } from '@/components/post-editor/types';
 import type { MediaFormatOptions } from '@/lib/media-format';
@@ -13,12 +14,16 @@ export type PostEditorPageData = {
     client: { id: number; name: string };
     targetAccounts: TargetAccountData[];
     campaignOptions: CampaignOption[];
+    /** The places the Location picker offers; `id` is Instagram's location_id. */
+    locationOptions: { id: string; name: string }[];
     hashtagSuggestions: string[];
     mediaFormatOptions: MediaFormatOptions;
     /** Step M-5.4: internal staff for the assignee/reviewer pickers. */
     staff: { id: number; name: string }[];
     /** Step CG-5.2: the brand's open deals, for linking a paid-partnership post to one. */
     dealOptions: { id: number; partner_name: string }[];
+    /** Step S-1.4: who can post a Story by hand, and the client's default. */
+    storyHandoff: StoryHandoffOptions;
     can: { update: boolean; create_asset: boolean; duplicate: boolean };
 };
 

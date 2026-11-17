@@ -37,6 +37,8 @@ import type { LiveCampaign } from '@/components/campaigns/live-campaigns-panel';
 import { LiveCampaignsPanel } from '@/components/campaigns/live-campaigns-panel';
 import { HomeViewTabs } from '@/components/home-view-tabs';
 import { StatusPill } from '@/components/status-pill';
+import type { StoryHandoff } from '@/components/stories/story-handoff-pill';
+import { StoryHandoffPill } from '@/components/stories/story-handoff-pill';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { calendar, dashboard, needsAttention } from '@/routes';
@@ -66,17 +68,22 @@ type PublishReliabilityMonth = {
     month: string;
     label: string;
     failed: number;
+    /** Step S-5.3: Stories nobody posted by hand in time. Never part of `failed`. */
+    missed_by_hand: number;
     published: number;
 };
 
 type PublishReliability = {
     monthly: PublishReliabilityMonth[];
     averageAttemptsToSuccess: number | null;
+    missedByHand: number;
 };
 
 type UpcomingPostOccurrence = {
     post_id: number;
     target_id: number;
+    /** Step S-5.1: the channel's assisted-lane state (a Story posted by hand). */
+    handoff?: StoryHandoff | null;
     client_name: string | null;
     platform: string | null;
     handle: string | null;
@@ -218,9 +225,11 @@ export default function Dashboard({
     const totalPaid = invoiceTotals.reduce((sum, month) => sum + month.paid, 0);
 
     const publishReliabilityMonthly = publishReliability.monthly;
-    const hasPublishReliabilityData = publishReliabilityMonthly.some(
-        (month) => month.failed > 0 || month.published > 0,
-    );
+    const hasPublishReliabilityData =
+        publishReliability.missedByHand > 0 ||
+        publishReliabilityMonthly.some(
+            (month) => month.failed > 0 || month.published > 0,
+        );
 
     return (
         <>
@@ -667,6 +676,12 @@ export default function Dashboard({
                                                             ? ` · ${occurrence.handle}`
                                                             : ''}
                                                     </span>
+                                                    <StoryHandoffPill
+                                                        handoff={
+                                                            occurrence.handoff
+                                                        }
+                                                        className="mt-1 self-start"
+                                                    />
                                                 </span>
                                                 <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
                                                     {occurrence.time}
@@ -811,6 +826,25 @@ export default function Dashboard({
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
+                                {/* Step S-5.3: a Story nobody posted by hand is its own figure,
+                                    never a publishing failure. */}
+                                {publishReliability.missedByHand > 0 && (
+                                    <div className="border-border/70 mt-4 flex items-center justify-between gap-4 border-t pt-4">
+                                        <div className="flex min-w-0 flex-col gap-0.5">
+                                            <span className="text-sm font-medium">
+                                                Stories not posted in time
+                                            </span>
+                                            <span className="text-muted-foreground text-xs text-pretty">
+                                                Posted by hand, so they are
+                                                counted apart from failed
+                                                publishes.
+                                            </span>
+                                        </div>
+                                        <span className="font-display text-2xl leading-none font-bold tabular-nums">
+                                            {publishReliability.missedByHand}
+                                        </span>
+                                    </div>
+                                )}
                                 {canViewAnalytics && (
                                     <FullAnalyticsLink section="posts" />
                                 )}

@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
+use App\Enums\StoryHandoffOutcome;
+use App\Enums\StoryHandoffRecipient;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\Publishing\PlatformCapabilities;
 use App\Support\Publishing\CaptionComposer;
 use App\Support\Publishing\FormatSpec;
+use App\Support\Publishing\StoryExtras;
 use Database\Factories\PostTargetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -14,6 +18,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -36,6 +41,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $first_comment
  * @property string|null $link_url
  * @property string|null $format
+ * @property array<string, mixed>|null $story_extras
+ * @property bool $handoff_required
+ * @property StoryHandoffRecipient|null $handoff_recipient
  * @property string|null $vendor_request_id
  * @property string|null $platform_post_id
  * @property string|null $post_url
@@ -44,6 +52,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $metrics_error
  * @property int|null $latest_metrics_id
  * @property-read PostTargetMetric|null $latestMetrics
+ * @property-read StoryHandoff|null $openStoryHandoff
+ * @property-read StoryHandoff|null $postedStoryHandoff
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -51,12 +61,21 @@ use Illuminate\Support\Carbon;
     'post_id', 'social_account_id', 'scheduled_local_date', 'scheduled_local_time', 'scheduled_at_utc',
     'reminder_sent_at', 'push_reminder_sent_at', 'status', 'external_post_id', 'error', 'publish_attempt_id', 'publish_requested_at', 'publish_correlation_id',
     'caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format',
+    'story_extras', 'handoff_required', 'handoff_recipient',
     'vendor_request_id', 'platform_post_id', 'post_url', 'published_at', 'metrics_synced_at', 'metrics_error', 'latest_metrics_id',
 ])]
 class PostTarget extends Model
 {
     /** @use HasFactory<PostTargetFactory> */
     use HasFactory;
+
+    /**
+     * Step S-5.1: what `handoffState()` reads, besides the target's `post`. Eager-load these
+     * wherever channel states are listed (`targets.openStoryHandoff`, …) — lazy loading is off.
+     *
+     * @var list<string>
+     */
+    public const HANDOFF_STATE_RELATIONS = ['openStoryHandoff', 'postedStoryHandoff'];
 
     /**
      * @return array<string, string>
@@ -73,6 +92,9 @@ class PostTarget extends Model
             'metrics_synced_at' => 'datetime',
             'status' => PostTargetStatus::class,
             'hashtags_override' => 'array',
+            'story_extras' => 'array',
+            'handoff_required' => 'boolean',
+            'handoff_recipient' => StoryHandoffRecipient::class,
         ];
     }
 
@@ -143,6 +165,20 @@ class PostTarget extends Model
             && filled($this->external_post_id)
             && $this->scheduled_at_utc !== null
             && $this->scheduled_at_utc->isFuture();
+    }
+
+    /**
+     * Step S-2.5: an assisted Story that has been handed to a person and not confirmed yet —
+     * `pending` on a publish attempt, with nothing sent to the vendor. Like a vendor-held channel
+     * it hasn't gone out, as far as we know, so its post can still be taken off the schedule.
+     * Only meaningful on a `publishing` post (a `scheduled` one has no attempt id yet).
+     */
+    public function isAwaitingHandoff(): bool
+    {
+        return $this->handoff_required
+            && $this->status === PostTargetStatus::Pending
+            && blank($this->external_post_id)
+            && filled($this->publish_attempt_id);
     }
 
     /**
@@ -218,5 +254,118 @@ class PostTarget extends Model
         }
 
         return app(PlatformCapabilities::class)->resolveFormat($platform, $this->format, $this->post->mediaKinds());
+    }
+
+    /**
+     * Step S-2.2: every attempt at posting this Story by hand.
+     *
+     * @return HasMany<StoryHandoff, $this>
+     */
+    public function storyHandoffs(): HasMany
+    {
+        return $this->hasMany(StoryHandoff::class);
+    }
+
+    /**
+     * The handoff a poster can still act on, if there is one. Eager-load this wherever channel
+     * states are listed (`handoffState()` reads it).
+     *
+     * @return HasOne<StoryHandoff, $this>
+     */
+    public function openStoryHandoff(): HasOne
+    {
+        return $this->hasOne(StoryHandoff::class)
+            ->ofMany(['id' => 'max'], fn ($query) => $query->whereNull('completed_at')->whereNull('outcome'));
+    }
+
+    /**
+     * The handoff that ended with somebody confirming the Story went out, if there is one.
+     *
+     * @return HasOne<StoryHandoff, $this>
+     */
+    public function postedStoryHandoff(): HasOne
+    {
+        return $this->hasOne(StoryHandoff::class)
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('outcome', StoryHandoffOutcome::Posted));
+    }
+
+    /**
+     * Step S-1.2: this channel's Story extras (a link, a poll, …), normalised. Empty for a channel
+     * that has none.
+     */
+    public function storyExtras(): StoryExtras
+    {
+        return StoryExtras::fromArray($this->story_extras);
+    }
+
+    /**
+     * Step S-1.2 (decision D3): whether this channel is posted by hand — a Story, on a platform the
+     * assisted lane is offered on, with at least one extra. `handoff_required` is the stored copy
+     * of this answer, written only by `SyncTargetStoryExtrasAction`. The Story format is only ever
+     * an explicit choice, so this never depends on the attached media.
+     */
+    public function needsHandoff(): bool
+    {
+        $platform = $this->socialAccount?->platform;
+
+        return $platform !== null
+            && $this->format === PlatformCapabilities::STORY_FORMAT
+            && app(PlatformCapabilities::class)->supportsStoryExtras($platform)
+            && ! $this->storyExtras()->isEmpty();
+    }
+
+    /**
+     * Step S-1.2 (decision D7): who posts this Story — the channel's own choice, else the client's
+     * default. A business workspace has no client to hand it to, so it is always the team.
+     */
+    public function handoffRecipient(): StoryHandoffRecipient
+    {
+        // Loaded explicitly, so a caller that only has the channel never trips lazy loading.
+        $this->loadMissing('post');
+        $this->post?->loadMissing('client');
+        $client = $this->post?->client;
+
+        // A client loaded with a column list (`client:id,name`) doesn't carry the two columns
+        // read here; fetch the real row rather than mistake "not selected" for a value.
+        if ($client !== null && ! array_key_exists('is_primary', $client->getAttributes())) {
+            $client = Client::query()->withoutGlobalScopes()->find($client->id);
+        }
+
+        if ($client === null || $client->is_primary) {
+            return StoryHandoffRecipient::Team;
+        }
+
+        return $this->handoff_recipient ?? $client->story_handoff_recipient;
+    }
+
+    /**
+     * Step S-5.1: the assisted lane's state for this channel, or null for a channel that publishes
+     * itself. Derived, never stored (decision D2): the channel stays `pending` while a handoff is
+     * open, and this is what turns that into something a person can read.
+     *
+     *  - `needs_hand_posting`: it will be posted by hand at its time;
+     *  - `ready_to_post`: its handoff is open and due — somebody should be posting it now;
+     *  - `posted_by_hand`: published, and it was a person who confirmed it.
+     *
+     * Needs `post`, `openStoryHandoff` and `postedStoryHandoff` loaded.
+     */
+    public function handoffState(): ?string
+    {
+        if ($this->status === PostTargetStatus::Published) {
+            return $this->postedStoryHandoff !== null ? 'posted_by_hand' : null;
+        }
+
+        // A draft with extras isn't "waiting to be posted by hand" yet; lists stay calm until the
+        // post is on the schedule.
+        if (! $this->handoff_required || $this->status !== PostTargetStatus::Pending
+            || ! in_array($this->post?->status, [PostStatus::Scheduled, PostStatus::Publishing], true)) {
+            return null;
+        }
+
+        $open = $this->openStoryHandoff;
+
+        return $open !== null && $open->due_at->lessThanOrEqualTo(now()) && $this->post->status === PostStatus::Publishing
+            ? 'ready_to_post'
+            : 'needs_hand_posting';
     }
 }

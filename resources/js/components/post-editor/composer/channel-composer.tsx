@@ -13,15 +13,18 @@ import {
     sameTags,
     usageFor,
 } from '@/components/post-editor/composer/composer-parts';
+import { StoryExtrasPanel } from '@/components/post-editor/story-extras-panel';
 import type {
     ChannelState,
+    StoryPanelContext,
     TargetAccountData,
 } from '@/components/post-editor/types';
 import { EMPTY_CHANNEL, isCustomized } from '@/components/post-editor/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { capabilityOf, usePlatforms } from '@/lib/platforms';
+import { capabilityOf, takesStoryExtras, usePlatforms } from '@/lib/platforms';
+
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,6 +39,7 @@ export function ChannelComposer({
     mediaKinds,
     hashtagSuggestions,
     captionRef,
+    story,
 }: {
     account: TargetAccountData;
     master: MasterContent;
@@ -44,6 +48,8 @@ export function ChannelComposer({
     mediaKinds: string[];
     hashtagSuggestions: string[];
     captionRef?: Ref<HTMLTextAreaElement>;
+    /** Step S-1.4: what the Story extras panel needs; omit to leave the panel out. */
+    story?: StoryPanelContext;
 }) {
     const registry = usePlatforms();
     const [showLink, setShowLink] = useState(false);
@@ -82,9 +88,13 @@ export function ChannelComposer({
                         variant="ghost"
                         size="sm"
                         onClick={() =>
+                            // The channel's own words go back to the main post; its format
+                            // and its Story extras are not overrides, so they stay.
                             onChannelChange(account.id, {
                                 ...EMPTY_CHANNEL,
                                 format: channel.format,
+                                storyExtras: channel.storyExtras,
+                                handoffRecipient: channel.handoffRecipient,
                             })
                         }
                     >
@@ -101,6 +111,22 @@ export function ChannelComposer({
                     format={channel.format}
                     mediaKinds={mediaKinds}
                     onChange={(format) => set({ format })}
+                />
+            )}
+
+            {story && takesStoryExtras(capability, channel.format) && (
+                <StoryExtrasPanel
+                    id={`${id}-story`}
+                    extras={channel.storyExtras}
+                    recipient={channel.handoffRecipient}
+                    onExtrasChange={(storyExtras) => set({ storyExtras })}
+                    onRecipientChange={(handoffRecipient) =>
+                        set({ handoffRecipient })
+                    }
+                    postLink={(channel.link ?? master.link).trim()}
+                    options={story.options}
+                    assigneeId={story.assigneeId}
+                    clientName={story.clientName}
                 />
             )}
 

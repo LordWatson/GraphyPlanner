@@ -93,7 +93,7 @@ export function CampaignField({
 
     return (
         <div className="grid gap-3">
-            <div className="grid gap-1.5">
+            <div className="grid gap-2">
                 <Label htmlFor="post-campaign">Campaign</Label>
                 <Select
                     value={value || NONE}

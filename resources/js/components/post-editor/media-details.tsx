@@ -85,7 +85,7 @@ export function MediaDetails({
                                 )
                             }
                         >
-                            <SelectTrigger id="cover_asset">
+                            <SelectTrigger id="cover_asset" className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

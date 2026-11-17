@@ -6,6 +6,7 @@ use App\Enums\ApprovalMode;
 use App\Enums\MediaRatio;
 use App\Enums\Platform;
 use App\Enums\PostRecurrence;
+use App\Http\Requests\Concerns\ValidatesStoryExtras;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Support\Media\CropBox;
@@ -18,6 +19,8 @@ use Illuminate\Validation\Validator;
 
 class UpdatePostRequest extends FormRequest
 {
+    use ValidatesStoryExtras;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -58,6 +61,9 @@ class UpdatePostRequest extends FormRequest
             'thumb_offset_ms' => ['nullable', 'integer', 'min:0', 'max:86400000'],
             'music' => ['nullable', 'array'],
             'location' => ['nullable', 'array'],
+            // Instagram only accepts a known Facebook place ID — see config/instagram_locations.php.
+            'location.id' => ['nullable', Rule::in(array_column(config('instagram_locations'), 'id'))],
+            'location.name' => ['nullable', 'string', 'max:255'],
 
             // Step CG-5.1 (B-11.1) / CG-5.2: the paid-partnership declaration, who it's with, and
             // the deal it delivers (this brand's own only — a bare `exists:` would take another's).
@@ -112,7 +118,31 @@ class UpdatePostRequest extends FormRequest
             'targets.*.link_url' => ['nullable', 'string', 'max:2048'],
             // Step I-3.2 / M-2.3: checked against the account's platform in `after()`.
             'targets.*.format' => ['nullable', 'string', 'max:32'],
+            // Step S-1.3: a Story channel's extras (a link, a poll, …) and who posts it by hand.
+            ...$this->storyExtrasRules('targets.*'),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return $this->storyExtrasMessages('targets.*');
+    }
+
+    /**
+     * Step S-1.3: the validated data, with each channel's Story extras as they were sent — an
+     * empty extras object means "none", and must not be mistaken for "not sent".
+     *
+     * @param  array-key|null  $key
+     * @param  mixed  $default
+     */
+    public function validated($key = null, $default = null): mixed
+    {
+        $validated = $this->restoreStoryExtras((array) parent::validated(), $this->input('targets'));
+
+        return $key === null ? $validated : data_get($validated, $key, $default);
     }
 
     /**
@@ -158,7 +188,8 @@ class UpdatePostRequest extends FormRequest
             }
         }
 
-        $this->merge(['targets' => $targets]);
+        // Step S-1.3: each channel's Story extras arrive as one JSON string.
+        $this->merge(['targets' => $this->decodeStoryExtras($targets)]);
     }
 
     /**
@@ -219,6 +250,9 @@ class UpdatePostRequest extends FormRequest
                         $validator->errors()->add("targets.{$i}.format", __(':platform doesn’t offer that format.', ['platform' => $account->platform->label()]));
                     }
                 }
+
+                // Step S-1.3: Story extras only on a platform the assisted lane is offered on.
+                $this->validateStoryExtrasPlatforms($validator, $targets);
             },
         ];
     }

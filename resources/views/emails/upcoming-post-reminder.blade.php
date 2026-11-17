@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Posts scheduled to go out soon</title>
+    <title>{{ $headline }}</title>
 </head>
 <body style="margin:0; padding:0; background-color:#F5F2E8; font-family:'Poppins', Arial, sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F2E8; padding:32px 0;">
@@ -18,11 +18,31 @@
                     <tr>
                         <td style="padding:32px;">
                             <h1 style="margin:0 0 12px; font-family:'Poppins', Arial, sans-serif; font-size:22px; line-height:1.3; color:#181723; font-weight:600;">
-                                {{ count($occurrences) === 1 ? 'A post is scheduled to go out soon' : count($occurrences).' posts are scheduled to go out soon' }}
+                                {{ $headline }}
                             </h1>
                             <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#4A4857;">
-                                Here's what's due to be published for {{ $organization->name }} in the next {{ $days }} {{ Str::plural('day', $days) }}:
+                                @if ($storiesOnly)
+                                    Here's what {{ $organization->name }} is posting by hand today:
+                                @else
+                                    Here's what's due to be published for {{ $organization->name }} in the next {{ $days }} {{ Str::plural('day', $days) }}:
+                                @endif
                             </p>
+
+                            @if ($storyHeadsUp)
+                                {{-- Step S-3.4: the morning heads-up for assisted Stories due today. --}}
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ECE2E5; border:1px solid #DBC3DE; border-radius:8px; margin:0 0 20px;">
+                                    <tr>
+                                        <td style="padding:14px 18px;">
+                                            <p style="margin:0 0 4px; font-size:15px; line-height:1.5; color:#181723; font-weight:600;">
+                                                {{ $storyHeadsUp }}
+                                            </p>
+                                            <p style="margin:0; font-size:13px; line-height:1.6; color:#181723;">
+                                                Instagram only allows links and stickers from its own app. We'll remind whoever is posting when each one is due.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            @endif
 
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                                 @foreach ($occurrences as $occurrence)
@@ -39,6 +59,9 @@
                                                 @if ($occurrence['platform'])
                                                     &middot; {{ ucfirst($occurrence['platform']) }}
                                                 @endif
+                                                @if ($occurrence['by_hand'] ?? false)
+                                                    &middot; <span style="color:#181723; font-weight:600;">Story &middot; posted by hand</span>
+                                                @endif
                                             </p>
                                             @if ($occurrence['master_caption'])
                                                 <p style="margin:0; font-size:13px; color:#4A4857;">
@@ -51,9 +74,11 @@
                                 @endforeach
                             </table>
 
-                            <p style="margin:0; font-size:12px; line-height:1.6; color:#6B6977;">
-                                This is a one-time reminder per post — you won't be notified again for the same post.
-                            </p>
+                            @unless ($storiesOnly)
+                                <p style="margin:0; font-size:12px; line-height:1.6; color:#6B6977;">
+                                    This is a one-time reminder per post — you won't be notified again for the same post.
+                                </p>
+                            @endunless
                         </td>
                     </tr>
                     <tr>

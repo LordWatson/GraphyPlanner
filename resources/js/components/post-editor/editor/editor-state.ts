@@ -8,6 +8,7 @@ import type {
 import { EMPTY_CHANNEL } from '@/components/post-editor/types';
 import type { Crop, MediaFormat } from '@/lib/media-format';
 import { DEFAULT_CROP, normalizeCrop } from '@/lib/media-format';
+import { parseStoryExtras } from '@/lib/story-extras';
 
 /** Everything the editor form can change before it's saved. */
 export type EditorState = {
@@ -18,6 +19,7 @@ export type EditorState = {
     schedule: ScheduleRows;
     musicId: string;
     musicName: string;
+    locationId: string;
     locationName: string;
     mediaFormat: MediaFormat;
     /** Framing of the attached media only, keyed by asset id. */
@@ -71,6 +73,10 @@ export const checkSection: Record<string, EditorSection> = {
     media_framing: 'preview',
     campaign_hashtags: 'settings',
     partnership_disclosure: 'settings',
+    // Step S-1.4: a Story's extras live with its channel's own content; who posts it follows
+    // the assignee, which is in Settings.
+    story_extras: 'compose',
+    story_handoff: 'settings',
 };
 
 export const approvalLabels: Record<string, string> = {
@@ -107,6 +113,7 @@ export function initialEditorState(
         ),
         musicId: (post.music?.id as string) ?? '',
         musicName: (post.music?.name as string) ?? '',
+        locationId: (post.location?.id as string) ?? '',
         locationName: (post.location?.name as string) ?? '',
         mediaFormat: { ...post.media_format },
         crops: Object.fromEntries(
@@ -123,6 +130,8 @@ export function initialEditorState(
                     firstComment: target.first_comment,
                     link: target.link_url,
                     format: target.format,
+                    storyExtras: parseStoryExtras(target.story_extras),
+                    handoffRecipient: target.handoff_recipient ?? null,
                 } satisfies ChannelState,
             ]),
         ),

@@ -1,6 +1,8 @@
 import { Form, router } from '@inertiajs/react';
 import {
+    BellRing,
     Check,
+    CheckCheck,
     Copy,
     Link2,
     Mail,
@@ -13,6 +15,7 @@ import type {
     ActivityLogData,
     TargetData,
 } from '@/components/post-editor/types';
+import { markStoryPosted } from '@/components/post-editor/workflow/story-by-hand-row';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClipboard } from '@/hooks/use-clipboard';
@@ -135,6 +138,9 @@ export function ReviewLinkRow({
     );
 }
 
+/** Failure reasons that belong to a Story posted by hand (`PublishFailureReason`). */
+const STORY_REASONS = ['story_not_posted', 'story_problem_reported'];
+
 /**
  * Step I-1.3 / B-5.3 — shown on a `failed`/`partially_published` post: each failed channel with a
  * plain-language reason and the one thing to do next, a per-channel retry (channels that already
@@ -143,11 +149,15 @@ export function ReviewLinkRow({
 export function RetryFailedTargetsRow({
     postId,
     failedTargets,
+    canMarkStoryPosted = false,
 }: {
     postId: number;
     failedTargets: TargetData[];
+    /** Step S-5.2: the member may confirm a Story that did go out (`postStoryByHand`). */
+    canMarkStoryPosted?: boolean;
 }) {
     const [retrying, setRetrying] = useState<number | 'all' | null>(null);
+    const [marking, setMarking] = useState<number | null>(null);
 
     const retry = (target?: number) => {
         setRetrying(target ?? 'all');
@@ -179,6 +189,14 @@ export function RetryFailedTargetsRow({
                         .join(' · ');
                     const retryable = target.failure?.retryable ?? true;
                     const busy = retrying === target.id || retrying === 'all';
+                    // Step S-5.2: a Story that is posted by hand has nothing to "retry" at a
+                    // vendor — retrying sends its poster a new reminder. One nobody confirmed
+                    // may well have gone out, so it can be marked as posted instead.
+                    const byHand = STORY_REASONS.includes(
+                        target.failure?.reason ?? '',
+                    );
+                    const unconfirmed =
+                        target.failure?.reason === 'story_not_posted';
 
                     return (
                         <li
@@ -200,20 +218,47 @@ export function RetryFailedTargetsRow({
                                     )}
                                 </p>
                             </div>
-                            {retryable && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={busy}
-                                    onClick={() => retry(target.id)}
-                                >
-                                    <RefreshCw />
-                                    {retrying === target.id
-                                        ? 'Retrying…'
-                                        : 'Retry'}
-                                </Button>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {unconfirmed && canMarkStoryPosted && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-11 sm:h-8"
+                                        disabled={marking === target.id}
+                                        onClick={() => {
+                                            setMarking(target.id);
+                                            void markStoryPosted(
+                                                postId,
+                                                target,
+                                                () => setMarking(null),
+                                            );
+                                        }}
+                                    >
+                                        <CheckCheck />
+                                        Mark as posted
+                                    </Button>
+                                )}
+                                {retryable && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-11 sm:h-8"
+                                        disabled={busy}
+                                        onClick={() => retry(target.id)}
+                                    >
+                                        {byHand ? <BellRing /> : <RefreshCw />}
+                                        {retrying === target.id
+                                            ? byHand
+                                                ? 'Sending…'
+                                                : 'Retrying…'
+                                            : byHand
+                                              ? 'Send a new reminder'
+                                              : 'Retry'}
+                                    </Button>
+                                )}
+                            </div>
                         </li>
                     );
                 })}

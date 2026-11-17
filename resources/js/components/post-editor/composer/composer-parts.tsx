@@ -24,7 +24,8 @@ export type MasterContent = {
 export const AUTO = '__auto';
 
 export const captionClass =
-    'border-input bg-card focus-visible:border-ring focus-visible:ring-ring/40 dark:bg-input/30 placeholder:text-muted-foreground flex min-h-44 w-full resize-y rounded-lg border px-4 py-3.5 text-[15px] leading-relaxed outline-none focus-visible:ring-[3px]';
+    // Matches `Input` (2px border, card fill, blue focus); 16px on phones so iOS doesn't zoom in.
+    'border-input bg-card hover:border-foreground/60 focus-visible:border-ring focus-visible:ring-ring/25 placeholder:text-muted-foreground flex min-h-44 w-full resize-y rounded-lg border-2 px-3.5 py-3 text-base leading-relaxed transition-[box-shadow,border-color] outline-none focus-visible:ring-[3px] md:text-[15px]';
 
 /** The caption as it publishes on a channel, against that channel's limit. */
 export function usageFor(

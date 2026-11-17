@@ -24,6 +24,7 @@ export function ChannelsSection({ error }: { error?: string }) {
                     onApplyToAll={editor.applyScheduleToAll}
                     onSameInstant={editor.applySameInstant}
                     usage={view.channelUsage}
+                    byHand={view.assistedAccountIds}
                     error={error}
                 />
                 <TargetFields

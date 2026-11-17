@@ -26,6 +26,10 @@ use Illuminate\Support\Str;
  * - **Nulls are not zeros.** A total is null when no reading in scope reported it; a platform
  *   without a metrics source (`config/platforms.php`) is listed with `available: false` and the
  *   "not available for {platform}" note.
+ * - **Posted by hand is not zero either** (Step S-5.3). An assisted Story is posted from a phone,
+ *   so there is no platform post id to read numbers for. Such a channel (`posted_by_hand`) is never
+ *   measured: it is counted apart (`posted_by_hand_channels`, and per platform `posted_by_hand`
+ *   with the "not available" note) and stays out of every total, rate and ranking.
  * - **Engagement rate** = interactions ÷ (reach, else impressions, else views), summed over the
  *   channels that report both — never averaged per post, so one tiny post can't skew it.
  * - **Followers** come from `social_account_metrics` for the in-scope clients' accounts (campaign
@@ -35,13 +39,17 @@ class EngagementMetrics
 {
     public const TOP_POSTS = 5;
 
+    /** Step S-5.3: what a platform row says about its assisted Stories. */
+    public const POSTED_BY_HAND_NOTE = "Engagement isn't available for stories posted by hand.";
+
     private const METRICS = ['impressions', 'reach', 'views', 'likes', 'comments', 'shares', 'saves', 'clicks', 'engagement'];
 
     public function __construct(private readonly BestTimeService $bestTime) {}
 
     /**
      * One row per published channel in scope and range, with its latest reading (metric columns
-     * are null when it has none).
+     * are null when it has none). `posted_by_hand` marks an assisted Story somebody posted from
+     * their phone: it has no platform post id, so it never carries a reading.
      *
      * @return Collection<int, \stdClass>
      */
@@ -61,6 +69,8 @@ class EngagementMetrics
                 'post_targets.published_at',
                 'post_targets.post_url',
                 'post_targets.metrics_synced_at',
+                'post_targets.handoff_required',
+                'post_targets.platform_post_id',
                 'posts.client_id',
                 'posts.campaign_id',
                 'social_accounts.id as social_account_id',
@@ -71,7 +81,21 @@ class EngagementMetrics
                 ...array_map(fn (string $metric) => "m.{$metric}", self::METRICS),
             ])
             ->orderBy('post_targets.id')
-            ->get();
+            ->get()
+            ->each(function (\stdClass $row): void {
+                $row->posted_by_hand = (bool) $row->handoff_required && $row->platform_post_id === null;
+
+                if ($row->posted_by_hand) {
+                    // Unmeasurable, not zero: whatever a stray reading says, it is not this Story's.
+                    $row->metric_id = null;
+
+                    foreach (self::METRICS as $metric) {
+                        $row->{$metric} = null;
+                    }
+                }
+
+                unset($row->handoff_required, $row->platform_post_id);
+            });
     }
 
     /**
@@ -88,6 +112,8 @@ class EngagementMetrics
         return [
             'published_channels' => $channels->count(),
             'measured_channels' => $measured->count(),
+            // Step S-5.3: assisted Stories — published, but engagement is not available for them.
+            'posted_by_hand_channels' => $channels->where('posted_by_hand', true)->count(),
             'totals' => $this->totals($measured),
             'engagement_rate' => $this->rate($measured),
             'by_platform' => $this->byPlatform($scope, $channels),
@@ -288,6 +314,7 @@ class EngagementMetrics
             $mine = $channels->where('platform', $platform->value);
             $measured = $mine->whereNotNull('metric_id');
             $totals = $this->totals($measured);
+            $byHand = $mine->where('posted_by_hand', true)->count();
 
             $rows[] = [
                 'platform' => $platform->value,
@@ -296,6 +323,8 @@ class EngagementMetrics
                 'note' => $spec->postMetrics ? null : "Post engagement isn't available for {$spec->label}.",
                 'published' => $mine->count(),
                 'measured' => $measured->count(),
+                'posted_by_hand' => $byHand,
+                'posted_by_hand_note' => $byHand > 0 ? self::POSTED_BY_HAND_NOTE : null,
                 'engagement' => $totals['engagement'],
                 'impressions' => $totals['impressions'],
                 'reach' => $totals['reach'],

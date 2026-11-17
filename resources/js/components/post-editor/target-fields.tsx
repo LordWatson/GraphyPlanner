@@ -1,5 +1,6 @@
 import type { ChannelState } from '@/components/post-editor/types';
 import { EMPTY_CHANNEL } from '@/components/post-editor/types';
+import { serializeStoryExtras } from '@/lib/story-extras';
 
 /**
  * The hidden form fields for every selected channel, in one place so each target's schedule and
@@ -77,6 +78,17 @@ export function TargetFields({
                             type="hidden"
                             name={field('format')}
                             value={channel.format ?? ''}
+                        />
+                        {/* Step S-1.4: a Story's extras travel as one JSON string. */}
+                        <input
+                            type="hidden"
+                            name={field('story_extras')}
+                            value={serializeStoryExtras(channel.storyExtras)}
+                        />
+                        <input
+                            type="hidden"
+                            name={field('handoff_recipient')}
+                            value={channel.handoffRecipient ?? ''}
                         />
                     </span>
                 );

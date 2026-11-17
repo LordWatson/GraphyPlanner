@@ -1,6 +1,7 @@
 import { platformIcon } from '@/components/platform-icon';
 import type { AssetData } from '@/components/post-editor/types';
 import type { PreviewTarget } from '@/components/social-post-preview';
+import { Badge } from '@/components/ui/badge';
 import {
     isImageAsset,
     isVideoAsset,
@@ -9,9 +10,48 @@ import {
 import { describeRatio, foldCaption, ratioQuotient } from '@/lib/media-format';
 import type { PlatformCapability, PlatformFormat } from '@/lib/platforms';
 import { platformLabelOf, usePlatforms } from '@/lib/platforms';
+import type { StoryExtras } from '@/lib/story-extras';
+import { storyExtrasChips } from '@/lib/story-extras';
 import { cn } from '@/lib/utils';
 
-export type Target = PreviewTarget & { id: number };
+export type Target = PreviewTarget & {
+    id: number;
+    /** Step S-1.4: a Story's extras, listed under the preview (never drawn on the media). */
+    storyExtras?: StoryExtras | null;
+};
+
+/**
+ * Step S-1.4 — a Story's extras as chips under the phone preview ("Link: Shop now", "Poll").
+ * Deliberately a list, not fake stickers on the media: where they sit is the poster's call.
+ */
+export function StoryExtrasChips({
+    extras,
+}: {
+    extras: StoryExtras | null | undefined;
+}) {
+    const chips = storyExtrasChips(extras);
+
+    if (chips.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="grid gap-2">
+            <span className="eyebrow text-muted-foreground">
+                Added by hand in Instagram
+            </span>
+            <ul className="flex flex-wrap gap-1.5">
+                {chips.map((chip) => (
+                    <li key={chip.key} className="min-w-0">
+                        <Badge variant="secondary" className="max-w-full">
+                            <span className="truncate">{chip.label}</span>
+                        </Badge>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
 export function TargetSwitcher({
     targets,

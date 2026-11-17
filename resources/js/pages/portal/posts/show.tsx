@@ -20,6 +20,8 @@ import { ReviewChanges } from '@/components/posts/review-changes';
 import { SocialPostPreview } from '@/components/social-post-preview';
 import { StatusPill } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import type { ClientStory } from '@/components/posts/story-extras-note';
+import { StoryExtrasNote } from '@/components/posts/story-extras-note';
 import { formatSchedule } from '@/lib/dates';
 import type { MediaFormat } from '@/lib/media-format';
 import type { RevisionDiff } from '@/lib/post-diff';
@@ -42,6 +44,8 @@ type TargetData = {
     published_caption?: string;
     first_comment?: string | null;
     format?: string | null;
+    /** Step S-1.5: a Story's link and stickers, when it is posted by hand. */
+    story?: ClientStory | null;
 };
 
 type CommentData = {
@@ -369,6 +373,14 @@ export default function PortalPostShow({
                                 Download approval certificate
                             </a>
                         )}
+
+                        {/* Above the decision: the link and stickers are part of what is approved. */}
+                        <StoryExtrasNote
+                            stories={post.targets.map((target) => ({
+                                handle: target.handle,
+                                story: target.story,
+                            }))}
+                        />
 
                         {can.decide && (
                             <Form

@@ -32,6 +32,7 @@ import { useEditorNavigation } from '@/components/post-editor/editor/use-editor-
 import { usePostEditor } from '@/components/post-editor/editor/use-post-editor';
 import type {
     PostData,
+    StoryHandoffOptions,
     TargetAccountData,
     TransitionOption,
 } from '@/components/post-editor/types';
@@ -69,6 +70,7 @@ export default function PostEdit({
     can,
     hashtagSuggestions,
     campaignOptions,
+    locationOptions,
     mentionableUsers,
     ai,
     imageStudio,
@@ -76,6 +78,7 @@ export default function PostEdit({
     staff,
     dealOptions,
     workflow,
+    storyHandoff,
     grid = null,
 }: {
     post: PostData;
@@ -93,7 +96,10 @@ export default function PostEdit({
         create_asset: boolean;
         quick_schedule: boolean;
         share_preview: boolean;
+        post_story_by_hand: boolean;
     };
+    /** Step S-1.4: who can post a Story by hand, and the client's default. */
+    storyHandoff: StoryHandoffOptions;
     workflow: {
         is_business: boolean;
         requires_review: boolean;
@@ -101,6 +107,7 @@ export default function PostEdit({
     };
     hashtagSuggestions: string[];
     campaignOptions: CampaignOption[];
+    locationOptions: { id: string; name: string }[];
     mentionableUsers: MentionableUser[];
     ai?: { enabled: boolean; canUse: boolean };
     imageStudio?: ImageStudioData | null;
@@ -118,6 +125,7 @@ export default function PostEdit({
         targetAccounts,
         campaignOptions,
         canUpdate: can.update,
+        storyHandoff,
     });
 
     // When there's feedback to read (changes requested, a failed publish), open the editor on the
@@ -155,10 +163,12 @@ export default function PostEdit({
         client,
         targetAccounts,
         campaignOptions,
+        locationOptions,
         hashtagSuggestions,
         mediaFormatOptions,
         staff,
         dealOptions,
+        storyHandoff,
         can,
     };
 

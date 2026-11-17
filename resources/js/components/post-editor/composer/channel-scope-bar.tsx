@@ -43,7 +43,7 @@ export function ChannelScopeBar({
             <div
                 role="tablist"
                 aria-label="Edit content for"
-                className="bg-muted flex min-w-0 gap-1 overflow-x-auto rounded-full p-1"
+                className="bg-muted flex min-w-0 [scrollbar-width:none] gap-1 overflow-x-auto rounded-full p-1"
             >
                 <button
                     type="button"

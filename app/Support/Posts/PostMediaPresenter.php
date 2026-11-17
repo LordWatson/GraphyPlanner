@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Services\Media\PublishImageCropper;
+use App\Support\Stories\StoryChannelPresenter;
 
 /**
  * The image-format payload every post preview reads (editor, review link, client portal): the
@@ -90,6 +91,11 @@ final class PostMediaPresenter
             'published_caption' => $target->publishedCaption(),
             'first_comment_effective' => $target->effectiveFirstComment(),
             'is_customized' => $target->isCustomized(),
+            // Step S-1.4: a Story's extras (a link, a poll, …), whether that puts it on the
+            // assisted lane, and who posts it (null = the client's default).
+            'story_extras' => $target->storyExtras()->toArray(),
+            'handoff_required' => $target->handoff_required,
+            'handoff_recipient' => $target->handoff_recipient?->value,
         ];
     }
 
@@ -98,7 +104,11 @@ final class PostMediaPresenter
      * exactly as they'll publish there, and the format — so they approve the real thing, never
      * the raw overrides. The target's `post` relation must be set.
      *
-     * @return array{published_caption: string, first_comment: string|null, format: string|null}
+     * Step S-1.5: `story` is set for a Story that is posted by hand — its link and stickers as a
+     * read-only list, so the client approves them with the creative. The post's `client` must be
+     * loaded for it.
+     *
+     * @return array{published_caption: string, first_comment: string|null, format: string|null, story: array<string, mixed>|null}
      */
     public static function channelPreview(PostTarget $target): array
     {
@@ -106,6 +116,7 @@ final class PostMediaPresenter
             'published_caption' => $target->publishedCaption(),
             'first_comment' => $target->effectiveFirstComment(),
             'format' => $target->resolvedFormat()?->key,
+            'story' => StoryChannelPresenter::clientStory($target),
         ];
     }
 

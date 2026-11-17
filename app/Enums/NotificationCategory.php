@@ -32,7 +32,7 @@ enum NotificationCategory: string
         return match ($this) {
             self::Approvals => 'A post is approved, has changes requested, or an approval is overdue.',
             self::Comments => 'Someone comments on or mentions you about a post.',
-            self::Publishing => 'A post fails to publish or needs attention.',
+            self::Publishing => 'A post fails to publish, or a story is ready for you to post.',
             self::Invoices => 'An invoice is issued or a payment is reported.',
             self::Campaigns => 'Campaign briefs, deliverables and reviews.',
             self::Other => 'Anything not covered above.',

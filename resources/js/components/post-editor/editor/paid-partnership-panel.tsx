@@ -1,4 +1,3 @@
-import { Handshake } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { Panel } from '@/components/page';
 import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
@@ -33,10 +32,8 @@ export function PaidPartnershipPanel({
 
     return (
         <Panel
-            eyebrow="06"
             title="Paid partnership"
             description="Tell people when a post is paid for, gifted or affiliate — it's the law, and we won't let it go out without it."
-            icon={Handshake}
             className="mt-5"
             bodyClassName="grid gap-5"
         >
@@ -95,7 +92,10 @@ export function PaidPartnershipPanel({
                                 })
                             }
                         >
-                            <SelectTrigger id="brand_deal_id">
+                            <SelectTrigger
+                                id="brand_deal_id"
+                                className="w-full"
+                            >
                                 <SelectValue placeholder="Not linked" />
                             </SelectTrigger>
                             <SelectContent>

@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
     ClipboardCheck,
     CornerDownLeft,
+    Hand,
     Handshake,
     LayoutGrid,
     ListChecks,
@@ -57,6 +58,7 @@ import { index as myWorkIndex } from '@/routes/my-work';
 import { index as invoicesIndex } from '@/routes/invoices';
 import { edit as editProfile } from '@/routes/profile';
 import { index as staffIndex } from '@/routes/staff';
+import { queue as storiesQueue } from '@/routes/stories';
 import { dashboard as superAdminDashboard } from '@/routes/super-admin';
 import { index as superAdminAnalytics } from '@/routes/super-admin/analytics';
 import { index as superAdminOrganizations } from '@/routes/super-admin/organizations';
@@ -137,6 +139,8 @@ function useCommands(close: () => void): Command[] {
             auth.user.role === 'owner' || auth.user.role === 'strategist';
         const isOwner = auth.user.role === 'owner';
         const canViewAnalytics = auth.can?.viewAnalytics === true;
+        // Step S-4.4 — `PostPolicy::viewStoryQueue`, shared as `auth.can`.
+        const canPostStories = auth.can?.viewStoryQueue === true;
 
         const chapterCommand = (
             chapter: Chapter,
@@ -173,6 +177,21 @@ function useCommands(close: () => void): Command[] {
                 chapter: chapters.home,
                 run: visit(myWorkIndex()),
             },
+            ...(canPostStories
+                ? [
+                      {
+                          id: 'section-stories-to-post',
+                          group: 'Chapters',
+                          label: 'Stories to post',
+                          hint: 'Stories ready to post by hand, and what is due later.',
+                          keywords:
+                              'story stories instagram link sticker hand post queue handoff',
+                          icon: Hand,
+                          chapter: chapters.home,
+                          run: visit(storiesQueue()),
+                      } satisfies Command,
+                  ]
+                : []),
             chapterCommand(chapters.calendar, calendar()),
             chapterCommand(chapters.content, contentIndex()),
             {
@@ -330,6 +349,7 @@ function useCommands(close: () => void): Command[] {
     }, [
         auth.user.role,
         auth.can?.viewAnalytics,
+        auth.can?.viewStoryQueue,
         isBusiness,
         createActions,
         close,

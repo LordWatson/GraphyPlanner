@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     ClipboardList,
     Eye,
+    Hand,
     type LucideIcon,
 } from 'lucide-react';
 import { HomeViewTabs } from '@/components/home-view-tabs';
@@ -19,6 +20,10 @@ import {
 } from '@/components/page';
 import { platformIcon } from '@/components/platform-icon';
 import { StatusPill } from '@/components/status-pill';
+import type { StoryHandoff } from '@/components/stories/story-handoff-pill';
+import { StoryHandoffPill } from '@/components/stories/story-handoff-pill';
+import type { StoryQueueRow } from '@/components/stories/story-row';
+import { StoryRow } from '@/components/stories/story-row';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatSchedule } from '@/lib/dates';
 import { cn } from '@/lib/utils';
@@ -26,11 +31,14 @@ import { calendar, dashboard } from '@/routes';
 import { index as contentIndex } from '@/routes/content';
 import { index as myWorkIndex } from '@/routes/my-work';
 import { edit as editPost } from '@/routes/posts';
+import { queue as storiesQueue } from '@/routes/stories';
 
 type Row = {
     id: number;
     status: string;
     status_label: string;
+    /** Step S-5.1: the most urgent assisted-lane state across the post's channels. */
+    handoff?: StoryHandoff | null;
     master_caption: string | null;
     client: { id: number; name: string | null };
     due_at: string | null;
@@ -40,6 +48,8 @@ type Row = {
 };
 
 type Buckets = {
+    /** Step S-5.2: the viewer's own Stories to post by hand, ready now or due within a day. */
+    stories?: StoryQueueRow[];
     due: Row[];
     review: Row[];
     assigned: Row[];
@@ -47,7 +57,7 @@ type Buckets = {
 };
 
 const SECTIONS: {
-    key: keyof Buckets;
+    key: Exclude<keyof Buckets, 'stories'>;
     title: string;
     description: string;
     icon: LucideIcon;
@@ -87,10 +97,18 @@ const SECTIONS: {
 /**
  * Step M-5.4 — "My work": one staff member's posts across every client, in four lenses. Each row
  * opens the editor. The due date is overdue-red when it's past.
+ *
+ * Step S-5.2: when the viewer has Stories to post by hand, they lead the page — the ready ones
+ * are the only thing here with a clock running.
  */
 export default function MyWork({ buckets }: { buckets: Buckets }) {
+    const stories = buckets.stories ?? [];
+    const readyStories = stories.filter((story) => story.state === 'ready');
     const total =
-        buckets.due.length + buckets.review.length + buckets.assigned.length;
+        buckets.due.length +
+        buckets.review.length +
+        buckets.assigned.length +
+        readyStories.length;
 
     return (
         <>
@@ -137,6 +155,36 @@ export default function MyWork({ buckets }: { buckets: Buckets }) {
                 />
 
                 <HomeViewTabs className="animate-rise" />
+
+                {stories.length > 0 && (
+                    <Panel
+                        eyebrow={`${readyStories.length} ready`}
+                        title="Stories to post"
+                        description="Stories with a link or a sticker go out by hand. Open one when it's ready."
+                        icon={Hand}
+                        actions={
+                            <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-11 sm:h-8"
+                            >
+                                <Link href={storiesQueue()}>
+                                    Open the queue
+                                </Link>
+                            </Button>
+                        }
+                        bodyClassName="p-0 sm:p-0"
+                    >
+                        <ul className="divide-border/70 divide-y">
+                            {stories.map((story) => (
+                                <li key={story.target_id}>
+                                    <StoryRow story={story} />
+                                </li>
+                            ))}
+                        </ul>
+                    </Panel>
+                )}
 
                 {SECTIONS.map((section) => {
                     const rows = buckets[section.key];
@@ -193,6 +241,7 @@ function WorkRow({ row, showDue }: { row: Row; showDue: boolean }) {
                     <span className="text-muted-foreground block truncate text-xs">
                         {row.client.name ?? '—'}
                     </span>
+                    <StoryHandoffPill handoff={row.handoff} className="mt-1" />
                 </span>
                 <span className="text-muted-foreground hidden items-center gap-1.5 sm:flex">
                     {row.targets.map((target, i) => {

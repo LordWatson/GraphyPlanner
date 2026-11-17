@@ -1,4 +1,4 @@
-import { Repeat } from 'lucide-react';
+import { Recycle, Repeat } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { Panel } from '@/components/page';
 import { usePostEditorContext } from '@/components/post-editor/editor/editor-context';
@@ -29,7 +29,6 @@ export function RepeatReusePanel({
 
     return (
         <Panel
-            eyebrow="06"
             title="Repeat & reuse"
             description="Repost this evergreen post later, or have it recur automatically."
             className="mt-5"
@@ -51,7 +50,7 @@ export function RepeatReusePanel({
                         })
                     }
                 >
-                    <SelectTrigger id="recurrence">
+                    <SelectTrigger id="recurrence" className="w-full">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -70,7 +69,12 @@ export function RepeatReusePanel({
             </div>
 
             <div className="grid content-start gap-2">
-                <Label className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm leading-none font-medium">
+                    <Recycle className="text-muted-foreground size-3.5" />
+                    Reuse
+                </span>
+                {/* Input-height row, so the tick lines up with the Repeat select beside it. */}
+                <Label className="flex min-h-10 items-center gap-2.5 font-normal">
                     <Checkbox
                         checked={state.isRecyclable}
                         onCheckedChange={(checked) =>

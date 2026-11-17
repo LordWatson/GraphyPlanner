@@ -1,14 +1,21 @@
 import { usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 import { http } from '@/lib/http';
-import { subscribe as subscribeRoute } from '@/routes/business/push';
-import { unsubscribe as unsubscribeRoute } from '@/routes/business/push';
+import {
+    subscribe as subscribeRoute,
+    unsubscribe as unsubscribeRoute,
+} from '@/routes/push';
 
 /**
- * Step B-7.4 — per-browser push opt-in for the business shell. Reads the VAPID key from the shared
- * `pwa` prop, reflects the browser's current subscription state, and stores/removes it server-side
- * through the shared `http` helper. Everything degrades quietly when push is unsupported or
- * unconfigured, so the toggle simply doesn't show.
+ * Step B-7.4 / S-3.2 — per-browser push opt-in. Reads the VAPID key from the shared `pwa` prop,
+ * reflects the browser's current subscription state, and stores/removes it server-side through the
+ * shared `http` helper. Everything degrades quietly when push is unsupported or unconfigured, so
+ * the toggle simply doesn't show.
+ *
+ * The business shell registers the service worker on every page (`PwaProvider`). An agency page
+ * doesn't, so nothing here waits on `serviceWorker.ready` before a registration exists (it would
+ * never settle): state is read from `getRegistration()`, and the worker is registered when the
+ * user opts in.
  */
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
@@ -66,11 +73,12 @@ export function usePush(): PushState {
 
         let cancelled = false;
 
-        navigator.serviceWorker.ready
-            .then((registration) => registration.pushManager.getSubscription())
+        navigator.serviceWorker
+            .getRegistration()
+            .then((registration) => registration?.pushManager.getSubscription())
             .then((subscription) => {
                 if (!cancelled) {
-                    setSubscribed(subscription !== null);
+                    setSubscribed(Boolean(subscription));
                 }
             })
             .catch(() => {});
@@ -95,6 +103,8 @@ export function usePush(): PushState {
                 return;
             }
 
+            // Idempotent: a no-op where the business shell already registered it.
+            await navigator.serviceWorker.register('/sw.js');
             const registration = await navigator.serviceWorker.ready;
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
@@ -128,9 +138,10 @@ export function usePush(): PushState {
         setBusy(true);
 
         try {
-            const registration = await navigator.serviceWorker.ready;
+            const registration =
+                await navigator.serviceWorker.getRegistration();
             const subscription =
-                await registration.pushManager.getSubscription();
+                await registration?.pushManager.getSubscription();
 
             if (subscription) {
                 await http.delete(unsubscribeRoute().url, {

@@ -45,6 +45,10 @@ class PostRevisionService
                     'first_comment' => $target->first_comment,
                     'link_url' => $target->link_url,
                     'format' => $target->format,
+                    // Step S-1.2: a Story's link and stickers are content the client approves. The
+                    // key is only present when there are some, so a snapshot taken before extras
+                    // existed still compares equal to the same content today.
+                    ...($target->story_extras !== null ? ['story_extras' => $target->story_extras] : []),
                 ])
                 ->values()
                 ->all(),
@@ -200,7 +204,7 @@ class PostRevisionService
         $index = fn (array $targets) => collect($targets)->keyBy(fn ($target) => (int) $target['social_account_id']);
         $before = $index($old);
         $after = $index($new);
-        $fields = ['caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format'];
+        $fields = ['caption_override', 'hashtags_override', 'first_comment', 'link_url', 'format', 'story_extras'];
         $changes = [];
 
         foreach ($after as $id => $target) {

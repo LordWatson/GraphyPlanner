@@ -3,6 +3,7 @@
 namespace App\Actions\Posts;
 
 use App\Models\Post;
+use App\Support\Stories\StoryPostPresenter;
 use Illuminate\Support\Collection;
 
 /**
@@ -12,7 +13,13 @@ use Illuminate\Support\Collection;
  *
  * Shared by the internal `CalendarController` and the client portal's `PortalCalendarController`
  * so both calendars render identical occurrence shapes. Callers are responsible for scoping and
- * eager-loading `client`, `campaign` and `targets.socialAccount` on the posts they pass in.
+ * eager-loading `client`, `campaign`, `targets.socialAccount` and the targets' handoff-state
+ * relations (`PostTarget::HANDOFF_STATE_RELATIONS`, with `status` and `handoff_required`
+ * selected) on the posts they pass in.
+ *
+ * Step S-5.1: each occurrence carries `handoff` — the channel's assisted-lane state
+ * (`{state, label}`, or null for a channel that publishes itself). `$forClient` gives the portal's
+ * reading, which never says "ready to post".
  */
 class BuildCalendarOccurrencesAction
 {
@@ -20,7 +27,7 @@ class BuildCalendarOccurrencesAction
      * @param  Collection<int, Post>  $posts
      * @return list<array<string, mixed>>
      */
-    public function __invoke(Collection $posts, string $orgTimezone): array
+    public function __invoke(Collection $posts, string $orgTimezone, bool $forClient = false): array
     {
         $occurrences = [];
 
@@ -41,6 +48,7 @@ class BuildCalendarOccurrencesAction
                     'campaign_colour' => $post->campaign?->colour?->value,
                     'status' => $post->status->value,
                     'status_label' => $post->status->label(),
+                    'handoff' => StoryPostPresenter::channel($post, $target, $forClient),
                     // Step 18.11: the grid chip, when the post was made from a grid tile.
                     'grid_plan_id' => $post->relationLoaded('gridTile') ? $post->gridTile?->grid_plan_id : null,
                     'grid_tile_position' => $post->relationLoaded('gridTile') ? $post->gridTile?->position : null,

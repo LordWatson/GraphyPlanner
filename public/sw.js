@@ -5,8 +5,8 @@
  *   1. An offline shell: hashed build assets are cached first (they're immutable), and a failed
  *      navigation falls back to a branded /offline.html. No offline *writes* — a POST never touches
  *      the cache, so the share target and every form still hit the server.
- *   2. Web push: render "Post goes out in 30 minutes" / failure / "nothing scheduled" notifications
- *      and focus the app when one is tapped.
+ *   2. Web push: render "Post goes out in 30 minutes" / failure / "nothing scheduled" / "Time to
+ *      post." (story handoff) notifications and focus the app when one is tapped.
  *
  * Bump CACHE_VERSION to retire old caches on the next activation.
  */
@@ -118,21 +118,32 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const target =
-        (event.notification.data && event.notification.data.url) || '/today';
+    const target = new URL(
+        (event.notification.data && event.notification.data.url) || '/today',
+        self.location.origin,
+    ).href;
 
     event.waitUntil(
         self.clients
             .matchAll({ type: 'window', includeUncontrolled: true })
             .then((clientList) => {
-                for (const client of clientList) {
-                    if ('focus' in client) {
-                        client.navigate(target);
-                        return client.focus();
-                    }
+                // Reuse an Alima window that is already open rather than stacking a new one.
+                const client = clientList.find(
+                    (candidate) =>
+                        'focus' in candidate &&
+                        new URL(candidate.url).origin === self.location.origin,
+                );
+
+                if (!client) {
+                    return self.clients.openWindow(target);
                 }
 
-                return self.clients.openWindow(target);
+                // navigate() rejects for a window this worker doesn't control (an agency page
+                // opened before the worker was registered); open a fresh one in that case.
+                return client
+                    .navigate(target)
+                    .then((navigated) => (navigated || client).focus())
+                    .catch(() => self.clients.openWindow(target));
             }),
     );
 });

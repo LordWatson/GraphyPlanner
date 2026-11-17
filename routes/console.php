@@ -37,6 +37,11 @@ $safely(Schedule::command('push:send-empty-tomorrow')->dailyAt('18:00'), 'push:s
 // never arrived.
 $safely(Schedule::command('publishing:poll-pending-statuses')->everyFiveMinutes(), 'publishing:poll-pending-statuses');
 
+// Step S-2.3: Stories with a link or stickers are posted by hand. Every minute this tells the
+// poster when one is due, nudges once, and fails the channel if nobody confirms inside the window.
+// Idempotent (`notified_at` / `nudged_at` are stamped under a row lock before anything is sent).
+$safely(Schedule::command('stories:process-handoffs')->everyMinute(), 'stories:process-handoffs');
+
 // Step 1.6: re-checks every connected social account's token health so an expired token is
 // caught even if nothing else touches that account.
 $safely(Schedule::command('social-accounts:check-health')->hourly(), 'social-accounts:check-health');

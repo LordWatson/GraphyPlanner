@@ -32,6 +32,7 @@ type ClientData = {
     billing_cycle: string | null;
     default_approval_mode: string;
     approval_policy: string;
+    story_handoff_recipient?: string;
     default_language: string | null;
     approval_email: string | null;
     target_posts_per_week: number | null;
@@ -49,6 +50,7 @@ export default function ClientEdit({
     statuses,
     approvalModes = [],
     approvalPolicies = [],
+    storyHandoff = null,
     billingCycles,
     languages,
     owners,
@@ -59,6 +61,8 @@ export default function ClientEdit({
     statuses: Option[];
     approvalModes?: Option[];
     approvalPolicies?: Array<Option & { description?: string }>;
+    /** Step S-1.5: who posts Stories with extras by hand; null while the lane is switched off. */
+    storyHandoff?: { options: Option[] } | null;
     billingCycles: Option[];
     languages: Option[];
     owners: Option[];
@@ -240,6 +244,50 @@ export default function ClientEdit({
                                 </p>
                                 <InputError message={errors.approval_policy} />
                             </div>
+
+                            {storyHandoff && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="story_handoff_recipient">
+                                        Stories with links and stickers are
+                                        posted by
+                                    </Label>
+                                    <Select
+                                        name="story_handoff_recipient"
+                                        defaultValue={
+                                            client.story_handoff_recipient ??
+                                            'team'
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="story_handoff_recipient"
+                                            className="w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {storyHandoff.options.map(
+                                                (option) => (
+                                                    <SelectItem
+                                                        key={option.value}
+                                                        value={option.value}
+                                                    >
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-muted-foreground text-xs">
+                                        Instagram only allows links and stickers
+                                        from its own app, so someone posts those
+                                        stories by hand. Each post can still
+                                        choose differently.
+                                    </p>
+                                    <InputError
+                                        message={errors.story_handoff_recipient}
+                                    />
+                                </div>
+                            )}
 
                             <div className="grid gap-2">
                                 <Label htmlFor="owner_user_id">Owner</Label>

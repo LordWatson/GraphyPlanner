@@ -13,6 +13,7 @@ import type {
     ChannelState,
     ChecklistFix,
     PostData,
+    StoryHandoffOptions,
     TargetAccountData,
 } from '@/components/post-editor/types';
 import { EMPTY_CHANNEL } from '@/components/post-editor/types';
@@ -34,12 +35,14 @@ export function usePostEditor({
     targetAccounts,
     campaignOptions,
     canUpdate,
+    storyHandoff,
 }: {
     post: PostData;
-    client: { id: number };
+    client: { id: number; name?: string };
     targetAccounts: TargetAccountData[];
     campaignOptions: CampaignOption[];
     canUpdate: boolean;
+    storyHandoff?: StoryHandoffOptions;
 }) {
     const [initial] = useState(() => initialEditorState(post, targetAccounts));
     const [state, setState] = useState<EditorState>(initial);
@@ -61,6 +64,8 @@ export function usePostEditor({
         campaignOptions,
         registry,
         canUpdate,
+        storyHandoff,
+        clientName: client.name,
     });
     const isDirty = canUpdate && isEditorDirty(state, initial);
 

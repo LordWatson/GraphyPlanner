@@ -8,6 +8,8 @@ use App\Models\Organization;
 use App\Models\User;
 use Database\Seeders\PreviewSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class PreviewModeTest extends TestCase
@@ -122,6 +124,27 @@ class PreviewModeTest extends TestCase
         $this->actingAs($previewUser);
 
         $this->get(route('clients.index'))->assertForbidden();
+        $this->assertGuest();
+    }
+
+    /**
+     * The rejected path is logged, and it can be a public token link (`story/…`, `review/…`): the
+     * token must not reach the log.
+     */
+    public function test_the_rejection_log_never_carries_a_link_token(): void
+    {
+        $this->seed(PreviewSeeder::class);
+        $this->actingAs(User::firstWhere('email', User::PREVIEW_EMAIL));
+        $token = Str::random(64);
+        $log = Log::spy();
+
+        $this->get(route('story-handoff.show', ['token' => $token]))->assertForbidden();
+
+        $log->shouldHaveReceived('warning')
+            ->once()
+            ->withArgs(fn (string $message, array $context) => $message === 'Preview user authenticated outside preview mode'
+                && $context['path'] === '/story/[Filtered]'
+                && ! str_contains((string) json_encode($context), $token));
         $this->assertGuest();
     }
 

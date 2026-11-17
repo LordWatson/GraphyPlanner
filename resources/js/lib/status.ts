@@ -41,7 +41,8 @@ export type StatusKind =
     | 'deal'
     | 'audienceContact'
     | 'bioDomain'
-    | 'registration';
+    | 'registration'
+    | 'storyHandoff';
 
 type StatusDefinition = { tone: StatusTone; label: string };
 
@@ -236,6 +237,17 @@ export const statusMap: Record<StatusKind, Record<string, StatusDefinition>> = {
     },
     // The register-interest pipeline (`RegistrationInterestStatus`). `new` is a warning: we
     // promised a reply within 24 hours.
+    // Phase S: a Story with a link or stickers is posted by hand from the Instagram app. These
+    // are derived by the backend (`StoryChannelPresenter`) — `auto` is the editor's own word for
+    // a Story that publishes itself. Info, not warning: posting by hand is the plan, not a
+    // problem. `ready_to_post` is the one that asks for somebody's attention now.
+    storyHandoff: {
+        auto: { tone: 'neutral', label: 'Auto-publish' },
+        needs_hand_posting: { tone: 'info', label: 'Needs posting by hand' },
+        ready_to_post: { tone: 'warning', label: 'Ready to post' },
+        posted_by_hand: { tone: 'success', label: 'Posted by hand' },
+        missed: { tone: 'danger', label: 'Not posted in time' },
+    },
     registration: {
         new: { tone: 'warning', label: 'New' },
         contacted: { tone: 'info', label: 'Contacted' },

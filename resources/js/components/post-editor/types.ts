@@ -1,6 +1,7 @@
 import type { CampaignChipData } from '@/components/campaigns/types';
 import type { FeedbackThread } from '@/components/feedback/types';
 import type { Crop, MediaFormat } from '@/lib/media-format';
+import type { StoryExtras, StoryHandoffRecipient } from '@/lib/story-extras';
 
 /** Prop shapes sent by `PostController::edit` to the `posts/edit` page. */
 
@@ -59,6 +60,25 @@ export type TargetData = {
     resolved_format: string | null;
     published_caption: string;
     is_customized: boolean;
+    /** Step S-1.4: a Story's extras, whether that means it is posted by hand, and by whom. */
+    story_extras?: Record<string, unknown> | null;
+    handoff_required?: boolean;
+    handoff_recipient?: StoryHandoffRecipient | null;
+    /** Step S-5.1: `needs_hand_posting` / `ready_to_post` / `posted_by_hand`, or null. */
+    handoff_state?: string | null;
+};
+
+/** Step S-1.4: what the Story extras panel needs to say who will post a Story by hand. */
+export type StoryHandoffOptions = {
+    default_recipient: StoryHandoffRecipient;
+    /** False in a business workspace: there is no client to hand a Story to. */
+    can_choose_recipient: boolean;
+    client_can_be_notified: boolean;
+    /** Team members who can be the poster (Owner, Strategist, Designer). */
+    posters: { id: number; name: string }[];
+    creator_id: number | null;
+    /** How long after its time a Story can still be confirmed, in minutes. */
+    window_minutes: number;
 };
 
 export type ActivityLogData = {
@@ -190,6 +210,13 @@ export type BestTime = {
     }[];
 };
 
+/** Step S-1.4: the page-level facts a Story channel's extras panel reads. */
+export type StoryPanelContext = {
+    options: StoryHandoffOptions;
+    assigneeId: string;
+    clientName: string;
+};
+
 /**
  * Step M-2.2 / M-2.3 — one channel's own content in the editor. `null` = uses the master; an
  * empty string / list = deliberately none on this channel.
@@ -200,6 +227,9 @@ export type ChannelState = {
     firstComment: string | null;
     link: string | null;
     format: string | null;
+    /** Step S-1.4: a Story's extras (null = none) and who posts it (null = the client's default). */
+    storyExtras: StoryExtras | null;
+    handoffRecipient: StoryHandoffRecipient | null;
 };
 
 export const EMPTY_CHANNEL: ChannelState = {
@@ -208,6 +238,8 @@ export const EMPTY_CHANNEL: ChannelState = {
     firstComment: null,
     link: null,
     format: null,
+    storyExtras: null,
+    handoffRecipient: null,
 };
 
 export function isCustomized(channel: ChannelState | undefined): boolean {

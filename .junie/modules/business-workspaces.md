@@ -230,11 +230,22 @@ discardPlan}` (`business.plan.*`). Internals in `.junie/modules/ai.md` ("Plan my
       subscriptions when a scheduled target enters the lead window (`config('push.reminder_lead_minutes')`),
       idempotent via `post_targets.push_reminder_sent_at`, pruning `Gone` subscriptions. Never throws
       for one dead endpoint.
-    - The `pwa` shared Inertia prop (`HandleInertiaRequests::sharedPwa`, business-only) carries
+    - The `pwa` shared Inertia prop (`HandleInertiaRequests::sharedPwa`) carries
       `{pushEnabled, pushPublicKey}`; the frontend `PwaProvider` (manifest+SW+install card, business
       shell only), `use-push.ts` hook and `PushRemindersCard` (Profile settings) consume it. Static
       assets: `public/manifest.webmanifest`, `public/sw.js`, `public/offline.html`, `public/icons/*`.
       Config in `config/push.php`.
+    - **Phase S (Stories with extras, Step S-3.2):** the push opt-in is no longer business-only.
+      `sharedPwa` sends the prop to every member who may subscribe (every business role, and every
+      agency member except a client reviewer), and agencies get their own
+      `PushRemindersCard workspace="agency"` on Settings → Notifications. What did not change: the
+      business "Post reminders" card on Profile, the PWA shell and install card (business shell
+      only, decided from `workspace.type`, not from `pwa`), and the three business pushes
+      (`SendPostPushRemindersAction`, `SendPublishFailurePushAction`,
+      `SendNothingScheduledTomorrowPushAction`), which still skip agency organizations. A business
+      workspace's assisted Story is always posted by the team (`PostTarget::handoffRecipient()`),
+      and the editor hides the "who posts it" choice (`can_choose_recipient` false). See
+      `notifications.md` › Web push and `publishing.md` › "Stories with extras".
 - **Phase B-8 insights for one brand:**
     - `App\Actions\Business\GetBusinessInsightsAction` (B-8.1) — now also reads the shared
       `App\Services\Analytics\EngagementMetrics` scoped to the primary brand (reach/engagement by
@@ -348,9 +359,11 @@ social-account connect endpoints and `clients.posts.store` → editor, brand id 
   standalone mobile page `business/posts/quick`); `POST /posts/quick` → `store`
   (`business.posts.quick.store`); `POST /posts/quick/share` → `share` (`business.posts.quick.share`,
   `throttle:30,1`, the manifest's Web Share Target action).
-- **B-7.4:** `POST /push/subscribe` (`business.push.subscribe`) / `DELETE /push/subscribe`
-  (`business.push.unsubscribe`) → `PushSubscriptionController`. Per-user, per-browser; subscribe
-  404s when push isn't configured.
+- **B-7.4:** `POST /push/subscribe` (`push.subscribe`) / `DELETE /push/subscribe`
+  (`push.unsubscribe`) → `PushSubscriptionController`. Per-user, per-browser; subscribe
+  404s when push isn't configured. Step S-3.2 moved these out of the business route group and
+  dropped the `business.` name prefix (same URL): they now sit in the `org.member` +
+  `portal.redirect` group, open to agency members too.
 - **Step CG-1.2 (competitor-gap Phase CG-1):** `GET/POST /grid` → `Business\GridController`
   (`business.grids.*`) is the grid planner hub + create; the planner, tiles, workflow, production and
   AI are the shared brand-agnostic `grids.*` routes. Grid is a Posts sub-item + ⌘K. The agency
@@ -521,8 +534,16 @@ ability for business orgs (policy `before()`); `StorePostRequest`/`UpdatePostReq
 - `tests/Feature/Business/MediaKitTest.php` — **B-8.4:** built from public data only (published posts,
   no drafts/emails), opt-in (404 until shared), share→view→revoke→404, a new link invalidates the old,
   owner page loads (agency 404), bio save, and the PDF download.
+- Phase S: `tests/Feature/Business/PushRemindersTest.php` was updated for the renamed
+  `push.subscribe` / `push.unsubscribe` routes. `tests/Feature/Stories/AgencyPushOptInTest.php`
+  asserts the opt-in keeps the URL business browsers already use and that the "goes out soon",
+  "nothing scheduled tomorrow" and publish-failure pushes still skip a subscribed agency member.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): the business shell has no surface of its own for Stories posted by hand
+  beyond the shared editor, the handoff page and the "Stories to post" manifest shortcut; the
+  Today dashboard does not list them.
 
 - **Phase B-8 (insights for one brand) is done**: `/insights` now shows reach/engagement, top posts,
   follower growth and best times (B-8.1/B-8.3), plain-language AI takeaways + the weekly email digest
@@ -718,3 +739,7 @@ Action` "Today" page (B-4.3); the `workspace-copy.ts` / `WorkspaceCopy` term pas
   preview payload, which put the page into read-only preview mode and cancelled every link on it.
   The payload is now `publicPreview`, and `usePreviewGuard`/`PreviewBanner` only treat `preview`
   as preview mode when it is boolean `true`. See `bio-pages.md` → Gotchas.
+- 2026-11-13: Phase S — Stories with extras (assisted lane). The push opt-in opened to agency
+  members: routes renamed `business.push.*` → `push.subscribe` / `push.unsubscribe` (same URL) and
+  moved out of the business group; the `pwa` prop is no longer business-only. The business
+  "Post reminders" card, the PWA shell and the three business pushes are unchanged.

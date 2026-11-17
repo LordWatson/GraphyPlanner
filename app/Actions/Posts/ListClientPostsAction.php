@@ -27,7 +27,7 @@ class ListClientPostsAction
         $platform = $filters['platform'] ?? null;
 
         return $client->posts()
-            ->with(['targets.socialAccount', 'campaign'])
+            ->with(['targets.socialAccount', 'targets.openStoryHandoff', 'targets.postedStoryHandoff', 'campaign'])
             ->when($search !== '', function (Builder $query) use ($search) {
                 // Treat the user's input literally: `%` / `_` are not wildcards here. See
                 // `LikeSearch` for why the escape character is `!` and never a backslash.

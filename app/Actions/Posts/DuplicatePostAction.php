@@ -2,6 +2,7 @@
 
 namespace App\Actions\Posts;
 
+use App\Actions\Stories\SyncTargetStoryExtrasAction;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\User;
@@ -21,7 +22,9 @@ class DuplicatePostAction
     {
         $source->loadMissing(['targets', 'assets']);
 
-        return DB::transaction(function () use ($source, $user) {
+        $syncExtras = app(SyncTargetStoryExtrasAction::class);
+
+        return DB::transaction(function () use ($source, $user, $syncExtras) {
             $copy = Post::create([
                 'org_id' => $source->org_id,
                 'client_id' => $source->client_id,
@@ -61,15 +64,19 @@ class DuplicatePostAction
             }
 
             // Target accounts with their content overrides, but no schedule and no publish state.
+            // Step S-1.2: a Story's extras come along, and the copy's lane is re-derived by the
+            // one writer of `handoff_required` rather than copied.
             foreach ($source->targets as $target) {
-                $copy->targets()->create([
+                $syncExtras->refresh($copy->targets()->create([
                     'social_account_id' => $target->social_account_id,
                     'caption_override' => $target->caption_override,
                     'hashtags_override' => $target->hashtags_override,
                     'first_comment' => $target->first_comment,
                     'link_url' => $target->link_url,
                     'format' => $target->format,
-                ]);
+                    'story_extras' => $target->story_extras,
+                    'handoff_recipient' => $target->handoff_recipient,
+                ]));
             }
 
             Log::info('Post duplicated', [

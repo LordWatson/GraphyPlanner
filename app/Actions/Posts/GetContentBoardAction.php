@@ -25,7 +25,7 @@ class GetContentBoardAction
     public function __invoke(array $filters, User $user): array
     {
         $posts = $this->list->query($filters)
-            ->with(['client:id,name', 'campaign', 'targets.socialAccount', 'assets:id'])
+            ->with(['client:id,name', 'campaign', 'targets.socialAccount', 'targets.openStoryHandoff', 'targets.postedStoryHandoff', 'assets:id'])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->limit(self::CAP + 1)

@@ -1,4 +1,5 @@
 import { MapPin, Music2 } from 'lucide-react';
+import { Combobox } from '@/components/combobox';
 import InputError from '@/components/input-error';
 import { Panel } from '@/components/page';
 import { CampaignField } from '@/components/post-editor/campaign-field';
@@ -7,7 +8,6 @@ import { usePostEditorContext } from '@/components/post-editor/editor/editor-con
 import { PaidPartnershipPanel } from '@/components/post-editor/editor/paid-partnership-panel';
 import { RepeatReusePanel } from '@/components/post-editor/editor/repeat-reuse-panel';
 import { MusicField } from '@/components/post-editor/music-field';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -71,7 +71,7 @@ export function SettingsSection({
                             editor.update({ approvalMode })
                         }
                     >
-                        <SelectTrigger id="approval_mode">
+                        <SelectTrigger id="approval_mode" className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -120,16 +120,35 @@ export function SettingsSection({
                         <MapPin className="text-muted-foreground size-3.5" />
                         Location
                     </Label>
-                    <Input
+                    {/* The value is the place's Instagram location ID; a name typed before the
+                        picker existed (no id) stays as the placeholder until replaced. */}
+                    <Combobox
                         id="location_name"
-                        name="location[name]"
-                        dir="auto"
-                        value={state.locationName}
-                        onChange={(e) =>
-                            editor.update({ locationName: e.target.value })
+                        name="location[id]"
+                        options={page.locationOptions.map((place) => ({
+                            value: place.id,
+                            label: place.name,
+                        }))}
+                        value={state.locationId || null}
+                        onChange={(id) =>
+                            editor.update({
+                                locationId: id ?? '',
+                                locationName:
+                                    page.locationOptions.find(
+                                        (place) => place.id === id,
+                                    )?.name ?? '',
+                            })
                         }
-                        placeholder="e.g. Shoreditch, London"
+                        placeholder={state.locationName || 'Search locations…'}
+                        searchPlaceholder="Search locations…"
+                        emptyText="No matching location yet."
                     />
+                    <input
+                        type="hidden"
+                        name="location[name]"
+                        value={state.locationName}
+                    />
+                    <InputError message={errors['location.id']} />
                 </div>
             </Panel>
 

@@ -10,6 +10,7 @@ use App\Enums\BrandKind;
 use App\Enums\ClientHealth;
 use App\Enums\ClientReportSchedule;
 use App\Enums\ClientStatus;
+use App\Enums\StoryHandoffRecipient;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\ClientHealthService;
@@ -62,6 +63,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $target_posts_per_week
  * @property array<string, mixed>|null $posting_goal
  * @property ClientReportSchedule $report_schedule
+ * @property StoryHandoffRecipient $story_handoff_recipient
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -72,7 +74,7 @@ use Illuminate\Support\Carbon;
     'default_language', 'notes_internal', 'approval_email', 'billing_email', 'billing_address',
     'tax_registration_number', 'billing_currency', 'default_tax_rate_id', 'auto_invoice_retainer',
     'approval_lead_days', 'default_approval_mode', 'approval_policy', 'report_schedule', 'target_posts_per_week',
-    'posting_goal',
+    'posting_goal', 'story_handoff_recipient',
 ])]
 class Client extends Model
 {
@@ -89,6 +91,8 @@ class Client extends Model
         'is_primary' => false,
         // Step M-6.3: single-approver behaviour by default.
         'approval_policy' => 'any',
+        // Step S-1.2: mirrors the column default — the agency posts Stories with extras itself.
+        'story_handoff_recipient' => 'team',
     ];
 
     /**
@@ -115,6 +119,7 @@ class Client extends Model
             // Step B-4.5: the richer weekly posting goal for a business workspace's primary brand.
             'posting_goal' => 'array',
             'report_schedule' => ClientReportSchedule::class,
+            'story_handoff_recipient' => StoryHandoffRecipient::class,
         ];
     }
 

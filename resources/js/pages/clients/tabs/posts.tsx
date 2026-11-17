@@ -6,6 +6,8 @@ import { Plus, Send, Upload } from 'lucide-react';
 import type { PostTargetAccount } from '@/components/posts/new-post-dialog';
 import { NewPostDialog } from '@/components/posts/new-post-dialog';
 import { StatusPill } from '@/components/status-pill';
+import type { StoryHandoff } from '@/components/stories/story-handoff-pill';
+import { StoryHandoffPill } from '@/components/stories/story-handoff-pill';
 import { Button } from '@/components/ui/button';
 import { formatSchedule } from '@/lib/dates';
 import { calendar } from '@/routes';
@@ -45,6 +47,8 @@ type PostData = {
     campaign_name: string | null;
     campaign: CampaignChipData | null;
     status: string;
+    /** Step S-5.1: the most urgent assisted-lane state across the post's channels. */
+    handoff?: StoryHandoff | null;
     approval_mode: string;
     master_caption: string | null;
     hashtags: string[] | null;
@@ -68,7 +72,10 @@ const postColumns: ColumnDef<PostData, unknown>[] = [
         enableHiding: false,
         meta: { className: 'w-0' },
         cell: ({ row }) => (
-            <StatusPill kind="post" value={row.original.status} />
+            <span className="flex flex-col items-start gap-1">
+                <StatusPill kind="post" value={row.original.status} />
+                <StoryHandoffPill handoff={row.original.handoff} />
+            </span>
         ),
     },
     {

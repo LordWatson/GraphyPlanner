@@ -33,6 +33,8 @@ final class ClientPresenter
             'status' => $client->status->value,
             'default_approval_mode' => $client->default_approval_mode->value,
             'approval_policy' => $client->approval_policy->value,
+            // Step S-1.5: who posts this client's Stories with extras by hand.
+            'story_handoff_recipient' => $client->story_handoff_recipient->value,
             'owner_user_id' => $client->owner_user_id,
             'start_date' => $client->start_date?->toDateString(),
             'retainer_amount' => $canViewBilling ? $client->retainer_amount : null,

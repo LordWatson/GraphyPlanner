@@ -25,6 +25,25 @@ import { formatCurrency, formatCurrencyTotals } from '@/lib/currency';
 import { show as showOrganization } from '@/routes/super-admin/organizations';
 import type { MetricKey, PlatformSummary } from './types';
 
+/** "4 min", "1 h 12 min"; a dash when nobody has opened and confirmed one yet. */
+function formatMinutes(minutes: number | null | undefined): string {
+    if (minutes === null || minutes === undefined) {
+        return '—';
+    }
+
+    const whole = Math.round(minutes);
+
+    if (whole < 60) {
+        return whole < 1 ? 'Under a minute' : `${whole} min`;
+    }
+
+    const rest = whole % 60;
+
+    return rest === 0
+        ? `${Math.floor(whole / 60)} h`
+        : `${Math.floor(whole / 60)} h ${rest} min`;
+}
+
 /**
  * Step 15.4 — renders a `GetPlatformAnalyticsSummaryAction` result: the numeral spec row, then a
  * chart panel per selected section, the breakdowns, and the most active organizations. Shared by
@@ -94,6 +113,9 @@ export function PlatformAnalyticsView({
         });
     }
 
+    const storiesByHand = posts?.stories_posted_by_hand ?? 0;
+    const storiesMissed = posts?.stories_missed ?? 0;
+
     const series = summary.series;
     const hasActivity = series.some(
         (bucket) => bucket.published > 0 || bucket.failed > 0,
@@ -127,6 +149,28 @@ export function PlatformAnalyticsView({
                                 className="border-0"
                                 title="Nothing went out."
                                 description="Published and failed posts will chart here as they happen."
+                            />
+                        )}
+                        {/* Step S-5.3: the assisted lane, apart from vendor publishing. */}
+                        {posts && storiesByHand + storiesMissed > 0 && (
+                            <FigureList
+                                className="border-border/70 mt-5 border-t pt-4"
+                                rows={[
+                                    [
+                                        'Stories posted by hand',
+                                        integer.format(storiesByHand),
+                                    ],
+                                    [
+                                        'Stories not posted in time',
+                                        integer.format(storiesMissed),
+                                    ],
+                                    [
+                                        'Median time to post',
+                                        formatMinutes(
+                                            posts.stories_median_minutes_to_post,
+                                        ),
+                                    ],
+                                ]}
                             />
                         )}
                     </Panel>

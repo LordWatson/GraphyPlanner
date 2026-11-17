@@ -36,6 +36,13 @@ Profile/Security/Appearance settings pages.
   filterable by status, numbers masked. **Skipped** rows are listed beside delivered ones on
   purpose: "nothing was sent, because they never consented" is the answer most of the time and is
   invisible anywhere else.
+- Phase S — Stories with extras (assisted lane), Step S-3.2: for agency members
+  `settings/notifications` also shows `PushRemindersCard workspace="agency"`, "Story reminders on
+  this phone". It is the per-browser web-push opt-in, used only for "a Story is ready to post"
+  (`POST` / `DELETE /push/subscribe`, routes `push.subscribe` / `push.unsubscribe`). A business
+  workspace keeps its own card on Profile (`workspace="business"`, "Post reminders"). The
+  `Publishing` category's description now reads "A post fails to publish, or a story is ready for
+  you to post." See `notifications.md` › Web push.
 
 ## Phase M-6.5 (Phase 9) — approval SLA
 
@@ -212,8 +219,14 @@ existing org already has.
   can't reach another org's settings; and an automated assertion (`assertDontSee`) that the rendered
   page's raw HTML/JSON never contains a stored secret key value — the automated check called for by the
   plan's "Done when" criterion.
+- `tests/Feature/Stories/AgencyPushOptInTest.php` (Phase S): an agency member subscribes and
+  unsubscribes a browser; a client reviewer and a guest cannot; the `pwa` prop reaches an agency
+  member and not a client reviewer.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): the "Story reminders on this phone" card has no component test, and the
+  settings page does not list which browsers a member has subscribed.
 
 - **No per-agency sending domain** (Step GTM-3.1). A white-label email carries the agency's display
   name and reply-to, but the envelope from-address stays our own verified domain, because SPF and
@@ -230,6 +243,8 @@ existing org already has.
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). Settings → Notifications gained the
+  "Story reminders on this phone" push opt-in for agency members.
 - 2026-11-10: Dropped the settings shell's `max-w-xl` content cap — every section is now full width.
 - 2026-11-07: Added the Owner-only **Data export** (`data_exports`, `OrganizationDataExport`,
   `BuildOrganizationDataExportJob`, `exports:purge-expired`, `settings/data-export.tsx`) — see the

@@ -35,6 +35,11 @@ export type HttpOptions = {
     /** Override the message for a 429 (e.g. the AI endpoints' friendlier line). */
     rateLimitMessage?: string;
     headers?: Record<string, string>;
+    /**
+     * Let the request outlive the page (a "this happened" ping sent just before the browser hands
+     * over to another app). The body must stay small.
+     */
+    keepalive?: boolean;
 };
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -84,6 +89,7 @@ export async function request<T>(
             body: payloadBody,
             credentials: 'same-origin',
             signal: options.signal,
+            keepalive: options.keepalive,
         });
 
         const payload = (await response.json().catch(() => null)) as
@@ -159,6 +165,66 @@ function errorMessage(
     return [502, 503, 504].includes(status)
         ? 'The server took too long to answer. Try again.'
         : `Something went wrong (${status}). Try again.`;
+}
+
+export type BlobResult =
+    | { ok: true; blob: Blob }
+    | { ok: false; status: number; aborted: boolean };
+
+/**
+ * Download a same-origin file into memory, reporting progress (0–1) when the server says how big
+ * it is. For the few places that need the bytes themselves rather than a URL — the Story handoff
+ * page hands a `File` to the phone's share sheet. Never throws.
+ */
+export async function fetchBlob(
+    url: string,
+    options: {
+        signal?: AbortSignal;
+        onProgress?: (fraction: number) => void;
+    } = {},
+): Promise<BlobResult> {
+    try {
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            signal: options.signal,
+        });
+
+        if (!response.ok) {
+            return { ok: false, status: response.status, aborted: false };
+        }
+
+        const total = Number(response.headers.get('Content-Length') ?? 0);
+        const type = response.headers.get('Content-Type') ?? '';
+
+        if (!response.body || !options.onProgress || total <= 0) {
+            return { ok: true, blob: await response.blob() };
+        }
+
+        const reader = response.body.getReader();
+        const chunks: BlobPart[] = [];
+        let received = 0;
+
+        for (;;) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                break;
+            }
+
+            chunks.push(value);
+            received += value.byteLength;
+            options.onProgress(Math.min(1, received / total));
+        }
+
+        return { ok: true, blob: new Blob(chunks, { type }) };
+    } catch (error) {
+        return {
+            ok: false,
+            status: 0,
+            aborted:
+                error instanceof DOMException && error.name === 'AbortError',
+        };
+    }
 }
 
 /** Laravel's `{ field: [messages] }` → `{ field: first message }`, for `InputError`. */

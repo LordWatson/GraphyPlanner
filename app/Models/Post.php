@@ -422,9 +422,13 @@ class Post extends Model
     {
         $this->loadMissing('targets');
 
+        // Step S-2.5: a Story waiting to be posted by hand hasn't gone out either — recalling it
+        // closes its handoff (`VendorScheduleService::recall()`).
+        $recallable = fn (PostTarget $target): bool => $target->isVendorHeld() || $target->isAwaitingHandoff();
+
         return $this->status === PostStatus::Publishing
-            && $this->targets->contains(fn (PostTarget $target) => $target->isVendorHeld())
-            && $this->targets->every(fn (PostTarget $target) => $target->isVendorHeld() || $target->status === PostTargetStatus::Failed);
+            && $this->targets->contains($recallable)
+            && $this->targets->every(fn (PostTarget $target) => $recallable($target) || $target->status === PostTargetStatus::Failed);
     }
 
     /**

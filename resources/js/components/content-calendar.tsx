@@ -17,6 +17,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Grid3x3,
+    Hand,
     Plus,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -33,6 +34,8 @@ import {
 import { CampaignSwatch } from '@/components/campaigns/campaign-chip';
 import { ReschedulePopover } from '@/components/calendar/reschedule-popover';
 import { EmptyState } from '@/components/page';
+import type { StoryHandoff } from '@/components/stories/story-handoff-pill';
+import { StoryHandoffPill } from '@/components/stories/story-handoff-pill';
 import { Button } from '@/components/ui/button';
 import { resolveStatus, toneBgClass, toneTextClass } from '@/lib/status';
 import { cn } from '@/lib/utils';
@@ -69,6 +72,11 @@ export type Occurrence = {
     grid_tile_position?: number | null;
     status: string;
     status_label: string;
+    /**
+     * Step S-5.1: the channel's assisted-lane state (a Story posted by hand), from
+     * `StoryChannelPresenter`. Null for a channel that publishes itself.
+     */
+    handoff?: StoryHandoff | null;
     master_caption: string | null;
     platform: string | null;
     handle: string | null;
@@ -924,6 +932,7 @@ export function ContentCalendar({
                                 occurrence={dragging}
                                 time={display(dragging).time}
                                 multiClient={multiClient}
+                                detailed={view === 'list'}
                                 className="shadow-lg"
                             />
                         ) : null}
@@ -952,14 +961,21 @@ function ChipBody({
     occurrence,
     time,
     multiClient,
+    detailed = false,
     className,
 }: {
     occurrence: Occurrence;
     time: string | null;
     multiClient: boolean;
+    /** The roomy list rows spell the assisted-lane state out as a pill; grid chips keep a marker. */
+    detailed?: boolean;
     className?: string;
 }) {
     const tone = resolveStatus('post', occurrence.status).tone;
+    const handoff = occurrence.handoff ?? null;
+    const handoffTone = handoff
+        ? resolveStatus('storyHandoff', handoff.state).tone
+        : null;
 
     return (
         <div
@@ -994,6 +1010,18 @@ function ChipBody({
                     : (occurrence.master_caption ?? 'Untitled post')}
             </span>
             <span className="text-muted-foreground flex min-w-0 items-center gap-1.5">
+                {handoff && handoffTone && !detailed && (
+                    <span
+                        className={cn(
+                            'inline-flex shrink-0 items-center',
+                            toneTextClass[handoffTone],
+                        )}
+                        title={handoff.label}
+                    >
+                        <Hand className="size-3" aria-hidden />
+                        <span className="sr-only">{handoff.label}</span>
+                    </span>
+                )}
                 {occurrence.grid_plan_id && (
                     <span
                         className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px]"
@@ -1027,6 +1055,12 @@ function ChipBody({
                         : ''}
                 </span>
             </span>
+            {detailed && (
+                <StoryHandoffPill
+                    handoff={handoff}
+                    className="mt-1 self-start"
+                />
+            )}
         </div>
     );
 }
@@ -1085,7 +1119,9 @@ function CalendarChip({
         });
     };
 
-    const title = `${occurrence.status_label} — ${
+    const title = `${occurrence.status_label}${
+        occurrence.handoff ? ` · ${occurrence.handoff.label}` : ''
+    } — ${
         (multiClient ? occurrence.client_name : occurrence.master_caption) ?? ''
     }${canMove ? ' · drag to move' : ''}`;
 
@@ -1116,6 +1152,7 @@ function CalendarChip({
                     occurrence={occurrence}
                     time={slot.time}
                     multiClient={multiClient}
+                    detailed={view === 'list'}
                 />
             </Link>
             {canMove && (

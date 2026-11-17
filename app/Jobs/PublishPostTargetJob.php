@@ -46,10 +46,20 @@ class PublishPostTargetJob implements ShouldQueue
 
     public int $timeout = 180;
 
+    /**
+     * Step S-6.2: this one attempt may send an assisted Story to the vendor, without its extras —
+     * set only by `ExpireStoryHandoffAction`, for a post that asked to go out plain if nobody
+     * posted it by hand. Declared (not promoted) with a default, so jobs serialized before it
+     * existed still unserialize.
+     */
+    public bool $plain = false;
+
     public function __construct(
         public readonly int $targetId,
         public readonly string $attemptId,
+        bool $plain = false,
     ) {
+        $this->plain = $plain;
         // Step I-2.8: publishing has its own queue and workers.
         $this->onQueue(Queues::PUBLISHING);
     }
@@ -179,6 +189,18 @@ class PublishPostTargetJob implements ShouldQueue
 
             if ($target->status !== PostTargetStatus::Pending || $target->external_post_id !== null) {
                 Log::info('PublishPostTargetJob: target already sent, skipping', ['post_target_id' => $target->id]);
+
+                return null;
+            }
+
+            // Step S-2.1: belt and braces. `PublishPostJob::dispatchTargets()` never queues one of
+            // these for a Story that is posted by hand; this is the net for any future caller that
+            // goes around it. Nothing is stamped, so the handoff still owns the channel.
+            if ($target->handoff_required && ! $this->plain) {
+                Log::warning('PublishPostTargetJob: channel is posted by hand, not sending it to the vendor', [
+                    'post_id' => $target->post_id,
+                    'post_target_id' => $target->id,
+                ]);
 
                 return null;
             }

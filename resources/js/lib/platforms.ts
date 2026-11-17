@@ -53,6 +53,11 @@ export type PlatformCapability = {
     caption_fold: { chars: number; lines: number };
     default_format: string;
     formats: PlatformFormat[];
+    /**
+     * Step S-1.1: a Story here can carry extras (a link, a poll, …) and be posted by hand. Off
+     * when the lane's kill switch is off, so the editor needs no flag of its own.
+     */
+    story_extras?: boolean;
 };
 
 export type PlatformRegistry = Record<string, PlatformCapability>;
@@ -77,7 +82,22 @@ const FALLBACK: PlatformCapability = {
     caption_fold: { chars: 240, lines: 5 },
     default_format: 'post',
     formats: [],
+    story_extras: false,
 };
+
+/** The format key the assisted lane is built on (`PlatformCapabilities::STORY_FORMAT`). */
+export const STORY_FORMAT = 'story';
+
+/**
+ * Whether a channel is a Story that can carry extras: the platform offers them and the channel's
+ * format is Story — which is only ever an explicit choice, never inferred from the media.
+ */
+export function takesStoryExtras(
+    capability: PlatformCapability,
+    format: string | null | undefined,
+): boolean {
+    return Boolean(capability.story_extras) && format === STORY_FORMAT;
+}
 
 /** The shared registry. Empty only on pages rendered outside Inertia (tests). */
 export function usePlatforms(): PlatformRegistry {

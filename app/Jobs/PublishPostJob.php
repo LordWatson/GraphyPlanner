@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Actions\Posts\TransitionPostStatusAction;
 use App\Actions\Publishing\ResolvePostPublishOutcomeAction;
+use App\Actions\Stories\CancelStoryHandoffsAction;
+use App\Actions\Stories\OpenStoryHandoffAction;
 use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Models\Post;
@@ -119,12 +121,33 @@ class PublishPostJob implements ShouldBeUnique, ShouldQueue
      * Fan out one `PublishPostTargetJob` per target in a single batch (also used by
      * `RetryFailedPostTargetsAction`). Targets must already carry their `publish_attempt_id`.
      *
+     * Step S-2.1 (decision D1): this is where the two lanes split. A Story channel with extras
+     * (`handoff_required`) is not sent to the vendor at all — it gets a handoff
+     * (`OpenStoryHandoffAction`) and waits, `pending`, for a person to post it. Everything else is
+     * batched as before, and a channel that has just left the assisted lane has any handoff it
+     * was holding closed first.
+     *
      * @param  Collection<int, PostTarget>  $targets
      */
     public static function dispatchTargets(Post $post, Collection $targets): void
     {
+        [$assisted, $targets] = $targets->partition(fn (PostTarget $target) => $target->handoff_required);
+
+        foreach ($assisted as $target) {
+            app(OpenStoryHandoffAction::class)($target);
+        }
+
+        if ($targets->isEmpty()) {
+            return;
+        }
+
+        app(CancelStoryHandoffsAction::class)(
+            array_values($targets->map(fn (PostTarget $target) => $target->id)->all()),
+            'channel is going to the vendor',
+        );
+
         Bus::batch(
-            $targets->map(fn (PostTarget $target) => new PublishPostTargetJob($target->id, (string) $target->publish_attempt_id))->all(),
+            $targets->values()->map(fn (PostTarget $target) => new PublishPostTargetJob($target->id, (string) $target->publish_attempt_id))->all(),
         )
             ->name("publish-post-{$post->id}")
             ->allowFailures()

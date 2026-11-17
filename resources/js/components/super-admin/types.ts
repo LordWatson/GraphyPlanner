@@ -67,6 +67,10 @@ export type PlatformSummary = {
         failed: number;
         success_rate: number | null;
         scheduled: number;
+        /** Step S-5.3 — the assisted lane. Optional: a report run before it has none. */
+        stories_posted_by_hand?: number;
+        stories_missed?: number;
+        stories_median_minutes_to_post?: number | null;
     } | null;
     revenue: {
         invoiced: CurrencyTotal[];

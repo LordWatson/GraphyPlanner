@@ -21,13 +21,19 @@ import {
 import { Toggle } from '@/components/ui/toggle';
 import type { Crop, MediaFormat, MediaFormatOptions } from '@/lib/media-format';
 import { publishedCaption, ratioLabels } from '@/lib/media-format';
-import { capabilityOf, resolveFormat, usePlatforms } from '@/lib/platforms';
+import {
+    capabilityOf,
+    resolveFormat,
+    takesStoryExtras,
+    usePlatforms,
+} from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import type { Target } from '@/components/post-editor/preview/preview-parts';
 import {
     TargetSwitcher,
     previewNotes,
     CaptionFoldMeter,
+    StoryExtrasChips,
 } from '@/components/post-editor/preview/preview-parts';
 
 type PanelProps = {
@@ -190,6 +196,9 @@ export function PreviewPanel({
                         showSafeZones={vertical && safeZones}
                     />
                 </div>
+                {takesStoryExtras(capability, active.format) && (
+                    <StoryExtrasChips extras={active.storyExtras} />
+                )}
                 <div className="grid gap-2">
                     {vertical && (
                         <Toggle

@@ -43,6 +43,9 @@ class PushRemindersTest extends TestCase
         return User::factory()->for($organization, 'organization')->role(Role::Owner)->create();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function subscriptionPayload(string $endpoint = 'https://push.example/one'): array
     {
         return [
@@ -57,7 +60,7 @@ class PushRemindersTest extends TestCase
         $owner = $this->owner();
 
         $this->actingAs($owner)
-            ->postJson(route('business.push.subscribe'), $this->subscriptionPayload())
+            ->postJson(route('push.subscribe'), $this->subscriptionPayload())
             ->assertCreated();
 
         $this->assertDatabaseHas('push_subscriptions', [
@@ -70,8 +73,8 @@ class PushRemindersTest extends TestCase
     {
         $owner = $this->owner();
 
-        $this->actingAs($owner)->postJson(route('business.push.subscribe'), $this->subscriptionPayload())->assertCreated();
-        $this->actingAs($owner)->postJson(route('business.push.subscribe'), [
+        $this->actingAs($owner)->postJson(route('push.subscribe'), $this->subscriptionPayload())->assertCreated();
+        $this->actingAs($owner)->postJson(route('push.subscribe'), [
             ...$this->subscriptionPayload(),
             'keys' => ['p256dh' => 'NewKey', 'auth' => 'NewAuth'],
         ])->assertCreated();
@@ -83,10 +86,10 @@ class PushRemindersTest extends TestCase
     public function test_a_user_opts_out(): void
     {
         $owner = $this->owner();
-        $this->actingAs($owner)->postJson(route('business.push.subscribe'), $this->subscriptionPayload())->assertCreated();
+        $this->actingAs($owner)->postJson(route('push.subscribe'), $this->subscriptionPayload())->assertCreated();
 
         $this->actingAs($owner)
-            ->deleteJson(route('business.push.unsubscribe'), ['endpoint' => 'https://push.example/one'])
+            ->deleteJson(route('push.unsubscribe'), ['endpoint' => 'https://push.example/one'])
             ->assertOk();
 
         $this->assertSame(0, PushSubscription::query()->count());
@@ -98,7 +101,7 @@ class PushRemindersTest extends TestCase
         $owner = $this->owner();
 
         $this->actingAs($owner)
-            ->postJson(route('business.push.subscribe'), $this->subscriptionPayload())
+            ->postJson(route('push.subscribe'), $this->subscriptionPayload())
             ->assertNotFound();
     }
 

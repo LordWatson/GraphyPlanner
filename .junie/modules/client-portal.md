@@ -150,6 +150,26 @@ invitation)` — Owner/Strategist only, scoped to the invitation's client's `org
   through the vendor popup (M-2.8). Post and campaign review previews show each channel's
   published caption and first comment.
 
+## Phase S — Stories with extras (assisted lane)
+
+Plan: `.junie/plans/story-extras.md`; the lane is in `publishing.md` › "Stories with extras".
+
+- The review link (`ReviewController`) and the portal post page (`PortalPostController`) list a
+  Story's extras read-only, so the client approves the link and sticker text with the creative.
+  `PostMediaPresenter::channelPreview()` adds `story`, from
+  `StoryChannelPresenter::clientStory()`: `{extras, summary, placement_note, posted_by}`, or null
+  for a channel that is not posted by hand. React: `components/posts/story-extras-note.tsx` (a `Panel`), used
+  by `pages/review/show.tsx` and `pages/portal/posts/show.tsx`, above the decision form on both. It says the Story will be posted
+  by hand at the scheduled time and, when the recipient is the client, "We'll send you a link to
+  post it yourselves."
+- The portal calendar passes `forClient: true` to `BuildCalendarOccurrencesAction`
+  (`PortalCalendarController`), so a client only ever sees `needs_hand_posting` or
+  `posted_by_hand`. `ready_to_post` is the studio's business
+  (`StoryChannelPresenter::clientState()`).
+- A client who posts their own Stories gets the tokenised handoff page by email or WhatsApp. It
+  needs no portal login and leaves no bell item. The page shows that one Story and nothing else.
+- Role scoping is unchanged: a client reviewer sees extras only on their own client's posts.
+
 ## Routes / Controllers
 
 - `POST /clients/{client}/invitations` → `ClientInvitationController::store` — validated via
@@ -356,6 +376,13 @@ stored on the organization.
   own campaign's detail page (visible-status posts only); gets a 404 for another client's
   campaign id; a non-reviewer is forbidden. See `.junie/modules/campaigns.md` for the full
   feature note.
+- `tests/Feature/Stories/StoryExtrasClientSurfacesTest.php` (Step S-1.5): the review link lists a
+  Story's extras read-only and says when the client posts it themselves; a plain Story and a feed
+  channel carry no `story` note; a review token never shows another client's extras; the portal
+  lists extras for the reviewer's own client only.
+- `tests/Feature/Stories/StorySurfacesTest.php` (Step S-5.1):
+  `test_the_portal_calendar_never_says_ready_to_post`.
+- Vitest: `resources/js/components/posts/story-extras-note.test.tsx`.
 
 ## Step M-4.2 — "Mark Paid" payment handshake
 
@@ -393,6 +420,8 @@ stored on the organization.
 
 ## Known Gaps / Open Questions
 
+- Phase S (2026-11-13): the portal has no "Stories to post" queue. A client recipient works from
+  the emailed or WhatsApp link, one Story at a time, and gets no push or bell item.
 - No login redirect target exists yet beyond the generic `login` page; the post-accept redirect in
   `AcceptClientInvitationAction`/`ClientInvitationAcceptController` could now point straight at
   `/portal` since the shell exists, but this hasn't been changed.
@@ -404,6 +433,9 @@ stored on the organization.
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). The review link and the portal post
+  page list a Story's extras read-only (`channelPreview()['story']`, `story-extras-note.tsx`); the
+  portal calendar shows "Needs posting by hand" / "Posted by hand" and never "Ready to post".
 - 2026-10-24: UX overhaul (review handoff, `.junie/plans/ux-overhaul.md`) — the portal post page
   now carries a one-tap review queue. `PortalPostController::show` returns `queue {remaining,
 next_id}` (other posts still awaiting this reviewer); `portal/posts/show.tsx` shows a "Review the

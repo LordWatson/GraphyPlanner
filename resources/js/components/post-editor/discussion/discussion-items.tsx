@@ -180,17 +180,32 @@ export function ActivityItem({
                     <span className="font-medium">
                         {log.user_name ?? 'System'}
                     </span>
-                    <span className="text-muted-foreground">moved it</span>
-                    {log.from_status && (
+                    {/* A note logged without a move (a story posted by hand, say) has the
+                        same status on both sides: it reads as a note, not as "moved it". */}
+                    {log.from_status === log.to_status ? (
+                        <span className="text-muted-foreground">
+                            added a note
+                        </span>
+                    ) : (
                         <>
+                            <span className="text-muted-foreground">
+                                moved it
+                            </span>
+                            {log.from_status && (
+                                <>
+                                    <StatusPill
+                                        kind={statusKind}
+                                        value={log.from_status}
+                                    />
+                                    <ArrowRight className="text-muted-foreground size-3.5" />
+                                </>
+                            )}
                             <StatusPill
                                 kind={statusKind}
-                                value={log.from_status}
+                                value={log.to_status}
                             />
-                            <ArrowRight className="text-muted-foreground size-3.5" />
                         </>
                     )}
-                    <StatusPill kind={statusKind} value={log.to_status} />
                     <span className="text-muted-foreground font-mono text-[11px]">
                         {formatTimestamp(log.created_at)}
                     </span>

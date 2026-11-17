@@ -49,6 +49,46 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
   implementation of the per-target local-time rules, carousel ordering, the activity log or the
   pre-publish gate. Same rule the MCP tools follow.
 
+## Phase S — Stories with extras (assisted lane)
+
+Plan: `.junie/plans/story-extras.md`, Steps S-5.4 and S-5.5. The lane is in `publishing.md` ›
+"Stories with extras". An Instagram Story with a link or stickers is posted by a person, never by
+Alima, and the API says so wherever a caller could assume otherwise.
+
+- `App\Support\Api\StoryChannels`: the one place the API and the MCP tools accept, refuse and
+  report Story extras, so they cannot drift from each other or from the editor.
+    - `validate($input, $key, $rules)` adds the editor's own rules (`ValidatesStoryExtras`) for
+      `format`, `story_extras` and `handoff_recipient` on each channel, and the platform check.
+    - `withoutBlankExtras()`: to the editor a key that is present but blank means "added, not
+      filled in yet". To a caller writing JSON, `"hashtag": null` means "no hashtag". So a null,
+      an empty string, an empty list and an empty `link` or `poll` are dropped first.
+    - `present(PostTarget)` → `story_extras`, `handoff_recipient`, `posted_by_hand`,
+      `handoff_state`. `RELATIONS` is what it needs eager-loaded.
+    - `note(Post)` → one plain sentence saying which channel a person posts by hand and when, or
+      null when every channel publishes itself.
+    - `carryOptions()` tells a create that it has to follow up through `UpdatePostAction`, the
+      path `SyncTargetStoryExtrasAction` runs on.
+    - `keepIfMissed()` is MCP only (see `mcp.md`). The API does accept `if_missed`.
+- `ApiResponse::item($data, $meta = [])`: a second argument for things about the answer rather
+  than the record. `meta.notes` is the list of sentences a caller should pass on to a person.
+- `POST /posts` and `PATCH /posts/{post}` accept per-channel `format`, `story_extras` and
+  `handoff_recipient`. `PATCH` now accepts `channels`, as a full replacement: a channel left out
+  is removed; a listed one keeps `format`, `story_extras` and `handoff_recipient` unless they are
+  sent, but its date and time are set from what is sent. `story_extras: null` or `{}` removes a
+  Story's extras and it goes back to publishing itself.
+- Every channel in a response carries `format`, `story_extras`, `handoff_recipient`,
+  `posted_by_hand` and `handoff_state` (`needs_hand_posting` / `ready_to_post` /
+  `posted_by_hand` / null).
+- `POST /posts/{post}/schedule` now returns the full post plus `scheduled_at`, and `meta.notes`
+  with the `StoryChannels::note()` sentence when a channel is posted by hand (an empty array
+  otherwise).
+- No response ever carries a handoff token or a `/story/` URL. There is no endpoint that opens or
+  completes a handoff.
+- Webhook `story.ready_to_post` (`WebhookEvent::StoryReadyToPost`), sent once, on the first
+  reminder: `post_id`, `client_id`, `post_target_id`, `platform`, `handle`, `due_at`, `posted_by`
+  and `url` (the signed-in `posts.story-handoff.open` route).
+- `resources/api/openapi.json` documents all of the above.
+
 ## Routes / Controllers
 
 `routes/api.php`, all under `/api/v1`, all `api.token:<scope>`:
@@ -127,8 +167,23 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
   auto-disable, no double delivery.
 - `tests/Feature/Api/OpenApiSpecTest.php` (3): the spec is valid and served, **every v1 route is
   documented and nothing extra is**, and the documented events are the ones that exist.
+- `tests/Feature/Api/ApiV1StoryExtrasTest.php` (14, Phase S): a post returns each channel's
+  extras and lane; a due Story reads `ready_to_post` without its handoff link; creating and
+  editing channels with extras; an integration can choose `publish_plain`; an empty object clears
+  extras; extras on a non-Story channel are stored but it still publishes itself; the kill switch
+  off ignores extras; the editor's validation rules apply; a null key means "not added"; another
+  organization's token cannot read or write; scheduling says which channel is posted by hand and
+  has no note otherwise.
+- `tests/Feature/Stories/StoryHandoffNotificationTest.php`:
+  `test_the_ready_to_post_webhook_fires_on_the_first_notification_only_and_carries_no_token`.
 
 ## Known Gaps / Open Questions
+
+- **Phase S (2026-11-13): no endpoint confirms a Story as posted, and none lists handoffs.** That
+  is deliberate for now: "posted" is the poster's word, given on the handoff page or in the
+  editor. `story.ready_to_post` is the only Story event; there is no `story.posted` or
+  `story.missed`. A miss arrives as `post.failed` for a Story-only post; on a mixed post the
+  status is `partially_published`, which `WebhookEvent::forPostStatus()` maps to `post.published`.
 
 - ~~`order.paid` is in the enum but nothing emits it.~~ **Wired 2026-11-07** in `MarkOrderPaidAction`,
   after the commit so nothing is announced that a rollback un-did.
@@ -151,3 +206,10 @@ assistant protocol is not a substitute for `GET /api/v1/posts` when the buyer's 
 - **"API access" is not in the plan matrix.** Item 18 step 6 asks for it in `config/plans.php`;
   gating the API by plan is a pricing decision that belongs with item 22, which is itself waiting
   on the tax question (GTM-0.3), so it is deliberately not invented here.
+
+## Changelog
+
+- 2026-11-13: Phase S — Stories with extras (assisted lane). Channels accept and return `format`,
+  `story_extras` and `handoff_recipient`, and report `posted_by_hand` / `handoff_state`; the
+  `PATCH` on a post accepts `channels`; scheduling returns the full post and `meta.notes`; new webhook
+  `story.ready_to_post`. Shared with MCP through `App\Support\Api\StoryChannels`.

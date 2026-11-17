@@ -159,6 +159,18 @@ base64. Either way the media attaches via `create_draft_post` (`asset_ids`) or `
 these need the **Write drafts** scope. Graphy never hands an assistant a media download URL, so sharing
 media works one way: into Graphy.
 
+### Stories with a link or stickers
+
+Instagram only lets a person add a link, mention, hashtag, location or poll sticker to a story, from
+its own app. Your assistant can set one up: on `create_draft_post` or `update_post`, a target takes
+`format: "story"`, `story_extras` (`link`, `mentions`, `hashtag`, `location`, `poll`,
+`placement_note`) and `handoff_recipient` (`team` or `client`). That story is then **posted by hand**:
+Alima does not publish it. When it is due, the poster is reminded, shares it from Instagram and
+confirms it. `get_post` shows this as `posted_by_hand` with a `handoff_state`, and `schedule_post` says
+so in its reply, so the assistant should never tell you such a story will publish itself. An assistant
+cannot confirm a story as posted, and cannot choose "publish it plain if nobody posts it": that
+choice is yours, in the editor.
+
 ### Safety
 
 - **Read‑only by default.** Elevated scopes are an explicit opt‑in.

@@ -8,6 +8,7 @@ import {
     ClipboardCheck,
     Clock,
     Grid3x3,
+    Hand,
     ImageOff,
     Megaphone,
     Recycle,
@@ -17,6 +18,8 @@ import { CampaignChip } from '@/components/campaigns/campaign-chip';
 import { HomeViewTabs } from '@/components/home-view-tabs';
 import { ChapterHero, HeroStat, Page, StatStrip } from '@/components/page';
 import { StatusPill } from '@/components/status-pill';
+import type { StoryQueueRow } from '@/components/stories/story-row';
+import { StoryRow } from '@/components/stories/story-row';
 import { Button } from '@/components/ui/button';
 import { calendar, dashboard, needsAttention } from '@/routes';
 import { index as contentIndex } from '@/routes/content';
@@ -33,6 +36,9 @@ type PostRow = {
     status: string;
     status_label: string;
     reason: string;
+    /** Step S-5.2: what to do next, when the row failed in the assisted lane (a Story nobody posted). */
+    fix?: string | null;
+    story_failure?: string | null;
     master_caption: string | null;
     platform: string | null;
     handle: string | null;
@@ -60,6 +66,8 @@ type Bucket<Row> = { items: Row[]; total: number };
 type RecycleRow = PostRow & { recycle_after_days: number };
 
 type NeedsAttentionItems = {
+    /** Step S-5.2: Stories with extras that are due to be posted by hand right now. */
+    storiesToPost?: Bucket<StoryQueueRow>;
     failedPublishes: Bucket<PostRow>;
     internalReviews: Bucket<PostRow>;
     waitingApprovals: Bucket<PostRow>;
@@ -206,6 +214,11 @@ function PostRowItem({ row }: { row: PostRow }) {
                         {row.handle ? ` · ${row.handle}` : ''}
                         {row.master_caption ? ` · ${row.master_caption}` : ''}
                     </span>
+                    {row.fix && (
+                        <span className="text-destructive mt-1 text-xs text-pretty">
+                            {row.reason} {row.fix}
+                        </span>
+                    )}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                     {row.overdue && (
@@ -225,7 +238,9 @@ function PostRowItem({ row }: { row: PostRow }) {
 }
 
 export default function Home({ items }: HomeProps) {
+    const stories = items.storiesToPost ?? { items: [], total: 0 };
     const total =
+        stories.total +
         items.failedPublishes.total +
         items.internalReviews.total +
         items.waitingApprovals.total +
@@ -361,6 +376,26 @@ export default function Home({ items }: HomeProps) {
                 />
 
                 <div className="animate-rise flex flex-col [animation-delay:80ms]">
+                    {/* Step S-5.2: the one lane with a clock running, so it leads when it has rows. */}
+                    {stories.total > 0 && (
+                        <Lane
+                            id="lane-stories"
+                            index="Now — Stories"
+                            icon={Hand}
+                            title="Stories to post"
+                            description="Ready now. These go out by hand from the Instagram app, so post them before anything else."
+                            count={stories.total}
+                            shown={stories.items.length}
+                            accentClassName="bg-warning/12 text-warning"
+                            emptyLabel="No stories to post."
+                        >
+                            {stories.items.map((story) => (
+                                <li key={story.target_id}>
+                                    <StoryRow story={story} showPoster />
+                                </li>
+                            ))}
+                        </Lane>
+                    )}
                     {gridRisks.total > 0 && (
                         <Lane
                             id="lane-grids"

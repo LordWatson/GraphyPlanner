@@ -100,6 +100,9 @@ class RestorePostRevisionAction
                     'first_comment' => $old['first_comment'] ?? $current->first_comment,
                     'link_url' => $old['link_url'] ?? $current->link_url,
                     'format' => $old['format'] ?? $current->format,
+                    // Step S-1.2: a channel that was in the revision gets that version's Story
+                    // extras back (none, if it had none); one added since keeps its own.
+                    'story_extras' => $old !== null ? ($old['story_extras'] ?? null) : $current->story_extras,
                 ];
             })
             ->all());

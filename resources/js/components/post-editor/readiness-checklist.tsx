@@ -33,6 +33,8 @@ const shortLabels: Record<string, string> = {
     first_comment: 'First comments supported',
     media_framing: 'Media framed for each channel',
     campaign_hashtags: 'Campaign hashtags included',
+    story_extras: 'Story extras complete',
+    story_handoff: 'Someone to post the story by hand',
 };
 
 /** One checklist line: a button that jumps to the field when the editor can, plain text otherwise. */
@@ -123,7 +125,7 @@ export function ReadinessChecklist({
             </div>
             {allPassed && open.length === 0 && (
                 <p className="text-muted-foreground mt-3 text-[13px]">
-                    Every check passes — move it along from the workflow above.
+                    Every check passes — move it along from the workflow.
                 </p>
             )}
             <ul className={cn('grid gap-2.5', visible.length > 0 && 'mt-4')}>

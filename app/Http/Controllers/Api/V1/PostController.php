@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\Post;
 use App\Models\PostTarget;
 use App\Support\Api\ApiResponse;
+use App\Support\Api\StoryChannels;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,9 @@ use Illuminate\Validation\Rule;
  */
 class PostController extends Controller
 {
+    /** What `present()` reads for a post's channels (lazy loading is off). */
+    public const CHANNELS = ['targets.socialAccount:id,platform,handle', ...StoryChannels::RELATIONS];
+
     public function index(Request $request): JsonResponse
     {
         // Validated, not trusted: `?updated_since=garbage` used to reach `Carbon::parse` and come
@@ -47,7 +51,7 @@ class PostController extends Controller
         ]);
 
         $query = Post::query()
-            ->with(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')])
+            ->with(self::CHANNELS)
             ->when($request->filled('client_id'), fn ($q) => $q->where('client_id', $request->integer('client_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             // Incremental sync. ISO 8601 in, so a caller never has to guess our timezone.
@@ -64,7 +68,7 @@ class PostController extends Controller
     {
         $this->authorize('view', $post);
 
-        $post->load(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')]);
+        $post->load(self::CHANNELS);
 
         return ApiResponse::item(self::present($post));
     }
@@ -92,7 +96,9 @@ class PostController extends Controller
 
         // The same rules as `StorePostRequest` and `CreateDraftPostTool`: every id must belong to
         // this client, so a valid token cannot borrow another client's campaign or asset.
-        $validated = $request->validate([
+        // Step S-5.4: a channel may also carry its `format`, Story extras and who posts it by hand,
+        // under the editor's own rules.
+        $validated = StoryChannels::validate($request->all(), 'channels', [
             'caption' => ['nullable', 'string', 'max:65000'],
             'hashtags' => ['nullable', 'array'],
             'hashtags.*' => ['string', 'max:150'],
@@ -105,22 +111,28 @@ class PostController extends Controller
             'channels.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
         ]);
 
+        $channels = $validated['channels'] ?? [];
+
         $post = $createPost($client, [
             'status' => PostStatus::Draft->value,
             'master_caption' => $validated['caption'] ?? null,
             'hashtags' => $validated['hashtags'] ?? null,
             'campaign_id' => $validated['campaign_id'] ?? null,
-            'targets' => $validated['channels'] ?? [],
+            'targets' => $channels,
         ]);
 
-        // Media goes through UpdatePostAction so carousel order and the checklist stay on one path.
-        if (! empty($validated['asset_ids'])) {
-            $post = $updatePost($post, [
-                'asset_ids' => array_values(array_map('intval', $validated['asset_ids'])),
-            ], $request->user());
+        // Media, formats and Story extras go through UpdatePostAction so carousel order, the
+        // checklist and the one writer of "posted by hand" stay on one path.
+        $changes = array_filter([
+            'asset_ids' => empty($validated['asset_ids']) ? null : array_values(array_map('intval', $validated['asset_ids'])),
+            'targets' => StoryChannels::carryOptions($channels) ? $channels : null,
+        ], fn ($value) => $value !== null);
+
+        if ($changes !== []) {
+            $post = $updatePost($post, $changes, $request->user());
         }
 
-        $post->load(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')]);
+        $post->load(self::CHANNELS);
 
         return response()->json(['data' => self::present($post)], 201);
     }
@@ -144,13 +156,19 @@ class PostController extends Controller
             );
         }
 
-        $validated = $request->validate([
+        $validated = StoryChannels::validate($request->all(), 'channels', [
             'caption' => ['sometimes', 'nullable', 'string', 'max:65000'],
             'hashtags' => ['sometimes', 'nullable', 'array'],
             'hashtags.*' => ['string', 'max:150'],
             'campaign_id' => ['sometimes', 'nullable', 'integer', Rule::exists('campaigns', 'id')->where('client_id', $post->client_id)->whereNull('deleted_at')],
             'asset_ids' => ['sometimes', 'array'],
             'asset_ids.*' => ['integer', 'distinct', Rule::exists('assets', 'id')->where('client_id', $post->client_id)->whereNull('deleted_at')],
+            // Step S-5.4: the full set of channels, as the editor saves it. One not listed is
+            // removed; a listed one keeps any field that is not sent, except its date and time.
+            'channels' => ['sometimes', 'array'],
+            'channels.*.social_account_id' => ['required', 'integer', 'distinct', Rule::exists('social_accounts', 'id')->where('client_id', $post->client_id)->whereNull('deleted_at')],
+            'channels.*.scheduled_local_date' => ['nullable', 'date_format:Y-m-d'],
+            'channels.*.scheduled_local_time' => ['nullable', 'date_format:H:i,H:i:s'],
         ]);
 
         $changes = [];
@@ -171,12 +189,16 @@ class PostController extends Controller
             $changes['asset_ids'] = array_values(array_map('intval', $validated['asset_ids']));
         }
 
+        if (array_key_exists('channels', $validated)) {
+            $changes['targets'] = $validated['channels'];
+        }
+
         if ($changes === []) {
-            return ApiResponse::error('nothing_to_update', 'Send at least one of caption, hashtags, campaign_id or asset_ids.', 422);
+            return ApiResponse::error('nothing_to_update', 'Send at least one of caption, hashtags, campaign_id, asset_ids or channels.', 422);
         }
 
         $post = $updatePost($post, $changes, $request->user());
-        $post->load(['targets' => fn ($q) => $q->with('socialAccount:id,platform,handle')]);
+        $post->load(self::CHANNELS);
 
         return ApiResponse::item(self::present($post));
     }
@@ -184,7 +206,7 @@ class PostController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private static function present(Post $post): array
+    public static function present(Post $post): array
     {
         return [
             'id' => $post->id,
@@ -197,6 +219,7 @@ class PostController extends Controller
                 'platform' => $target->socialAccount?->platform?->value,
                 'handle' => $target->socialAccount?->handle,
                 'status' => $target->status->value,
+                'format' => $target->format,
                 // Local date and time as the account sees them, plus the absolute instant. Both,
                 // because "9am for the client" and "this exact moment" are different questions and
                 // an integration usually wants the second.
@@ -206,6 +229,8 @@ class PostController extends Controller
                 'published_at' => $target->published_at?->toIso8601String(),
                 'url' => $target->post_url,
                 'error' => $target->error,
+                // Step S-5.4: a story with a link or stickers is posted by a person, not by us.
+                ...StoryChannels::present($target->setRelation('post', $post)),
             ])->all(),
             'created_at' => $post->created_at?->toIso8601String(),
             'updated_at' => $post->updated_at?->toIso8601String(),

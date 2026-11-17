@@ -27,7 +27,8 @@ class OrganizationScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $orgId = self::currentOrgId();
+        // A route authorised by a link rather than a login runs unscoped (`TenantScopes`).
+        $orgId = TenantScopes::areSuspended() ? null : self::currentOrgId();
 
         if ($orgId !== null) {
             $builder->where($model->qualifyColumn('org_id'), $orgId);

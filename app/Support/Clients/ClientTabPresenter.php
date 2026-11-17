@@ -11,6 +11,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Support\Campaigns\CampaignPresenter;
 use App\Support\Invoices\InvoicePresenter;
+use App\Support\Stories\StoryPostPresenter;
 
 /**
  * Step I-2.4 — the row shapes of the client page's tabs (moved out of `ClientController` so each
@@ -89,7 +90,8 @@ final class ClientTabPresenter
     }
 
     /**
-     * Expects `targets.socialAccount` and `campaign` eager-loaded.
+     * Expects `targets.socialAccount`, the targets' handoff-state relations and `campaign`
+     * eager-loaded.
      *
      * @return array<string, mixed>
      */
@@ -102,6 +104,8 @@ final class ClientTabPresenter
             // Campaigns enhancement C-1.3: the chip (colour + code).
             'campaign' => $post->campaign ? CampaignPresenter::chip($post->campaign) : null,
             'status' => $post->status->value,
+            // Step S-5.1: the most urgent assisted-lane state across the post's channels.
+            'handoff' => StoryPostPresenter::summary($post),
             'approval_mode' => $post->approval_mode->value,
             'master_caption' => $post->master_caption,
             'hashtags' => $post->hashtags,

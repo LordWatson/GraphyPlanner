@@ -298,6 +298,30 @@ report _page_ is branded by the portal shell (`client-portal.md`).
   reports" button on the client analytics header (not in the client page's More box, which already links to Analytics); "Reports" in the
   portal nav. Status kind `clientReport`.
 
+## Phase S — Stories with extras (assisted lane): reporting honesty (Step S-5.3)
+
+Plan: `.junie/plans/story-extras.md`; the lane is in `publishing.md` › "Stories with extras".
+
+- **A missed Story is not a publishing failure.** The vendor was never asked.
+  `App\Actions\Posts\GetPublishReliabilityStatsAction` now returns `monthly[].missed_by_hand` and
+  `missedByHand`. A failure transition (`failed` / `partially_published`) counts as missed by hand
+  when one of the post's handoffs closed as `missed` within 60 seconds before it, and no other
+  channel of that post is failed for a reason of its own. Those transitions are left out of
+  `failed` and are not an "attempt" in `averageAttemptsToSuccess`. A real vendor failure beside a
+  missed Story still counts as `failed`.
+- **Posted by hand is "not available", never zero.** `App\Services\Analytics\EngagementMetrics`:
+  a published channel with `handoff_required` and no `platform_post_id` is `posted_by_hand`. It is
+  never measured: its metric columns are nulled even if a stray reading exists, and it stays out
+  of every total, rate and ranking. `summary()` adds `posted_by_hand_channels`; `byPlatform()`
+  adds `posted_by_hand` and `posted_by_hand_note` (`EngagementMetrics::POSTED_BY_HAND_NOTE`). A
+  Story that went out plain through the vendor (`if_missed = publish_plain`) has a platform post id
+  and is measured as usual.
+- `BuildClientReportSnapshotAction` carries `posted_by_hand_channels` into the client report
+  snapshot. Both PDFs (`pdf/analytics-report.blade.php`, `pdf/client-report.blade.php`) and both
+  React views (`components/analytics/engagement-section.tsx`,
+  `components/client-reports/client-report-document.tsx`) show "posted by hand · not available"
+  on the platform row.
+
 ## Business Rules
 
 - **Timezone:** ranges and daily buckets follow `organizations.default_timezone` (a post published at
@@ -367,8 +391,18 @@ analytics`.
 - `ScheduledReportsTest` — once per week/month (org timezone), suspended orgs, departed recipients,
   per-recipient role scoping, attachments and subject.
 - `tests/Feature/SuperAdmin/PlatformAnalyticsTest` drill-down test updated for Step 17.9.
+- `tests/Feature/Stories/StoryReportingHonestyTest` (Step S-5.3) — a missed Story is counted apart
+  from publishing failures and is not an attempt before success; a real vendor failure beside it,
+  or earlier on the same post, still counts as failed; another organization's missed Stories are
+  not counted; the dashboard shares the figure; a Story posted by hand reads "not available"
+  instead of zero and a stray reading on it is never counted; an auto-published Story is measured
+  as before; the platform summary figures (see `super-admin.md`).
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): a Story posted by hand has no engagement numbers at all until auto-confirm
+  (S-6.1) can resolve a media id. The 60-second match between a missed handoff and its failure
+  transition is slack around one transaction, not a stored link between the two rows.
 
 - Engagement field names are mapped from Upload-Post's **docs** (read 21 Oct 2026); the live sandbox
   check M-0.2 asked for is still due — if a network names a metric differently, extend
@@ -400,6 +434,10 @@ analytics`.
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane), Step S-5.3. Publish reliability
+  counts Stories nobody posted in time as `missed_by_hand`, apart from `failed`; engagement treats
+  a Story posted by hand as "not available" (`posted_by_hand_channels`,
+  `by_platform[].posted_by_hand`), in the summary, the client report and both PDFs.
 - 2026-11-07: **The engagement sweep is spread across its window and reports how long it took.**
   `analytics:sync-engagement` runs every 30 minutes and queued one job per organization all at
   once; each is now delayed by `id % analytics.sync_spread_minutes` minutes (20 by default, 0 to

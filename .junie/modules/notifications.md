@@ -118,6 +118,7 @@ channel it covers every notification without anyone remembering to `use` it.)
 | `CampaignBriefReady`            | `campaign_brief_ready`    | Client contacts (`campaigns`)      |
 | Any other campaign notification | `alima_notification`      | Members (`campaigns`)              |
 | `DailyDigestReady`              | `daily_digest`            | Members (`other`)                  |
+| `StoryPublishHandoffReady`      | `story_ready_to_post`     | The Story's poster (`publishing`)  |
 
 - The client-approval message carries the **same link the email would have given them**: a magic
   portal link for a contact with a login, the token-only `/review/:token` otherwise
@@ -128,6 +129,11 @@ channel it covers every notification without anyone remembering to `use` it.)
   that seam posts one message to an organization's team channel and is addressed to an
   `Organization`, while a digest is addressed to a person with their own preferences and number.
   `SlackChatNotifier` keeps the seam.
+- Step S-3.3: `MessageTemplate::StoryReadyToPost` (`story_ready_to_post`, variables `account`,
+  `due_at`, `url`; env `TWILIO_TEMPLATE_STORY_READY_TO_POST` →
+  `services.whatsapp.templates.story_ready_to_post`). Until its `ContentSid` is set,
+  `StoryPublishHandoffReady::toWhatsApp()` sends the generic `alima_notification` template
+  instead. The poster is a team member who opted in, or a client contact who consented.
 
 ### The message log and the webhook (Step W-3.1)
 
@@ -163,6 +169,11 @@ channel it covers every notification without anyone remembering to `use` it.)
 Nothing in steps 1–4 sends a message to anybody: with no opt-in and no consent, every send is a
 `Skipped` row.
 
+Step S-3.3 added one template to step 2: `story_ready_to_post`
+(`TWILIO_TEMPLATE_STORY_READY_TO_POST`). Submit it with the others. It is optional: with the env
+var empty, a Story reminder goes out on the generic `alima_notification` template, so only that
+one has to be approved before the assisted lane is switched on.
+
 ### Tests
 
 `tests/Unit/Services/WhatsApp/TwilioWhatsAppClientTest`,
@@ -180,6 +191,62 @@ Nothing in steps 1–4 sends a message to anybody: with no opt-in and no consent
   and, for a `waiting_client` post, a `ClientApprovalReminderMail` (fresh review link) to the client's
   review-email contacts (Step M-6.1). Throttled to once/24h per post, so a daily run never
   double-sends. Tests `tests/Feature/Approvals/ApprovalSlaTest`.
+
+## Phase S — Stories with extras (assisted lane)
+
+Plan: `.junie/plans/story-extras.md`. The lane itself is in `publishing.md` › "Stories with
+extras". This is how the poster hears about a Story that is due.
+
+- `App\Notifications\StoryPublishHandoffReady` (Step S-3.1). Queued, `ShouldBeEncrypted` (the
+  handoff link carries a token, so it must not sit readable in a queue or `failed_jobs`). The class
+  name carries `Publish`, which puts it in the `publishing` preference category. Constructor: the
+  handoff id, the link, `late`, `nudge`. `via()` by notifiable:
+
+    | Notifiable                         | Channels                                    |
+    | ---------------------------------- | ------------------------------------------- |
+    | A team member (`User`)             | bell + mail, plus WhatsApp if they opted in |
+    | A member who muted `publishing`    | mail only (the email always goes)           |
+    | An address (`Notification::route`) | mail                                        |
+    | A client contact (`ClientContact`) | WhatsApp only, and only with consent        |
+
+    Unlike a publish failure, agencies get the email too. The bell `url` is the signed-in
+    `posts.story-handoff.open` route, never a token link. The mail view
+    `resources/views/emails/story-handoff-ready.blade.php` lists the account, the due time in the
+    account's timezone and the extras; for a client recipient it carries the agency's branding
+    (`BrandingResolver`), for a team member Alima's. Titles: "Time to post." / "Still to post."
+    (nudge); a late notification says when the Story was due.
+
+- `App\Actions\Stories\NotifyStoryPosterAction` (called by the sweep after it stamps the handoff)
+  decides who:
+
+    | Handoff                   | Recipients                                                                           |
+    | ------------------------- | ------------------------------------------------------------------------------------ |
+    | `team`, with a poster     | that member                                                                          |
+    | `team`, nobody assigned   | every Owner, Strategist and Designer of the organization                             |
+    | `client`                  | review-email contacts and portal reviewers by email; consenting contacts by WhatsApp |
+    | `client`, nobody to reach | falls back to the team, with a warning in the log                                    |
+
+    One link is issued per call and shared by every recipient. It also sends the push and, on the
+    first notification only, the `story.ready_to_post` webhook (`WebhookEvent::StoryReadyToPost`;
+    the payload has the signed-in open URL, no token).
+
+- **Push (Step S-3.2).** `App\Actions\Push\SendStoryHandoffPushAction`: tag
+  `story-handoff-{id}`, so the nudge replaces the first notification on the lock screen. Team
+  recipients only; a client recipient gets no push. See "Web push" below for the opt-in.
+- **Morning heads-up (Step S-3.4).** `SendUpcomingPostReminderEmailsAction` reads the
+  organization's assisted Stories (`handoff_required`, `pending`, on a `scheduled` post) due in its
+  local today straight from `post_targets`, independent of `reminder_sent_at`: a Story reminded
+  about days ahead still has to be announced on its day. Guarded once per organization per local
+  day by the cache key `story-heads-up:{org_id}:{Y-m-d}` (36 hours). When nothing else is new, a
+  stories-only mail is still sent. Only while the kill switch is on. `UpcomingPostReminderMail`
+  takes `$storyTimes` and `$storiesOnly` and exposes `$storyHeadsUp` ("2 stories to post by hand
+  today (10:00, 16:30).") and `$headline`; `UpcomingPublishReminder` takes `$storiesByHand` and
+  folds it into the WhatsApp `post_summary`.
+- `NotificationCategory::Publishing->description()` now reads "A post fails to publish, or a story
+  is ready for you to post." (Step S-3.5).
+- `AlertOnFailedPublishingJob::queueOf()` no longer calls `unserialize()` on a payload that is not
+  a serialized object. An encrypted job's command is ciphertext, and reading it must not replace
+  the real failure with a second one.
 
 ## Actions / Services / Contracts
 
@@ -323,8 +390,33 @@ exclude: $actor)` only — never the actor, outsiders, or client-portal users �
     - `test_clicking_a_notification_marks_it_as_read_and_redirects_to_its_url` —
       `notifications.read` marks `read_at` and redirects to the notification's stored `url`.
     - `test_a_user_cannot_mark_another_users_notification_as_read` — cross-user 404 isolation.
+- Phase S (Stories with extras):
+    - `tests/Feature/Stories/StoryHandoffNotificationTest.php` — recipients per handoff type and
+      the fallback to the team; bell + mail for a member, WhatsApp only on opt-in, mail still sent
+      with the bell muted; an address gets mail and a contact gets WhatsApp only with consent; the
+      notification is queued, encrypted and in the `publishing` category; the stored bell payload
+      points at the signed-in route and holds no token; late and nudge wording; the mail renders
+      the account, the extras and the link; the generic template until the dedicated one is
+      configured; the link is the same each time it is issued; the push (poster's subscriptions only,
+      tag reuse, `Gone` pruned, no-op when unconfigured); no log line contains the token; the
+      webhook fires on the first notification only.
+    - `tests/Feature/Stories/AgencyPushOptInTest.php` — an agency member subscribes and
+      unsubscribes on the URL business browsers already use; a client reviewer and a guest
+      cannot; the `pwa` prop is shared with an agency member and not with a client reviewer; the
+      "goes out soon", "nothing scheduled tomorrow" and publish-failure pushes still skip a
+      subscribed agency member.
+    - `tests/Feature/Stories/StoryMorningHeadsUpTest.php` — the count and times, the singular,
+      the organization's own day, nothing while the lane is off, nothing on a second run, a Story
+      reminded days ahead still announced on its day, the stories-only mail, a Story no longer
+      waiting left out, and the WhatsApp summary with and without Stories.
+    - `tests/Feature/Business/PushRemindersTest.php` was updated for the renamed routes.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): a client recipient of a Story handoff gets email and WhatsApp, not push or
+  a bell item. `story_ready_to_post` still needs external template approval; the generic template
+  is used until its `ContentSid` is set. The morning heads-up guard is a cache key, so a cache
+  flush on the day can send it twice.
 
 - No mail/broadcast channel yet — notifications are database-only (in-app bell). Real-time delivery
   (broadcasting to update the badge without a page navigation) would need a `broadcast` channel and
@@ -342,6 +434,11 @@ exclude: $actor)` only — never the actor, outsiders, or client-portal users �
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). New `StoryPublishHandoffReady`
+  (bell + mail + WhatsApp, encrypted, no token in the bell), `NotifyStoryPosterAction`,
+  `SendStoryHandoffPushAction`, the `story_ready_to_post` WhatsApp template, the morning heads-up
+  in the upcoming-post reminder, and the `story.ready_to_post` webhook. Push opt-in opened to
+  agency members (`business.push.*` renamed `push.*`). See the Phase S section above.
 - 2026-11-07: **Team chat actually sends now, and bounced addresses stop receiving mail.**
   `ChatNotifier` had only a no-op binding, so every caller believing it told the team something was
   talking to nothing. New `SlackChatNotifier` (per-org `organizations.chat_webhook_url`, encrypted;
@@ -426,6 +523,19 @@ subscriptions and prunes `Gone`; runs only when `isConfigured()`):
   `SchedulerHeartbeat`) — nudges onboarded business orgs whose brand has a connected account but
   nothing scheduled tomorrow (brand timezone). Idempotent per org per local day (a cache guard).
   Tests: `tests/Feature/Business/PushNotificationsTest`.
+- `SendStoryHandoffPushAction` (**S-3.2**) — "Time to post. @handle's story is ready.", to the
+  Story's team poster(s). The one push that goes to **agency** members.
+
+**Opt-in opened to agencies (Step S-3.2).** The routes moved out of the business group and were
+renamed `business.push.*` → `push.subscribe` / `push.unsubscribe` (same URL, `POST` / `DELETE
+/push/subscribe`, `PushSubscriptionController`). They sit behind `org.member` + `portal.redirect`,
+so every member of an agency or business workspace can subscribe and a client reviewer cannot. The
+`pwa` shared prop (`HandleInertiaRequests::sharedPwa`) is now sent to every member except an
+agency's client reviewers. `PushRemindersCard workspace="agency"` on Settings → Notifications
+("Story reminders on this phone"); `use-push.ts` registers the service worker when an agency
+member opts in, because only the business shell registers it on every page. The three older pushes
+above still filter on business organizations (`AgencyPushOptInTest`). `public/sw.js`: a
+notification click reuses a same-origin window when one is open and opens a new one otherwise.
 
 ## Phase M-9 — overdue inbox reply reminder
 

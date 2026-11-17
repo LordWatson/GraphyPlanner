@@ -73,11 +73,31 @@ message, errors, aborted }` with readable messages (422 first error, 413, 419, 4
   super-admin Onboard an org / Build a report). `CreateMenu` renders it as the always-visible "New"
   button in `AppSidebarHeader`, and the ⌘K command palette's Create group reads the same hook, so
   the two never drift. Hidden when the viewer can create nothing.
+- **Phase S — Stories with extras (assisted lane)**, the shared pieces (feature detail in
+  `posts.md` and `publishing.md`):
+    - `StatusPill kind="storyHandoff"` in `lib/status.ts`: `auto` (neutral, "Auto-publish", the
+      editor's own word for a Story that publishes itself), `needs_hand_posting` (info),
+      `ready_to_post` (warning, the one that asks for attention now), `posted_by_hand` (success),
+      `missed` (danger, "Not posted in time"). The middle three mirror
+      `App\Support\Stories\StoryChannelPresenter::LABELS`.
+    - `StoryHandoffPill` (`components/stories/story-handoff-pill.tsx`): takes the backend's
+      `{state, label}` and renders nothing for a channel that publishes itself. Used on the
+      content hub, the client Posts tab, My work, the dashboard, the business posts list and the
+      calendar.
+    - `StoryRow` (`components/stories/story-row.tsx`): one Story in the "Stories to post" lists
+      (Needs attention, My work, `/stories/to-post`).
+    - Calendar chip hand-marker: on a compact chip the state is a small hand icon in the tone's
+      text colour, with the label as `title` and as `sr-only` text. Use this pattern when a full
+      pill will not fit; the label must still be there.
+    - `lib/http.ts`: `fetchBlob(url, { signal, onProgress })` downloads a same-origin file into
+      memory with progress and never throws; `keepalive` is a new request option for a
+      fire-and-forget POST that must survive the page going to the background.
 
 ## Guard rails (`scripts/frontend-guards.mjs`, part of `npm run check`)
 
 - No raw `fetch(` outside `lib/http.ts`.
-- No post-editor file (`pages/posts/edit.tsx`, `components/post-editor/**`) over 300 lines.
+- No post-editor file (`pages/posts/edit.tsx`, `components/post-editor/**`) over 300 lines. The
+  rule is by path, so it applies to test files under `components/post-editor` too.
 - The formatter and linter both skip `.agents/**`, `.claude/**` and `.cursor/**`
   (`vite.config.ts`). Installed agent tooling is not project source, and sweeping `.claude/**` is
   what had `npm run check` failing (market-readiness finding 30): 323 files the formatter wanted to
@@ -93,6 +113,12 @@ message, errors, aborted }` with readable messages (422 first error, 413, 419, 4
   `components/post-editor/editor/editor-state.test.ts`,
   `components/post-editor/editor/editor-stepper.test.ts` (the guided-stepper step helpers),
   `components/post-editor/use-media-reorder.test.ts` (the media reorder lift/move/drop rules).
+  Phase S added `lib/story-extras.test.ts`, `lib/live-checklist.story.test.ts`,
+  `lib/story-share.test.ts`, `components/post-editor/story-extras-panel.test.tsx`,
+  `components/post-editor/story-extras/who-posts.test.tsx`,
+  `components/post-editor/composer/channel-composer.story.test.tsx`,
+  `components/posts/story-extras-note.test.tsx`, `components/stories/story-row.test.tsx` and
+  `components/story-handoff/handoff-view.test.tsx`.
 - **Playwright** (`npm run test:e2e` after `npm run build`; `playwright.config.ts`, specs in
   `tests/e2e`): `signup-to-scheduled.spec.ts` — sign up → verify email (link read from the JSON
   mail log) → client → LinkedIn channel → post with a date/time → start drafting → internal
@@ -105,6 +131,9 @@ serve`, which would drop env vars also in `.env`); `support/env.mjs` holds the i
 
 ## Known Gaps / Open Questions
 
+- Phase S (2026-11-13): the Story handoff page has Vitest coverage only. There is no Playwright
+  journey for it, and `navigator.share` with files cannot be exercised in jsdom or desktop
+  Chromium, so the share path is proven by mocks until the real-phone test (plan Step S-0.1).
 - Only the first of the four I-14.6 journeys exists; the portal approval, publish-failure retry
   and invoice → paid journeys land with M-4 / M-6 / M-11 (per the MVP note on M-1.5).
 - `DataTable` has no virtualisation; lists stay server-paginated (25 per page by default).
@@ -112,6 +141,19 @@ serve`, which would drop env vars also in `.env`); `support/env.mjs` holds the i
 
 ## Changelog
 
+- 2026-11-13: Post editor field pass. Every field in the editor now wears the one input shape
+  (brand §6: 8px radius, 2px `border-input`, `bg-card`, 40px): `DatePicker`'s trigger (shared —
+  it was a pill button), `HashtagInput`'s box and the caption textarea. `SelectTrigger` is `w-fit`
+  by default, so selects in a form grid need `className="w-full"` — the editor's now have it.
+  `DateTimePicker` at its default size stacks date over time below `sm` (side by side the time
+  selects clip at 375px); the channel rows in Where & when use that size, with everything about
+  "when" on one left edge under the handle. Text fields are 16px on phones (iOS zooms below that).
+  The caption's AI tools moved from the Write panel header to under the caption; the Settings
+  sub-panels (Assignment, Paid partnership, Repeat & reuse) no longer carry step numbers.
+
+- 2026-11-13: Phase S — Stories with extras (assisted lane). New status kind `storyHandoff`,
+  shared `StoryHandoffPill` and `StoryRow`, the calendar chip hand-marker pattern, and `fetchBlob`
+  / `keepalive` in `lib/http.ts`. Nine new Vitest files.
 - 2026-11-07: **425KB of test code removed from the production build.**
   `resources/js/pages/inbox/composer.test.tsx` sat inside the Inertia page glob
   (`pages/**/*.tsx`), so it was compiled into the build as if it were a page — a 425KB chunk of

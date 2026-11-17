@@ -112,6 +112,33 @@ averageAttemptsToSuccess: float|null}`. `monthly` mirrors `GetMonthlyInvoiceTota
 - The accounts lane ("Accounts to reconnect") also lists connections expiring within 7 days, with a
   `reason` ("Connection expires in 5 days") shown instead of the status pill (M-2.7).
 
+## Phase S — Stories with extras (assisted lane)
+
+Plan: `.junie/plans/story-extras.md`; the lane is in `publishing.md` › "Stories with extras".
+
+- `GetNeedsAttentionItemsAction` returns a new first bucket, `storiesToPost {items, total}`, from
+  `GetStoryQueueAction($user, oversee: true, includeUpcoming: false)`: Story handoffs that are open
+  and due. The viewer sees the ones they are the poster for; an Owner or Strategist sees every one
+  in the organization, including those a client is meant to post, so somebody can chase. Empty for
+  a Viewer or a client reviewer. Each row's `url` is the signed-in `posts.story-handoff.open`
+  route, never a token link. The queue is capped at `GetStoryQueueAction::LIMIT` (50).
+- `failedPublishes` rows now carry `fix` and `story_failure`. A Story nobody confirmed, or whose
+  poster reported a problem, reads the `PublishFailureReason::StoryNotPosted` /
+  `StoryProblemReported` message and fix, on the channel it happened to. The rows query now also
+  selects the targets' `status` and `error`.
+- `home.tsx`: the lane "Now — Stories" ("Stories to post") is shown first, and only when it has
+  rows. Rows use the shared `components/stories/story-row.tsx`.
+- My work: `GetMyWorkAction` returns a `stories` bucket, the viewer's own Stories that are ready
+  now or due inside the next 24 hours (`state` `ready` / `upcoming`,
+  `GetStoryQueueAction::UPCOMING_HOURS`). Its other rows carry the post-level `handoff` pill.
+- Dashboard: the upcoming list shows `StoryHandoffPill` per occurrence
+  (`GetUpcomingPostOccurrencesAction` adds `handoff`, read the client's way for a client
+  reviewer). The publish reliability card shows "Stories not posted in time" when
+  `publishReliability.missedByHand` is above zero; `GetPublishReliabilityStatsAction` returns
+  `monthly[].missed_by_hand` and `missedByHand`, counted apart from `failed` (see `analytics.md`).
+- `/stories` (the poster's queue, `stories.queue`) belongs to the Home chapter in
+  `resources/js/lib/chapters.ts`.
+
 ## Routes / Controllers
 
 - `GET /dashboard` → `App\Http\Controllers\DashboardController` (invokable) — renders the
@@ -237,8 +264,23 @@ unapprovedDrafts, activeClients }`.
   `averageAttemptsToSuccess` reflect a post with one `Failed` then one `Published` activity log
   entry (average of `2`), scoped to the user's org (a published post + log from another org is
   excluded).
+- Phase S:
+    - `tests/Feature/Stories/StorySurfacesTest.php` — Needs attention lists a due Story for its
+      poster and for an Owner only, never carries a token link and leaves upcoming Stories out; a
+      missed Story lands in `failedPublishes` with the Story reason and an ordinary failed publish
+      keeps its plain one; My work rows carry the state and list the viewer's ready and upcoming
+      Stories.
+    - `tests/Feature/Stories/StoryReportingHonestyTest.php` —
+      `test_the_dashboard_shares_the_missed_figure`.
+    - `tests/Feature/Stories/StoryHandoffOpenTest.php` — the queue page and `GetStoryQueueAction`
+      (own Stories only, overseeing, `readyCount`, `nextFor`).
+    - Vitest: `resources/js/components/stories/story-row.test.tsx`.
 
 ## Known Gaps / Open Questions
+
+- Phase S (2026-11-13): `GetStoryQueueAction::readyCount()` exists for a nav badge, but no badge
+  is wired yet. A Story a client is meant to post shows in Needs attention for an Owner or
+  Strategist only.
 
 - Previously the dashboard route used `Route::inertia(...)` with no controller, so it always
   rendered a hardcoded `0` regardless of actual data — this was the root cause of "0 clients shown"
@@ -254,6 +296,9 @@ unapprovedDrafts, activeClients }`.
 
 ## Changelog
 
+- 2026-11-13: Phase S — Stories with extras (assisted lane). Needs attention gained the "Stories
+  to post" lane (`storiesToPost`) and Story-specific reason and fix on failed publishes; My work
+  gained a `stories` bucket; the dashboard shows the handoff pill and "Stories not posted in time".
 - 2026-10-24: UI only — the **Needs attention** (`/home`) and **Mine** (`/my-work`) views now open
   with the same Ink `ChapterHero` + `HeroStat` as the Studio view (replacing their `PageHeader`s), so
   all three Home views share one chapter-opener and each leads with its most telling number (open

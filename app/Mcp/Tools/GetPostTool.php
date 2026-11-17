@@ -6,6 +6,7 @@ use App\Actions\Posts\EvaluatePostChecklistAction;
 use App\Enums\McpScope;
 use App\Models\Asset;
 use App\Models\Post;
+use App\Support\Api\StoryChannels;
 use App\Support\Mcp\McpImagePreview;
 use App\Support\Mcp\McpPresenters;
 use App\Support\Mcp\McpTenant;
@@ -30,7 +31,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('get_post')]
 #[Title('Get post')]
-#[Description('Returns a full post: caption, hashtags, each target\'s scheduled time in both the account\'s local timezone and the org timezone, attached asset metadata, the live pre-publish checklist, AND (unless include_media is false) the attached images themselves so you can SEE the media and caption from it. Read-only.')]
+#[Description('Returns a full post: caption, hashtags, each target\'s scheduled time in both the account\'s local timezone and the org timezone, each target\'s story_extras and whether it is posted_by_hand (a person posts it from the Instagram app; Alima does not publish it) with its handoff_state, attached asset metadata, the live pre-publish checklist, AND (unless include_media is false) the attached images themselves so you can SEE the media and caption from it. Read-only.')]
 #[IsReadOnly]
 class GetPostTool extends McpTool
 {
@@ -63,11 +64,14 @@ class GetPostTool extends McpTool
             ->withoutOrgScope()
             ->where('org_id', $org->id)
             ->with([
-                'client:id,name',
+                // The whole client: the checklist reads its story poster default and `is_primary`
+                // (`PostTarget::handoffRecipient()`), which a column-limited load would hide.
+                'client',
                 'campaign:id,name',
                 'creator:id,name',
                 'assignee:id,name',
                 'targets.socialAccount:id,platform,handle,timezone',
+                ...StoryChannels::RELATIONS,
                 'assets',
             ])
             ->where('id', $validated['post_id'])

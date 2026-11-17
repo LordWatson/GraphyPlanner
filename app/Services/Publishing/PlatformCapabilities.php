@@ -17,6 +17,9 @@ use App\Support\Publishing\PlatformSpec;
  */
 class PlatformCapabilities
 {
+    /** The format key the assisted lane is built on (`config/platforms.php`). */
+    public const STORY_FORMAT = 'story';
+
     /** @var array<string, PlatformSpec> */
     private array $specs = [];
 
@@ -76,6 +79,18 @@ class PlatformCapabilities
     }
 
     /**
+     * Step S-1.1 — whether a Story on this platform can carry extras (a link, a poll, …) and so
+     * take the assisted lane: the kill switch is on, the platform is on the lane's list, and it
+     * has a `story` format at all. The editor reads the same answer from the `platforms` prop.
+     */
+    public function supportsStoryExtras(Platform $platform): bool
+    {
+        return (bool) config('publishing.story_handoff.enabled', false)
+            && in_array($platform->value, (array) config('publishing.story_handoff.platforms', []), true)
+            && $this->for($platform)->hasFormat(self::STORY_FORMAT);
+    }
+
+    /**
      * The format a target publishes as: its explicit choice when the platform offers it, else the
      * first format (in registry order) whose media kinds and item bounds fit the attached media,
      * else the platform default. Formats with a forced crop (Stories) are only ever explicit.
@@ -130,7 +145,13 @@ class PlatformCapabilities
 
         return collect($this->all())
             ->mapWithKeys(fn (PlatformSpec $spec) => [
-                $spec->platform->value => [...$spec->toArray(), 'enabled' => in_array($spec->platform->value, $enabled, true)],
+                $spec->platform->value => [
+                    ...$spec->toArray(),
+                    'enabled' => in_array($spec->platform->value, $enabled, true),
+                    // Step S-1.1: the kill switch travels with the registry, so the editor needs
+                    // no flag of its own.
+                    'story_extras' => $this->supportsStoryExtras($spec->platform),
+                ],
             ])
             ->all();
     }
